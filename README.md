@@ -118,7 +118,7 @@ docker run -it projectdiscovery/naabu
 
 For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run -v -it projectdiscovery/naabu -d hackerone.com > hackerone.com.txt
+docker run -v -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
 ```
 
 ### MacOS
@@ -133,7 +133,7 @@ Just like MacOS, you can only run naabu on windows with Docker. See the [From Do
 
 To run the tool on a target, just use the following command.
 ```bash
-> naabu -d hackerone.com
+> naabu -host hackerone.com
 ```
 
 This will run the tool against hackerone.com. There are a number of configuration options that you can pass along with this command. The verbose switch (-v) can be used to display verbose information.
@@ -168,7 +168,7 @@ You can also specify a file which contains the ports to scan for using the `pL` 
 The -o command can be used to specify an output file.
 
 ```bash
-> naabu -d hackerone.com -o output.txt
+> naabu -host hackerone.com -o output.txt
 ```
 
 To run the tool on a list of hosts, `-hL` option can be used. This requires a directory to write the output files. Ports for each host from the list are written in a text file in the directory specified by the `-oD` flag with their name being the host name.
@@ -193,7 +193,7 @@ If you want to save results to a single file while using a domain list, specify 
 hackerone.com
 google.com
 
-> naabu -dL hosts.txt -o ~/path/to/output.txt
+> naabu -hL hosts.txt -o ~/path/to/output.txt
 > ls ~/path/to/
 
 output.txt
