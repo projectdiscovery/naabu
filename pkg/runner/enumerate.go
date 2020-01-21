@@ -43,28 +43,45 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 	log.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
-	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
-	if err != nil {
-		log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
-		return
-	}
-	foundPorts, err := scanner.Scan(ports)
-	if err != nil {
-		log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
-		return
-	}
+	r.portsMutex.Lock()
+	cachedPorts, cacheHit := r.portsCache[host]
+	r.portsMutex.Unlock()
 
-	if scanner.Latency == -1 {
-		log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
-		return
+	var foundPorts map[int]struct{}
+
+	if !cacheHit {
+		scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
+		if err != nil {
+			log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
+			return
+		}
+		foundPorts, err = scanner.Scan(ports)
+		if err != nil {
+			log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
+			return
+		}
+
+		if scanner.Latency == -1 {
+			log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
+			return
+		}
+
+		// Store the ports in a cache to allow speedy lookup
+		// without re-scanning the same IP.
+		r.portsMutex.Lock()
+		r.portsCache[host] = foundPorts
+		r.portsMutex.Unlock()
+
+		log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
+	} else {
+		foundPorts = cachedPorts
+		log.Infof("Found %d ports on host %s (%s) from cache\n", len(foundPorts), host, hostIP)
 	}
 
 	if len(foundPorts) <= 0 {
 		log.Warningf("Could not scan on host %s (%s)\n", host)
 		return
 	}
-
-	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
 
 	for port := range foundPorts {
 		log.Silentf("%s:%d\n", host, port)
