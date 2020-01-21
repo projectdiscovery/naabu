@@ -24,6 +24,7 @@ type Options struct {
 	Silent          bool   // Silent suppresses any extra text and only writes found host:port to screen
 	Ports           string // Ports is the ports to use for enumeration
 	PortsFile       string // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts    string // ExcludePorts is the list of ports to exclude from enumeration
 	Stdin           bool   // Stdin specifies whether stdin input was given to the process
 	Version         bool   // Version specifies if we should just show version and exit
 }
@@ -44,9 +45,10 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
 	flag.BoolVar(&options.JSON, "oJ", false, "Write output in JSON lines Format")
 	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
-	flag.StringVar(&options.Ports, "p", "", "Ports to enumerate for on hosts")
-	flag.StringVar(&options.PortsFile, "pF", "", "File containing ports to enumerate for on hosts")
-	flag.BoolVar(&options.Version, "version", false, "Show version of subfinder")
+	flag.StringVar(&options.Ports, "ports", "", "Ports to enumerate for on hosts")
+	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
+	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
+	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
 	flag.Parse()
 
 	// Check if stdin pipe was given

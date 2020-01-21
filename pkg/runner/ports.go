@@ -15,32 +15,62 @@ const (
 
 // ParsePorts parses the list of ports an creates a port map
 func ParsePorts(options *Options) (map[int]struct{}, error) {
+	var ports map[int]struct{}
+	var err error
+
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
 		data, err := ioutil.ReadFile(options.PortsFile)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
-		return parsePortsList(string(data))
+		ports, err = parsePortsList(string(data))
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
 	}
 
 	// By default scan top 100 ports only
 	if options.Ports == "" {
-		return parsePortsList(NmapTop100)
+		ports, err = parsePortsList(NmapTop100)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
 	}
 
 	// If the user has specfied top-100, use them
 	if strings.EqualFold(options.Ports, "top-100") {
-		return parsePortsList(NmapTop100)
+		ports, err = parsePortsList(NmapTop100)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
 	}
 
 	// If the user has specfied top-1000, use them
 	if strings.EqualFold(options.Ports, "top-1000") {
-		return parsePortsList(NmapTop1000)
+		ports, err = parsePortsList(NmapTop1000)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
 	}
 
 	// Parse the custom ports list provided by the user
-	return parsePortsList(options.Ports)
+	ports, err = parsePortsList(options.Ports)
+	if err != nil {
+		return nil, fmt.Errorf("could not read ports: %s", err)
+	}
+
+	// Exclude the ports specified by the user in exclusion list
+	excludedPorts, err := parsePortsList(options.ExcludePorts)
+	if err != nil {
+		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
+	}
+
+	for p := range excludedPorts {
+		delete(ports, p)
+	}
+
+	return ports, nil
 }
 
 func parsePortsList(data string) (map[int]struct{}, error) {
