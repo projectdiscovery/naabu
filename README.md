@@ -118,7 +118,7 @@ docker run -it projectdiscovery/naabu
 
 For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run -v -it ice3man/subfinder -d hackerone.com > hackerone.com.txt
+docker run -v -it projectdiscovery/naabu -d hackerone.com > hackerone.com.txt
 ```
 
 ### MacOS
@@ -193,7 +193,7 @@ If you want to save results to a single file while using a domain list, specify 
 hackerone.com
 google.com
 
-> subfinder -dL hosts.txt -o ~/path/to/output.txt
+> naabu -dL hosts.txt -o ~/path/to/output.txt
 > ls ~/path/to/
 
 output.txt
@@ -220,7 +220,7 @@ Hosts can also be piped to naabu and port enumeration can be ran on them. For ex
 > cat targets.txt | naabu -v 
 ```
 
-The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by subfinder to the awesome [httprobe](https://github.com/tomnomnom/httprobe) tool by @tomnomnom which will then find running http servers on the host.
+The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to the awesome [httprobe](https://github.com/tomnomnom/httprobe) tool by @tomnomnom which will then find running http servers on the host.
 
 ```
 > echo "hackerone.com" | naabu -silent | httprobe
