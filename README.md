@@ -227,7 +227,6 @@ http://hackerone.com:8443
 http://hackerone.com:443
 http://hackerone.com:8080
 http://hackerone.com:80
-https://hackerone.com:443
 ```
 
 If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation 
@@ -241,5 +240,3 @@ The most optimal setting for `threads` is 10. Increasing it while processing hos
 # License
 
 naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
-
-Read the disclaimer for usage at **[DISCLAIMER.md](https://github.com/projectdiscovery/naabu/blob/master/DISCLAIMER.md)**
