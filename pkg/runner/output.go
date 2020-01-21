@@ -12,7 +12,7 @@ import (
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
 	Host string `json:"host"`
-	Port int    `json:"ip"`
+	Port int    `json:"port"`
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
