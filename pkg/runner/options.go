@@ -40,7 +40,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.NoColor, "nC", false, "Don't Use colors in output")
 	flag.IntVar(&options.Threads, "t", 10, "Number of concurrent goroutines for resolving")
 	flag.IntVar(&options.Timeout, "timeout", 700, "Millisecond to wait before timing out")
-	flag.StringVar(&options.Host, "h", "", "Host to find ports for")
+	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
 	flag.StringVar(&options.HostsFile, "hL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
 	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
