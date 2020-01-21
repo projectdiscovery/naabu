@@ -43,44 +43,27 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 	log.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
-	r.portsMutex.Lock()
-	cachedPorts, cacheHit := r.portsCache[hostIP]
-	r.portsMutex.Unlock()
-
-	var foundPorts map[int]struct{}
-
-	if !cacheHit {
-		scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
-		if err != nil {
-			log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
-			return
-		}
-		foundPorts, err = scanner.Scan(ports)
-		if err != nil {
-			log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
-			return
-		}
-
-		if scanner.Latency == -1 {
-			log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
-			return
-		}
-
-		// Validate the host if the user has asked for second step validation
-		if r.options.Verify {
-			foundPorts = scanner.ConnectVerify(host, foundPorts)
-		}
-
-		// Store the ports in a cache to allow speedy lookup
-		// without re-scanning the same IP.
-		r.portsMutex.Lock()
-		r.portsCache[hostIP] = foundPorts
-		r.portsMutex.Unlock()
-		log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
-	} else {
-		foundPorts = cachedPorts
-		log.Infof("Found %d ports on host %s (%s) from cache\n", len(foundPorts), host, hostIP)
+	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
+	if err != nil {
+		log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
+		return
 	}
+	foundPorts, err := scanner.Scan(ports)
+	if err != nil {
+		log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
+		return
+	}
+
+	if scanner.Latency == -1 {
+		log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
+		return
+	}
+
+	// Validate the host if the user has asked for second step validation
+	if r.options.Verify {
+		foundPorts = scanner.ConnectVerify(host, foundPorts)
+	}
+	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
 
 	if len(foundPorts) <= 0 {
 		log.Warningf("Could not scan on host %s (%s)\n", host)

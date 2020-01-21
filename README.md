@@ -240,8 +240,6 @@ If you want a second layer validation of the ports found, you can instruct the t
 
 The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false positive rates. So it is recommended to keep it low.
 
-While scanning for a list of hosts, if duplicate IP addresses are encountered, it returns ports that were found for that IP.
-
 # License
 
 naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
