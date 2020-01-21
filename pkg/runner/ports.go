@@ -15,51 +15,56 @@ const (
 
 // ParsePorts parses the list of ports an creates a port map
 func ParsePorts(options *Options) (map[int]struct{}, error) {
-	var ports map[int]struct{}
-	var err error
-
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
 		data, err := ioutil.ReadFile(options.PortsFile)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
-		ports, err = parsePortsList(string(data))
+		ports, err := parsePortsList(string(data))
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+		return excludePorts(options, ports)
 	}
 
 	// By default scan top 100 ports only
 	if options.Ports == "" {
-		ports, err = parsePortsList(NmapTop100)
+		ports, err := parsePortsList(NmapTop100)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+		return excludePorts(options, ports)
 	}
 
 	// If the user has specfied top-100, use them
 	if strings.EqualFold(options.Ports, "top-100") {
-		ports, err = parsePortsList(NmapTop100)
+		ports, err := parsePortsList(NmapTop100)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+		return excludePorts(options, ports)
 	}
 
 	// If the user has specfied top-1000, use them
 	if strings.EqualFold(options.Ports, "top-1000") {
-		ports, err = parsePortsList(NmapTop1000)
+		ports, err := parsePortsList(NmapTop1000)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+		return excludePorts(options, ports)
 	}
 
 	// Parse the custom ports list provided by the user
-	ports, err = parsePortsList(options.Ports)
+	ports, err := parsePortsList(options.Ports)
 	if err != nil {
 		return nil, fmt.Errorf("could not read ports: %s", err)
 	}
+	return excludePorts(options, ports)
+}
 
+// excludePorts excludes the list of ports from the exclusion list
+func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, error) {
 	// Exclude the ports specified by the user in exclusion list
 	excludedPorts, err := parsePortsList(options.ExcludePorts)
 	if err != nil {
@@ -69,7 +74,6 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 	for p := range excludedPorts {
 		delete(ports, p)
 	}
-
 	return ports, nil
 }
 
