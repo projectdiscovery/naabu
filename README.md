@@ -79,6 +79,10 @@ naabu requires go1.13+ to install successfully. Run the following command to get
 go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
 
+You also need the following libraries installed for the `go get` to work - 
+- libpcap, libpcap-dev
+
+On Ubuntu linux, these can be installed by using `apt get` or any package manager for the distro.
 #### From Binary
 
 The installation is easy. You can download the pre-built binaries from the [Releases](https://github.com/projectdiscovery/naabu/releases/) page. Extract them using tar, move it to your $PATH and you're ready to go.
