@@ -65,6 +65,10 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 
 // excludePorts excludes the list of ports from the exclusion list
 func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, error) {
+	if options.ExcludePorts == "" {
+		return ports, nil
+	}
+
 	// Exclude the ports specified by the user in exclusion list
 	excludedPorts, err := parsePortsList(options.ExcludePorts)
 	if err != nil {
