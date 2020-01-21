@@ -231,6 +231,8 @@ http://hackerone.com:80
 https://hackerone.com:443
 ```
 
+The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false positive rates. So it is recommended to keep it low.
+
 # License
 
 naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
