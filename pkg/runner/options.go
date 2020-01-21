@@ -10,7 +10,6 @@ import (
 // Options contains the configuration options for tuning
 // the port enumeration process.
 type Options struct {
-	AllIPs          bool   // AllIPs is the option to scan for ports on all ips of domain
 	Retries         int    // Retries is the number of retries for the port
 	Rate            int    // Rate is the rate of port scan requests
 	Verbose         bool   // Verbose flag indicates whether to show verbose output or not
@@ -33,7 +32,6 @@ type Options struct {
 func ParseOptions() *Options {
 	options := &Options{}
 
-	flag.BoolVar(&options.AllIPs, "all-ips", false, "Scan all IP addresses for a port")
 	flag.IntVar(&options.Retries, "retries", 1, "Number of retries for the port scan probe")
 	flag.IntVar(&options.Rate, "rate", 1000, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")

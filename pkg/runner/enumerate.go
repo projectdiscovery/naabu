@@ -3,7 +3,6 @@ package runner
 import (
 	"net"
 	"os"
-	"strings"
 	"time"
 
 	"github.com/projectdiscovery/naabu/pkg/log"
@@ -12,7 +11,7 @@ import (
 
 // EnumerateSingleHost performs port enumeration against a single host
 func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output string, add bool) {
-	var hosts []string
+	var hostIP string
 
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
@@ -35,52 +34,40 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 			return
 		}
 
-		if r.options.AllIPs {
-			hosts = append(hosts, initialHosts...)
-		} else {
-			hosts = append(hosts, initialHosts[0])
-		}
-
-		log.Infof("Resolved domain %s to [%s] for enumeration", strings.Join(hosts, ","))
+		hostIP = initialHosts[0]
+		log.Infof("Resolved domain %s to %s for enumeration", hostIP)
 	} else {
-		hosts = append(hosts, host)
+		hostIP = host
 		log.Infof("Using IP %s for enumeration\n", host)
 	}
 
-	foundPorts := make(map[int]struct{})
+	log.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
-	for _, ip := range hosts {
-		log.Infof("Starting scan on host %s (%s)\n", host, ip)
-
-		scanner, err := scan.NewScanner(net.ParseIP(ip), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
-		if err != nil {
-			log.Warningf("Could not start scan on host %s (%s): %s\n", host, ip, err)
-			return
-		}
-		found, err := scanner.Scan(ports)
-		if err != nil {
-			log.Warningf("Could not scan on host %s (%s): %s\n", host, ip, err)
-			return
-		}
-
-		log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(found), host, ip, scanner.Latency)
-		for p := range found {
-			if _, ok := foundPorts[p]; !ok {
-				foundPorts[p] = struct{}{}
-			}
-		}
+	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
+	if err != nil {
+		log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
+		return
+	}
+	foundPorts, err := scanner.Scan(ports)
+	if err != nil {
+		log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
+		return
 	}
 
-	if len(foundPorts) < 0 {
+	if scanner.Latency == -1 {
+		log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
+		return
+	}
+
+	if len(foundPorts) <= 0 {
 		log.Warningf("Could not scan on host %s (%s)\n", host)
 		return
 	}
 
-	// If verbose mode was used, then now print all the ports together
-	if r.options.Verbose {
-		for port := range foundPorts {
-			log.Silentf("%s:%d\n", host, port)
-		}
+	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
+
+	for port := range foundPorts {
+		log.Silentf("%s:%d\n", host, port)
 	}
 
 	// In case the user has given an output file, write all the found
