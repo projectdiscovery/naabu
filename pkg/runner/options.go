@@ -35,7 +35,7 @@ func ParseOptions() *Options {
 
 	flag.BoolVar(&options.AllIPs, "all-ips", false, "Scan all IP addresses for a port")
 	flag.IntVar(&options.Retries, "retries", 1, "Number of retries for the port scan probe")
-	flag.IntVar(&options.Retries, "rate", 1000, "Rate of port scan probe requests")
+	flag.IntVar(&options.Rate, "rate", 1000, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
 	flag.BoolVar(&options.NoColor, "nC", false, "Don't Use colors in output")
 	flag.IntVar(&options.Threads, "t", 10, "Number of concurrent goroutines for resolving")
