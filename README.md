@@ -205,10 +205,10 @@ You can also get output in json format using -oJ switch. This switch saves the o
 > naabu -host hackerone.com -oJ -o output.json
 > cat output.json
 
-{"host":"hackerone.com","ip":8443}
-{"host":"hackerone.com","ip":443}
-{"host":"hackerone.com","ip":8080}
-{"host":"hackerone.com","ip":80}
+{"host":"hackerone.com","port":8443}
+{"host":"hackerone.com","port":443}
+{"host":"hackerone.com","port":8080}
+{"host":"hackerone.com","port":80}
 ```
 
 The -silent switch can be used to show only ports found without any other info.
@@ -235,7 +235,7 @@ https://hackerone.com:443
 If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation 
 
 ```bash
-> naabu -h hackerone.com -verify
+> naabu -host hackerone.com -verify
 ```
 
 The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false positive rates. So it is recommended to keep it low.
