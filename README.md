@@ -47,21 +47,21 @@ This will display help for the tool. Here are all the switches it supports.
 
 | Flag | Description | Example |
 |------|-------------|---------|
-| -exclude-ports |  Ports to exclude from enumeration | naabu -exclude-ports 80,443 |
-| -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
 | -host | Host to find ports for | naabu -host 192.168.1.1 | 
-| -nC | Don't Use colors in output | naabu -nC | 
+| -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
+| -ports | Ports to enumerate for on hosts (top-100, top-1000, full, custom) | naabu -ports 80,443 |
+| -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
 | -oJ | Write output in JSON lines Format | naabu -oJ output.json |
-| -ports | Ports to enumerate for on hosts (top-100, top-1000, full, custom) | naabu -ports 80,443 |
-| -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
-| -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
-| -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
 | -silent | Show only host:ports in output | naabu -silent | 
+| -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
+| -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
+| -v | Show Verbose output | naabu -v |
+| -nC | Don't Use colors in output | naabu -nC | 
 | -t | Number of concurrent goroutines for scanning (default 10) | naabu -t 10 |
 | -timeout | Millisecond to wait before timing out (default 700) | naabu -timeout 1000 |
-| -v | Show Verbose output | naabu -v |
+| -exclude-ports |  Ports to exclude from enumeration | naabu -exclude-ports 80,443 |
 | -verify | Validate the ports again | naabu -verify |
 | -version | Show version of naabu | naabu -version |
 
