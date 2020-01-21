@@ -216,7 +216,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 			// Set latency if the latency is less than 0 or
 			// more than the default latency.
 			latency := time.Since(startTime)
-			if s.Latency < 0 || s.Latency < latency {
+			if s.Latency < 0 {
 				s.Latency = latency
 			}
 			results[open] = struct{}{}
