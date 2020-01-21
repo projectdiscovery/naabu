@@ -10,19 +10,19 @@
 [![Go Report Card](https://goreportcard.com/badge/github.com/projectdiscovery/naabu)](https://goreportcard.com/report/github.com/projectdiscovery/naabu)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/projectdiscovery/nabbu/issues)
 
-naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. 
-
-It is a really simple tool that does fast SYN scans on the host/list of hosts and lists
+naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN scans on the host/list of hosts and lists
 all ports that return a reply. 
+
+Inspired by the great `furious` project of [@liamg](https://github.com/liamg).
 
 # Resources
 - [Features](#features)
 - [Usage](#usage)
 - [Installation Instuctions (direct)](#direct-installation)
-- [Upgrading](#upgrading)
-- [Running in a Docker Container](#running-in-a-docker-container)
-- [Post Installation Instructions](#post-installation-instructions)
-- [Running subfinder](#running-subfinder)
+    - [Linux](#linux)
+    - [macOS](#macos)
+    - [Windows](#windows)
+- [Running naabu](#running-naabu)
 
  # Features
 
@@ -36,6 +36,7 @@ all ports that return a reply.
  - Multiple Output formats supported (Json, File, Stdout)
  - Optimized for speed, very fast and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
+ - Flexible definitions for ports to scan 
 
 # Usage
 
@@ -46,168 +47,137 @@ This will display help for the tool. Here are all the switches it supports.
 
 | Flag | Description | Example |
 |------|-------------|---------|
-| -config string | Configuration file for API Keys, etc  | subfinder -config config.yaml | 
-| -d | Domain to find subdomains for | subfinder -d uber.com | 
-| -dL  | File containing list of domains to enumerate | subfinder -d hackerone-hosts.txt | 
-| -exclude-sources | List of sources to exclude from enumeration | subfinder -exclude-sources archiveis | 
-| -max-time | Minutes to wait for enumeration results (default 10) | subfinder -max-time 1 | 
-| -nC | Don't Use colors in output | subfinder -nC | 
-| -nW | Remove Wildcard & Dead Subdomains from output | subfinder -nW | 
-| -o  | File to write output to (optional) | subfinder -o output.txt | 
-| -oD | Directory to write enumeration results to (optional) | subfinder -oD ~/outputs | 
-| -oI | Write output in Host,IP format | subfinder -oI |
-| -oJ | Write output in JSON lines Format | subfinder -oJ |
-| -r | Comma-separated list of resolvers to use | subfinder -r 1.1.1.1,1.0.0.1 | 
-| -rL | Text file containing list of resolvers to use | subfinder -rL resolvers.txt
-| -silent | Show only subdomains in output | subfinder -silent | 
-| -sources | Comma separated list of sources to use | subfinder -sources shodan,censys | 
-| -t | Number of concurrent goroutines for resolving (default 10) | subfinder -t 100 | 
-| -timeout | Seconds to wait before timing out (default 30) | subfinder -timeout 30 | 
-| -v | 	Show Verbose output | subfinder -v | 
-| -version | Show current program version | subfinder -version | 
-  
+| -exclude-ports |  Ports to exclude from enumeration | naabu -exclude-ports 80,443 |
+| -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
+| -host | Host to find ports for | naabu -h 192.168.1.1 | 
+| -nC | Don't Use colors in output | naabu -nC | 
+| -o | File to write output to (optional) | naabu -o output.txt | 
+| -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
+| -oJ | Write output in JSON lines Format | naabu -oJ output.json |
+| -ports | Ports to enumerate for on hosts | naabu -ports 80,443 |
+| -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
+| -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
+| -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
+| -silent | Show only host:ports in output | naabu -silent | 
+| -t | Number of concurrent goroutines for resolving (default 10) | naabu -t 100 |
+| -timeout | Millisecond to wait before timing out (default 700) | naabu -timeout 1000 |
+| -v | Show Verbose output | naabu -v |
+| -version | Show version of naabu | naabu -version |
 
 # Installation Instructions
 ## Direct Installation
 
-#### subfinder requires go1.13+ to install successfully !
+### Linux
 
-The installation is easy. You can download the pre-built binaries for different platforms from the [Releases](https://github.com/projectdiscovery/subfinder/releases/) page. Extract them using tar, move it to your $PATH and you're ready to go.
+There are various ways to install the tool on linux. You can install it via docker, 
+directly `go get` it or download and run the binary. 
+
+#### From Source
+
+naabu requires go1.13+ to install successfully. Run the following command to get the repo - 
 
 ```bash
-> tar -xzvf subfinder-linux-amd64.tar
-> mv subfinder-linux-amd64 /usr/bin/subfinder
-> subfinder 
+go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
 
-If you want to build it yourself, you can go get the repo
+#### From Binary
+
+The installation is easy. You can download the pre-built binaries from the [Releases](https://github.com/projectdiscovery/naabu/releases/) page. Extract them using tar, move it to your $PATH and you're ready to go.
 
 ```bash
-go get -v github.com/projectdiscovery/subfinder/cmd/subfinder
+> tar -xzvf naabu-linux-amd64.tar
+> mv naabu-linux-amd64 /usr/bin/naabu
+> naabu 
 ```
 
-## Upgrading
-If you wish to upgrade the package you can use:
-```bash
-go get -u -v github.com/projectdiscovery/subfinder/cmd/subfinder
-```
-## Running in a Docker Container
+#### From Docker
 
-You can use the official dockerhub image at [subfinder](https://hub.docker.com/r/ice3man/subfinder). Simply run - 
+You can use the official dockerhub image at [naabu](https://hub.docker.com/r/projectdiscovery/naabu). Simply run - 
 
 ```bash
-> docker pull ice3man/subfinder
+> docker pull projectdiscovery/naabu
 ```
 
 The above command will pull the latest tagged release from the dockerhub repository.
 
 If you want to build the container yourself manually, git clone the repo, then build and run the following commands
 
-- Clone the repo using `git clone https://github.com/projectdiscovery/subfinder.git`
+- Clone the repo using `git clone https://github.com/projectdiscovery/naabu.git`
 - Build your docker container
 ```bash
-docker build -t ice3man/subfinder .
+docker build -t projectdiscovery/naabu .
 ```
 
 - After building the container using either way, run the following - 
 ```bash
-docker run -it ice3man/subfinder
+docker run -it projectdiscovery/naabu
 ```
+
 > The above command is the same as running `-h`
 
-For example, this runs the tool against uber.com and output the results to your host file system:
+For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run -v $HOME/.config/subfinder:/root/.config/subfinder -it ice3man/subfinder -d uber.com > uber.com.txt
+docker run -v -it ice3man/subfinder -d hackerone.com > hackerone.com.txt
 ```
 
-## Post Installation Instructions
+### MacOS
 
-Subfinder will work after using the installation instructions however to configure Subfinder to work with certain services, you will need to have setup API keys. The following services do not work without an API key:
+`gopacket` has some issues on MacOS. Until that is fixed, Naabu can only run on MacOS with docker. See the [From Docker](#from-docker) section for install instructions on MacOS.
 
-- [Virustotal](https://www.virustotal.com/)
-- [Passivetotal](http://passivetotal.org/)
-- [SecurityTrails](http://securitytrails.com/)
-- [Censys](https://censys.io)
-- [Binaryedge](https://binaryedge.io)
-- [Shodan](https://shodan.io)
-- [URLScan](https://urlscan.io)
+### Windows
 
-Theses values are stored in the $HOME/.config/subfinder/config.yaml file which will be created when you run the tool for the first time. The configuration file uses the YAML format. Multiple API keys can be specified for each of these services from which one of them will be used for enumeration.
+Just like MacOS, you can only run naabu on windows with Docker. See the [From Docker](#from-docker) section for install instructions on Windows.
 
-For sources that require multiple keys, namely `Censys`, `Passivetotal`, they can be added by separating them via a colon (:).
-
-An example config file - 
-
-```yaml
-resolvers:
-  - 1.1.1.1
-  - 1.0.0.1
-sources:
-  - binaryedge
-  - bufferover
-  - censys
-  - passivetotal
-  - sitedossier
-binaryedge:
-  - 0bf8919b-aab9-42e4-9574-d3b639324597
-  - ac244e2f-b635-4581-878a-33f4e79a2c13
-censys:
-  - ac244e2f-b635-4581-878a-33f4e79a2c13:dd510d6e-1b6e-4655-83f6-f347b363def9
-certspotter: []
-passivetotal: 
-  - sampleemail@user.com:sample_password
-securitytrails: []
-shodan: []
-```
-
-If you are using docker, you need to first create your directory structure holding subfinder configuration file. After modifying the default config.yaml file, you can run:
-
-```bash
-> mkdir $HOME/.config/subfinder
-> cp config.yaml $HOME/.config/subfinder/config.yaml
-> nano $HOME/.config/subfinder/config.yaml
-```
-
-After that, you can pass it as a volume using the following sample command.
-```bash
-> docker run -v $HOME/.config/subfinder:/root/.config/subfinder -it ice3man/subfinder -d freelancer.com
-```
-
-# Running Subfinder
+# Running Naabu
 
 To run the tool on a target, just use the following command.
 ```bash
-> subfinder -d freelancer.com
+> naabu -d hackerone.com
 ```
 
-This will run the tool against freelancer.com. There are a number of configuration options that you can pass along with this command. The verbose switch (-v) can be used to display verbose information.
+This will run the tool against hackerone.com. There are a number of configuration options that you can pass along with this command. The verbose switch (-v) can be used to display verbose information.
 
 ```bash
-[CERTSPOTTER] www.fi.freelancer.com
-[DNSDUMPSTER] hosting.freelancer.com
-[DNSDUMPSTER] support.freelancer.com
-[DNSDUMPSTER] accounts.freelancer.com
-[DNSDUMPSTER] phabricator.freelancer.com
-[DNSDUMPSTER] cdn1.freelancer.com
-[DNSDUMPSTER] t1.freelancer.com
-[DNSDUMPSTER] wdc.t1.freelancer.com
-[DNSDUMPSTER] dal.t1.freelancer.com
+[INF] Starting scan on host hackerone.com (104.16.100.52)
+[INF] Found 4 ports on host hackerone.com (104.16.100.52) with latency 25.46362ms
+hackerone.com:443
+hackerone.com:8443
+hackerone.com:80
+hackerone.com:8080
+```
+
+The ports to scan for on the host can be specified via `-ports` parameter. It takes nmap format ports and runs enumeration on them.
+
+```bash
+> naabu -ports 80,443,21-23 -host hackerone.com
+```
+
+By default, the tool checks for nmap's `Top 100` ports. It supports following in-built port lists - 
+
+- `top-100` - Checks for nmap top 100 ports.
+- `top-1000` - Checks for nmap top 1000 ports.
+- `full` - Checks for 1-65535 ports.
+
+You can also specify a file which contains the ports to scan for using the `pL` format. You can also specify specific ports which you would like to exclude from the scan.
+
+```bash
+> naabu -ports full -exclude-ports 80,443
 ```
 
 The -o command can be used to specify an output file.
 
 ```bash
-> subfinder -d freelancer.com -o output.txt
+> naabu -d hackerone.com -o output.txt
 ```
 
-To run the tool on a list of domains, `-dL` option can be used. This requires a directory to write the output files. Subdomains for each domain from the list are written in a text file in the directory specified by the `-oD` flag with their name being the domain name.
+To run the tool on a list of hosts, `-hL` option can be used. This requires a directory to write the output files. Ports for each host from the list are written in a text file in the directory specified by the `-oD` flag with their name being the host name.
 
 ```bash
-> cat domains.txt
+> cat hosts.txt
 hackerone.com
 google.com
 
-> subfinder -dL domains.txt -oD ~/path/to/output
+> naabu -hL hosts.txt -oD ~/path/to/output
 > ls ~/path/to/output
 
 hackerone.com.txt
@@ -218,11 +188,11 @@ If you want to save results to a single file while using a domain list, specify 
 
 
 ```bash
-> cat domains.txt
+> cat hosts.txt
 hackerone.com
 google.com
 
-> subfinder -dL domains.txt -o ~/path/to/output.txt
+> subfinder -dL hosts.txt -o ~/path/to/output.txt
 > ls ~/path/to/
 
 output.txt
@@ -230,44 +200,35 @@ output.txt
 
 You can also get output in json format using -oJ switch. This switch saves the output in the JSON lines format. 
 
-If you use the JSON format, or the Host:IP format, then it becomes mandatory for you to use the **-nW** format as resolving is essential for these output format. By default, resolving the found subdomains is disabled.
-
 ```bash
-> subfinder -d hackerone.com -o output.json -oJ -nW
+> naabu -host hackerone.com -oJ -o output.json
 > cat output.json
 
-{"host":"www.hackerone.com","ip":"104.16.99.52"}
-{"host":"mta-sts.hackerone.com","ip":"185.199.108.153"}
-{"host":"hackerone.com","ip":"104.16.100.52"}
-{"host":"mta-sts.managed.hackerone.com","ip":"185.199.110.153"}
+{"host":"hackerone.com","ip":8443}
+{"host":"hackerone.com","ip":443}
+{"host":"hackerone.com","ip":8080}
+{"host":"hackerone.com","ip":80}
 ```
 
-The --silent switch can be used to show only subdomains found without any other info.
+The -silent switch can be used to show only ports found without any other info.
 
-You can specify custom resolvers too.
-```bash
-> subfinder -d freelancer.com -o result.txt -nW -v -r 8.8.8.8,1.1.1.1
-> subfinder -d freelancer.com -o result.txt -nW -v -rL resolvers.txt
-```
-
-**The new highlight of this release is the addition of stdin/stdout features.** Now, domains can be piped to subfinder and enumeration can be ran on them. For example - 
+Hosts can also be piped to naabu and port enumeration can be ran on them. For example - 
 
 ```
-> echo "hackerone.com" | subfinder -v 
-> cat targets.txt | subfinder -v 
+> echo "hackerone.com" | naabu -v 
+> cat targets.txt | naabu -v 
 ```
 
-The subdomains discovered can be piped to other tools too. For example, you can pipe the subdomains discovered by subfinder to the awesome [httprobe](https://github.com/tomnomnom/httprobe) tool by @tomnomnom which will then find running http servers on the host.
+The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by subfinder to the awesome [httprobe](https://github.com/tomnomnom/httprobe) tool by @tomnomnom which will then find running http servers on the host.
 
 ```
-> echo "hackerone.com" | subfinder -silent | httprobe 
+> echo "hackerone.com" | naabu -silent | httprobe
 
-http://hackerone.com
-http://www.hackerone.com
-http://docs.hackerone.com
-http://api.hackerone.com
-https://docs.hackerone.com
-http://mta-sts.managed.hackerone.com
+http://hackerone.com:8443
+http://hackerone.com:443
+http://hackerone.com:8080
+http://hackerone.com:80
+https://hackerone.com:443
 ```
 
 # License
