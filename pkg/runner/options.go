@@ -46,7 +46,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
 	flag.BoolVar(&options.JSON, "oJ", false, "Write output in JSON lines Format")
 	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
-	flag.StringVar(&options.Ports, "ports", "", "Ports to enumerate for on hosts")
+	flag.StringVar(&options.Ports, "ports", "", "Ports to enumerate for on hosts (top-100, top-1000, full, custom)")
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")

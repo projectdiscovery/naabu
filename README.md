@@ -54,7 +54,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
 | -oJ | Write output in JSON lines Format | naabu -oJ output.json |
-| -ports | Ports to enumerate for on hosts | naabu -ports 80,443 |
+| -ports | Ports to enumerate for on hosts (top-100, top-1000, full, custom) | naabu -ports 80,443 |
 | -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
 | -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
 | -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
