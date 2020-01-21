@@ -1,5 +1,3 @@
-# naabu
-
 <h1 align="left">
   <img src="static/naabu-logo.png" alt="naabu" width="170px"></a>
   <br>
