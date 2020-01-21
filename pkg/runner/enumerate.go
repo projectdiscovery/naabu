@@ -44,7 +44,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 	log.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
 	r.portsMutex.Lock()
-	cachedPorts, cacheHit := r.portsCache[host]
+	cachedPorts, cacheHit := r.portsCache[hostIP]
 	r.portsMutex.Unlock()
 
 	var foundPorts map[int]struct{}
@@ -74,7 +74,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		// Store the ports in a cache to allow speedy lookup
 		// without re-scanning the same IP.
 		r.portsMutex.Lock()
-		r.portsCache[host] = foundPorts
+		r.portsCache[hostIP] = foundPorts
 		r.portsMutex.Unlock()
 		log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
 	} else {
