@@ -109,15 +109,17 @@ docker build -t projectdiscovery/naabu .
 
 - After building the container using either way, run the following - 
 ```bash
-docker run -it projectdiscovery/naabu
+docker run --net=host -it projectdiscovery/naabu
 ```
 
 > The above command is the same as running `-h`
 
 For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
+docker run --net=host -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
 ```
+
+> Host Networking mode is required for naabu to work with docker because of some network level restrictions imposed by docker.
 
 ### MacOS
 
