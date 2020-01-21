@@ -93,9 +93,11 @@ func (r *Runner) EnumerateMultipleHosts(reader io.Reader, ports map[int]struct{}
 			// for each domain in the directory.
 			if r.options.Output != "" {
 				r.EnumerateSingleHost(host, ports, r.options.Output, true)
-			} else {
+			} else if r.options.OutputDirectory != "" {
 				outputFile := path.Join(r.options.OutputDirectory, host)
 				r.EnumerateSingleHost(host, ports, outputFile, false)
+			} else {
+				r.EnumerateSingleHost(host, ports, "", true)
 			}
 			swg.Done()
 		}(host)
