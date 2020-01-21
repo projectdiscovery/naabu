@@ -125,7 +125,7 @@ func (s *Scanner) getHwAddr(ip, gateway net.IP, srcIP net.IP, networkInterface *
 
 	buf := gopacket.NewSerializeBuffer()
 
-	// Send a single ARP request packet (we never retry a send, since this
+	// Send a single ARP request packet
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, &eth, &arp); err != nil {
 		handle.Close()
 		return nil, err
