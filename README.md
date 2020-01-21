@@ -49,7 +49,7 @@ This will display help for the tool. Here are all the switches it supports.
 |------|-------------|---------|
 | -exclude-ports |  Ports to exclude from enumeration | naabu -exclude-ports 80,443 |
 | -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
-| -host | Host to find ports for | naabu -h 192.168.1.1 | 
+| -host | Host to find ports for | naabu -host 192.168.1.1 | 
 | -nC | Don't Use colors in output | naabu -nC | 
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
@@ -59,7 +59,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
 | -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
 | -silent | Show only host:ports in output | naabu -silent | 
-| -t | Number of concurrent goroutines for resolving (default 10) | naabu -t 100 |
+| -t | Number of concurrent goroutines for scanning (default 10) | naabu -t 10 |
 | -timeout | Millisecond to wait before timing out (default 700) | naabu -timeout 1000 |
 | -v | Show Verbose output | naabu -v |
 | -verify | Validate the ports again | naabu -verify |
@@ -118,7 +118,7 @@ docker run -it projectdiscovery/naabu
 
 For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run -v -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
+docker run -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
 ```
 
 ### MacOS
@@ -216,8 +216,8 @@ The -silent switch can be used to show only ports found without any other info.
 Hosts can also be piped to naabu and port enumeration can be ran on them. For example - 
 
 ```
-> echo "hackerone.com" | naabu -v 
-> cat targets.txt | naabu -v 
+> echo "hackerone.com" | naabu
+> cat targets.txt | naabu
 ```
 
 The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to the awesome [httprobe](https://github.com/tomnomnom/httprobe) tool by @tomnomnom which will then find running http servers on the host.
@@ -232,7 +232,7 @@ http://hackerone.com:80
 https://hackerone.com:443
 ```
 
-If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.
+If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation 
 
 ```bash
 > naabu -h hackerone.com -verify
