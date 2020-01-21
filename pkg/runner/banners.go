@@ -1,7 +1,7 @@
 package runner
 
 import (
-	"github.com/projectdiscovery/subfinder/pkg/log"
+	"github.com/projectdiscovery/naabu/pkg/log"
 )
 
 const banner = `
