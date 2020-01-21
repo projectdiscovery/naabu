@@ -62,6 +62,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -t | Number of concurrent goroutines for resolving (default 10) | naabu -t 100 |
 | -timeout | Millisecond to wait before timing out (default 700) | naabu -timeout 1000 |
 | -v | Show Verbose output | naabu -v |
+| -verify | Validate the ports again | naabu -verify |
 | -version | Show version of naabu | naabu -version |
 
 # Installation Instructions
@@ -231,7 +232,15 @@ http://hackerone.com:80
 https://hackerone.com:443
 ```
 
+If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.
+
+```bash
+> naabu -h hackerone.com -verify
+```
+
 The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false positive rates. So it is recommended to keep it low.
+
+While scanning for a list of hosts, if duplicate IP addresses are encountered, it returns ports that were found for that IP.
 
 # License
 

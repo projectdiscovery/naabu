@@ -26,6 +26,7 @@ type Options struct {
 	PortsFile       string // PortsFile is the file containing ports to use for enumeration
 	ExcludePorts    string // ExcludePorts is the list of ports to exclude from enumeration
 	Stdin           bool   // Stdin specifies whether stdin input was given to the process
+	Verify          bool   // Verify is used to check if the ports found were valid using CONNECT method
 	Version         bool   // Version specifies if we should just show version and exit
 }
 
@@ -48,6 +49,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.Ports, "ports", "", "Ports to enumerate for on hosts")
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
+	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")
 	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
 	flag.Parse()
 
