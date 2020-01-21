@@ -66,12 +66,16 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 			return
 		}
 
+		// Validate the host if the user has asked for second step validation
+		if r.options.Verify {
+			foundPorts = scanner.ConnectVerify(host, foundPorts)
+		}
+
 		// Store the ports in a cache to allow speedy lookup
 		// without re-scanning the same IP.
 		r.portsMutex.Lock()
 		r.portsCache[host] = foundPorts
 		r.portsMutex.Unlock()
-
 		log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
 	} else {
 		foundPorts = cachedPorts
