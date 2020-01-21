@@ -35,7 +35,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		}
 
 		hostIP = initialHosts[0]
-		log.Infof("Resolved domain %s to %s for enumeration", hostIP)
+		log.Infof("Resolved domain %s to %s for enumeration", host, hostIP)
 	} else {
 		hostIP = host
 		log.Infof("Using IP %s for enumeration\n", host)
