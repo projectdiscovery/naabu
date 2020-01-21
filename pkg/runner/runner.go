@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"path"
-	"sync"
 
 	"github.com/projectdiscovery/naabu/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
@@ -19,18 +18,13 @@ type Runner struct {
 	scanner *scan.Scanner
 
 	ports map[int]struct{}
-
-	portsCache map[string]map[int]struct{}
-	portsMutex *sync.Mutex
 }
 
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
-		options:    options,
-		portsCache: make(map[string]map[int]struct{}),
-		portsMutex: &sync.Mutex{},
+		options: options,
 	}
 
 	var err error
