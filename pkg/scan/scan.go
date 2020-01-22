@@ -72,7 +72,17 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 	}
 	scanner.networkInterface, scanner.gateway, scanner.srcIP, err = router.Route(host)
 	if err != nil {
-		return nil, err
+		// retry with default gateway
+		scanner.networkInterface, scanner.gateway, scanner.srcIP, err = router.Route(net.ParseIP("0.0.0.0"))
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// check if the interface is TUN/TAP (no hardware address)
+	if scanner.networkInterface.HardwareAddr == nil {
+		scanner.hwaddr = nil
+		return scanner, nil
 	}
 
 	// First off, get the MAC address we should be sending packets to.
@@ -118,18 +128,18 @@ func (s *Scanner) getHwAddr(ip, gateway net.IP, srcIP net.IP, networkInterface *
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
 		SourceHwAddress:   []byte(networkInterface.HardwareAddr),
-		SourceProtAddress: []byte(srcIP),
+		SourceProtAddress: []byte(srcIP.To4()),
 		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
-		DstProtAddress:    []byte(arpDst),
+		DstProtAddress:    []byte(arpDst.To4()),
 	}
 
 	buf := gopacket.NewSerializeBuffer()
-
 	// Send a single ARP request packet
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, &eth, &arp); err != nil {
 		handle.Close()
 		return nil, err
 	}
+
 	if err := handle.WritePacketData(buf.Bytes()); err != nil {
 		handle.Close()
 		return nil, err
@@ -230,6 +240,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 		DstMAC:       s.hwaddr,
 		EthernetType: layers.EthernetTypeIPv4,
 	}
+
 	ip4 := layers.IPv4{
 		SrcIP:    s.srcIP,
 		DstIP:    s.host,
@@ -308,7 +319,15 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 			tcp.DstPort = layers.TCPPort(port)
 			for i := 0; i < s.retries; i++ {
 				<-limiter
-				err := s.send(handle, &eth, &ip4, &tcp)
+				// if it's a TUN/TAP interface we we need only IP and TCP layers
+				// see here https://github.com/kdar/gorawtcpsyn/blob/master/main.go
+				var layers []gopacket.SerializableLayer
+				if eth.SrcMAC == nil {
+					layers = append(layers, &ip4, &tcp)
+				} else {
+					layers = append(layers, &eth, &ip4, &tcp)
+				}
+				err := s.send(handle, layers...)
 				if err == nil {
 					break
 				}
