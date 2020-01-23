@@ -1,14 +1,18 @@
 package scan
 
 import (
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 )
 
@@ -19,8 +23,9 @@ type Scanner struct {
 	retries          int
 	rate             int
 
-	host  net.IP
-	srcIP net.IP
+	host         net.IP
+	srcIP        net.IP
+	srcInterface string
 
 	Latency time.Duration
 }
@@ -58,11 +63,18 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 		Latency: -1,
 	}
 
+	// Get the source IP and the network interface packets will be sent from
 	var err error
-	scanner.srcIP, err = localIPPort(host)
+	scanner.srcIP, err = getSourceIP(host)
 	if err != nil {
 		return nil, err
 	}
+
+	networkInterface, err := getInterfaceFromIP(scanner.srcIP)
+	if err != nil {
+		return nil, err
+	}
+	scanner.srcInterface = networkInterface.Name
 
 	return scanner, nil
 }
@@ -78,8 +90,37 @@ func (s *Scanner) send(conn net.PacketConn, dstip net.IP, l ...gopacket.Serializ
 
 // Scan scans a single host and returns the results
 func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
+	inactive, err := pcap.NewInactiveHandle(s.srcInterface)
+	if err != nil {
+		return nil, err
+	}
+	inactive.SetSnapLen(65536)
+
+	readTimeout := time.Duration(1500) * time.Millisecond
+	if err = inactive.SetTimeout(readTimeout); err != nil {
+		inactive.CleanUp()
+		return nil, err
+	}
+	inactive.SetImmediateMode(true)
+
+	handle, err := inactive.Activate()
+	if err != nil {
+		inactive.CleanUp()
+		return nil, err
+	}
+
 	rawPort, err := freeport.GetFreePort()
 	if err != nil {
+		handle.Close()
+		inactive.CleanUp()
+		return nil, err
+	}
+
+	filter := "tcp and port " + strconv.Itoa(rawPort)
+	err = handle.SetBPFFilter(filter)
+	if err != nil {
+		handle.Close()
+		inactive.CleanUp()
 		return nil, err
 	}
 
@@ -87,8 +128,6 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	if err != nil {
 		return nil, err
 	}
-
-	readTimeout := time.Duration(1500) * time.Millisecond
 
 	openChan := make(chan int)
 	results := make(map[int]struct{})
@@ -99,12 +138,6 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	go func() {
 		for open := range openChan {
-			// Set latency if the latency is less than 0 or
-			// more than the default latency.
-			latency := time.Since(startTime)
-			if s.Latency < 0 {
-				s.Latency = latency
-			}
 			results[open] = struct{}{}
 		}
 		resultsWg.Done()
@@ -138,29 +171,45 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	tasksWg := &sync.WaitGroup{}
 	tasksWg.Add(1)
 
+	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.host, s.srcIP)
+
 	go func() {
-		buf := make([]byte, 4096)
+		ip4 := &layers.IPv4{}
+		tcp := &layers.TCP{}
+
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, ip4, tcp)
+		decoded := []gopacket.LayerType{}
 		for {
-			n, addr, err := conn.ReadFrom(buf)
+			data, _, err := handle.ReadPacketData()
 			if err == io.EOF {
-				break
-			} else if e, ok := err.(net.Error); ok && e.Timeout() {
-				// read timeout
 				break
 			} else if err != nil {
 				continue
-			} else if addr.String() != s.host.String() {
-				// mismatching ip
-				continue
 			}
 
-			conn.SetReadDeadline(time.Now().Add(readTimeout))
+			if err := parser.DecodeLayers(data, &decoded); err != nil {
+				continue
+			}
+			for _, layerType := range decoded {
+				switch layerType {
+				case layers.LayerTypeIPv4:
+					if ip4.NetworkFlow() != ipFlow {
+						continue
+					}
+				case layers.LayerTypeTCP:
+					// We consider only incoming packets
+					if tcp.DstPort != layers.TCPPort(rawPort) {
+						continue
+					} else {
+						// Set latency if the latency is less than 0
+						if s.Latency < 0 {
+							s.Latency = time.Since(startTime)
+						}
 
-			packet := gopacket.NewPacket(buf[:n], layers.LayerTypeTCP, gopacket.Default)
-			if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-				tcp, _ := tcpLayer.(*layers.TCP)
-				if tcp.SYN && tcp.ACK {
-					openChan <- int(tcp.SrcPort)
+						if tcp.SYN && tcp.ACK {
+							openChan <- int(tcp.SrcPort)
+						}
+					}
 				}
 			}
 		}
@@ -208,8 +257,8 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	return results, nil
 }
 
-// get the local ip and port based on our destination ip
-func localIPPort(dstip net.IP) (net.IP, error) {
+// getSourceIP gets the local ip based on our destination ip
+func getSourceIP(dstip net.IP) (net.IP, error) {
 	serverAddr, err := net.ResolveUDPAddr("udp", dstip.String()+":12345")
 	if err != nil {
 		return nil, err
@@ -222,4 +271,31 @@ func localIPPort(dstip net.IP) (net.IP, error) {
 		}
 	}
 	return nil, err
+}
+
+// getInterfaceFromIP gets the name of the network interface from local ip address
+func getInterfaceFromIP(ip net.IP) (*net.Interface, error) {
+	address := ip.String()
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, i := range interfaces {
+		byNameInterface, err := net.InterfaceByName(i.Name)
+		if err != nil {
+			return nil, err
+		}
+		addresses, err := byNameInterface.Addrs()
+		for _, v := range addresses {
+			// Check if the IP for the current interface is our
+			// source IP. If yes, return the interface
+			if strings.HasPrefix(v.String(), address+"/") {
+				return byNameInterface, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no interface found for ip %s", address)
 }
