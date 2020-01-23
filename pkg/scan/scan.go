@@ -5,7 +5,6 @@ import (
 	"io"
 	"math/rand"
 	"net"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -102,8 +101,10 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 		return nil, err
 	}
 
-	filter := "tcp and port " + strconv.Itoa(rawPort)
-	err = handle.SetBPFFilter(filter)
+	// strict BPF filter
+	// + Packets coming from target ip
+	// + Destination port equals to sender socket source port
+	err = handle.SetBPFFilter(fmt.Sprintf("tcp and port %d and ip host %s", rawPort, s.host))
 	if err != nil {
 		handle.Close()
 		inactive.CleanUp()
