@@ -23,28 +23,16 @@ type Scanner struct {
 	retries          int
 	rate             int
 
-	host         net.IP
-	srcIP        net.IP
-	srcInterface string
+	networkInterface *net.Interface
+	host             net.IP
+	srcIP            net.IP
+}
 
+// Result are the ports returned by the scanner along with latency, etc
+type Result struct {
+	Ports   map[int]struct{}
 	Latency time.Duration
 }
-
-// Result is a port or an error returned from the scanner
-type Result struct {
-	Port  int
-	Type  ResultType
-	Error error
-}
-
-// ResultType is the type of result returned
-type ResultType int
-
-// Types of results retured
-const (
-	ResultPort ResultType = iota
-	ResultError
-)
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
 func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner, error) {
@@ -57,10 +45,9 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 		},
 		timeout: timeout,
 		retries: retries,
-		host:    host,
 		rate:    rate,
 
-		Latency: -1,
+		host: host,
 	}
 
 	// Get the source IP and the network interface packets will be sent from
@@ -70,27 +57,26 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 		return nil, err
 	}
 
-	networkInterface, err := getInterfaceFromIP(scanner.srcIP)
+	scanner.networkInterface, err = getInterfaceFromIP(scanner.srcIP)
 	if err != nil {
 		return nil, err
 	}
-	scanner.srcInterface = networkInterface.Name
 
 	return scanner, nil
 }
 
 // send sends the given layers as a single packet on the network.
-func (s *Scanner) send(conn net.PacketConn, dstip net.IP, l ...gopacket.SerializableLayer) (int, error) {
+func (s *Scanner) send(conn net.PacketConn, l ...gopacket.SerializableLayer) (int, error) {
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, l...); err != nil {
 		return 0, err
 	}
-	return conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: dstip})
+	return conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: s.host})
 }
 
 // Scan scans a single host and returns the results
-func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
-	inactive, err := pcap.NewInactiveHandle(s.srcInterface)
+func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
+	inactive, err := pcap.NewInactiveHandle(s.networkInterface.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -132,15 +118,16 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	}
 
 	openChan := make(chan int)
-	results := make(map[int]struct{})
+	results := &Result{
+		Ports:   make(map[int]struct{}),
+		Latency: -1,
+	}
 	resultsWg := &sync.WaitGroup{}
 	resultsWg.Add(1)
 
-	startTime := time.Now()
-
 	go func() {
 		for open := range openChan {
-			results[open] = struct{}{}
+			results.Ports[open] = struct{}{}
 		}
 		resultsWg.Done()
 	}()
@@ -172,8 +159,9 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	tasksWg := &sync.WaitGroup{}
 	tasksWg.Add(1)
-
 	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.host, s.srcIP)
+
+	startTime := time.Now()
 
 	go func() {
 		ip4 := &layers.IPv4{}
@@ -202,15 +190,12 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 					// We consider only incoming packets
 					if tcp.DstPort != layers.TCPPort(rawPort) {
 						continue
-					} else {
-						// Set latency if the latency is less than 0
-						if s.Latency < 0 {
-							s.Latency = time.Since(startTime)
-						}
-
-						if tcp.SYN && tcp.ACK {
-							openChan <- int(tcp.SrcPort)
-						}
+					} else if tcp.SYN && tcp.ACK {
+						openChan <- int(tcp.SrcPort)
+					}
+					// Set latency if the latency is less than 0
+					if results.Latency < 0 {
+						results.Latency = time.Since(startTime)
 					}
 				}
 			}
@@ -231,7 +216,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 			tcp.DstPort = layers.TCPPort(port)
 			for i := 0; i < s.retries; i++ {
 				<-limiter
-				n, err := s.send(conn, ip4.DstIP, &tcp)
+				n, err := s.send(conn, &tcp)
 				if n > 0 && err == nil {
 					break
 				}
@@ -246,12 +231,14 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	// Just like masscan, wait for 10 seconds for further packets
 	if s.timeout > 0 {
-		timer := time.AfterFunc(10*time.Second, func() { conn.Close(); handle.Close() })
+		timer := time.AfterFunc(10*time.Second, func() {
+			handle.Close()
+			conn.Close()
+		})
 		defer timer.Stop()
 	} else {
-		conn.Close()
 		handle.Close()
-		inactive.CleanUp()
+		conn.Close()
 	}
 
 	tasksWg.Wait()
