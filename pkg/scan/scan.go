@@ -126,6 +126,8 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
 	if err != nil {
+		handle.Close()
+		inactive.CleanUp()
 		return nil, err
 	}
 
@@ -244,15 +246,19 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	// Just like masscan, wait for 10 seconds for further packets
 	if s.timeout > 0 {
-		timer := time.AfterFunc(10*time.Second, func() { conn.Close() })
+		timer := time.AfterFunc(10*time.Second, func() { conn.Close(); handle.Close() })
 		defer timer.Stop()
 	} else {
 		conn.Close()
+		handle.Close()
+		inactive.CleanUp()
 	}
 
 	tasksWg.Wait()
 	close(openChan)
 	resultsWg.Wait()
+
+	inactive.CleanUp()
 
 	return results, nil
 }
