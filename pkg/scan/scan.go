@@ -164,10 +164,11 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 	startTime := time.Now()
 
 	go func() {
+		eth := &layers.Ethernet{}
 		ip4 := &layers.IPv4{}
 		tcp := &layers.TCP{}
 
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, ip4, tcp)
+		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, eth, ip4, tcp)
 		decoded := []gopacket.LayerType{}
 		for {
 			data, _, err := handle.ReadPacketData()
@@ -193,6 +194,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 					} else if tcp.SYN && tcp.ACK {
 						openChan <- int(tcp.SrcPort)
 					}
+
 					// Set latency if the latency is less than 0
 					if results.Latency < 0 {
 						results.Latency = time.Since(startTime)
