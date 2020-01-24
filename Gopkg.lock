@@ -2,13 +2,12 @@
 
 
 [[projects]]
-  digest = "1:d27ea1c526b6a93f98ed31df56d0061bc4489446016cdb20a8072bbb64a5db4d"
+  digest = "1:7f4a1262a7b322e29c5fadfe25c8d2c47b5a73fb903db701b58b676e381dc75e"
   name = "github.com/google/gopacket"
   packages = [
     ".",
     "layers",
     "pcap",
-    "routing",
   ]
   pruneopts = "UT"
   revision = "6d3e2615da4ed2ed2a349918fe74e7e6d03482fa"
@@ -47,14 +46,6 @@
   version = "1.0.1"
 
 [[projects]]
-  branch = "master"
-  digest = "1:cbf0c68647b33254e5d14b37c67006465702375eec1a00730b7311d414db814a"
-  name = "github.com/mostlygeek/arp"
-  packages = ["."]
-  pruneopts = "UT"
-  revision = "541a2129847a674f55f3cb2915279009e7b7bcb1"
-
-[[projects]]
   digest = "1:7413525ee648f20b4181be7fe8103d0cb98be9e141926a03ee082dc207061e4e"
   name = "github.com/phayes/freeport"
   packages = ["."]
@@ -77,10 +68,8 @@
     "github.com/google/gopacket",
     "github.com/google/gopacket/layers",
     "github.com/google/gopacket/pcap",
-    "github.com/google/gopacket/routing",
     "github.com/json-iterator/go",
     "github.com/logrusorgru/aurora",
-    "github.com/mostlygeek/arp",
     "github.com/phayes/freeport",
     "github.com/remeh/sizedwaitgroup",
   ]
