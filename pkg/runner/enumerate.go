@@ -66,7 +66,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(results.Ports), host, hostIP, results.Latency)
 
 	if len(results.Ports) <= 0 {
-		log.Warningf("Could not scan on host %s (%s)\n", host)
+		log.Warningf("Could not scan on host %s (%s)\n", host, hostIP)
 		return
 	}
 
