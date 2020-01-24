@@ -151,7 +151,7 @@ func Errorf(format string, args ...interface{}) {
 
 // Debugf writes an error message on the screen with the default label
 func Debugf(format string, args ...interface{}) {
-	log(Error, "", format, args...)
+	log(Debug, "", format, args...)
 }
 
 // Verbosef writes a verbose message on the screen with a tabel
