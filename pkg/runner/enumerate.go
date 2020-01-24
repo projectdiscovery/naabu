@@ -48,29 +48,29 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
 		return
 	}
-	foundPorts, err := scanner.Scan(ports)
+	results, err := scanner.Scan(ports)
 	if err != nil {
 		log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
 		return
 	}
 
-	if scanner.Latency == -1 {
+	if results.Latency == -1 {
 		log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
 		return
 	}
 
 	// Validate the host if the user has asked for second step validation
 	if r.options.Verify {
-		foundPorts = scanner.ConnectVerify(host, foundPorts)
+		results.Ports = scanner.ConnectVerify(host, results.Ports)
 	}
-	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(foundPorts), host, hostIP, scanner.Latency)
+	log.Infof("Found %d ports on host %s (%s) with latency %s\n", len(results.Ports), host, hostIP, results.Latency)
 
-	if len(foundPorts) <= 0 {
+	if len(results.Ports) <= 0 {
 		log.Warningf("Could not scan on host %s (%s)\n", host, hostIP)
 		return
 	}
 
-	for port := range foundPorts {
+	for port := range results.Ports {
 		log.Silentf("%s:%d\n", host, port)
 	}
 
@@ -101,9 +101,9 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 		// Write the output to the file depending upon user requirement
 		if r.options.JSON {
-			err = WriteJSONOutput(host, foundPorts, file)
+			err = WriteJSONOutput(host, results.Ports, file)
 		} else {
-			err = WriteHostOutput(host, foundPorts, file)
+			err = WriteHostOutput(host, results.Ports, file)
 		}
 		if err != nil {
 			log.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
