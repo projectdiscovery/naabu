@@ -165,11 +165,21 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 	startTime := time.Now()
 
 	go func() {
-		eth := &layers.Ethernet{}
-		ip4 := &layers.IPv4{}
-		tcp := &layers.TCP{}
+		var (
+			eth    layers.Ethernet
+			ip4    layers.IPv4
+			tcp    layers.TCP
+			parser *gopacket.DecodingLayerParser
+		)
 
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, eth, ip4, tcp)
+		if s.networkInterface.HardwareAddr != nil {
+			// Interfaces with MAC (Physical + Virtualized)
+			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
+		} else {
+			// Interfaces without MAC (TUN/TAP)
+			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
+		}
+
 		decoded := []gopacket.LayerType{}
 		for {
 			data, _, err := handle.ReadPacketData()
