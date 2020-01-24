@@ -22,6 +22,7 @@ const (
 	Error
 	Info
 	Warning
+	Debug
 	Verbose
 )
 
@@ -38,6 +39,7 @@ var (
 		Error:   "ERR",
 		Label:   "WRN",
 		Fatal:   "FTL",
+		Debug:   "DBG",
 		Info:    "INF",
 	}
 
@@ -65,6 +67,8 @@ func wrap(label string, level Level) string {
 		return aurora.Bold(aurora.Red(label)).String()
 	case Error:
 		return aurora.Red(label).String()
+	case Debug:
+		return aurora.Magenta(label).String()
 	case Warning, Label:
 		return aurora.Yellow(label).String()
 	default:
@@ -78,7 +82,7 @@ func getLabel(level Level, label string, sb *strings.Builder) {
 	switch level {
 	case Silent, Misc:
 		return
-	case Error, Fatal, Info, Warning, Label:
+	case Error, Fatal, Info, Warning, Debug, Label:
 		sb.WriteString("[")
 		sb.WriteString(wrap(labels[level], level))
 		sb.WriteString("]")
@@ -143,6 +147,11 @@ func Warningf(format string, args ...interface{}) {
 // Errorf writes an error message on the screen with the default label
 func Errorf(format string, args ...interface{}) {
 	log(Error, "", format, args...)
+}
+
+// Debugf writes an error message on the screen with the default label
+func Debugf(format string, args ...interface{}) {
+	log(Debug, "", format, args...)
 }
 
 // Verbosef writes a verbose message on the screen with a tabel
