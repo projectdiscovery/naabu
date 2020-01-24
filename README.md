@@ -32,7 +32,7 @@ Inspired by the great `furious` project of [@liamg](https://github.com/liamg).
  - Simple and modular code base making it easy to contribute.
  - Fast And Simple SYN probe based scanning.
  - Multiple Output formats supported (Json, File, Stdout)
- - Optimized for speed, very fast and **lightweight** on resources
+ - Optimized for ease of use and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
  - Flexible definitions for ports to scan 
 
@@ -79,10 +79,10 @@ naabu requires go1.13+ to install successfully. Run the following command to get
 go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
 
-You also need the following libraries installed for the `go get` to work - 
-- libpcap, libpcap-dev
+You also need the following libraries installed for the `go get` to work - `libpcap, libpcap-dev`.
 
-On Ubuntu linux, these can be installed by using `apt get` or any package manager for the distro.
+On Ubuntu linux `libpcap` is installed by default. For those compiling from source, the header files can be installed by using `apt-get install libpcap-dev`.
+
 #### From Binary
 
 The installation is easy. You can download the pre-built binaries from the [Releases](https://github.com/projectdiscovery/naabu/releases/) page. Extract them using tar, move it to your $PATH and you're ready to go.
@@ -113,25 +113,35 @@ docker build -t projectdiscovery/naabu .
 
 - After building the container using either way, run the following - 
 ```bash
-docker run --net=host -it projectdiscovery/naabu
+docker run -it projectdiscovery/naabu
 ```
 
 > The above command is the same as running `-h`
 
 For example, this runs the tool against hackerone.com and output the results to your host file system:
 ```bash
-docker run --net=host -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
+docker run -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
 ```
-
-> Host Networking mode is required for naabu to work with docker because of some network level restrictions imposed by docker.
 
 ### MacOS
 
-`gopacket` has some issues on MacOS. Until that is fixed, Naabu can only run on MacOS with docker. See the [From Docker](#from-docker) section for install instructions on MacOS.
+On MacOS, the install instructions are similar to linux. You can download a binary for MacOS from the releases page. You can also `go get` the package to install it from source.
+
+You need `libpcap` library on MacOS to build successfully from source or run the downloaded binary. If you are using homebrew as your package manager, you can run `brew install libpcap` to download and install it in your system.
+
+After that, you can just run the following command to download and install naabu -
+
+```bash
+go get -v github.com/projectdiscovery/naabu/cmd/naabu
+```
+
+See the [From Docker](#from-docker) section for install instructions on MacOS with docker.
 
 ### Windows
 
-Just like MacOS, you can only run naabu on windows with Docker. See the [From Docker](#from-docker) section for install instructions on Windows.
+Windows version is currently not usable without docker.
+
+The docker install instructions are identical to the ones for other platforms. See the [From Docker](#from-docker) section for install instructions on Windows.
 
 # Running Naabu
 
