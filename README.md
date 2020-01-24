@@ -139,9 +139,7 @@ See the [From Docker](#from-docker) section for install instructions on MacOS wi
 
 ### Windows
 
-The windows installation for pcap is very tricky to get right. So, it is recommended to use the pre-built binaries or docker instead of compiling from source.
-
-You do need this [winpcap](https://www.winpcap.org/) library if are using the binary on windows.
+Windows version is currently not usable without docker.
 
 The docker install instructions are identical to the ones for other platforms. See the [From Docker](#from-docker) section for install instructions on Windows.
 
