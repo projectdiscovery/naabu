@@ -1,19 +1,17 @@
 package scan
 
 import (
-	"errors"
+	"fmt"
 	"io"
 	"math/rand"
 	"net"
-	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/google/gopacket/routing"
-	"github.com/mostlygeek/arp"
 	"github.com/phayes/freeport"
 )
 
@@ -26,28 +24,14 @@ type Scanner struct {
 
 	networkInterface *net.Interface
 	host             net.IP
-	gateway          net.IP
 	srcIP            net.IP
-	hwaddr           net.HardwareAddr
+}
 
+// Result are the ports returned by the scanner along with latency, etc
+type Result struct {
+	Ports   map[int]struct{}
 	Latency time.Duration
 }
-
-// Result is a port or an error returned from the scanner
-type Result struct {
-	Port  int
-	Type  ResultType
-	Error error
-}
-
-// ResultType is the type of result returned
-type ResultType int
-
-// Types of results retured
-const (
-	ResultPort ResultType = iota
-	ResultError
-)
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
 func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner, error) {
@@ -60,23 +44,19 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 		},
 		timeout: timeout,
 		retries: retries,
-		host:    host,
 		rate:    rate,
 
-		Latency: -1,
+		host: host,
 	}
 
-	router, err := routing.New()
-	if err != nil {
-		return nil, err
-	}
-	scanner.networkInterface, scanner.gateway, scanner.srcIP, err = router.Route(host)
+	// Get the source IP and the network interface packets will be sent from
+	var err error
+	scanner.srcIP, err = getSourceIP(host)
 	if err != nil {
 		return nil, err
 	}
 
-	// First off, get the MAC address we should be sending packets to.
-	scanner.hwaddr, err = scanner.getHwAddr(host, scanner.gateway, scanner.srcIP, scanner.networkInterface)
+	scanner.networkInterface, err = getInterfaceFromIP(scanner.srcIP)
 	if err != nil {
 		return nil, err
 	}
@@ -84,92 +64,17 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 	return scanner, nil
 }
 
-func (s *Scanner) getHwAddr(ip, gateway net.IP, srcIP net.IP, networkInterface *net.Interface) (net.HardwareAddr, error) {
-	// grab mac from ARP table if we have it cached
-	macStr := arp.Search(ip.String())
-	if macStr != "00:00:00:00:00:00" {
-		if mac, err := net.ParseMAC(macStr); err == nil {
-			return mac, nil
-		}
-	}
-
-	arpDst := ip
-	if gateway != nil {
-		arpDst = gateway
-	}
-
-	handle, err := pcap.OpenLive(networkInterface.Name, 65536, true, pcap.BlockForever)
-	if err != nil {
-		return nil, err
-	}
-
-	start := time.Now()
-
-	// Prepare the layers to send for an ARP request.
-	eth := layers.Ethernet{
-		SrcMAC:       networkInterface.HardwareAddr,
-		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		EthernetType: layers.EthernetTypeARP,
-	}
-	arp := layers.ARP{
-		AddrType:          layers.LinkTypeEthernet,
-		Protocol:          layers.EthernetTypeIPv4,
-		HwAddressSize:     6,
-		ProtAddressSize:   4,
-		Operation:         layers.ARPRequest,
-		SourceHwAddress:   []byte(networkInterface.HardwareAddr),
-		SourceProtAddress: []byte(srcIP),
-		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
-		DstProtAddress:    []byte(arpDst),
-	}
-
-	buf := gopacket.NewSerializeBuffer()
-
-	// Send a single ARP request packet
-	if err := gopacket.SerializeLayers(buf, s.serializeOptions, &eth, &arp); err != nil {
-		handle.Close()
-		return nil, err
-	}
-	if err := handle.WritePacketData(buf.Bytes()); err != nil {
-		handle.Close()
-		return nil, err
-	}
-
-	// Wait 10 seconds for an ARP reply.
-	for {
-		if time.Since(start) > time.Duration(10)*time.Second {
-			handle.Close()
-			return nil, errors.New("timeout getting ARP reply")
-		}
-		data, _, err := handle.ReadPacketData()
-		if err == pcap.NextErrorTimeoutExpired {
-			continue
-		} else if err != nil {
-			handle.Close()
-			return nil, err
-		}
-		packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.NoCopy)
-		if arpLayer := packet.Layer(layers.LayerTypeARP); arpLayer != nil {
-			arp := arpLayer.(*layers.ARP)
-			if net.IP(arp.SourceProtAddress).Equal(arpDst) {
-				handle.Close()
-				return net.HardwareAddr(arp.SourceHwAddress), nil
-			}
-		}
-	}
-}
-
 // send sends the given layers as a single packet on the network.
-func (s *Scanner) send(handle *pcap.Handle, l ...gopacket.SerializableLayer) error {
+func (s *Scanner) send(conn net.PacketConn, l ...gopacket.SerializableLayer) (int, error) {
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, l...); err != nil {
-		return err
+		return 0, err
 	}
-	return handle.WritePacketData(buf.Bytes())
+	return conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: s.host})
 }
 
 // Scan scans a single host and returns the results
-func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
+func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 	inactive, err := pcap.NewInactiveHandle(s.networkInterface.Name)
 	if err != nil {
 		return nil, err
@@ -196,8 +101,17 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 		return nil, err
 	}
 
-	filter := "tcp and port " + strconv.Itoa(rawPort)
-	err = handle.SetBPFFilter(filter)
+	// Strict BPF filter
+	// + Packets coming from target ip
+	// + Destination port equals to sender socket source port
+	err = handle.SetBPFFilter(fmt.Sprintf("tcp and port %d and ip host %s", rawPort, s.host))
+	if err != nil {
+		handle.Close()
+		inactive.CleanUp()
+		return nil, err
+	}
+
+	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
 	if err != nil {
 		handle.Close()
 		inactive.CleanUp()
@@ -205,31 +119,21 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	}
 
 	openChan := make(chan int)
-	results := make(map[int]struct{})
+	results := &Result{
+		Ports:   make(map[int]struct{}),
+		Latency: -1,
+	}
 	resultsWg := &sync.WaitGroup{}
 	resultsWg.Add(1)
 
-	startTime := time.Now()
-
 	go func() {
 		for open := range openChan {
-			// Set latency if the latency is less than 0 or
-			// more than the default latency.
-			latency := time.Since(startTime)
-			if s.Latency < 0 {
-				s.Latency = latency
-			}
-			results[open] = struct{}{}
+			results.Ports[open] = struct{}{}
 		}
 		resultsWg.Done()
 	}()
 
 	// Construct all the network layers we need.
-	eth := layers.Ethernet{
-		SrcMAC:       s.networkInterface.HardwareAddr,
-		DstMAC:       s.hwaddr,
-		EthernetType: layers.EthernetTypeIPv4,
-	}
 	ip4 := layers.IPv4{
 		SrcIP:    s.srcIP,
 		DstIP:    s.host,
@@ -258,12 +162,24 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	tasksWg.Add(1)
 	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.host, s.srcIP)
 
-	go func() {
-		eth := &layers.Ethernet{}
-		ip4 := &layers.IPv4{}
-		tcp := &layers.TCP{}
+	startTime := time.Now()
 
-		parser := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, eth, ip4, tcp)
+	go func() {
+		var (
+			eth    layers.Ethernet
+			ip4    layers.IPv4
+			tcp    layers.TCP
+			parser *gopacket.DecodingLayerParser
+		)
+
+		if s.networkInterface.HardwareAddr != nil {
+			// Interfaces with MAC (Physical + Virtualized)
+			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
+		} else {
+			// Interfaces without MAC (TUN/TAP)
+			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
+		}
+
 		decoded := []gopacket.LayerType{}
 		for {
 			data, _, err := handle.ReadPacketData()
@@ -289,6 +205,11 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 					} else if tcp.SYN && tcp.ACK {
 						openChan <- int(tcp.SrcPort)
 					}
+
+					// Set latency if the latency is less than 0
+					if results.Latency < 0 {
+						results.Latency = time.Since(startTime)
+					}
 				}
 			}
 		}
@@ -308,8 +229,8 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 			tcp.DstPort = layers.TCPPort(port)
 			for i := 0; i < s.retries; i++ {
 				<-limiter
-				err := s.send(handle, &eth, &ip4, &tcp)
-				if err == nil {
+				n, err := s.send(conn, &tcp)
+				if n > 0 && err == nil {
 					break
 				}
 			}
@@ -323,10 +244,14 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	// Just like masscan, wait for 10 seconds for further packets
 	if s.timeout > 0 {
-		timer := time.AfterFunc(10*time.Second, func() { handle.Close() })
+		timer := time.AfterFunc(10*time.Second, func() {
+			handle.Close()
+			conn.Close()
+		})
 		defer timer.Stop()
 	} else {
 		handle.Close()
+		conn.Close()
 	}
 
 	tasksWg.Wait()
@@ -336,4 +261,47 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	inactive.CleanUp()
 
 	return results, nil
+}
+
+// getSourceIP gets the local ip based on our destination ip
+func getSourceIP(dstip net.IP) (net.IP, error) {
+	serverAddr, err := net.ResolveUDPAddr("udp", dstip.String()+":12345")
+	if err != nil {
+		return nil, err
+	}
+
+	if con, err := net.DialUDP("udp", nil, serverAddr); err == nil {
+		defer con.Close()
+		if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
+			return udpaddr.IP, nil
+		}
+	}
+	return nil, err
+}
+
+// getInterfaceFromIP gets the name of the network interface from local ip address
+func getInterfaceFromIP(ip net.IP) (*net.Interface, error) {
+	address := ip.String()
+
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+
+	for _, i := range interfaces {
+		byNameInterface, err := net.InterfaceByName(i.Name)
+		if err != nil {
+			return nil, err
+		}
+		addresses, err := byNameInterface.Addrs()
+		for _, v := range addresses {
+			// Check if the IP for the current interface is our
+			// source IP. If yes, return the interface
+			if strings.HasPrefix(v.String(), address+"/") {
+				return byNameInterface, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("no interface found for ip %s", address)
 }
