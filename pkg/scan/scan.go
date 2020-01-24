@@ -101,7 +101,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 		return nil, err
 	}
 
-	// strict BPF filter
+	// Strict BPF filter
 	// + Packets coming from target ip
 	// + Destination port equals to sender socket source port
 	err = handle.SetBPFFilter(fmt.Sprintf("tcp and port %d and ip host %s", rawPort, s.host))
