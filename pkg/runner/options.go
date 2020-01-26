@@ -28,6 +28,7 @@ type Options struct {
 	Stdin           bool   // Stdin specifies whether stdin input was given to the process
 	Verify          bool   // Verify is used to check if the ports found were valid using CONNECT method
 	Version         bool   // Version specifies if we should just show version and exit
+	Ping            bool   // Ping uses ping probes to discover fastest active host and discover dead hosts
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -51,6 +52,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")
 	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
+	flag.BoolVar(&options.Ping, "Pn", false, "Use ping probes for verification of host")
 	flag.Parse()
 
 	// Check if stdin pipe was given
@@ -64,7 +66,8 @@ func ParseOptions() *Options {
 
 	if options.Version {
 		log.Infof("Current Version: %s\n", Version)
-		os.Exit(0)	}
+		os.Exit(0)
+	}
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
 	err := options.validateOptions()

@@ -49,6 +49,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
 | -ports | Ports to enumerate for on hosts (top-100, top-1000, full, custom) | naabu -ports 80,443 |
 | -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
+| -Pn | Perform ping probe to detect alive hosts | naabu -Pn |
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
 | -oJ | Write output in JSON lines Format | naabu -oJ output.json |
