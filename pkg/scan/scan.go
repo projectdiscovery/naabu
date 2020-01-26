@@ -29,12 +29,6 @@ type Scanner struct {
 	srcIP            net.IP
 }
 
-// Result are the ports returned by the scanner along with latency, etc
-type Result struct {
-	Ports   map[int]struct{}
-	Latency time.Duration
-}
-
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
 func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner, error) {
 	rand.Seed(time.Now().UnixNano())
@@ -76,7 +70,7 @@ func (s *Scanner) send(conn net.PacketConn, l ...gopacket.SerializableLayer) (in
 }
 
 // Scan scans a single host and returns the results
-func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
+func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	inactive, err := pcap.NewInactiveHandle(s.networkInterface.Name)
 	if err != nil {
 		return nil, err
@@ -121,10 +115,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 	}
 
 	openChan := make(chan int)
-	results := &Result{
-		Ports:   make(map[int]struct{}),
-		Latency: -1,
-	}
+	results := make(map[int]struct{})
 	resultsWg := &sync.WaitGroup{}
 	resultsWg.Add(1)
 
@@ -132,7 +123,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 		for open := range openChan {
 			log.Debugf("Found active port %d on %s\n", open, s.host.String())
 
-			results.Ports[open] = struct{}{}
+			results[open] = struct{}{}
 		}
 		resultsWg.Done()
 	}()
@@ -165,8 +156,6 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 	tasksWg := &sync.WaitGroup{}
 	tasksWg.Add(1)
 	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.host, s.srcIP)
-
-	startTime := time.Now()
 
 	go func() {
 		var (
@@ -208,11 +197,6 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (*Result, error) {
 						continue
 					} else if tcp.SYN && tcp.ACK {
 						openChan <- int(tcp.SrcPort)
-					}
-
-					// Set latency if the latency is less than 0
-					if results.Latency < 0 {
-						results.Latency = time.Since(startTime)
 					}
 				}
 			}
