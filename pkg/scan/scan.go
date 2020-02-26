@@ -13,8 +13,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
-
-	"github.com/projectdiscovery/naabu/pkg/log"
+	"github.com/projectdiscovery/gologger"
 )
 
 // Scanner is a scanner that scans for ports using SYN packets.
@@ -121,7 +120,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	go func() {
 		for open := range openChan {
-			log.Debugf("Found active port %d on %s\n", open, s.host.String())
+			gologger.Debugf("Found active port %d on %s\n", open, s.host.String())
 
 			results[open] = struct{}{}
 		}

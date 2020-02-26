@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/projectdiscovery/naabu/pkg/log"
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
 )
 
@@ -20,7 +20,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 	if net.ParseIP(host) == nil {
 		ips, err := net.LookupIP(host)
 		if err != nil {
-			log.Warningf("Could not get IP for host: %s\n", host)
+			gologger.Warningf("Could not get IP for host: %s\n", host)
 			return
 		}
 		for _, ip := range ips {
@@ -30,13 +30,13 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		}
 
 		if len(initialHosts) == 0 {
-			log.Warningf("No IP addresses found for host: %s\n", host)
+			gologger.Warningf("No IP addresses found for host: %s\n", host)
 			return
 		}
-		log.Debugf("Found %v addresses for %s\n", initialHosts, host)
+		gologger.Debugf("Found %v addresses for %s\n", initialHosts, host)
 	} else {
 		initialHosts = append(initialHosts, host)
-		log.Debugf("Using IP address %s for enumeration\n", host)
+		gologger.Debugf("Using IP address %s for enumeration\n", host)
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
@@ -44,45 +44,45 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		// Scan the hosts found for ping probes
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {
-			log.Warningf("Could not perform ping scan on %s: %s\n", host, err)
+			gologger.Warningf("Could not perform ping scan on %s: %s\n", host, err)
 			return
 		}
 		for _, result := range pingResults.Hosts {
 			if result.Type == scan.HostActive {
-				log.Debugf("Ping probe succeed for %s: latency=%s\n", result.Host, result.Latency)
+				gologger.Debugf("Ping probe succeed for %s: latency=%s\n", result.Host, result.Latency)
 			} else {
-				log.Debugf("Ping probe failed for %s: error=%s\n", result.Host, result.Error)
+				gologger.Debugf("Ping probe failed for %s: error=%s\n", result.Host, result.Error)
 			}
 		}
 
 		// Get the fastest host in the list of hosts
 		fastestHost, err := pingResults.GetFastestHost()
 		if err != nil {
-			log.Warningf("No active host found for %s: %s\n", host, err)
+			gologger.Warningf("No active host found for %s: %s\n", host, err)
 			return
 		}
-		log.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
+		gologger.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
 		hostIP = fastestHost.Host
 	} else {
 		hostIP = initialHosts[0]
-		log.Infof("Using host %s for enumeration\n", host)
+		gologger.Infof("Using host %s for enumeration\n", host)
 	}
 
-	log.Infof("Starting scan on host %s (%s)\n", host, hostIP)
+	gologger.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
 	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
 	if err != nil {
-		log.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
+		gologger.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
 		return
 	}
 	results, err := scanner.Scan(ports)
 	if err != nil {
-		log.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
+		gologger.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
 		return
 	}
 
 	if len(results) == 0 {
-		log.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
+		gologger.Infof("No ports found on %s (%s). Host seems down\n", host, hostIP)
 		return
 	}
 
@@ -90,10 +90,10 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 	if r.options.Verify {
 		results = scanner.ConnectVerify(host, results)
 	}
-	log.Infof("Found %d ports on host %s (%s)\n", len(results), host, hostIP)
+	gologger.Infof("Found %d ports on host %s (%s)\n", len(results), host, hostIP)
 
 	for port := range results {
-		log.Silentf("%s:%d\n", host, port)
+		gologger.Silentf("%s:%d\n", host, port)
 	}
 
 	// In case the user has given an output file, write all the found
@@ -117,7 +117,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 			file, err = os.Create(output)
 		}
 		if err != nil {
-			log.Errorf("Could not create file %s for %s: %s\n", output, host, err)
+			gologger.Errorf("Could not create file %s for %s: %s\n", output, host, err)
 			return
 		}
 
@@ -128,7 +128,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 			err = WriteHostOutput(host, results, file)
 		}
 		if err != nil {
-			log.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+			gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
 		}
 		file.Close()
 		return

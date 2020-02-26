@@ -1,8 +1,6 @@
 package runner
 
-import (
-	"github.com/projectdiscovery/naabu/pkg/log"
-)
+import "github.com/projectdiscovery/gologger"
 
 const banner = `
                   __       
@@ -16,9 +14,9 @@ const Version = `1.0.1`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
-	log.Printf("%s\n", banner)
-	log.Printf("\t\tprojectdiscovery.io\n\n")
+	gologger.Printf("%s\n", banner)
+	gologger.Printf("\t\tprojectdiscovery.io\n\n")
 
-	log.Labelf("Use with caution. You are responsible for your actions\n")
-	log.Labelf("Developers assume no liability and are not responsible for any misuse or damage.\n")
+	gologger.Labelf("Use with caution. You are responsible for your actions\n")
+	gologger.Labelf("Developers assume no liability and are not responsible for any misuse or damage.\n")
 }
