@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/projectdiscovery/naabu/pkg/log"
+	"github.com/projectdiscovery/gologger"
 )
 
 // ConnectVerify is used to verify if ports are accurate using a connect request
@@ -15,7 +15,7 @@ func (s *Scanner) ConnectVerify(host string, ports map[int]struct{}) map[int]str
 			delete(ports, port)
 			continue
 		}
-		log.Debugf("Validated active port %d on %s\n", port, s.host.String())
+		gologger.Debugf("Validated active port %d on %s\n", port, s.host.String())
 		conn.Close()
 	}
 	return ports
