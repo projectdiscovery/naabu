@@ -3,6 +3,7 @@ package scan
 import (
 	"fmt"
 	"io"
+	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -140,7 +141,7 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 		OptionLength: 4,
 		OptionData:   []byte{0x12, 0x34},
 	}
-	randSeq := 1000000000 + rand.Intn(8999999999)
+	randSeq := 1000000000 + rand.Intn(math.MaxInt32)
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(rawPort),
