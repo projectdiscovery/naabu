@@ -52,7 +52,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -Pn | Perform ping probe to detect alive hosts | naabu -Pn |
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
-| -oJ | Write output in JSON lines Format | naabu -oJ output.json |
+| -oJ | Write output in JSON lines Format | naabu -oJ -o output.json |
 | -silent | Show only host:ports in output | naabu -silent | 
 | -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
 | -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
