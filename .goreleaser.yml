@@ -1,0 +1,17 @@
+builds:
+    - binary: naavu
+      main: cmd/naabu/main.go
+      goos:
+        - linux
+        - darwin
+      goarch:
+        - amd64
+        - 386
+        - arm
+        - arm64
+  
+archives:
+    - id: tgz
+      format: tar.gz
+      replacements:
+          darwin: macOS
