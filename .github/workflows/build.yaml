@@ -19,7 +19,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Test
-        run: go test cmd/naabu/
+        run: go test .
+        working-directory: cmd/naabu/
 
       - name: Build
-        run: go build cmd/naabu/
+        run: go build .
+        working-directory: cmd/naabu/
