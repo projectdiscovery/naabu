@@ -2,11 +2,10 @@ package runner
 
 import (
 	"bufio"
+	"encoding/json"
 	"io"
 	"strconv"
 	"strings"
-
-	jsoniter "github.com/json-iterator/go"
 )
 
 // JSONResult contains the result for a host in JSON format
@@ -38,7 +37,7 @@ func WriteHostOutput(host string, results map[int]struct{}, writer io.Writer) er
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
 func WriteJSONOutput(host string, results map[int]struct{}, writer io.Writer) error {
-	encoder := jsoniter.NewEncoder(writer)
+	encoder := json.NewEncoder(writer)
 
 	data := JSONResult{}
 	data.Host = host
