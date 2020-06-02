@@ -3,9 +3,9 @@ package runner
 import (
 	"bufio"
 	"fmt"
-	"io"
 	"os"
 	"path"
+	"sync"
 
 	"github.com/projectdiscovery/naabu/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
@@ -18,6 +18,7 @@ type Runner struct {
 	scanner *scan.Scanner
 
 	ports map[int]struct{}
+	wg    sync.WaitGroup
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -44,9 +45,17 @@ func (r *Runner) RunEnumeration() error {
 		return fmt.Errorf("could not parse ports: %s", err)
 	}
 
+	targets := make(chan string)
+	// start listener
+	r.wg.Add(1)
+	go r.EnumerateMultipleHosts(targets, ports)
+
 	// Check if only a single host is sent as input. Process the host now.
 	if r.options.Host != "" {
-		r.EnumerateSingleHost(r.options.Host, ports, r.options.Output, false)
+		targets <- r.options.Host
+		close(targets)
+
+		r.wg.Wait()
 		return nil
 	}
 
@@ -56,47 +65,78 @@ func (r *Runner) RunEnumeration() error {
 		if err != nil {
 			return err
 		}
-		r.EnumerateMultipleHosts(f, ports)
-		f.Close()
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		for scanner.Scan() {
+			targets <- scanner.Text()
+		}
+
+		close(targets)
+
+		r.wg.Wait()
 		return nil
 	}
 
 	// If we have STDIN input, treat it as multiple hosts
 	if r.options.Stdin {
-		r.EnumerateMultipleHosts(os.Stdin, ports)
+		scanner := bufio.NewScanner(os.Stdin)
+		for scanner.Scan() {
+			targets <- scanner.Text()
+		}
+
+		close(targets)
+
+		r.wg.Wait()
 	}
 	return nil
 }
 
 // EnumerateMultipleHosts enumerates hosts for ports.
 // We keep enumerating ports for a given host until we reach an error
-func (r *Runner) EnumerateMultipleHosts(reader io.Reader, ports map[int]struct{}) {
-	scanner := bufio.NewScanner(reader)
+func (r *Runner) EnumerateMultipleHosts(targets chan string, ports map[int]struct{}) {
+	defer r.wg.Done()
+
 	swg := sizedwaitgroup.New(r.options.Threads)
 
-	for scanner.Scan() {
-		host := scanner.Text()
+	for host := range targets {
 		if host == "" {
 			continue
 		}
 
-		swg.Add()
-		go func(host string) {
-			// If the user has specifed an output file, use that output file instead
-			// of creating a new output file for each domain. Else create a new file
-			// for each domain in the directory.
-			if r.options.Output != "" {
-				r.EnumerateSingleHost(host, ports, r.options.Output, true)
-			} else if r.options.OutputDirectory != "" {
-				outputFile := path.Join(r.options.OutputDirectory, host)
-				r.EnumerateSingleHost(host, ports, outputFile, false)
-			} else {
-				r.EnumerateSingleHost(host, ports, "", true)
+		// Check if the host is a cidr
+		if scan.IsCidr(host) {
+			ips, err := scan.Ips(host)
+			if err != nil {
+				return
 			}
-			swg.Done()
-		}(host)
-	}
-	swg.Wait()
 
-	return
+			for _, ip := range ips {
+				swg.Add()
+				go r.handleHost(&swg, ip, ports)
+			}
+
+		} else {
+			swg.Add()
+			go r.handleHost(&swg, host, ports)
+		}
+	}
+
+	swg.Wait()
+}
+
+func (r *Runner) handleHost(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+	defer swg.Done()
+
+	// If the user has specifed an output file, use that output file instead
+	// of creating a new output file for each domain. Else create a new file
+	// for each domain in the directory.
+	if r.options.Output != "" {
+		r.EnumerateSingleHost(host, ports, r.options.Output, true)
+	} else if r.options.OutputDirectory != "" {
+		outputFile := path.Join(r.options.OutputDirectory, host)
+		r.EnumerateSingleHost(host, ports, outputFile, false)
+	} else {
+		r.EnumerateSingleHost(host, ports, "", true)
+	}
 }
