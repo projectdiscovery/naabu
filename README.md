@@ -46,6 +46,8 @@ This will display help for the tool. Here are all the switches it supports.
 | Flag | Description | Example |
 |------|-------------|---------|
 | -host | Host to find ports for | naabu -host 192.168.1.1 | 
+| -host | CIDR to find ports for | naabu -host 173.0.84.0/24 | 
+| -host | Domain/subdomain to find ports for | naabu -host uber.com | 
 | -hL | File containing list of hosts to enumerate ports | naabu -hL hosts.txt | 
 | -ports | Ports to enumerate for on hosts (top-100, top-1000, full, custom) | naabu -ports 80,443 |
 | -ports-file | File containing ports to enumerate for on hosts | naabu -ports-file ports.txt | 
