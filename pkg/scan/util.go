@@ -12,6 +12,11 @@ func IsCidr(ip string) bool {
 	return true
 }
 
+// IsIP determines if the given string is a valid ip
+func IsIP(ip string) bool {
+	return net.ParseIP(ip) != nil
+}
+
 // Ips of a cidr
 func Ips(cidr string) ([]string, error) {
 	ip, ipnet, err := net.ParseCIDR(cidr)

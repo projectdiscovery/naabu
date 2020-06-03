@@ -17,8 +17,9 @@ type Runner struct {
 	options *Options
 	scanner *scan.Scanner
 
-	ports map[int]struct{}
-	wg    sync.WaitGroup
+	ports       map[int]struct{}
+	excludedIps map[string]struct{}
+	wg          sync.WaitGroup
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -30,6 +31,11 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	var err error
 	runner.ports, err = ParsePorts(options)
+	if err != nil {
+		return nil, err
+	}
+
+	runner.excludedIps, err = parseExcludedIps(options)
 	if err != nil {
 		return nil, err
 	}
@@ -127,6 +133,11 @@ func (r *Runner) EnumerateMultipleHosts(targets chan string, ports map[int]struc
 
 func (r *Runner) handleHost(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
 	defer swg.Done()
+
+	// check if ip is excluded
+	if _, ok := r.excludedIps[host]; ok {
+		return
+	}
 
 	// If the user has specifed an output file, use that output file instead
 	// of creating a new output file for each domain. Else create a new file
