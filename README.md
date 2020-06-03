@@ -62,6 +62,8 @@ This will display help for the tool. Here are all the switches it supports.
 | -nC | Don't Use colors in output | naabu -nC | 
 | -t | Number of concurrent goroutines for scanning (default 10) | naabu -t 10 |
 | -timeout | Millisecond to wait before timing out (default 700) | naabu -timeout 1000 |
+| -exclude | Ip's to exclude for port scan | naabu -exclude 127.0.0.1, 0.0.0.0 |
+| -exclude-file | List of ip's to exclude for port scan | naabu -exclude-file internal-hosts.txt |
 | -exclude-ports |  Ports to exclude from enumeration | naabu -exclude-ports 80,443 |
 | -verify | Validate the ports again | naabu -verify |
 | -version | Show version of naabu | naabu -version |
