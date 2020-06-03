@@ -24,7 +24,9 @@ func parseExcludedIps(options *Options) (map[string]struct{}, error) {
 	}
 
 	for _, ip := range allIps {
-		if scan.IsCidr(ip) {
+		if ip == "" {
+			continue
+		} else if scan.IsCidr(ip) {
 			cidrIps, err := scan.Ips(ip)
 			if err != nil {
 				return nil, err

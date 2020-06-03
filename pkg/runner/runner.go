@@ -134,11 +134,6 @@ func (r *Runner) EnumerateMultipleHosts(targets chan string, ports map[int]struc
 func (r *Runner) handleHost(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
 	defer swg.Done()
 
-	// check if ip is excluded
-	if _, ok := r.excludedIps[host]; ok {
-		return
-	}
-
 	// If the user has specifed an output file, use that output file instead
 	// of creating a new output file for each domain. Else create a new file
 	// for each domain in the directory.
