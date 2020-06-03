@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"encoding/json"
 	"net"
 	"os"
 	"time"
@@ -100,8 +101,20 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 	}
 	gologger.Infof("Found %d ports on host %s (%s)\n", len(results), host, hostIP)
 
-	for port := range results {
-		gologger.Silentf("%s:%d\n", host, port)
+	if r.options.JSON {
+		data := JSONResult{Host: host}
+		for port := range results {
+			data.Port = port
+			b, err := json.Marshal(data)
+			if err != nil {
+				continue
+			}
+			gologger.Silentf("%s\n", string(b))
+		}
+	} else {
+		for port := range results {
+			gologger.Silentf("%s:%d\n", host, port)
+		}
 	}
 
 	// In case the user has given an output file, write all the found
