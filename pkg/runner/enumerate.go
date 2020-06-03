@@ -75,7 +75,15 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		gologger.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
 		return
 	}
-	results, err := scanner.Scan(ports)
+
+	var results map[int]struct{}
+
+	if os.Geteuid() > 0 {
+		results, err = scanner.ScanConnect(ports)
+	} else {
+		results, err = scanner.ScanSyn(ports)
+	}
+
 	if err != nil {
 		gologger.Warningf("Could not scan on host %s (%s): %s\n", host, hostIP, err)
 		return

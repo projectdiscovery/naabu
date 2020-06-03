@@ -1,5 +1,3 @@
-// +build linux darwin
-
 package scan
 
 import (
@@ -16,6 +14,7 @@ import (
 	"github.com/google/gopacket/layers"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
+	"github.com/remeh/sizedwaitgroup"
 )
 
 // Scanner is a scanner that scans for ports using SYN packets.
@@ -70,8 +69,8 @@ func (s *Scanner) send(conn net.PacketConn, l ...gopacket.SerializableLayer) (in
 	return conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: s.host})
 }
 
-// Scan scans a single host and returns the results
-func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
+// ScanSyn scans a single host and returns the results
+func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
 	if err != nil {
 		return nil, err
@@ -191,6 +190,59 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	} else {
 		conn.Close()
 	}
+
+	tasksWg.Wait()
+	close(openChan)
+	resultsWg.Wait()
+
+	return results, nil
+}
+
+// ScanConnect a single host and returns the results
+func (s *Scanner) ScanConnect(wordlist map[int]struct{}) (map[int]struct{}, error) {
+	openChan := make(chan int)
+	results := make(map[int]struct{})
+	resultsWg := &sync.WaitGroup{}
+	resultsWg.Add(1)
+
+	go func() {
+		for open := range openChan {
+			gologger.Debugf("Found active port %d on %s\n", open, s.host.String())
+
+			results[open] = struct{}{}
+		}
+		resultsWg.Done()
+	}()
+
+	tasksWg := &sync.WaitGroup{}
+	tasksWg.Add(1)
+
+	ports := make(chan int)
+	go func() {
+		defer tasksWg.Done()
+
+		swgscan := sizedwaitgroup.New(s.rate)
+		for port := range ports {
+			swgscan.Add()
+			go func(port int) {
+				defer swgscan.Done()
+
+				conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", s.host, port), s.timeout)
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+
+				openChan <- port
+			}(port)
+		}
+		swgscan.Wait()
+	}()
+
+	for port := range wordlist {
+		ports <- port
+	}
+	close(ports)
 
 	tasksWg.Wait()
 	close(openChan)
