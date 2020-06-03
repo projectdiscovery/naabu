@@ -16,12 +16,7 @@ jobs:
           go-version: 1.13
 
       - name: Check out code
-        uses: actions/checkout@v2
-
-      - name: Install libpcap
-        run: |
-          sudo apt-get update
-          sudo apt install libpcap-dev
+        uses: actions/checkout@v2W
 
       - name: Test
         run: go test .
