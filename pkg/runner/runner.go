@@ -17,8 +17,9 @@ type Runner struct {
 	options *Options
 	scanner *scan.Scanner
 
-	ports map[int]struct{}
-	wg    sync.WaitGroup
+	ports       map[int]struct{}
+	excludedIps map[string]struct{}
+	wg          sync.WaitGroup
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -30,6 +31,11 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	var err error
 	runner.ports, err = ParsePorts(options)
+	if err != nil {
+		return nil, err
+	}
+
+	runner.excludedIps, err = parseExcludedIps(options)
 	if err != nil {
 		return nil, err
 	}

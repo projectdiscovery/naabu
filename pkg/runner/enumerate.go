@@ -39,6 +39,14 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 		gologger.Debugf("Using IP address %s for enumeration\n", host)
 	}
 
+	// if the host resolves to an excluded ip then skip it
+	for _, ip := range initialHosts {
+		if _, ok := r.excludedIps[ip]; ok {
+			gologger.Warningf("Skipping host %s as ip %s was excluded\n", host, ip)
+			return
+		}
+	}
+
 	// If the user has specified ping probes, perform ping on addresses
 	if r.options.Ping {
 		// Scan the hosts found for ping probes
