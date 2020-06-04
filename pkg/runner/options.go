@@ -43,7 +43,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
 	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
-	flag.BoolVar(&options.JSON, "oJ", false, "Write output in JSON lines Format")
+	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")
 	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
 	flag.IntVar(&options.Retries, "retries", 1, "Number of retries for the port scan probe")
 	flag.IntVar(&options.Rate, "rate", 1000, "Rate of port scan probe requests")
