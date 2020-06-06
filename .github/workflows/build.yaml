@@ -18,11 +18,6 @@ jobs:
       - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Install libpcap
-        run: |
-          sudo apt-get update
-          sudo apt install libpcap-dev
-
       - name: Test
         run: go test .
         working-directory: cmd/naabu/
