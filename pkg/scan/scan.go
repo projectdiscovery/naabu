@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"net"
@@ -144,7 +143,6 @@ func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 				if !ok {
 					continue
 				}
-				log.Println(addr.String(), s.host.String(), rawPort, tcp.DstPort, tcp.SrcPort, "syn", tcp.SYN, "ack", tcp.ACK)
 				// We consider only incoming packets
 				if tcp.DstPort != layers.TCPPort(rawPort) {
 					continue
