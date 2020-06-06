@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"math/rand"
 	"net"
@@ -12,9 +11,9 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
+	"github.com/remeh/sizedwaitgroup"
 )
 
 // Scanner is a scanner that scans for ports using SYN packets.
@@ -69,48 +68,16 @@ func (s *Scanner) send(conn net.PacketConn, l ...gopacket.SerializableLayer) (in
 	return conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: s.host})
 }
 
-// Scan scans a single host and returns the results
-func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
-	inactive, err := pcap.NewInactiveHandle(s.networkInterface.Name)
+// ScanSyn scans a single host and returns the results
+func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
+	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
 	if err != nil {
 		return nil, err
 	}
-	inactive.SetSnapLen(65536)
-
-	readTimeout := time.Duration(1500) * time.Millisecond
-	if err = inactive.SetTimeout(readTimeout); err != nil {
-		inactive.CleanUp()
-		return nil, err
-	}
-	inactive.SetImmediateMode(true)
-
-	handle, err := inactive.Activate()
-	if err != nil {
-		inactive.CleanUp()
-		return nil, err
-	}
+	defer conn.Close()
 
 	rawPort, err := freeport.GetFreePort()
 	if err != nil {
-		handle.Close()
-		inactive.CleanUp()
-		return nil, err
-	}
-
-	// Strict BPF filter
-	// + Packets coming from target ip
-	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(fmt.Sprintf("tcp and port %d and ip host %s", rawPort, s.host))
-	if err != nil {
-		handle.Close()
-		inactive.CleanUp()
-		return nil, err
-	}
-
-	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
-	if err != nil {
-		handle.Close()
-		inactive.CleanUp()
 		return nil, err
 	}
 
@@ -155,53 +122,35 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	tasksWg := &sync.WaitGroup{}
 	tasksWg.Add(1)
-	ipFlow := gopacket.NewFlow(layers.EndpointIPv4, s.host, s.srcIP)
 
 	go func() {
-		var (
-			eth    layers.Ethernet
-			ip4    layers.IPv4
-			tcp    layers.TCP
-			parser *gopacket.DecodingLayerParser
-		)
-
-		if s.networkInterface.HardwareAddr != nil {
-			// Interfaces with MAC (Physical + Virtualized)
-			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
-		} else {
-			// Interfaces without MAC (TUN/TAP)
-			parser = gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
-		}
-
-		decoded := []gopacket.LayerType{}
+		defer tasksWg.Done()
+		data := make([]byte, 4096)
 		for {
-			data, _, err := handle.ReadPacketData()
-			if err == io.EOF {
+			n, addr, err := conn.ReadFrom(data)
+			if err != nil {
 				break
-			} else if err != nil {
+			}
+
+			// not matching ip
+			if addr.String() != s.host.String() {
 				continue
 			}
 
-			if err := parser.DecodeLayers(data, &decoded); err != nil {
-				continue
-			}
-			for _, layerType := range decoded {
-				switch layerType {
-				case layers.LayerTypeIPv4:
-					if ip4.NetworkFlow() != ipFlow {
-						continue
-					}
-				case layers.LayerTypeTCP:
-					// We consider only incoming packets
-					if tcp.DstPort != layers.TCPPort(rawPort) {
-						continue
-					} else if tcp.SYN && tcp.ACK {
-						openChan <- int(tcp.SrcPort)
-					}
+			packet := gopacket.NewPacket(data[:n], layers.LayerTypeTCP, gopacket.Default)
+			if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
+				tcp, ok := tcpLayer.(*layers.TCP)
+				if !ok {
+					continue
+				}
+				// We consider only incoming packets
+				if tcp.DstPort != layers.TCPPort(rawPort) {
+					continue
+				} else if tcp.SYN && tcp.ACK {
+					openChan <- int(tcp.SrcPort)
 				}
 			}
 		}
-		tasksWg.Done()
 	}()
 
 	limiter := time.Tick(time.Second / time.Duration(s.rate))
@@ -233,12 +182,10 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	// Just like masscan, wait for 10 seconds for further packets
 	if s.timeout > 0 {
 		timer := time.AfterFunc(10*time.Second, func() {
-			handle.Close()
 			conn.Close()
 		})
 		defer timer.Stop()
 	} else {
-		handle.Close()
 		conn.Close()
 	}
 
@@ -246,7 +193,58 @@ func (s *Scanner) Scan(wordlist map[int]struct{}) (map[int]struct{}, error) {
 	close(openChan)
 	resultsWg.Wait()
 
-	inactive.CleanUp()
+	return results, nil
+}
+
+// ScanConnect a single host and returns the results
+func (s *Scanner) ScanConnect(wordlist map[int]struct{}) (map[int]struct{}, error) {
+	openChan := make(chan int)
+	results := make(map[int]struct{})
+	resultsWg := &sync.WaitGroup{}
+	resultsWg.Add(1)
+
+	go func() {
+		for open := range openChan {
+			gologger.Debugf("Found active port %d on %s\n", open, s.host.String())
+
+			results[open] = struct{}{}
+		}
+		resultsWg.Done()
+	}()
+
+	tasksWg := &sync.WaitGroup{}
+	tasksWg.Add(1)
+
+	ports := make(chan int)
+	go func() {
+		defer tasksWg.Done()
+
+		swgscan := sizedwaitgroup.New(s.rate)
+		for port := range ports {
+			swgscan.Add()
+			go func(port int) {
+				defer swgscan.Done()
+
+				conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", s.host, port), s.timeout)
+				if err != nil {
+					return
+				}
+				defer conn.Close()
+
+				openChan <- port
+			}(port)
+		}
+		swgscan.Wait()
+	}()
+
+	for port := range wordlist {
+		ports <- port
+	}
+	close(ports)
+
+	tasksWg.Wait()
+	close(openChan)
+	resultsWg.Wait()
 
 	return results, nil
 }
