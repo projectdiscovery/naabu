@@ -21,6 +21,8 @@ Inspired by the great `furious` project of [@liamg](https://github.com/liamg).
     - [macOS](#macos)
     - [Windows](#windows)
 - [Running naabu](#running-naabu)
+- [Helper scripts](#helper-scripts)
+
 
  # Features
 
@@ -54,7 +56,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -Pn | Perform ping probe to detect alive hosts | naabu -Pn |
 | -o | File to write output to (optional) | naabu -o output.txt | 
 | -oD | Directory to write enumeration results to (optional) | naabu -oD outputs | 
-| -oJ | Write output in JSON lines Format | naabu -oJ -o output.json |
+| -json | Prints output in JSON lines Format | naabu -json  |
 | -silent | Show only host:ports in output | naabu -silent | 
 | -retries | Number of retries for the port scan probe (default 1) | naabu -retries 4 |
 | -rate | Rate of port scan probe requests (default 1000) | naabu -rate 100 |
@@ -84,9 +86,6 @@ naabu requires go1.13+ to install successfully. Run the following command to get
 GO111MODULE=on go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
 
-You also need the following libraries installed for the `go get` to work - `libpcap, libpcap-dev`.
-
-On Ubuntu linux `libpcap` is installed by default. For those compiling from source, the header files can be installed by using `apt-get install libpcap-dev`.
 
 #### From Binary
 
@@ -130,14 +129,12 @@ docker run -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
 
 ### MacOS
 
-On MacOS, the install instructions are similar to linux. You can download a binary for MacOS from the releases page. You can also `go get` the package to install it from source.
+On MacOS, the install instructions are similar to linux. You can download a binary for MacOS from the releases page. You can also `go get` the package to install it from the source.
 
-You need `libpcap` library on MacOS to build successfully from source or run the downloaded binary. If you are using homebrew as your package manager, you can run `brew install libpcap` to download and install it in your system.
-
-After that, you can just run the following command to download and install naabu -
+You can just run the following command to download and install naabu -
 
 ```bash
-go get -v github.com/projectdiscovery/naabu/cmd/naabu
+GO111MODULE=on go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
 
 See the [From Docker](#from-docker) section for install instructions on MacOS with docker.
@@ -218,11 +215,10 @@ google.com
 output.txt
 ```
 
-You can also get output in json format using -oJ switch. This switch saves the output in the JSON lines format. 
+You can also get output in json format using -json switch. This switch saves the output in the JSON lines format. 
 
 ```bash
-> naabu -host hackerone.com -oJ -o output.json
-> cat output.json
+> naabu -host hackerone.com -json
 
 {"host":"hackerone.com","port":8443}
 {"host":"hackerone.com","port":443}
@@ -243,6 +239,7 @@ The ports discovered can be piped to other tools too. For example, you can pipe 
 
 ```
 > echo "hackerone.com" | naabu -silent | httprobe
+> echo "hackerone.com" | naabu -silent | httpx -silent
 
 http://hackerone.com:8443
 http://hackerone.com:443
@@ -256,7 +253,45 @@ If you want a second layer validation of the ports found, you can instruct the t
 > naabu -host hackerone.com -verify
 ```
 
-The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false positive rates. So it is recommended to keep it low.
+The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it low.
+
+# Helper scripts
+
+We have included two [helper scripts](https://github.com/projectdiscovery/naabu/tree/master/scripts) for the [nmap](https://nmap.org) ❤️ which can be used to pipe results from `naabu` to detect services using `nmap`, make sure you have `nmap` installed on your system.  
+
+```bash
+
+> echo hackerone.com | naabu -silent | bash naabu2nmap.sh
+
+  ___  ___  ___ _/ /  __ __
+ / _ \/ _ \/ _ \/ _ \/ // /
+/_//_/\_,_/\_,_/_.__/\_,_/ v1                 
+
+        projectdiscovery.io
+
+[WRN] Use with caution. You are responsible for your actions
+[WRN] Developers assume no liability and are not responsible for any misuse or damage.
+[INF] Using host hackerone.com for enumeration
+[INF] Starting scan on host hackerone.com (104.16.99.52)
+[INF] Found 4 ports on host hackerone.com (104.16.99.52)
+
+Running nmap service scan on found results.
+Executing nmap -iL naabu_output_targets.txt -p 443,80,8080,8443 -sV
+
+PORT     STATE SERVICE       VERSION
+80/tcp   open  http          cloudflare
+443/tcp  open  ssl/https     cloudflare
+8080/tcp open  http-proxy    cloudflare
+8443/tcp open  ssl/https-alt cloudflare
+
+```
+
+Similarly `prepare4nmap.sh` will prepare command to execute for nmap, feel free to update or create new scripts based on your use-case, PR's are always welcome. 
+
+```bash
+
+> echo hackerone.com | naabu -silent | bash prepare4nmap.sh
+```
 
 # License
 
