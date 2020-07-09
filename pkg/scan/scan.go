@@ -22,6 +22,7 @@ type Scanner struct {
 	serializeOptions gopacket.SerializeOptions
 	retries          int
 	rate             int
+	debug            bool
 
 	networkInterface *net.Interface
 	host             net.IP
@@ -29,7 +30,7 @@ type Scanner struct {
 }
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
-func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner, error) {
+func NewScanner(host net.IP, timeout time.Duration, retries, rate int, debug bool) (*Scanner, error) {
 	rand.Seed(time.Now().UnixNano())
 
 	scanner := &Scanner{
@@ -40,20 +41,33 @@ func NewScanner(host net.IP, timeout time.Duration, retries, rate int) (*Scanner
 		timeout: timeout,
 		retries: retries,
 		rate:    rate,
+		debug:   debug,
 
 		host: host,
 	}
 
 	// Get the source IP and the network interface packets will be sent from
 	var err error
+	if debug {
+		gologger.Debugf("Looking for source ip\n")
+	}
 	scanner.srcIP, err = getSourceIP(host)
 	if err != nil {
 		return nil, err
 	}
+	if debug {
+		gologger.Debugf("Source ip %s found\n", scanner.srcIP)
+	}
 
+	if debug {
+		gologger.Debugf("Looking for interface from ip %s\n", scanner.srcIP)
+	}
 	scanner.networkInterface, err = getInterfaceFromIP(scanner.srcIP)
 	if err != nil {
 		return nil, err
+	}
+	if debug {
+		gologger.Debugf("Interface %s (%s) for source ip %s found\n", scanner.networkInterface.Name, scanner.networkInterface.HardwareAddr, scanner.srcIP)
 	}
 
 	return scanner, nil
@@ -134,6 +148,9 @@ func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 			// not matching ip
 			if addr.String() != s.host.String() {
+				if s.debug {
+					gologger.Debugf("Discarding TCP packet from %s not matching %s ip\n", addr.String(), s.host.String())
+				}
 				continue
 			}
 
@@ -145,8 +162,14 @@ func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 				}
 				// We consider only incoming packets
 				if tcp.DstPort != layers.TCPPort(rawPort) {
+					if s.debug {
+						gologger.Debugf("Discarding TCP packet to %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, s.host.String(), rawPort)
+					}
 					continue
 				} else if tcp.SYN && tcp.ACK {
+					if s.debug {
+						gologger.Debugf("Accepting SYN+ACK packet from %s:%d\n", addr.String(), tcp.DstPort)
+					}
 					openChan <- int(tcp.SrcPort)
 				}
 			}
@@ -166,6 +189,9 @@ func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 			tcp.DstPort = layers.TCPPort(port)
 			for i := 0; i < s.retries; i++ {
 				<-limiter
+				if s.debug {
+					gologger.Debugf("Sending Syn Packet from %s:%d to %s:%d (Retry %d)\n", s.srcIP, rawPort, s.host, port, i)
+				}
 				n, err := s.send(conn, &tcp)
 				if n > 0 && err == nil {
 					break
@@ -181,6 +207,9 @@ func (s *Scanner) ScanSyn(wordlist map[int]struct{}) (map[int]struct{}, error) {
 
 	// Just like masscan, wait for 10 seconds for further packets
 	if s.timeout > 0 {
+		if s.debug {
+			gologger.Debugf("Waiting %d seconds before closing\n", 10)
+		}
 		timer := time.AfterFunc(10*time.Second, func() {
 			conn.Close()
 		})
@@ -225,12 +254,21 @@ func (s *Scanner) ScanConnect(wordlist map[int]struct{}) (map[int]struct{}, erro
 			go func(port int) {
 				defer swgscan.Done()
 
+				if s.debug {
+					gologger.Debugf("Connecting to %s:%d\n", s.host, port)
+				}
 				conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", s.host, port), s.timeout)
 				if err != nil {
+					if s.debug {
+						gologger.Debugf("Connection to %s:%d failed: %s\n", s.host, port, err)
+					}
 					return
 				}
 				defer conn.Close()
 
+				if s.debug {
+					gologger.Debugf("Connection to %s:%d successful\n", s.host, port)
+				}
 				openChan <- port
 			}(port)
 		}
