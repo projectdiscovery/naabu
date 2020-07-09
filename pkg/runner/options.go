@@ -31,6 +31,7 @@ type Options struct {
 	Ping            bool   // Ping uses ping probes to discover fastest active host and discover dead hosts
 	ExcludeIps      string // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile  string // File containing Ips or cidr to exclude from the scan
+	Debug           bool   // Prints out debug information
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -57,6 +58,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Ping, "Pn", false, "Use ping probes for verification of host")
 	flag.StringVar(&options.ExcludeIps, "exclude", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
 	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "This offers the same functionality as the -exclude option, except that the excluded targets are provided in a newline-delimited file")
+	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.Parse()
 
 	// Check if stdin pipe was given
