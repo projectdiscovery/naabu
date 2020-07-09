@@ -87,10 +87,10 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 	var results map[int]struct{}
 
-	if os.Geteuid() > 0 {
-		results, err = scanner.ScanConnect(ports)
-	} else {
+	if isRoot() {
 		results, err = scanner.ScanSyn(ports)
+	} else {
+		results, err = scanner.ScanConnect(ports)
 	}
 
 	if err != nil {

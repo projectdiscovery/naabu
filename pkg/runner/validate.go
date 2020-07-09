@@ -25,10 +25,20 @@ func (options *Options) validateOptions() error {
 	}
 	if options.Timeout == 0 {
 		return errors.New("timeout cannot be zero")
+	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {
+		options.Timeout = DefaultPortTimeoutConnectScan
 	}
+
 	if options.Rate == 0 {
 		return errors.New("rate cannot be zero")
+	} else if !isRoot() && options.Rate == DefaultRateSynScan {
+		options.Rate = DefaultRateConnectScan
 	}
+
+	if !isRoot() && options.Retries == DefaultRetriesSynScan {
+		options.Retries = DefaultRetriesConnectScan
+	}
+
 	return nil
 }
 
