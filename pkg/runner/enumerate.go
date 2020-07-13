@@ -79,7 +79,7 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 	gologger.Infof("Starting scan on host %s (%s)\n", host, hostIP)
 
-	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate)
+	scanner, err := scan.NewScanner(net.ParseIP(hostIP), time.Duration(r.options.Timeout)*time.Millisecond, r.options.Retries, r.options.Rate, r.options.Debug)
 	if err != nil {
 		gologger.Warningf("Could not start scan on host %s (%s): %s\n", host, hostIP, err)
 		return
@@ -87,10 +87,16 @@ func (r *Runner) EnumerateSingleHost(host string, ports map[int]struct{}, output
 
 	var results map[int]struct{}
 
-	if os.Geteuid() > 0 {
-		results, err = scanner.ScanConnect(ports)
-	} else {
+	if isRoot() {
+		if r.options.Debug {
+			gologger.Debugf("Performing SYN Scan with root privileges on %s\n", host)
+		}
 		results, err = scanner.ScanSyn(ports)
+	} else {
+		if r.options.Debug {
+			gologger.Debugf("Performing Connect Scan without root privileges on %s\n", host)
+		}
+		results, err = scanner.ScanConnect(ports)
 	}
 
 	if err != nil {

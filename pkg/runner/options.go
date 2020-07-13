@@ -31,6 +31,7 @@ type Options struct {
 	Ping            bool   // Ping uses ping probes to discover fastest active host and discover dead hosts
 	ExcludeIps      string // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile  string // File containing Ips or cidr to exclude from the scan
+	Debug           bool   // Prints out debug information
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -45,18 +46,19 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
 	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")
 	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
-	flag.IntVar(&options.Retries, "retries", 1, "Number of retries for the port scan probe")
-	flag.IntVar(&options.Rate, "rate", 1000, "Rate of port scan probe requests")
+	flag.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe")
+	flag.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
 	flag.BoolVar(&options.NoColor, "nC", false, "Don't Use colors in output")
-	flag.IntVar(&options.Threads, "t", 10, "Number of concurrent goroutines for resolving")
-	flag.IntVar(&options.Timeout, "timeout", 700, "Millisecond to wait before timing out")
+	flag.IntVar(&options.Threads, "t", DefaultResolverThreads, "Number of concurrent goroutines for resolving")
+	flag.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")
 	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
 	flag.BoolVar(&options.Ping, "Pn", false, "Use ping probes for verification of host")
 	flag.StringVar(&options.ExcludeIps, "exclude", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
 	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "This offers the same functionality as the -exclude option, except that the excluded targets are provided in a newline-delimited file")
+	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.Parse()
 
 	// Check if stdin pipe was given
