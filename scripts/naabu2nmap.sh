@@ -13,9 +13,9 @@ if [ -z "$2" ]
 fi
 
 
-# truncate files
-truncate -s 0 $TARGETSFILE
-truncate -s 0 $PORTSFILE
+# clean files files
+echo -n "" > $TARGETSFILE
+echo -n "" > $PORTSFILE
 
 while IFS=: read ip port; do
   echo $ip>>$TARGETSFILE
