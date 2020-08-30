@@ -1,11 +1,9 @@
 package runner
 
 import (
-	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
-	"strconv"
-	"strings"
 )
 
 // JSONResult contains the result for a host in JSON format
@@ -15,34 +13,24 @@ type JSONResult struct {
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, results map[int]struct{}, writer io.Writer) error {
-	bufwriter := bufio.NewWriter(writer)
-	sb := &strings.Builder{}
-
-	for port := range results {
-		sb.WriteString(host)
-		sb.WriteString(":")
-		sb.WriteString(strconv.Itoa(port))
-		sb.WriteString("\n")
-
-		_, err := bufwriter.WriteString(sb.String())
+func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) error {
+	for port := range ports {
+		_, err := fmt.Fprintf(writer, "%s:%d\n", host, port)
 		if err != nil {
-			bufwriter.Flush()
 			return err
 		}
-		sb.Reset()
 	}
-	return bufwriter.Flush()
+	return nil
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host string, results map[int]struct{}, writer io.Writer) error {
+func WriteJSONOutput(host string, ports map[int]struct{}, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
 	data := JSONResult{}
 	data.Host = host
 
-	for port := range results {
+	for port := range ports {
 		data.Port = port
 
 		err := encoder.Encode(&data)
