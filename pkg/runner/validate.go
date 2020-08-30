@@ -23,6 +23,7 @@ func (options *Options) validateOptions() error {
 	if options.Threads == 0 {
 		return errors.New("threads cannot be zero")
 	}
+
 	if options.Timeout == 0 {
 		return errors.New("timeout cannot be zero")
 	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {

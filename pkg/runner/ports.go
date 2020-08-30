@@ -131,3 +131,31 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 
 	return ports, nil
 }
+
+func (r *Runner) parseProbesPorts(options *Options) (err error) {
+	synprobesports, ackprobesports := make(map[int]struct{}), make(map[int]struct{})
+	for _, portProbe := range strings.Split(options.PortProbes, ",") {
+		err = checkPort(synprobesports, portProbe, "S")
+		if err != nil {
+			return
+		}
+		err = checkPort(ackprobesports, portProbe, "A")
+		if err != nil {
+			return
+		}
+	}
+	r.scanner.SynProbesPorts, r.scanner.AckProbesPorts = synprobesports, ackprobesports
+	return
+}
+
+func checkPort(m map[int]struct{}, p, prefix string) error {
+	if strings.HasPrefix(p, prefix) {
+		port, err := strconv.Atoi(strings.TrimPrefix(p, prefix))
+		if err != nil {
+			return err
+		}
+		m[port] = struct{}{}
+	}
+
+	return nil
+}
