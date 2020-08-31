@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
 )
 
@@ -67,14 +68,50 @@ func (r *Runner) addOrExpand(target string) error {
 		return err
 	}
 
+	var (
+		initialHosts []string
+		hostIP       string
+	)
 	for _, ip := range ips {
 		_, toExclude := r.scanner.ExcludedIps[ip]
 		if toExclude {
+			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
 
-		r.scanner.Targets[ip] = struct{}{}
+		initialHosts = append(initialHosts, ip)
 	}
+
+	// If the user has specified ping probes, perform ping on addresses
+	if r.options.Ping {
+		// Scan the hosts found for ping probes
+		pingResults, err := scan.PingHosts(initialHosts)
+		if err != nil {
+			gologger.Warningf("Could not perform ping scan on %s: %s\n", target, err)
+			return err
+		}
+		for _, result := range pingResults.Hosts {
+			if result.Type == scan.HostActive {
+				gologger.Debugf("Ping probe succeed for %s: latency=%s\n", result.Host, result.Latency)
+			} else {
+				gologger.Debugf("Ping probe failed for %s: error=%s\n", result.Host, result.Error)
+			}
+		}
+
+		// Get the fastest host in the list of hosts
+		fastestHost, err := pingResults.GetFastestHost()
+		if err != nil {
+			gologger.Warningf("No active host found for %s: %s\n", target, err)
+			return err
+		}
+		gologger.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
+		hostIP = fastestHost.Host
+	} else {
+		hostIP = initialHosts[0]
+		gologger.Infof("Using host %s for enumeration\n", target)
+	}
+
+	r.scanner.Targets[hostIP] = struct{}{}
 
 	return nil
 }

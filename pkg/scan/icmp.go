@@ -10,10 +10,6 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-const (
-	ProtocolICMP = 1
-)
-
 func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
