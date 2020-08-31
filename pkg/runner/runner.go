@@ -104,9 +104,30 @@ func (r *Runner) RunEnumeration() error {
 
 	r.scanner.State = scan.Done
 
+	// Validate the hosts if the user has asked for second step validation
+	if r.options.Verify {
+		r.ConnectVerification()
+	}
+
 	r.handleOutput()
 
 	return nil
+}
+
+func (r *Runner) ConnectVerification() {
+	r.scanner.State = scan.Scan
+	swg := sizedwaitgroup.New(r.options.Rate)
+
+	for host, ports := range r.scanner.ScanResults.M {
+		swg.Add()
+		go func(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+			defer swg.Done()
+			results := r.scanner.ConnectVerify(host, ports)
+			r.scanner.ScanResults.SetPorts(host, results)
+		}(&swg, host, ports)
+	}
+
+	swg.Wait()
 }
 
 func (r *Runner) BackgroundWorkers() {
@@ -171,6 +192,8 @@ func (r *Runner) handleOutput() {
 		err    error
 		output string
 	)
+	// In case the user has given an output file, write all the found
+	// ports to the output file.
 	if r.options.Output != "" {
 		output = r.options.Output
 		// If the output format is json, append .json

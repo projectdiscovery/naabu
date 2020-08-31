@@ -3,7 +3,6 @@ package scan
 import (
 	"fmt"
 	"log"
-	"math"
 	"math/rand"
 	"net"
 	"strings"
@@ -66,6 +65,7 @@ type Scanner struct {
 
 	NetworkInterface *net.Interface
 	SourceIP         net.IP
+	tcpsequencer     *TCPSequencer
 }
 
 type PkgSend struct {
@@ -89,10 +89,11 @@ func NewScanner(options *Options) (*Scanner, error) {
 			FixLengths:       true,
 			ComputeChecksums: true,
 		},
-		timeout: options.Timeout,
-		retries: options.Retries,
-		rate:    options.Rate,
-		debug:   options.Debug,
+		timeout:      options.Timeout,
+		retries:      options.Retries,
+		rate:         options.Rate,
+		debug:        options.Debug,
+		tcpsequencer: NewTCPSequencer(),
 	}
 
 	rawPort, err := freeport.GetFreePort()
@@ -383,14 +384,13 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		OptionLength: 4,
 		OptionData:   []byte{0x12, 0x34},
 	}
-	randSeq := 1000000000 + rand.Intn(math.MaxInt32)
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(rawPort),
 		DstPort: layers.TCPPort(port),
 		ACK:     true,
 		Window:  1024,
-		Seq:     uint32(randSeq),
+		Seq:     uint32(s.tcpsequencer.One()),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
@@ -452,14 +452,13 @@ func (s *Scanner) SynPortAsync(ip string, port int) {
 		OptionLength: 4,
 		OptionData:   []byte{0x12, 0x34},
 	}
-	randSeq := 1000000000 + rand.Intn(math.MaxInt32)
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.listenPort),
 		DstPort: layers.TCPPort(port),
 		SYN:     true,
 		Window:  1024,
-		Seq:     uint32(randSeq),
+		Seq:     uint32(s.tcpsequencer.One()),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
@@ -480,14 +479,13 @@ func (s *Scanner) ACKPortAsync(ip string, port int) {
 		OptionLength: 4,
 		OptionData:   []byte{0x12, 0x34},
 	}
-	randSeq := 1000000000 + rand.Intn(math.MaxInt32)
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.listenPort),
 		DstPort: layers.TCPPort(port),
 		ACK:     true,
 		Window:  1024,
-		Seq:     uint32(randSeq),
+		Seq:     uint32(s.tcpsequencer.One()),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)

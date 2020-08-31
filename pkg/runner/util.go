@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+
+	"github.com/projectdiscovery/gologger"
 )
 
 func isRoot() bool {
@@ -17,6 +19,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 		var ips []net.IP
 		ips, err = net.LookupIP(target)
 		if err != nil {
+			gologger.Warningf("Could not get IP for host: %s\n", target)
 			return
 		}
 		for _, ip := range ips {
@@ -30,6 +33,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 		}
 	} else {
 		targetIPs = append(targetIPs, target)
+		gologger.Debugf("Found %d addresses for %s\n", len(targetIPs), target)
 	}
 
 	return
