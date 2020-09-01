@@ -390,7 +390,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		DstPort: layers.TCPPort(port),
 		ACK:     true,
 		Window:  1024,
-		Seq:     uint32(s.tcpsequencer.One()),
+		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
@@ -458,7 +458,7 @@ func (s *Scanner) SynPortAsync(ip string, port int) {
 		DstPort: layers.TCPPort(port),
 		SYN:     true,
 		Window:  1024,
-		Seq:     uint32(s.tcpsequencer.One()),
+		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
@@ -485,7 +485,7 @@ func (s *Scanner) ACKPortAsync(ip string, port int) {
 		DstPort: layers.TCPPort(port),
 		ACK:     true,
 		Window:  1024,
-		Seq:     uint32(s.tcpsequencer.One()),
+		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)

@@ -2,24 +2,27 @@ package scan
 
 import (
 	"math"
-	"math/rand"
-	"sync"
-	"time"
+	"sync/atomic"
 )
 
+// TCPSequencer generates linear TCP sequence numbers that wrap
+// around after reaching their maximum value.
+//
+// According to specs, this is the correct way to approach TCP sequence
+// number since linearity will be gauranteed by the wrapping around to initial 0.
 type TCPSequencer struct {
-	sync.RWMutex
-	current int
+	current uint32
 }
 
+// NewTCPSequencer creates a new linear tcp sequenc enumber generator
 func NewTCPSequencer() *TCPSequencer {
-	rand.Seed(time.Now().UnixNano())
-	return &TCPSequencer{current: 1000000000 + rand.Intn(math.MaxInt32)}
+	// Start the sequence with math.MaxUint32, which will then wrap around
+	// when incremented starting the sequence with 0 as desired.
+	return &TCPSequencer{current: math.MaxUint32}
 }
 
-func (t *TCPSequencer) One() int {
-	t.Lock()
-	t.current++
-	t.Unlock()
-	return t.current
+// Next returns the next number in the sequence of tcp sequence numbers
+func (t *TCPSequencer) Next() uint32 {
+	value := atomic.AddUint32(&t.current, 1)
+	return value
 }
