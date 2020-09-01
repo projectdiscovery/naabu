@@ -10,6 +10,7 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
+// PingIcmpEchoRequest syncronous to the target ip address
 func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
@@ -55,6 +56,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	return false
 }
 
+// PingIcmpEchoRequestAsync asyncronous to the target ip address
 func (s *Scanner) PingIcmpEchoRequestAsync(ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
@@ -84,6 +86,7 @@ send:
 	}
 }
 
+// PingIcmpTimestampRequest syncronous to the target ip address
 func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
@@ -130,6 +133,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	return false
 }
 
+// PingIcmpTimestampRequestAsync syncronous to the target ip address
 func (s *Scanner) PingIcmpTimestampRequestAsync(ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
@@ -150,6 +154,7 @@ func (s *Scanner) PingIcmpTimestampRequestAsync(ip string) {
 	s.icmpPacketListener.WriteTo(data, destAddr)
 }
 
+// Timestamp ICMP structure
 type Timestamp struct {
 	ID                int
 	Seq               int
@@ -160,6 +165,7 @@ type Timestamp struct {
 
 const marshalledTimestampLen = 16
 
+// Len returns default timestamp length
 func (t *Timestamp) Len(_ int) int {
 	if t == nil {
 		return 0
@@ -167,6 +173,7 @@ func (t *Timestamp) Len(_ int) int {
 	return marshalledTimestampLen
 }
 
+// Marshal the timestamp structure
 func (t *Timestamp) Marshal(_ int) ([]byte, error) {
 	b := make([]byte, marshalledTimestampLen)
 	b[0], b[1] = byte(t.ID>>8), byte(t.ID)
@@ -181,6 +188,7 @@ func (t *Timestamp) Marshal(_ int) ([]byte, error) {
 	return b, nil
 }
 
+// ParseTimestamp to MessageBody structure
 func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 	bodyLen := len(b)
 	if bodyLen != marshalledTimestampLen {

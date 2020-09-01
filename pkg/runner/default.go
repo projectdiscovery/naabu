@@ -12,6 +12,5 @@ const (
 	DefaultRetriesSynScan     = 1
 	DefaultRetriesConnectScan = 3
 
-	WarmUpTime            = 2500
 	ExternalTargetForTune = "8.8.8.8"
 )
