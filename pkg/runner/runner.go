@@ -85,7 +85,9 @@ func (r *Runner) RunEnumeration() error {
 
 	r.ProbeOrSkip()
 
-	time.Sleep(time.Duration(WarmUpTime) * time.Millisecond)
+	if r.options.WarmUpTime > 0 {
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
+	}
 
 	// update targets
 	if len(r.scanner.ProbeResults.M) > 0 {
@@ -100,7 +102,9 @@ func (r *Runner) RunEnumeration() error {
 		r.RawSocketEnumeration()
 	}
 
-	time.Sleep(time.Duration(2500) * time.Millisecond)
+	if r.options.WarmUpTime > 0 {
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
+	}
 
 	r.scanner.State = scan.Done
 

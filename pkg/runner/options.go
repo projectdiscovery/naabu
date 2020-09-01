@@ -38,6 +38,7 @@ type Options struct {
 	IcmpTimestampProbe bool
 	SourceIp           string
 	Interface          string
+	WarmUpTime         int
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -71,6 +72,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface")
+	flag.IntVar(&options.WarmUpTime, "warmup-time", 2500, "Milliseconds between scan phases")
 	flag.Parse()
 
 	// Check if stdin pipe was given

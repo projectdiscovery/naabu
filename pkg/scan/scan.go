@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"strings"
@@ -18,15 +17,17 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-type ScanState int
+// State determines the internal scan state
+type State int
 
 const (
-	Init ScanState = iota
+	Init State = iota
 	Probe
 	Scan
 	Done
 )
 
+// PkgFlag represent the TCP packet flag
 type PkgFlag int
 
 const (
@@ -60,7 +61,7 @@ type Scanner struct {
 	listenPort         int
 	tcpChan            chan *PkgResult
 	icmpChan           chan *PkgResult
-	State              ScanState
+	State              State
 	ScanResults        *KV.KVD
 
 	NetworkInterface *net.Interface
@@ -125,11 +126,13 @@ func NewScanner(options *Options) (*Scanner, error) {
 	return scanner, nil
 }
 
+// Close the scanner and terminate all workers
 func (s *Scanner) Close() {
 	s.tcpPacketlistener.Close()
 	s.icmpPacketListener.Close()
 }
 
+// StartWorkers of the scanner
 func (s *Scanner) StartWorkers() {
 	go s.TCPReadWorker()
 	go s.TCPWriteWorker()
@@ -139,6 +142,7 @@ func (s *Scanner) StartWorkers() {
 	go s.TCPResultWorker()
 }
 
+// TCPWriteWorker that sends out TCP packets
 func (s *Scanner) TCPWriteWorker() {
 	for pkg := range s.tcpPacketSend {
 		switch pkg.flag {
@@ -150,6 +154,7 @@ func (s *Scanner) TCPWriteWorker() {
 	}
 }
 
+// TCPReadWorker reads and parse incoming TCP packets
 func (s *Scanner) TCPReadWorker() {
 	defer s.tcpPacketlistener.Close()
 	data := make([]byte, 4096)
@@ -187,6 +192,7 @@ func (s *Scanner) TCPReadWorker() {
 	}
 }
 
+// EnqueueICMP outgoing ICMP packets
 func (s *Scanner) EnqueueICMP(ip string, pkgtype PkgFlag) {
 	s.icmpPacketSend <- &PkgSend{
 		ip:   ip,
@@ -194,6 +200,7 @@ func (s *Scanner) EnqueueICMP(ip string, pkgtype PkgFlag) {
 	}
 }
 
+// EnqueueTCP outgoing TCP packets
 func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 	s.tcpPacketSend <- &PkgSend{
 		ip:   ip,
@@ -202,6 +209,7 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 	}
 }
 
+// ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
 		switch pkg.flag {
@@ -213,6 +221,7 @@ func (s *Scanner) ICMPWriteWorker() {
 	}
 }
 
+// ICMPReadWorker reads packets from the network layer
 func (s *Scanner) ICMPReadWorker() {
 	defer s.icmpPacketListener.Close()
 	data := make([]byte, 1500)
@@ -237,11 +246,12 @@ func (s *Scanner) ICMPReadWorker() {
 	}
 }
 
+// ICMPResultWorker handles ICMP responses (used only during probes)
 func (s *Scanner) ICMPResultWorker() {
 	for ip := range s.icmpChan {
 		switch s.State {
 		case Probe:
-			log.Printf("PROBE %+v\n", ip)
+			gologger.Debugf("Received ICMP response from %s\n", ip.ip)
 			s.ProbeResults.Set(ip.ip)
 		case Scan:
 			// Discard
@@ -249,19 +259,21 @@ func (s *Scanner) ICMPResultWorker() {
 	}
 }
 
+// TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		switch s.State {
 		case Probe:
-			log.Printf("PROBE %+v\n", ip)
+			gologger.Debugf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
 			s.ProbeResults.Set(ip.ip)
 		case Scan:
-			log.Printf("RESULT %+v\n", ip)
+			gologger.Debugf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
 	}
 }
 
+// GetSrcParameters gets the network parameters from the destination ip
 func GetSrcParameters(destIP string) (srcIP net.IP, networkInterface *net.Interface, err error) {
 	srcIP, err = GetSourceIP(net.ParseIP(destIP))
 	if err != nil {
@@ -302,12 +314,14 @@ send:
 	return n, err
 }
 
+// ScanSyn a target ip
 func (s *Scanner) ScanSyn(ip string) {
 	for port := range s.Ports {
 		s.SynPortAsync(ip, port)
 	}
 }
 
+// GetSourceIP gets the local ip based on our destination ip
 func GetSourceIP(dstip net.IP) (net.IP, error) {
 	serverAddr, err := net.ResolveUDPAddr("udp", dstip.String()+":12345")
 	if err != nil {
@@ -323,6 +337,7 @@ func GetSourceIP(dstip net.IP) (net.IP, error) {
 	return nil, err
 }
 
+// GetInterfaceFromIP gets the name of the network interface from local ip address
 func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 	address := ip.String()
 
@@ -359,6 +374,7 @@ func ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
 	return true, err
 }
 
+// ACKPort sends an ACK packet to a port
 func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, error) {
 	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
 	if err != nil {
@@ -395,7 +411,6 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	}
 	tcp.SetNetworkLayerForChecksum(&ip4)
 
-	// maybe should be moved after listening - WIP
 	s.send(dstIP, conn, &tcp)
 
 	data := make([]byte, 4096)
@@ -437,7 +452,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	return false, nil
 }
 
-// ConnectPort a single host and port
+// SynPortAsync sends a single SYN packet to a port
 func (s *Scanner) SynPortAsync(ip string, port int) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
@@ -465,6 +480,7 @@ func (s *Scanner) SynPortAsync(ip string, port int) {
 	s.send(ip, s.tcpPacketlistener, &tcp)
 }
 
+// ACKPortAsync sends a single ACK packet to a port
 func (s *Scanner) ACKPortAsync(ip string, port int) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
@@ -493,6 +509,7 @@ func (s *Scanner) ACKPortAsync(ip string, port int) {
 	s.send(ip, s.tcpPacketlistener, &tcp)
 }
 
+// TuneSource automatically with ip and interface
 func (s *Scanner) TuneSource(ip string) error {
 	var err error
 	s.SourceIP, s.NetworkInterface, err = GetSrcParameters(ip)
