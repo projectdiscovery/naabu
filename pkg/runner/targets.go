@@ -13,7 +13,7 @@ func (r *Runner) Load() error {
 	r.scanner.State = scan.Init
 	// target defined via CLI argument
 	if r.options.Host != "" {
-		r.scanner.Targets[r.options.Host] = struct{}{}
+		r.AddTarget(r.options.Host)
 	}
 
 	// Targets from file
@@ -83,7 +83,7 @@ func (r *Runner) addOrExpand(target string) error {
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
-	if r.options.Ping {
+	if r.options.Ping && len(initialHosts) > 1 {
 		// Scan the hosts found for ping probes
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {
@@ -111,7 +111,8 @@ func (r *Runner) addOrExpand(target string) error {
 		gologger.Infof("Using host %s for enumeration\n", target)
 	}
 
-	r.scanner.Targets[hostIP] = struct{}{}
+	// we also keep track of ip => host for the output
+	r.scanner.Targets[hostIP] = target
 
 	return nil
 }
