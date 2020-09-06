@@ -42,7 +42,7 @@ type Scanner struct {
 	Ports          map[int]struct{}
 	ExcludedIps    map[string]struct{}
 	wg             sync.WaitGroup
-	Targets        map[string]struct{}
+	Targets        map[string]string
 	ProbeResults   *KV.KV
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
@@ -97,28 +97,30 @@ func NewScanner(options *Options) (*Scanner, error) {
 		tcpsequencer: NewTCPSequencer(),
 	}
 
-	rawPort, err := freeport.GetFreePort()
-	if err != nil {
-		return nil, err
-	}
-	scanner.listenPort = rawPort
+	if options.Root {
+		rawPort, err := freeport.GetFreePort()
+		if err != nil {
+			return nil, err
+		}
+		scanner.listenPort = rawPort
 
-	tcpConn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
-	if err != nil {
-		return nil, err
-	}
-	scanner.tcpPacketlistener = tcpConn
+		tcpConn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
+		if err != nil {
+			return nil, err
+		}
+		scanner.tcpPacketlistener = tcpConn
 
-	icmpConn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-	if err != nil {
-		return nil, err
-	}
-	scanner.icmpPacketListener = icmpConn
+		icmpConn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+		if err != nil {
+			return nil, err
+		}
+		scanner.icmpPacketListener = icmpConn
 
-	scanner.icmpChan = make(chan *PkgResult, 1000)
-	scanner.icmpPacketSend = make(chan *PkgSend)
-	scanner.tcpChan = make(chan *PkgResult, 1000)
-	scanner.tcpPacketSend = make(chan *PkgSend)
+		scanner.icmpChan = make(chan *PkgResult, 1000)
+		scanner.icmpPacketSend = make(chan *PkgSend)
+		scanner.tcpChan = make(chan *PkgResult, 1000)
+		scanner.tcpPacketSend = make(chan *PkgSend)
+	}
 
 	scanner.ProbeResults = KV.NewKV()
 	scanner.ScanResults = KV.NewKVResults()
@@ -169,7 +171,7 @@ func (s *Scanner) TCPReadWorker() {
 
 		_, ok := s.Targets[addr.String()]
 		if !ok {
-			gologger.Debugf("Discarding TCP packet from %s not matching %s ip\n", addr.String())
+			gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String())
 			continue
 		}
 
@@ -181,7 +183,7 @@ func (s *Scanner) TCPReadWorker() {
 			}
 			// We consider only incoming packets
 			if tcp.DstPort != layers.TCPPort(s.listenPort) {
-				gologger.Debugf("Discarding TCP packet to %s:%d not matching port %d port\n", addr.String(), tcp.DstPort, s.listenPort)
+				gologger.Debugf("Discarding TCP packet from %s:%d not matching port %d port\n", addr.String(), tcp.DstPort, s.listenPort)
 			} else if tcp.SYN && tcp.ACK {
 				if s.debug {
 					gologger.Debugf("Accepting SYN+ACK packet from %s:%d\n", addr.String(), tcp.DstPort)
@@ -423,7 +425,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		// not matching ip
 		if addr.String() != dstIP {
 			if s.debug {
-				gologger.Debugf("Discarding TCP packet from %s not matching %s ip\n", addr.String(), dstIP)
+				gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String(), dstIP)
 			}
 			continue
 		}
@@ -437,7 +439,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 			// We consider only incoming packets
 			if tcp.DstPort != layers.TCPPort(rawPort) {
 				if s.debug {
-					gologger.Debugf("Discarding TCP packet to %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
+					gologger.Debugf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
 				}
 				continue
 			} else if tcp.RST {

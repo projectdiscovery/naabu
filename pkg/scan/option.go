@@ -8,4 +8,5 @@ type Options struct {
 	Retries int
 	Rate    int
 	Debug   bool
+	Root    bool
 }

@@ -31,6 +31,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		Retries: options.Retries,
 		Rate:    options.Rate,
 		Debug:   options.Debug,
+		Root:    isRoot(),
 	})
 	if err != nil {
 		return nil, err
@@ -52,7 +53,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 
-	runner.scanner.Targets = make(map[string]struct{})
+	runner.scanner.Targets = make(map[string]string)
 
 	return runner, nil
 }
@@ -77,40 +78,45 @@ func (r *Runner) RunEnumeration() error {
 		return err
 	}
 
-	r.BackgroundWorkers()
-
-	if err := r.SetSourceIpAndInterface(); err != nil {
-		r.scanner.TuneSource(ExternalTargetForTune)
-	}
-
-	r.ProbeOrSkip()
-
-	if r.options.WarmUpTime > 0 {
-		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
-	}
-
-	// update targets
-	if len(r.scanner.ProbeResults.M) > 0 {
-		r.scanner.Targets = r.scanner.ProbeResults.M
-	}
-
 	if !isRoot() {
 		// Connect Scan - perform ports spray scan
 		r.ConnectEnumeration()
+		r.scanner.State = scan.Done
 	} else {
+		r.BackgroundWorkers()
+
+		if err := r.SetSourceIpAndInterface(); err != nil {
+			r.scanner.TuneSource(ExternalTargetForTune)
+		}
+
+		r.ProbeOrSkip()
+
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
+		}
+
+		// update targets
+		if len(r.scanner.ProbeResults.M) > 0 {
+			for ip := range r.scanner.Targets {
+				if _, ok := r.scanner.ProbeResults.M[ip]; !ok {
+					delete(r.scanner.Targets, ip)
+				}
+			}
+		}
+
 		// Syn Scan - Perform scan with raw sockets
 		r.RawSocketEnumeration()
-	}
 
-	if r.options.WarmUpTime > 0 {
-		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
-	}
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Millisecond)
+		}
 
-	r.scanner.State = scan.Done
+		r.scanner.State = scan.Done
 
-	// Validate the hosts if the user has asked for second step validation
-	if r.options.Verify {
-		r.ConnectVerification()
+		// Validate the hosts if the user has asked for second step validation
+		if r.options.Verify {
+			r.ConnectVerification()
+		}
 	}
 
 	r.handleOutput()
@@ -217,8 +223,12 @@ func (r *Runner) handleOutput() {
 		defer file.Close()
 	}
 
-	for host, ports := range r.scanner.ScanResults.M {
-		gologger.Infof("Found %d ports on host %s\n", len(ports), host)
+	for hostIp, ports := range r.scanner.ScanResults.M {
+		host := hostIp
+		if hostOrig, ok := r.scanner.Targets[hostIp]; ok {
+			host = hostOrig
+		}
+		gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIp)
 
 		// console output
 		if r.options.JSON {
