@@ -96,6 +96,8 @@ func ParseOptions() *Options {
 		gologger.Fatalf("Program exiting: %s\n", err)
 	}
 
+	showNetworkCapabilities()
+
 	return options
 }
 
