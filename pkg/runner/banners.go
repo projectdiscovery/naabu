@@ -20,3 +20,15 @@ func showBanner() {
 	gologger.Labelf("Use with caution. You are responsible for your actions\n")
 	gologger.Labelf("Developers assume no liability and are not responsible for any misuse or damage.\n")
 }
+
+// showNetworkCapabilities shows the network capabilities/scan types possible with the running user
+func showNetworkCapabilities() {
+	accessLevel := "not root"
+	scanType := "Connect (Full Handshake)"
+	if isRoot() {
+		accessLevel = "root"
+		scanType = "TCP/ICMP Probes + Syn Scan"
+	}
+	gologger.Infof("Access Level: %s\n", accessLevel)
+	gologger.Infof("Scan Type: %s\n", scanType)
+}
