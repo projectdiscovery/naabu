@@ -53,7 +53,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 
-	runner.scanner.Targets = make(map[string]string)
+	runner.scanner.Targets = make(map[string]map[string]struct{})
 
 	return runner, nil
 }
@@ -224,38 +224,42 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIp, ports := range r.scanner.ScanResults.M {
-		host := hostIp
-		if hostOrig, ok := r.scanner.Targets[hostIp]; ok {
-			host = hostOrig
-		}
-		gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIp)
-
-		// console output
-		if r.options.JSON {
-			data := JSONResult{Host: host}
-			for port := range ports {
-				data.Port = port
-				b, err := json.Marshal(data)
-				if err != nil {
-					continue
-				}
-				gologger.Silentf("%s\n", string(b))
-			}
-		} else {
-			for port := range ports {
-				gologger.Silentf("%s:%d\n", host, port)
-			}
+		hostsOrig := r.scanner.Targets[hostIp]
+		// if no fqdn add the ip
+		if len(hostsOrig) == 0 {
+			hostsOrig[hostIp] = struct{}{}
 		}
 
-		// file output
-		if file != nil {
+		for host := range hostsOrig {
+			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIp)
+
+			// console output
 			if r.options.JSON {
-				err = WriteJSONOutput(host, ports, file)
+				data := JSONResult{Host: host}
+				for port := range ports {
+					data.Port = port
+					b, err := json.Marshal(data)
+					if err != nil {
+						continue
+					}
+					gologger.Silentf("%s\n", string(b))
+				}
 			} else {
-				err = WriteHostOutput(host, ports, file)
+				for port := range ports {
+					gologger.Silentf("%s:%d\n", host, port)
+				}
 			}
-			if err != nil {
-				gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+
+			// file output
+			if file != nil {
+				if r.options.JSON {
+					err = WriteJSONOutput(host, ports, file)
+				} else {
+					err = WriteHostOutput(host, ports, file)
+				}
+				if err != nil {
+					gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+				}
 			}
 		}
 	}

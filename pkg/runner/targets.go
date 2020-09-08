@@ -112,7 +112,10 @@ func (r *Runner) addOrExpand(target string) error {
 	}
 
 	// we also keep track of ip => host for the output
-	r.scanner.Targets[hostIP] = target
+	if _, ok := r.scanner.Targets[hostIP]; !ok {
+		r.scanner.Targets[hostIP] = make(map[string]struct{})
+	}
+	r.scanner.Targets[hostIP][target] = struct{}{}
 
 	return nil
 }

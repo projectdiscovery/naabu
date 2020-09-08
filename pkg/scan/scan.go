@@ -42,7 +42,7 @@ type Scanner struct {
 	Ports          map[int]struct{}
 	ExcludedIps    map[string]struct{}
 	wg             sync.WaitGroup
-	Targets        map[string]string
+	Targets        map[string]map[string]struct{}
 	ProbeResults   *KV.KV
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
