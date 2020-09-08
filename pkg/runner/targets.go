@@ -83,7 +83,7 @@ func (r *Runner) addOrExpand(target string) error {
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
-	if r.options.Ping && len(initialHosts) > 1 {
+	if isRoot() && r.options.Ping && len(initialHosts) > 1 {
 		// Scan the hosts found for ping probes
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {

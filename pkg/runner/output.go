@@ -10,7 +10,8 @@ import (
 
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
-	Host string `json:"host"`
+	Host string `json:"host,omitempty"`
+	Ip   string `json:"ip,omitempty"`
 	Port int    `json:"port"`
 }
 
@@ -36,11 +37,14 @@ func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) erro
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host string, ports map[int]struct{}, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
 	data := JSONResult{}
-	data.Host = host
+	if host != ip {
+		data.Host = host
+	}
+	data.Ip = ip
 
 	for port := range ports {
 		data.Port = port
