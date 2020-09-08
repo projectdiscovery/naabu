@@ -235,7 +235,10 @@ func (r *Runner) handleOutput() {
 
 			// console output
 			if r.options.JSON {
-				data := JSONResult{Host: host}
+				data := JSONResult{Ip: hostIp}
+				if host != hostIp {
+					data.Host = host
+				}
 				for port := range ports {
 					data.Port = port
 					b, err := json.Marshal(data)
@@ -253,7 +256,7 @@ func (r *Runner) handleOutput() {
 			// file output
 			if file != nil {
 				if r.options.JSON {
-					err = WriteJSONOutput(host, ports, file)
+					err = WriteJSONOutput(host, hostIp, ports, file)
 				} else {
 					err = WriteHostOutput(host, ports, file)
 				}
