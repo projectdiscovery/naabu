@@ -3,6 +3,7 @@ package runner
 import (
 	"bufio"
 	"errors"
+	"flag"
 	"os"
 
 	"github.com/projectdiscovery/gologger"
@@ -35,6 +36,11 @@ func (r *Runner) Load() error {
 		for scanner.Scan() {
 			r.AddTarget(scanner.Text())
 		}
+	}
+
+	// all additional non-named cli arguments are interpreted as targets
+	for _, target := range flag.Args() {
+		r.AddTarget(target)
 	}
 
 	if len(r.scanner.Targets) == 0 {
