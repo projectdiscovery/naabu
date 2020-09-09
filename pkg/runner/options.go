@@ -35,6 +35,8 @@ type Options struct {
 	ExcludeIpsFile     string // File containing Ips or cidr to exclude from the scan
 	Debug              bool   // Prints out debug information
 	TopPorts           string // Prints out debug information
+	Privileged         bool   // Attempts to run as root
+	Unprivileged       bool   // Drop root privileges
 	IcmpEchoProbe      bool
 	IcmpTimestampProbe bool
 	SourceIp           string
@@ -74,7 +76,8 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface")
-	flag.IntVar(&options.WarmUpTime, "warmup-time", 2500, "Milliseconds between scan phases")
+	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root")
+	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
 	flag.Parse()
 
 	// Check if stdin pipe was given
@@ -99,6 +102,8 @@ func ParseOptions() *Options {
 	}
 
 	showNetworkCapabilities()
+
+	handlePrivileges(options)
 
 	return options
 }
