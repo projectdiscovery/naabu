@@ -16,6 +16,10 @@ const (
 
 // ParsePorts parses the list of ports and creates a port map
 func ParsePorts(options *Options) (map[int]struct{}, error) {
+	portsFileMap := make(map[int]struct{})
+	portsCLIMap := make(map[int]struct{})
+	topPortsCLIMap := make(map[int]struct{})
+
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
 		data, err := ioutil.ReadFile(options.PortsFile)
@@ -26,11 +30,70 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
-		return excludePorts(options, ports)
+		portsFileMap, err = excludePorts(options, ports)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
 	}
+
+	// If the user has specfied top ports, use them as well
+	if options.TopPorts != "" {
+		// If the user has specfied full ports, use them
+		if strings.EqualFold(options.TopPorts, "full") {
+			var err error
+			ports, err := parsePortsList(Full)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+			topPortsCLIMap, err = excludePorts(options, ports)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+		}
+
+		// If the user has specfied top-100, use them
+		if strings.EqualFold(options.TopPorts, "top-100") {
+			ports, err := parsePortsList(NmapTop100)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+			topPortsCLIMap, err = excludePorts(options, ports)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+		}
+
+		// If the user has specfied top-1000, use them
+		if strings.EqualFold(options.TopPorts, "top-1000") {
+			ports, err := parsePortsList(NmapTop1000)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+			topPortsCLIMap, err = excludePorts(options, ports)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+		}
+	}
+
+	// If the user has specfied top option, use them too
+	if options.Ports != "" {
+		// Parse the custom ports list provided by the user
+		ports, err := parsePortsList(options.Ports)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
+		portsCLIMap, err = excludePorts(options, ports)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
+		}
+	}
+
+	// merge all the specified ports (meaningless is "all" is used)
+	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap)
 
 	// By default scan top 100 ports only
-	if options.Ports == "" {
+	if len(ports) == 0 {
 		ports, err := parsePortsList(NmapTop100)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
@@ -38,39 +101,7 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 		return excludePorts(options, ports)
 	}
 
-	// If the user has specfied full ports, use them
-	if strings.EqualFold(options.Ports, "full") {
-		ports, err := parsePortsList(Full)
-		if err != nil {
-			return nil, fmt.Errorf("could not read ports: %s", err)
-		}
-		return excludePorts(options, ports)
-	}
-
-	// If the user has specfied top-100, use them
-	if strings.EqualFold(options.Ports, "top-100") {
-		ports, err := parsePortsList(NmapTop100)
-		if err != nil {
-			return nil, fmt.Errorf("could not read ports: %s", err)
-		}
-		return excludePorts(options, ports)
-	}
-
-	// If the user has specfied top-1000, use them
-	if strings.EqualFold(options.Ports, "top-1000") {
-		ports, err := parsePortsList(NmapTop1000)
-		if err != nil {
-			return nil, fmt.Errorf("could not read ports: %s", err)
-		}
-		return excludePorts(options, ports)
-	}
-
-	// Parse the custom ports list provided by the user
-	ports, err := parsePortsList(options.Ports)
-	if err != nil {
-		return nil, fmt.Errorf("could not read ports: %s", err)
-	}
-	return excludePorts(options, ports)
+	return ports, nil
 }
 
 // excludePorts excludes the list of ports from the exclusion list
@@ -158,4 +189,15 @@ func checkPort(m map[int]struct{}, p, prefix string) error {
 	}
 
 	return nil
+}
+
+// merge maps in a new one
+func merge(maps ...map[int]struct{}) (m map[int]struct{}) {
+	m = make(map[int]struct{})
+	for _, mp := range maps {
+		for p := range mp {
+			m[p] = struct{}{}
+		}
+	}
+	return
 }
