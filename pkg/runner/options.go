@@ -34,6 +34,7 @@ type Options struct {
 	ExcludeIps         string // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile     string // File containing Ips or cidr to exclude from the scan
 	Debug              bool   // Prints out debug information
+	TopPorts           string // Prints out debug information
 	IcmpEchoProbe      bool
 	IcmpTimestampProbe bool
 	SourceIp           string
@@ -46,6 +47,7 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
+	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "p", "", "Ports to enumerate for on hosts (top-1000, full, custom, default: top-100)")
 	flag.StringVar(&options.PortProbes, "port-probe", "S80,A443", "Port probes for hosts (default SYN - 80, ACK - 443)")
