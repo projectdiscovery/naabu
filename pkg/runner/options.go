@@ -46,7 +46,7 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
-	flag.StringVar(&options.HostsFile, "hL", "", "File containing list of hosts to enumerate ports")
+	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "ports", "", "Ports to enumerate for on hosts (top-1000, full, custom, default: top-100)")
 	flag.StringVar(&options.PortProbes, "port-probe", "S80,A443", "Port probes for hosts (default SYN - 80, ACK - 443)")
 	flag.BoolVar(&options.IcmpEchoProbe, "icmp-echo-probe", true, "Use ICMP_ECHO_REQUEST probe")
