@@ -32,3 +32,15 @@ func showNetworkCapabilities() {
 	gologger.Infof("Access Level: %s\n", accessLevel)
 	gologger.Infof("Scan Type: %s\n", scanType)
 }
+
+func handlePrivileges(options *Options) error {
+	if options.Privileged {
+		return Sudo()
+	}
+
+	if options.Unprivileged {
+		return DropSudo()
+	}
+
+	return nil
+}
