@@ -177,8 +177,29 @@ func (r *Runner) ConnectEnumeration() {
 	swg.Wait()
 }
 
+// check if an ip can be scanned in case CDN exclusions are enabled
+func (r *Runner) canIScanIfCDN(host string, port int) bool {
+	// if CDN ips are not excluded all scans are allowed
+	if !r.options.ExcludeCDN {
+		return true
+	}
+
+	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
+	if !r.scanner.CdnCheck(host) {
+		return true
+	}
+
+	// If the cdn is part of the CDN ips range - only ports 80 and 443 are allowed
+	return port == 80 || port == 443
+}
+
 func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
 	defer swg.Done()
+
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(host, port) {
+		return
+	}
 
 	if r.scanner.ScanResults.Has(host, port) {
 		return

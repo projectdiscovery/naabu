@@ -37,6 +37,7 @@ type Options struct {
 	TopPorts           string // Prints out debug information
 	Privileged         bool   // Attempts to run as root
 	Unprivileged       bool   // Drop root privileges
+	ExcludeCDN         bool   // Excludes ip of knows CDN ranges
 	IcmpEchoProbe      bool
 	IcmpTimestampProbe bool
 	SourceIp           string
@@ -78,6 +79,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface")
 	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root")
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
+	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Avoid scanning CDN ips")
 	flag.Parse()
 
 	// Check if stdin pipe was given

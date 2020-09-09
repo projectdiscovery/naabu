@@ -11,6 +11,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/phayes/freeport"
+	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/KV"
 	"golang.org/x/net/icmp"
@@ -67,6 +68,7 @@ type Scanner struct {
 	NetworkInterface *net.Interface
 	SourceIP         net.IP
 	tcpsequencer     *TCPSequencer
+	cdn              *cdncheck.Client
 }
 
 type PkgSend struct {
@@ -124,6 +126,8 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 	scanner.ProbeResults = KV.NewKV()
 	scanner.ScanResults = KV.NewKVResults()
+
+	scanner.cdn = cdncheck.New()
 
 	return scanner, nil
 }
