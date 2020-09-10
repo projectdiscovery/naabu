@@ -127,7 +127,11 @@ func NewScanner(options *Options) (*Scanner, error) {
 	scanner.ProbeResults = KV.NewKV()
 	scanner.ScanResults = KV.NewKVResults()
 
-	scanner.cdn = cdncheck.New()
+	var err error
+	scanner.cdn, err = cdncheck.New()
+	if err != nil {
+		return nil, err
+	}
 
 	return scanner, nil
 }
