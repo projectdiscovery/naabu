@@ -2,6 +2,7 @@ package runner
 
 import (
 	"errors"
+	"flag"
 
 	"github.com/projectdiscovery/gologger"
 )
@@ -10,7 +11,7 @@ import (
 func (options *Options) validateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
 	// If none was provided, then return.
-	if options.Host == "" && options.HostsFile == "" && !options.Stdin {
+	if options.Host == "" && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
 		return errors.New("no input list provided")
 	}
 
