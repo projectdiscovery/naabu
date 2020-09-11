@@ -1,13 +1,13 @@
 // +build windows
 
-package runner
+package runas
 
-func Sudo() error {
+func Root() error {
 	// not implemented
 	return nil
 }
 
-func DropSudo() error {
+func Nobody() error {
 	// not implemented
 	return nil
 }

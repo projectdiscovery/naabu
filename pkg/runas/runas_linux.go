@@ -1,6 +1,6 @@
 // +build linux darwin
 
-package runner
+package runas
 
 import (
 	"fmt"
@@ -20,7 +20,8 @@ const (
 	PrivilegedUser   = "root"
 )
 
-func Sudo() error {
+// Root attempts to elevate to root
+func Root() error {
 	if os.Geteuid() != 0 {
 		// downgrading to user nobody
 		return switchUser(PrivilegedUser)
@@ -29,8 +30,8 @@ func Sudo() error {
 	return nil
 }
 
-// DropSudo privileges to nobody user
-func DropSudo() error {
+// Nobody drops root privileges
+func Nobody() error {
 	if os.Geteuid() == 0 {
 		// downgrading to user nobody
 		return switchUser(UnprivilegedUser)
