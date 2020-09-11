@@ -106,7 +106,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		}
 		scanner.listenPort = rawPort
 
-		tcpConn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
+		tcpConn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", rawPort))})
 		if err != nil {
 			return nil, err
 		}

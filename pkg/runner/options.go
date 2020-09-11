@@ -80,6 +80,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root")
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
 	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Avoid scanning CDN ips")
+	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in Seconds between scan phases")
 	flag.Parse()
 
 	// Check if stdin pipe was given
