@@ -1,6 +1,9 @@
 package runner
 
-import "github.com/projectdiscovery/gologger"
+import (
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/pkg/runas"
+)
 
 const banner = `
                   __       
@@ -35,11 +38,11 @@ func showNetworkCapabilities() {
 
 func handlePrivileges(options *Options) error {
 	if options.Privileged {
-		return Sudo()
+		return runas.Root()
 	}
 
 	if options.Unprivileged {
-		return DropSudo()
+		return runas.Nobody()
 	}
 
 	return nil
