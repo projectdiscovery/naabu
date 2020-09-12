@@ -6,6 +6,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/runas"
+	"github.com/projectdiscovery/naabu/pkg/scan"
 )
 
 const banner = `
@@ -40,6 +41,7 @@ func showNetworkCapabilities() {
 }
 
 func showNetworkInterfaces() error {
+	// Interfaces List
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		return err
@@ -56,6 +58,13 @@ func showNetworkInterfaces() error {
 		}
 		gologger.Infof("Interface %s:\nMAC: %s\nAddresses: %s\nMTU: %d\nFlags: %s\n", itf.Name, itf.HardwareAddr, strings.Join(addrstr, " "), itf.MTU, itf.Flags.String())
 	}
+	// External ip
+	externalIP, err := scan.WhatsMyIP()
+	if err != nil {
+		gologger.Warningf("Could not obtain public ip: %s\n", err)
+	}
+	gologger.Infof("External Ip: %s\n", externalIP)
+
 	return nil
 }
 
