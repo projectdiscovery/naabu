@@ -88,6 +88,10 @@ func (r *Runner) addOrExpand(target string) error {
 		initialHosts = append(initialHosts, ip)
 	}
 
+	if len(initialHosts) == 0 {
+		return nil
+	}
+
 	// If the user has specified ping probes, perform ping on addresses
 	if isRoot() && r.options.Ping && len(initialHosts) > 1 {
 		// Scan the hosts found for ping probes
@@ -114,7 +118,7 @@ func (r *Runner) addOrExpand(target string) error {
 		hostIP = fastestHost.Host
 	} else {
 		hostIP = initialHosts[0]
-		gologger.Infof("Using host %s for enumeration\n", target)
+		gologger.Debugf("Using host %s for enumeration\n", hostIP)
 	}
 
 	// we also keep track of ip => host for the output
