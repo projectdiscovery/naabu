@@ -3,6 +3,8 @@ package runner
 import (
 	"errors"
 	"flag"
+	"fmt"
+	"net"
 
 	"github.com/projectdiscovery/gologger"
 )
@@ -39,6 +41,12 @@ func (options *Options) validateOptions() error {
 
 	if !isRoot() && options.Retries == DefaultRetriesSynScan {
 		options.Retries = DefaultRetriesConnectScan
+	}
+
+	if options.Interface != "" {
+		if _, err := net.InterfaceByName(options.Interface); err != nil {
+			return fmt.Errorf("Interface %s not found", options.Interface)
+		}
 	}
 
 	return nil
