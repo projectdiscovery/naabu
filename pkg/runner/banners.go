@@ -1,6 +1,9 @@
 package runner
 
 import (
+	"net"
+	"strings"
+
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/runas"
 )
@@ -34,6 +37,26 @@ func showNetworkCapabilities() {
 	}
 	gologger.Infof("Access Level: %s\n", accessLevel)
 	gologger.Infof("Scan Type: %s\n", scanType)
+}
+
+func showNetworkInterfaces() error {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, itf := range interfaces {
+		addresses, err := itf.Addrs()
+		if err != nil {
+			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, err)
+			continue
+		}
+		var addrstr []string
+		for _, address := range addresses {
+			addrstr = append(addrstr, address.String())
+		}
+		gologger.Infof("Interface %s:\nMAC: %s\nAddresses: %s\nMTU: %d\nFlags: %s\n", itf.Name, itf.HardwareAddr, strings.Join(addrstr, " "), itf.MTU, itf.Flags.String())
+	}
+	return nil
 }
 
 func handlePrivileges(options *Options) error {
