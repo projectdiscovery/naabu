@@ -70,7 +70,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")
 	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
-	flag.StringVar(&options.ExcludeIps, "exclude", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
+	flag.StringVar(&options.ExcludeIps, "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
 	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "This offers the same functionality as the -exclude option, except that the excluded targets are provided in a newline-delimited file")
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
