@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/projectdiscovery/gologger"
@@ -198,6 +200,7 @@ func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string,
 
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
+		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
 		return
 	}
 
@@ -214,6 +217,12 @@ func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string,
 func (r *Runner) handleHostPortSyn(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
 	defer swg.Done()
 
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(host, port) {
+		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
+		return
+	}
+
 	r.scanner.SynPortAsync(host, port)
 }
 
@@ -229,13 +238,16 @@ func (r *Runner) handleOutput() {
 		output = r.options.Output
 		// If the output format is json, append .json
 		// else append .txt
-		if r.options.OutputDirectory != "" {
-			if r.options.JSON {
-				output += ".json"
-			} else {
-				output += ".txt"
-			}
+		if r.options.JSON && !strings.HasSuffix(output, ".json") {
+			output += ".json"
 		}
+
+		// create path if not existing
+		outputFolder := filepath.Dir(output)
+		if _, err := os.Stat(outputFolder); os.IsNotExist(err) {
+			os.MkdirAll(outputFolder, 0700)
+		}
+
 		file, err = os.Create(output)
 		if err != nil {
 			gologger.Errorf("Could not create file %s: %s\n", output, err)

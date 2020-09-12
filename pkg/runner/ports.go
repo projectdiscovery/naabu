@@ -78,11 +78,16 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 
 	// If the user has specfied top option, use them too
 	if options.Ports != "" {
-		// Parse the custom ports list provided by the user
+		// "-" equals to all ports
+		if options.Ports == "-" {
+			// Parse the custom ports list provided by the user
+			options.Ports = "1-65535"
+		}
 		ports, err := parsePortsList(options.Ports)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+
 		portsCLIMap, err = excludePorts(options, ports)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
@@ -124,7 +129,6 @@ func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, e
 
 func parsePortsList(data string) (map[int]struct{}, error) {
 	ports := make(map[int]struct{})
-
 	ranges := strings.Split(data, ",")
 	for _, r := range ranges {
 		r = strings.TrimSpace(r)

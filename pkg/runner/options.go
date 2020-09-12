@@ -19,7 +19,6 @@ type Options struct {
 	Host               string // Host is the host to find ports for
 	HostsFile          string // HostsFile is the file containing list of hosts to find port for
 	Output             string // Output is the file to write found ports to.
-	OutputDirectory    string // OutputDirectory is the directory to write results to in case list of hosts is given
 	JSON               bool   // JSON specifies whether to use json for output format or text file
 	Silent             bool   // Silent suppresses any extra text and only writes found host:port to screen
 	Ports              string // Ports is the ports to use for enumeration
@@ -60,7 +59,6 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Ping, "ping", true, "Use ping probes for verification of host")
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
-	flag.StringVar(&options.OutputDirectory, "oD", "", "Directory to write enumeration results to (optional)")
 	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")
 	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
 	flag.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe")
