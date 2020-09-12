@@ -42,6 +42,7 @@ type Options struct {
 	SourceIp           string
 	Interface          string
 	WarmUpTime         int
+	InterfacesList     bool
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -79,6 +80,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
 	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Avoid scanning CDN ips")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in Seconds between scan phases")
+	flag.BoolVar(&options.InterfacesList, "interface-list", false, "list available interfaces and exit")
 	flag.Parse()
 
 	// Check if stdin pipe was given
@@ -95,6 +97,12 @@ func ParseOptions() *Options {
 		os.Exit(0)
 	}
 
+	// Show network configuration and exit if the user requested it
+	if options.InterfacesList {
+		showNetworkInterfaces()
+		os.Exit(0)
+	}
+
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
 	err := options.validateOptions()
@@ -104,6 +112,7 @@ func ParseOptions() *Options {
 
 	showNetworkCapabilities()
 
+	// Handle privileges - most probably elevation will fail as the process would need to invoke fork()
 	err = handlePrivileges(options)
 	if err != nil {
 		gologger.Warningf("Could not set privileges:%s\n", err)
