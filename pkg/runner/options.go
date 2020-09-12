@@ -75,7 +75,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
 	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface")
-	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root")
+	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root - Use sudo if possible")
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
 	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Avoid scanning CDN ips")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in Seconds between scan phases")
@@ -104,7 +104,10 @@ func ParseOptions() *Options {
 
 	showNetworkCapabilities()
 
-	handlePrivileges(options)
+	err = handlePrivileges(options)
+	if err != nil {
+		gologger.Warningf("Could not set privileges:%s\n", err)
+	}
 
 	return options
 }
