@@ -1,4 +1,4 @@
-// +build windows darwin
+// +build darwin
 
 package runas
 
