@@ -10,16 +10,17 @@ import (
 
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
-	Host string `json:"host"`
+	Host string `json:"host,omitempty"`
+	Ip   string `json:"ip,omitempty"`
 	Port int    `json:"port"`
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, results map[int]struct{}, writer io.Writer) error {
+func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
 
-	for port := range results {
+	for port := range ports {
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(port))
@@ -36,13 +37,16 @@ func WriteHostOutput(host string, results map[int]struct{}, writer io.Writer) er
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host string, results map[int]struct{}, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
 	data := JSONResult{}
-	data.Host = host
+	if host != ip {
+		data.Host = host
+	}
+	data.Ip = ip
 
-	for port := range results {
+	for port := range ports {
 		data.Port = port
 
 		err := encoder.Encode(&data)

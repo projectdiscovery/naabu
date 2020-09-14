@@ -1,12 +1,15 @@
 package runner
 
 import (
-	"bufio"
+	"encoding/json"
 	"fmt"
+	"net"
 	"os"
-	"path"
-	"sync"
+	"path/filepath"
+	"strings"
+	"time"
 
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 )
@@ -16,10 +19,6 @@ import (
 type Runner struct {
 	options *Options
 	scanner *scan.Scanner
-
-	ports       map[int]struct{}
-	excludedIps map[string]struct{}
-	wg          sync.WaitGroup
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -29,120 +28,275 @@ func NewRunner(options *Options) (*Runner, error) {
 		options: options,
 	}
 
-	var err error
-	runner.ports, err = ParsePorts(options)
+	scanner, err := scan.NewScanner(&scan.Options{
+		Timeout: time.Duration(options.Timeout) * time.Millisecond,
+		Retries: options.Retries,
+		Rate:    options.Rate,
+		Debug:   options.Debug,
+		Root:    isRoot(),
+	})
+	if err != nil {
+		return nil, err
+	}
+	runner.scanner = scanner
+
+	runner.scanner.Ports, err = ParsePorts(options)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse ports: %s", err)
+	}
+
+	err = runner.parseProbesPorts(options)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse probes: %s", err)
+	}
+
+	runner.scanner.ExcludedIps, err = parseExcludedIps(options)
 	if err != nil {
 		return nil, err
 	}
 
-	runner.excludedIps, err = parseExcludedIps(options)
-	if err != nil {
-		return nil, err
-	}
+	runner.scanner.Targets = make(map[string]map[string]struct{})
 
 	return runner, nil
 }
 
-// RunEnumeration runs the ports enumeration flow on the targets specified
-func (r *Runner) RunEnumeration() error {
-	// Get the ports as specified by the user
-	ports, err := ParsePorts(r.options)
-	if err != nil {
-		return fmt.Errorf("could not parse ports: %s", err)
-	}
-
-	targets := make(chan string)
-	// start listener
-	r.wg.Add(1)
-	go r.EnumerateMultipleHosts(targets, ports)
-
-	// Check if only a single host is sent as input. Process the host now.
-	if r.options.Host != "" {
-		targets <- r.options.Host
-		close(targets)
-
-		r.wg.Wait()
-		return nil
-	}
-
-	// If we have multiple hosts as input,
-	if r.options.HostsFile != "" {
-		f, err := os.Open(r.options.HostsFile)
+func (r *Runner) SetSourceIpAndInterface() error {
+	if r.options.SourceIp != "" && r.options.Interface != "" {
+		r.scanner.SourceIP = net.ParseIP(r.options.SourceIp)
+		var err error
+		r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
 		if err != nil {
 			return err
 		}
-		defer f.Close()
-
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			targets <- scanner.Text()
-		}
-
-		close(targets)
-
-		r.wg.Wait()
-		return nil
 	}
 
-	// If we have STDIN input, treat it as multiple hosts
-	if r.options.Stdin {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			targets <- scanner.Text()
+	return fmt.Errorf("Source Ip and Interface not specified")
+}
+
+// RunEnumeration runs the ports enumeration flow on the targets specified
+func (r *Runner) RunEnumeration() error {
+	err := r.Load()
+	if err != nil {
+		return err
+	}
+
+	if !isRoot() {
+		// Connect Scan - perform ports spray scan
+		r.ConnectEnumeration()
+		r.scanner.State = scan.Done
+	} else {
+		r.BackgroundWorkers()
+
+		if err := r.SetSourceIpAndInterface(); err != nil {
+			r.scanner.TuneSource(ExternalTargetForTune)
 		}
 
-		close(targets)
+		r.ProbeOrSkip()
 
-		r.wg.Wait()
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+		}
+
+		// update targets
+		if len(r.scanner.ProbeResults.M) > 0 {
+			for ip := range r.scanner.Targets {
+				if _, ok := r.scanner.ProbeResults.M[ip]; !ok {
+					delete(r.scanner.Targets, ip)
+				}
+			}
+		}
+
+		// Syn Scan - Perform scan with raw sockets
+		r.RawSocketEnumeration()
+
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+		}
+
+		r.scanner.State = scan.Done
+
+		// Validate the hosts if the user has asked for second step validation
+		if r.options.Verify {
+			r.ConnectVerification()
+		}
 	}
+
+	r.handleOutput()
+
 	return nil
 }
 
-// EnumerateMultipleHosts enumerates hosts for ports.
-// We keep enumerating ports for a given host until we reach an error
-func (r *Runner) EnumerateMultipleHosts(targets chan string, ports map[int]struct{}) {
-	defer r.wg.Done()
+func (r *Runner) ConnectVerification() {
+	r.scanner.State = scan.Scan
+	swg := sizedwaitgroup.New(r.options.Rate)
 
-	swg := sizedwaitgroup.New(r.options.Threads)
+	for host, ports := range r.scanner.ScanResults.M {
+		swg.Add()
+		go func(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+			defer swg.Done()
+			results := r.scanner.ConnectVerify(host, ports)
+			r.scanner.ScanResults.SetPorts(host, results)
+		}(&swg, host, ports)
+	}
 
-	for host := range targets {
-		if host == "" {
-			continue
-		}
+	swg.Wait()
+}
 
-		// Check if the host is a cidr
-		if scan.IsCidr(host) {
-			ips, err := scan.Ips(host)
-			if err != nil {
-				return
-			}
+func (r *Runner) BackgroundWorkers() {
+	r.scanner.StartWorkers()
+}
 
-			for _, ip := range ips {
+func (r *Runner) RawSocketEnumeration() {
+	r.scanner.State = scan.Scan
+	swg := sizedwaitgroup.New(r.options.Rate)
+
+	for retry := 0; retry < r.options.Retries; retry++ {
+		for port := range r.scanner.Ports {
+			for target := range r.scanner.Targets {
 				swg.Add()
-				go r.handleHost(&swg, ip, ports)
+				go r.handleHostPortSyn(&swg, target, port)
 			}
-
-		} else {
-			swg.Add()
-			go r.handleHost(&swg, host, ports)
 		}
 	}
 
 	swg.Wait()
 }
 
-func (r *Runner) handleHost(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+func (r *Runner) ConnectEnumeration() {
+	r.scanner.State = scan.Scan
+	// naive algorithm - ports spray
+	swg := sizedwaitgroup.New(r.options.Rate)
+
+	for retry := 0; retry < r.options.Retries; retry++ {
+		for port := range r.scanner.Ports {
+			for target := range r.scanner.Targets {
+				swg.Add()
+				go r.handleHostPort(&swg, target, port)
+			}
+		}
+	}
+
+	swg.Wait()
+}
+
+// check if an ip can be scanned in case CDN exclusions are enabled
+func (r *Runner) canIScanIfCDN(host string, port int) bool {
+	// if CDN ips are not excluded all scans are allowed
+	if !r.options.ExcludeCDN {
+		return true
+	}
+
+	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
+	if !r.scanner.CdnCheck(host) {
+		return true
+	}
+
+	// If the cdn is part of the CDN ips range - only ports 80 and 443 are allowed
+	return port == 80 || port == 443
+}
+
+func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
 	defer swg.Done()
 
-	// If the user has specifed an output file, use that output file instead
-	// of creating a new output file for each domain. Else create a new file
-	// for each domain in the directory.
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(host, port) {
+		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
+		return
+	}
+
+	if r.scanner.ScanResults.Has(host, port) {
+		return
+	}
+
+	open, err := scan.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
+	if open && err == nil {
+		r.scanner.ScanResults.AddPort(host, port)
+	}
+}
+
+func (r *Runner) handleHostPortSyn(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
+	defer swg.Done()
+
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(host, port) {
+		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
+		return
+	}
+
+	r.scanner.SynPortAsync(host, port)
+}
+
+func (r *Runner) handleOutput() {
+	var (
+		file   *os.File
+		err    error
+		output string
+	)
+	// In case the user has given an output file, write all the found
+	// ports to the output file.
 	if r.options.Output != "" {
-		r.EnumerateSingleHost(host, ports, r.options.Output, true)
-	} else if r.options.OutputDirectory != "" {
-		outputFile := path.Join(r.options.OutputDirectory, host)
-		r.EnumerateSingleHost(host, ports, outputFile, false)
-	} else {
-		r.EnumerateSingleHost(host, ports, "", true)
+		output = r.options.Output
+		// If the output format is json, append .json
+		// else append .txt
+		if r.options.JSON && !strings.HasSuffix(output, ".json") {
+			output += ".json"
+		}
+
+		// create path if not existing
+		outputFolder := filepath.Dir(output)
+		if _, err := os.Stat(outputFolder); os.IsNotExist(err) {
+			os.MkdirAll(outputFolder, 0700)
+		}
+
+		file, err = os.Create(output)
+		if err != nil {
+			gologger.Errorf("Could not create file %s: %s\n", output, err)
+			return
+		}
+		defer file.Close()
+	}
+
+	for hostIp, ports := range r.scanner.ScanResults.M {
+		hostsOrig := r.scanner.Targets[hostIp]
+		// if no fqdn add the ip
+		if len(hostsOrig) == 0 {
+			hostsOrig[hostIp] = struct{}{}
+		}
+
+		for host := range hostsOrig {
+			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIp)
+
+			// console output
+			if r.options.JSON {
+				data := JSONResult{Ip: hostIp}
+				if host != hostIp {
+					data.Host = host
+				}
+				for port := range ports {
+					data.Port = port
+					b, err := json.Marshal(data)
+					if err != nil {
+						continue
+					}
+					gologger.Silentf("%s\n", string(b))
+				}
+			} else {
+				for port := range ports {
+					gologger.Silentf("%s:%d\n", host, port)
+				}
+			}
+
+			// file output
+			if file != nil {
+				if r.options.JSON {
+					err = WriteJSONOutput(host, hostIp, ports, file)
+				} else {
+					err = WriteHostOutput(host, ports, file)
+				}
+				if err != nil {
+					gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+				}
+			}
+		}
 	}
 }
