@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "github.com/projectdiscovery/fdmax/autofdmax"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/runner"
 )

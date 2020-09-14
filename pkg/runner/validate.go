@@ -2,6 +2,9 @@ package runner
 
 import (
 	"errors"
+	"flag"
+	"fmt"
+	"net"
 
 	"github.com/projectdiscovery/gologger"
 )
@@ -10,7 +13,7 @@ import (
 func (options *Options) validateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
 	// If none was provided, then return.
-	if options.Host == "" && options.HostsFile == "" && !options.Stdin {
+	if options.Host == "" && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
 		return errors.New("no input list provided")
 	}
 
@@ -23,6 +26,7 @@ func (options *Options) validateOptions() error {
 	if options.Threads == 0 {
 		return errors.New("threads cannot be zero")
 	}
+
 	if options.Timeout == 0 {
 		return errors.New("timeout cannot be zero")
 	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {
@@ -37,6 +41,12 @@ func (options *Options) validateOptions() error {
 
 	if !isRoot() && options.Retries == DefaultRetriesSynScan {
 		options.Retries = DefaultRetriesConnectScan
+	}
+
+	if options.Interface != "" {
+		if _, err := net.InterfaceByName(options.Interface); err != nil {
+			return fmt.Errorf("Interface %s not found", options.Interface)
+		}
 	}
 
 	return nil
