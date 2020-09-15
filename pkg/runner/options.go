@@ -33,11 +33,11 @@ type Options struct {
 	ExcludeIps         string // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile     string // File containing Ips or cidr to exclude from the scan
 	Debug              bool   // Prints out debug information
-	TopPorts           string // Prints out debug information
+	TopPorts           string // Tops ports to scan
 	Privileged         bool   // Attempts to run as root
 	Unprivileged       bool   // Drop root privileges
-	ExcludeCDN         bool   // Excludes ip of knows CDN ranges
-	IcmpEchoProbe      bool
+	ExcludeCDN         bool   // Excludes ip of knows CDN ranges for full port scan
+	IcmpEchoProbe      bool   // Probe for Icmp Echo 
 	IcmpTimestampProbe bool
 	SourceIp           string
 	Interface          string
@@ -50,9 +50,9 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
-	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports")
+	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
-	flag.StringVar(&options.Ports, "p", "", "Ports to enumerate for on hosts (top-1000, full, custom, default: top-100)")
+	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
 	flag.StringVar(&options.PortProbes, "port-probe", "S80,A443", "Port probes for hosts (default SYN - 80, ACK - 443)")
 	flag.BoolVar(&options.IcmpEchoProbe, "icmp-echo-probe", true, "Use ICMP_ECHO_REQUEST probe")
 	flag.BoolVar(&options.IcmpTimestampProbe, "icmp-timestamp-probe", true, "Use ICMP_ECHO_REQUEST probe")
@@ -61,7 +61,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
 	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")
-	flag.BoolVar(&options.Silent, "silent", false, "Show only host:ports in output")
+	flag.BoolVar(&options.Silent, "silent", false, "Show found ports only in output")
 	flag.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe")
 	flag.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
@@ -69,18 +69,18 @@ func ParseOptions() *Options {
 	flag.IntVar(&options.Threads, "t", DefaultResolverThreads, "Number of concurrent goroutines for resolving")
 	flag.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
-	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again")
+	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification")
 	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
 	flag.StringVar(&options.ExcludeIps, "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
-	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "This offers the same functionality as the -exclude option, except that the excluded targets are provided in a newline-delimited file")
-	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information") // Debug mode allows debugging request/responses for the engine
+	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)")
+	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
 	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
-	flag.StringVar(&options.Interface, "interface", "", "Network Interface")
+	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
 	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root - Use sudo if possible")
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
-	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Avoid scanning CDN ips")
-	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in Seconds between scan phases")
-	flag.BoolVar(&options.InterfacesList, "interface-list", false, "list available interfaces and public ip")
+	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Sikp full port scans for CDNs (only checks for 80,443)")
+	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
+	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
 	flag.Parse()
 
 	// Check if stdin pipe was given
