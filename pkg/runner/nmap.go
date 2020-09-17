@@ -28,11 +28,10 @@ func (r *Runner) handleNmap() {
 		}
 
 		portsStr := strings.Join(ports, ",")
-		ipsStr := strings.Join(ips, " ")
 
 		args = append(args, "-p")
 		args = append(args, portsStr)
-		args = append(args, ipsStr)
+		args = append(args, ips...)
 
 		if r.options.Nmap {
 			gologger.Infof("Running nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
