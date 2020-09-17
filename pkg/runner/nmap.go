@@ -10,7 +10,7 @@ import (
 )
 
 func (r *Runner) handleNmap() {
-	if r.options.config != nil || r.options.config.NMapCommand != "" {
+	if r.options.config != nil && r.options.config.NMapCommand != "" {
 		args := strings.Split(r.options.config.NMapCommand, " ")
 		var (
 			ips   []string
