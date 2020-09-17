@@ -56,6 +56,8 @@ type ConfigFile struct {
 	Interface string `yaml:"interface,omitempty"`
 	// WarmUpTime between scan phases
 	WarmUpTime int `yaml:"warm-up-time,omitempty"`
+	// NMapCommand to invoke after scanning
+	NMapCommand string `yaml:"nmap,omitempty"`
 }
 
 // GetConfigDirectory gets the subfinder config directory for a user
