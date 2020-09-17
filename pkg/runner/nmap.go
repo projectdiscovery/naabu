@@ -28,6 +28,7 @@ func (r *Runner) handleNmap() {
 		}
 
 		portsStr := strings.Join(ports, ",")
+		ipsStr := strings.Join(ips, ",")
 
 		args = append(args, "-p")
 		args = append(args, portsStr)
