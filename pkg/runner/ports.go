@@ -19,6 +19,7 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 	portsFileMap := make(map[int]struct{})
 	portsCLIMap := make(map[int]struct{})
 	topPortsCLIMap := make(map[int]struct{})
+	var portsConfigList []map[int]struct{}
 
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
@@ -76,6 +77,27 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 		}
 	}
 
+	// ports from config file
+	if options.config != nil {
+		for _, p := range options.config.Ports {
+			// "-" equals to all ports
+			if p == "-" {
+				// Parse the custom ports list provided by the user
+				p = "1-65535"
+			}
+			ports, err := parsePortsList(p)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+
+			pMap, err := excludePorts(options, ports)
+			if err != nil {
+				return nil, fmt.Errorf("could not read ports: %s", err)
+			}
+			portsConfigList = append(portsConfigList, pMap)
+		}
+	}
+
 	// If the user has specfied top option, use them too
 	if options.Ports != "" {
 		// "-" equals to all ports
@@ -87,7 +109,6 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
-
 		portsCLIMap, err = excludePorts(options, ports)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
@@ -95,7 +116,8 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 	}
 
 	// merge all the specified ports (meaningless is "all" is used)
-	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap)
+	portsConfigMap := merge(portsConfigList...)
+	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigMap)
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
@@ -116,10 +138,24 @@ func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, e
 	}
 
 	// Exclude the ports specified by the user in exclusion list
-	excludedPorts, err := parsePortsList(options.ExcludePorts)
+	excludedPortsCLI, err := parsePortsList(options.ExcludePorts)
 	if err != nil {
 		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
 	}
+
+	var excludedPortsConfigList []map[int]struct{}
+	if options.config != nil {
+		for _, excludePorts := range options.config.ExcludePorts {
+			p, err := parsePortsList(excludePorts)
+			if err != nil {
+				return nil, fmt.Errorf("could not read exclusion ports: %s", err)
+			}
+			excludedPortsConfigList = append(excludedPortsConfigList, p)
+		}
+	}
+
+	excludedPortsConfig := merge(excludedPortsConfigList...)
+	excludedPorts := merge(excludedPortsCLI, excludedPortsConfig)
 
 	for p := range excludedPorts {
 		delete(ports, p)
@@ -179,6 +215,22 @@ func (r *Runner) parseProbesPorts(options *Options) (err error) {
 			return
 		}
 	}
+
+	if options.config != nil {
+		for _, probeLine := range options.config.PortProbes {
+			for _, portProbe := range strings.Split(probeLine, ",") {
+				err = checkPort(synprobesports, portProbe, "S")
+				if err != nil {
+					return
+				}
+				err = checkPort(ackprobesports, portProbe, "A")
+				if err != nil {
+					return
+				}
+			}
+		}
+	}
+
 	r.scanner.SynProbesPorts, r.scanner.AckProbesPorts = synprobesports, ackprobesports
 	return
 }
