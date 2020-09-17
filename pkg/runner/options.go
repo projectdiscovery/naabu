@@ -103,6 +103,9 @@ func ParseOptions() *Options {
 	// Show the user the banner
 	showBanner()
 
+	// write default conf file template if it doesn't exist
+	options.writeDefaultConfig()
+
 	if options.Version {
 		gologger.Infof("Current Version: %s\n", Version)
 		os.Exit(0)
@@ -116,7 +119,13 @@ func ParseOptions() *Options {
 
 	// If a config file is provided, merge the options
 	if options.ConfigFile != "" {
-		options.MergeFromConfig()
+		options.MergeFromConfig(options.ConfigFile, false)
+	} else {
+		defaultConfigPath, err := getDefaultConfigFile()
+		if err != nil {
+			gologger.Errorf("Program exiting: %s\n", err)
+		}
+		options.MergeFromConfig(defaultConfigPath, true)
 	}
 
 	// Validate the options passed by the user and if any
@@ -146,10 +155,14 @@ func hasStdin() bool {
 	return fi.Mode()&os.ModeNamedPipe != 0
 }
 
-func (options *Options) MergeFromConfig() {
-	configFile, err := UnmarshalRead(options.ConfigFile)
+func (options *Options) MergeFromConfig(configFileName string, ignoreError bool) {
+	configFile, err := UnmarshalRead(configFileName)
 	if err != nil {
-		gologger.Fatalf("Could not read configuration file %s: %s\n", options.ConfigFile, err)
+		if ignoreError {
+			gologger.Warningf("Could not read configuration file %s: %s\n", configFileName, err)
+			return
+		}
+		gologger.Fatalf("Could not read configuration file %s: %s\n", configFileName, err)
 	}
 	options.config = &configFile
 
