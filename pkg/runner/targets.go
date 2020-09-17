@@ -43,6 +43,13 @@ func (r *Runner) Load() error {
 		r.AddTarget(target)
 	}
 
+	// handles targets from config file if provided
+	if r.options.config != nil {
+		for _, target := range r.options.config.Host {
+			r.AddTarget(target)
+		}
+	}
+
 	if len(r.scanner.Targets) == 0 {
 		return errors.New("No targets specified")
 	}
