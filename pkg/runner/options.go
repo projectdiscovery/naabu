@@ -37,7 +37,7 @@ type Options struct {
 	Privileged         bool   // Attempts to run as root
 	Unprivileged       bool   // Drop root privileges
 	ExcludeCDN         bool   // Excludes ip of knows CDN ranges for full port scan
-	IcmpEchoProbe      bool   // Probe for Icmp Echo 
+	IcmpEchoProbe      bool   // Probe for Icmp Echo
 	IcmpTimestampProbe bool
 	// SourceIp to use in TCP packets
 	SourceIp string
@@ -50,6 +50,7 @@ type Options struct {
 	// Config file contains a scan configuration
 	ConfigFile string
 	config     *ConfigFile
+	Nmap       bool // Invoke nmap detailed scan on results
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -88,7 +89,8 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Sikp full port scans for CDNs (only checks for 80,443)")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
 	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
-  flag.StringVar(&options.ConfigFile, "config", "", "Config file")
+	flag.StringVar(&options.ConfigFile, "config", "", "Config file")
+	flag.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)")
 
 	flag.Parse()
 
