@@ -2,15 +2,12 @@ package runner
 
 import (
 	"os"
+	"path"
 
 	"gopkg.in/yaml.v3"
 )
 
-// MultipleKeyPartsLength is the max length for multiple keys
-const MultipleKeyPartsLength = 2
-
-// YAMLIndentCharLength number of chars for identation on write YAML to file
-const YAMLIndentCharLength = 4
+const ConfigDefaultFilename = "naabu.conf"
 
 // ConfigFile contains the fields stored in the configuration file
 type ConfigFile struct {
@@ -98,7 +95,6 @@ func (c *ConfigFile) MarshalWrite(file string) error {
 
 	// Indent the spaces too
 	enc := yaml.NewEncoder(f)
-	enc.SetIndent(YAMLIndentCharLength)
 	err = enc.Encode(&c)
 	f.Close()
 	return err
@@ -115,4 +111,12 @@ func UnmarshalRead(file string) (ConfigFile, error) {
 	err = yaml.NewDecoder(f).Decode(&config)
 	f.Close()
 	return config, err
+}
+
+func getDefaultConfigFile() (string, error) {
+	directory, err := GetConfigDirectory()
+	if err != nil {
+		return "", err
+	}
+	return path.Join(directory, ConfigDefaultFilename), nil
 }
