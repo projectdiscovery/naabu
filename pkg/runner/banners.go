@@ -31,13 +31,14 @@ func showBanner() {
 
 // showNetworkCapabilities shows the network capabilities/scan types possible with the running user
 func showNetworkCapabilities() {
-	accessLevel := "non root"
-	scanType := "CONNECT"
+	accessLevel := "not root"
+	scanType := "Connect (Full Handshake)"
 	if isRoot() {
 		accessLevel = "root"
-		scanType = "TCP/ICMP/SYN"
+		scanType = "TCP/ICMP Probes + Syn Scan"
 	}
-	gologger.Infof("Running %s scan with %s privileges\n", scanType, accessLevel)
+	gologger.Infof("Access Level: %s\n", accessLevel)
+	gologger.Infof("Scan Type: %s\n", scanType)
 }
 
 func showNetworkInterfaces() error {
@@ -138,8 +139,7 @@ func (options *Options) writeDefaultConfig() {
 `
 	configFile, err := getDefaultConfigFile()
 	if err != nil {
-		gologger.Warningf("Could not get default configuration file: %s\n", err)
-		return
+		gologger.Fatalf("Could not get default configuration file: %s\n", err)
 	}
 	if fileExists(configFile) {
 		return
@@ -147,7 +147,8 @@ func (options *Options) writeDefaultConfig() {
 
 	err = ioutil.WriteFile(configFile, []byte(dummyconfig), 0755)
 	if err != nil {
-		gologger.Warningf("Could not write configuration file to %s: %s\n", configFile, err)
+		gologger.Fatalf("Could not write configuration file to %s: %s\n", configFile, err)
 	}
+
 	gologger.Infof("Configuration file saved to %s\n", configFile)
 }
