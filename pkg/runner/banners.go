@@ -138,8 +138,7 @@ func (options *Options) writeDefaultConfig() {
 `
 	configFile, err := getDefaultConfigFile()
 	if err != nil {
-		gologger.Warningf("Could not get default configuration file: %s\n", err)
-		return
+		gologger.Fatalf("Could not get default configuration file: %s\n", err)
 	}
 	if fileExists(configFile) {
 		return
@@ -147,7 +146,7 @@ func (options *Options) writeDefaultConfig() {
 
 	err = ioutil.WriteFile(configFile, []byte(dummyconfig), 0755)
 	if err != nil {
-		gologger.Warningf("Could not write configuration file to %s: %s\n", configFile, err)
+		gologger.Fatalf("Could not write configuration file to %s: %s\n", configFile, err)
 	}
 	gologger.Infof("Configuration file saved to %s\n", configFile)
 }

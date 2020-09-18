@@ -123,10 +123,9 @@ func ParseOptions() *Options {
 	} else {
 		defaultConfigPath, err := getDefaultConfigFile()
 		if err != nil {
-			gologger.Warningf("Could not get default config file: %s\n", err)
-		} else {
-			options.MergeFromConfig(defaultConfigPath, true)
+			gologger.Errorf("Program exiting: %s\n", err)
 		}
+		options.MergeFromConfig(defaultConfigPath, true)
 	}
 
 	// Validate the options passed by the user and if any
