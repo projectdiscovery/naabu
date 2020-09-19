@@ -9,7 +9,6 @@ require (
 	github.com/projectdiscovery/fdmax v0.0.2
 	github.com/projectdiscovery/gologger v1.0.1
 	github.com/projectdiscovery/mapcidr v0.0.4
-	github.com/remeh/sizedwaitgroup v1.0.0
 	golang.org/x/net v0.0.0-20200904194848-62affa334b73
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )
