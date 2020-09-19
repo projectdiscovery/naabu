@@ -7,11 +7,11 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
-	"github.com/remeh/sizedwaitgroup"
 )
 
 // Runner is an instance of the port enumeration
@@ -131,15 +131,17 @@ func (r *Runner) RunEnumeration() error {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.State = scan.Scan
-	swg := sizedwaitgroup.New(r.options.Rate)
+	var swg sync.WaitGroup
+	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
 
 	for host, ports := range r.scanner.ScanResults.M {
-		swg.Add()
-		go func(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+		<-limiter
+		swg.Add(1)
+		go func(host string, ports map[int]struct{}) {
 			defer swg.Done()
 			results := r.scanner.ConnectVerify(host, ports)
 			r.scanner.ScanResults.SetPorts(host, results)
-		}(&swg, host, ports)
+		}(host, ports)
 	}
 
 	swg.Wait()
@@ -151,12 +153,14 @@ func (r *Runner) BackgroundWorkers() {
 
 func (r *Runner) RawSocketEnumeration() {
 	r.scanner.State = scan.Scan
-	swg := sizedwaitgroup.New(r.options.Rate)
+	var swg sync.WaitGroup
+	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				swg.Add()
+				<-limiter
+				swg.Add(1)
 				go r.handleHostPortSyn(&swg, target, port)
 			}
 		}
@@ -168,12 +172,14 @@ func (r *Runner) RawSocketEnumeration() {
 func (r *Runner) ConnectEnumeration() {
 	r.scanner.State = scan.Scan
 	// naive algorithm - ports spray
-	swg := sizedwaitgroup.New(r.options.Rate)
+	var swg sync.WaitGroup
+	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				swg.Add()
+				<-limiter
+				swg.Add(1)
 				go r.handleHostPort(&swg, target, port)
 			}
 		}
@@ -198,7 +204,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
+func (r *Runner) handleHostPort(swg *sync.WaitGroup, host string, port int) {
 	defer swg.Done()
 
 	// performs cdn scan exclusions checks
@@ -217,7 +223,7 @@ func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string,
 	}
 }
 
-func (r *Runner) handleHostPortSyn(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
+func (r *Runner) handleHostPortSyn(swg *sync.WaitGroup, host string, port int) {
 	defer swg.Done()
 
 	// performs cdn scan exclusions checks

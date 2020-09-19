@@ -2,11 +2,11 @@ package runner
 
 import (
 	"net"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/projectdiscovery/naabu/pkg/scan"
-	"github.com/remeh/sizedwaitgroup"
 )
 
 func (r *Runner) pingprobes(ip string) bool {
@@ -103,10 +103,11 @@ func (r *Runner) ProbeOrSkip() {
 		return
 	}
 
-	swg := sizedwaitgroup.New(r.options.Rate)
-
+	var swg sync.WaitGroup
+	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
 	for ip := range r.scanner.Targets {
-		swg.Add()
+		<-limiter
+		swg.Add(1)
 		go func(ip string) {
 			defer swg.Done()
 			r.pingprobesasync(ip)
