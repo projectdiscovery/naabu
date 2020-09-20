@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/naabu/pkg/scan"
+	"go.uber.org/ratelimit"
 )
 
 func (r *Runner) pingprobes(ip string) bool {
@@ -104,9 +105,9 @@ func (r *Runner) ProbeOrSkip() {
 	}
 
 	var swg sync.WaitGroup
-	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
+	rl := ratelimit.New(r.options.Rate)
 	for ip := range r.scanner.Targets {
-		<-limiter
+		rl.Take()
 		swg.Add(1)
 		go func(ip string) {
 			defer swg.Done()

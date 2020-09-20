@@ -12,6 +12,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
+	"go.uber.org/ratelimit"
 )
 
 // Runner is an instance of the port enumeration
@@ -132,10 +133,10 @@ func (r *Runner) RunEnumeration() error {
 func (r *Runner) ConnectVerification() {
 	r.scanner.State = scan.Scan
 	var swg sync.WaitGroup
-	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
+	limiter := ratelimit.New(r.options.Rate)
 
 	for host, ports := range r.scanner.ScanResults.M {
-		<-limiter
+		limiter.Take()
 		swg.Add(1)
 		go func(host string, ports map[int]struct{}) {
 			defer swg.Done()
@@ -154,12 +155,12 @@ func (r *Runner) BackgroundWorkers() {
 func (r *Runner) RawSocketEnumeration() {
 	r.scanner.State = scan.Scan
 	var swg sync.WaitGroup
-	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
+	limiter := ratelimit.New(r.options.Rate)
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				<-limiter
+				limiter.Take()
 				swg.Add(1)
 				go r.handleHostPortSyn(&swg, target, port)
 			}
@@ -173,12 +174,12 @@ func (r *Runner) ConnectEnumeration() {
 	r.scanner.State = scan.Scan
 	// naive algorithm - ports spray
 	var swg sync.WaitGroup
-	limiter := time.Tick(time.Second / time.Duration(r.options.Rate))
+	limiter := ratelimit.New(r.options.Rate)
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				<-limiter
+				limiter.Take()
 				swg.Add(1)
 				go r.handleHostPort(&swg, target, port)
 			}
