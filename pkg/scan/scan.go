@@ -26,6 +26,7 @@ const (
 	Probe
 	Scan
 	Done
+	Guard
 )
 
 // PkgFlag represent the TCP packet flag
@@ -119,9 +120,9 @@ func NewScanner(options *Options) (*Scanner, error) {
 		scanner.icmpPacketListener = icmpConn
 
 		scanner.icmpChan = make(chan *PkgResult, 1000)
-		scanner.icmpPacketSend = make(chan *PkgSend)
+		scanner.icmpPacketSend = make(chan *PkgSend, 2500)
 		scanner.tcpChan = make(chan *PkgResult, 1000)
-		scanner.tcpPacketSend = make(chan *PkgSend)
+		scanner.tcpPacketSend = make(chan *PkgSend, 2500)
 	}
 
 	scanner.ProbeResults = KV.NewKV()
@@ -175,6 +176,10 @@ func (s *Scanner) TCPReadWorker() {
 		n, addr, err := s.tcpPacketlistener.ReadFrom(data)
 		if err != nil {
 			break
+		}
+
+		if s.State == Guard {
+			continue
 		}
 
 		_, ok := s.Targets[addr.String()]
@@ -244,6 +249,10 @@ func (s *Scanner) ICMPReadWorker() {
 			continue
 		}
 
+		if s.State == Guard {
+			continue
+		}
+
 		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
 		if err != nil {
 			continue
@@ -260,6 +269,8 @@ func (s *Scanner) ICMPReadWorker() {
 func (s *Scanner) ICMPResultWorker() {
 	for ip := range s.icmpChan {
 		switch s.State {
+		case Guard:
+			// ignore as working internally on data structures
 		case Probe:
 			gologger.Debugf("Received ICMP response from %s\n", ip.ip)
 			s.ProbeResults.Set(ip.ip)
@@ -273,6 +284,8 @@ func (s *Scanner) ICMPResultWorker() {
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		switch s.State {
+		case Guard:
+			// ignore as working internally on data structures
 		case Probe:
 			gologger.Debugf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
 			s.ProbeResults.Set(ip.ip)
@@ -327,7 +340,7 @@ send:
 // ScanSyn a target ip
 func (s *Scanner) ScanSyn(ip string) {
 	for port := range s.Ports {
-		s.SynPortAsync(ip, port)
+		s.EnqueueTCP(ip, port, SYN)
 	}
 }
 

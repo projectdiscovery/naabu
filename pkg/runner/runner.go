@@ -7,11 +7,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/pkg/scan"
-	"github.com/remeh/sizedwaitgroup"
+	"go.uber.org/ratelimit"
 )
 
 // Runner is an instance of the port enumeration
@@ -91,11 +92,14 @@ func (r *Runner) RunEnumeration() error {
 			r.scanner.TuneSource(ExternalTargetForTune)
 		}
 
+		r.scanner.State = scan.Probe
 		r.ProbeOrSkip()
 
 		if r.options.WarmUpTime > 0 {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
+
+		r.scanner.State = scan.Guard
 
 		// update targets
 		if len(r.scanner.ProbeResults.M) > 0 {
@@ -105,6 +109,8 @@ func (r *Runner) RunEnumeration() error {
 				}
 			}
 		}
+
+		r.scanner.State = scan.Scan
 
 		// Syn Scan - Perform scan with raw sockets
 		r.RawSocketEnumeration()
@@ -131,15 +137,17 @@ func (r *Runner) RunEnumeration() error {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.State = scan.Scan
-	swg := sizedwaitgroup.New(r.options.Rate)
+	var swg sync.WaitGroup
+	limiter := ratelimit.New(r.options.Rate)
 
 	for host, ports := range r.scanner.ScanResults.M {
-		swg.Add()
-		go func(swg *sizedwaitgroup.SizedWaitGroup, host string, ports map[int]struct{}) {
+		limiter.Take()
+		swg.Add(1)
+		go func(host string, ports map[int]struct{}) {
 			defer swg.Done()
 			results := r.scanner.ConnectVerify(host, ports)
 			r.scanner.ScanResults.SetPorts(host, results)
-		}(&swg, host, ports)
+		}(host, ports)
 	}
 
 	swg.Wait()
@@ -150,30 +158,29 @@ func (r *Runner) BackgroundWorkers() {
 }
 
 func (r *Runner) RawSocketEnumeration() {
-	r.scanner.State = scan.Scan
-	swg := sizedwaitgroup.New(r.options.Rate)
+	limiter := ratelimit.New(r.options.Rate)
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				swg.Add()
-				go r.handleHostPortSyn(&swg, target, port)
+				limiter.Take()
+				r.handleHostPortSyn(target, port)
 			}
 		}
 	}
-
-	swg.Wait()
 }
 
 func (r *Runner) ConnectEnumeration() {
 	r.scanner.State = scan.Scan
 	// naive algorithm - ports spray
-	swg := sizedwaitgroup.New(r.options.Rate)
+	var swg sync.WaitGroup
+	limiter := ratelimit.New(r.options.Rate)
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
 			for target := range r.scanner.Targets {
-				swg.Add()
+				limiter.Take()
+				swg.Add(1)
 				go r.handleHostPort(&swg, target, port)
 			}
 		}
@@ -198,7 +205,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
+func (r *Runner) handleHostPort(swg *sync.WaitGroup, host string, port int) {
 	defer swg.Done()
 
 	// performs cdn scan exclusions checks
@@ -217,16 +224,14 @@ func (r *Runner) handleHostPort(swg *sizedwaitgroup.SizedWaitGroup, host string,
 	}
 }
 
-func (r *Runner) handleHostPortSyn(swg *sizedwaitgroup.SizedWaitGroup, host string, port int) {
-	defer swg.Done()
-
+func (r *Runner) handleHostPortSyn(host string, port int) {
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
 		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
 		return
 	}
 
-	r.scanner.SynPortAsync(host, port)
+	r.scanner.EnqueueTCP(host, port, scan.SYN)
 }
 
 func (r *Runner) handleOutput() {
@@ -260,7 +265,10 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIp, ports := range r.scanner.ScanResults.M {
-		hostsOrig := r.scanner.Targets[hostIp]
+		hostsOrig, ok := r.scanner.Targets[hostIp]
+		if !ok {
+			continue
+		}
 		// if no fqdn add the ip
 		if len(hostsOrig) == 0 {
 			hostsOrig[hostIp] = struct{}{}

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/naabu/pkg/scan"
-	"github.com/remeh/sizedwaitgroup"
+	"go.uber.org/ratelimit"
 )
 
 func (r *Runner) pingprobes(ip string) bool {
@@ -94,7 +94,6 @@ func hasRefusedConnection(err error) bool {
 }
 
 func (r *Runner) ProbeOrSkip() {
-	r.scanner.State = scan.Probe
 	if r.options.NoProbe {
 		return
 	}
@@ -103,16 +102,11 @@ func (r *Runner) ProbeOrSkip() {
 		return
 	}
 
-	swg := sizedwaitgroup.New(r.options.Rate)
-
+	limiter := ratelimit.New(r.options.Rate)
 	for ip := range r.scanner.Targets {
-		swg.Add()
-		go func(ip string) {
-			defer swg.Done()
-			r.pingprobesasync(ip)
-			r.synprobesasync(ip)
-			r.ackprobesasync(ip)
-		}(ip)
+		limiter.Take()
+		r.pingprobesasync(ip)
+		r.synprobesasync(ip)
+		r.ackprobesasync(ip)
 	}
-	swg.Wait()
 }
