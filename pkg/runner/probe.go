@@ -2,7 +2,6 @@ package runner
 
 import (
 	"net"
-	"sync"
 	"syscall"
 	"time"
 
@@ -95,7 +94,6 @@ func hasRefusedConnection(err error) bool {
 }
 
 func (r *Runner) ProbeOrSkip() {
-	r.scanner.State = scan.Probe
 	if r.options.NoProbe {
 		return
 	}
@@ -104,17 +102,11 @@ func (r *Runner) ProbeOrSkip() {
 		return
 	}
 
-	var swg sync.WaitGroup
-	rl := ratelimit.New(r.options.Rate)
+	limiter := ratelimit.New(r.options.Rate)
 	for ip := range r.scanner.Targets {
-		rl.Take()
-		swg.Add(1)
-		go func(ip string) {
-			defer swg.Done()
-			r.pingprobesasync(ip)
-			r.synprobesasync(ip)
-			r.ackprobesasync(ip)
-		}(ip)
+		limiter.Take()
+		r.pingprobesasync(ip)
+		r.synprobesasync(ip)
+		r.ackprobesasync(ip)
 	}
-	swg.Wait()
 }
