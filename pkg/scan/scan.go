@@ -120,9 +120,9 @@ func NewScanner(options *Options) (*Scanner, error) {
 		scanner.icmpPacketListener = icmpConn
 
 		scanner.icmpChan = make(chan *PkgResult, 1000)
-		scanner.icmpPacketSend = make(chan *PkgSend, scanner.rate)
+		scanner.icmpPacketSend = make(chan *PkgSend, 2500)
 		scanner.tcpChan = make(chan *PkgResult, 1000)
-		scanner.tcpPacketSend = make(chan *PkgSend, scanner.rate)
+		scanner.tcpPacketSend = make(chan *PkgSend, 2500)
 	}
 
 	scanner.ProbeResults = KV.NewKV()
