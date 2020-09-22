@@ -1,4 +1,4 @@
-// +build darwin windows linux,386
+// +build darwin windows linux,386 linux,arm
 
 package runas
 
