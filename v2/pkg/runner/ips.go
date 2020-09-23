@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/projectdiscovery/naabu/pkg/scan"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
 func parseExcludedIps(options *Options) (map[string]struct{}, error) {

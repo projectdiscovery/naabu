@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/pkg/scan"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"go.uber.org/ratelimit"
 )
 

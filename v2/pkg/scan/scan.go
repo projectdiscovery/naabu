@@ -13,7 +13,7 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/pkg/KV"
+	"github.com/projectdiscovery/naabu/v2/pkg/KV"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
