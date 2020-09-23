@@ -86,8 +86,6 @@ func (options *Options) writeDefaultConfig() {
 # retries: 1
 # Packets rate
 # rate: 100
-# Number of threads
-# threads: 1
 # Timeout is the seconds to wait for ports to respond
 # timeout: 5
 # Hosts are the host to find ports for
