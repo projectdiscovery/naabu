@@ -5,9 +5,7 @@ const (
 	DefaultPortTimeoutConnectScan = 5000
 
 	DefaultRateSynScan     = 1000
-	DefaultRateConnectScan = 1500
-
-	DefaultResolverThreads = 10
+	DefaultRateConnectScan = 15000
 
 	DefaultRetriesSynScan     = 1
 	DefaultRetriesConnectScan = 3

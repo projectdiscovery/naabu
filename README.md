@@ -16,6 +16,7 @@ Naabu is a port scanning tool written in Go that allows you to enumerate valid p
 all ports that return a reply. 
 
 # Resources
+- [Resources](#resources)
 - [Features](#features)
 - [Usage](#usage)
 - [Installation Instructions](#installation-instructions)
@@ -23,7 +24,12 @@ all ports that return a reply.
     - [From Source](#from-source)
     - [From Github](#from-github)
     - [From Docker](#from-docker)
-- [Running naabu](#running-naabu)
+    - [Windows](#windows)
+- [Running Naabu](#running-naabu)
+- [Configuration file](#configuration-file)
+- [Nmap integration](#nmap-integration)
+- [CDN Exclusion](#cdn-exclusion)
+- [License](#license)
 
 
 # Features
@@ -179,7 +185,7 @@ The ports to scan for on the host can be specified via `-p` parameter. It takes 
 ▶ naabu -p 80,443,21-23 -host hackerone.com
 ```
 
-By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists - 
+By default, the Naabu checks for nmap's `Top 100` ports after a host discovery phase like nmap, that can be skipped by using the `-no-probe` flag. It supports following in-built port lists - 
 
 - `-top-ports 100` - Checks for nmap top 100 ports.
 - `-top-ports 1000` - Checks for nmap top 1000 ports.
@@ -238,7 +244,7 @@ If you want a second layer validation of the ports found, you can instruct the t
 ▶ naabu -host hackerone.com -verify
 ```
 
-The most optimal setting for `threads` is 10. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it low.
+The speed can be controlled by changing the value of `rate` that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
 
 # Configuration file
 
@@ -253,8 +259,6 @@ We have added support for config file, it allows each and every flag to define i
 # retries: 1
 # Packets rate
 # rate: 100
-# Number of threads
-# threads: 1
 # Timeout is the seconds to wait for ports to respond
 # timeout: 5
 # Hosts are the host to find ports for

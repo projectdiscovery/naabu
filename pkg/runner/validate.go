@@ -22,11 +22,6 @@ func (options *Options) validateOptions() error {
 		return errors.New("both verbose and silent mode specified")
 	}
 
-	// Validate threads and options
-	if options.Threads == 0 {
-		return errors.New("threads cannot be zero")
-	}
-
 	if options.Timeout == 0 {
 		return errors.New("timeout cannot be zero")
 	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {

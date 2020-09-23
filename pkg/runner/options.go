@@ -14,7 +14,6 @@ type Options struct {
 	Rate               int    // Rate is the rate of port scan requests
 	Verbose            bool   // Verbose flag indicates whether to show verbose output or not
 	NoColor            bool   // No-Color disables the colored output
-	Threads            int    // Thread controls the number of parallel host to enumerate
 	Timeout            int    // Timeout is the seconds to wait for ports to respond
 	Host               string // Host is the host to find ports for
 	HostsFile          string // HostsFile is the file containing list of hosts to find port for
@@ -74,7 +73,6 @@ func ParseOptions() *Options {
 	flag.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
 	flag.BoolVar(&options.NoColor, "nC", false, "Don't Use colors in output")
-	flag.IntVar(&options.Threads, "t", DefaultResolverThreads, "Number of concurrent goroutines for resolving")
 	flag.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification")
@@ -171,9 +169,6 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	}
 	if configFile.Rate > 0 {
 		options.Rate = configFile.Rate
-	}
-	if configFile.Threads > 0 {
-		options.Threads = configFile.Threads
 	}
 	if configFile.Timeout > 0 {
 		options.Timeout = configFile.Timeout
