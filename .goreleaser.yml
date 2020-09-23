@@ -1,6 +1,6 @@
 builds:
     - binary: naabu
-      main: cmd/naabu/main.go
+      main: v2/cmd/naabu/main.go
       goos:
         - linux
         - windows
