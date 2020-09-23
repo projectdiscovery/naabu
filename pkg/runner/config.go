@@ -15,8 +15,6 @@ type ConfigFile struct {
 	Retries int `yaml:"retries,omitempty"`
 	// Rate is the rate of port scan requests
 	Rate int `yaml:"rate,omitempty"`
-	// Thread controls the number of parallel host to enumerate
-	Threads int `yaml:"threads,omitempty"`
 	// Timeout is the seconds to wait for ports to respond
 	Timeout int `yaml:"timeout,omitempty"`
 	// Hosts are the host to find ports for
