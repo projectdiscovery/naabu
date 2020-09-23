@@ -10,6 +10,6 @@ require (
 	github.com/projectdiscovery/gologger v1.0.1
 	github.com/projectdiscovery/mapcidr v0.0.4
 	go.uber.org/ratelimit v0.1.0
-	golang.org/x/net v0.0.0-20200904194848-62affa334b73
+	golang.org/x/net v0.0.0-20200923182212-328152dc79b1
 	gopkg.in/yaml.v3 v3.0.0-20200615113413-eeeca48fe776
 )
