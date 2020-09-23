@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/pkg/runas"
-	"github.com/projectdiscovery/naabu/pkg/scan"
+	"github.com/projectdiscovery/naabu/v2/pkg/runas"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
 const banner = `
