@@ -38,6 +38,7 @@ all ports that return a reply.
  - Multiple Output formats supported (JSON, File, Stdout)
  - Optimized for ease of use and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
+ - Automatic handling of duplicate hosts between multiple subdomains
  - Flexible definitions for ports to scan 
 
 # Usage
