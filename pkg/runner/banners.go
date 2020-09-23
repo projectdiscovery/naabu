@@ -14,11 +14,11 @@ const banner = `
                   __       
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.0				 
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.1				 
 `
 
 // Version is the current version of naabu
-const Version = `2.0.0`
+const Version = `2.0.1`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
