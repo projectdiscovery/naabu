@@ -114,7 +114,7 @@ naabu requires **go1.14+** to install successfully. Run the following command to
 ### From Github
 
 ```sh
-▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/cmd/v2/naabu; go build; mv naabu /usr/local/bin/; naabu -h
+▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/v2/cmd/naabu; go build; mv naabu /usr/local/bin/; naabu -h
 ```
 
 ### From Docker
