@@ -71,7 +71,6 @@ This will display help for the tool. Here are all the switches it supports.
 | -o 	| File to write output to (optional) | naabu -o output.txt |
 | -json 	| Write output in JSON lines Format | naabu -json |
 | -rate 	| Rate of port scan probe requests	| naabu -rate 1000 |
-| -t 	| Number of concurrent goroutines for resolving (default 10) | naabu -t 10 |
 | -icmp-echo-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-echo-probe |
 | -icmp-timestamp-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-timestamp-probe |
 | -interface 	| Network Interface to use for port scan | naabu -interface eth0 | 
@@ -115,7 +114,7 @@ naabu requires **go1.14+** to install successfully. Run the following command to
 ### From Github
 
 ```sh
-▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/cmd/naabu; go build; mv naabu /usr/local/bin/; naabu -h
+▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/cmd/v2/naabu; go build; mv naabu /usr/local/bin/; naabu -h
 ```
 
 ### From Docker
