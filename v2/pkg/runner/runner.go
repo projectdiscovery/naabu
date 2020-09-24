@@ -252,7 +252,7 @@ func (r *Runner) handleOutput() {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
-		if _, err := os.Stat(outputFolder); os.IsNotExist(err) {
+		if _, statErr := os.Stat(outputFolder); os.IsNotExist(statErr) {
 			os.MkdirAll(outputFolder, 0700)
 		}
 
@@ -285,8 +285,8 @@ func (r *Runner) handleOutput() {
 				}
 				for port := range ports {
 					data.Port = port
-					b, err := json.Marshal(data)
-					if err != nil {
+					b, marshallErr := json.Marshal(data)
+					if marshallErr != nil {
 						continue
 					}
 					gologger.Silentf("%s\n", string(b))

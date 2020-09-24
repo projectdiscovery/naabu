@@ -351,13 +351,17 @@ func GetSourceIP(dstip net.IP) (net.IP, error) {
 		return nil, err
 	}
 
-	if con, err := net.DialUDP("udp", nil, serverAddr); err == nil {
-		defer con.Close()
-		if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
-			return udpaddr.IP, nil
-		}
+	con, dialUpErr := net.DialUDP("udp", nil, serverAddr)
+	if dialUpErr != nil {
+		return nil, dialUpErr
 	}
-	return nil, err
+
+	defer con.Close()
+	if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
+		return udpaddr.IP, nil
+	}
+
+	return nil, nil
 }
 
 // GetInterfaceFromIP gets the name of the network interface from local ip address
@@ -446,7 +450,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		// not matching ip
 		if addr.String() != dstIP {
 			if s.debug {
-				gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String(), dstIP)
+				gologger.Debugf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
 			}
 			continue
 		}

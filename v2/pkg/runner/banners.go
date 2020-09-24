@@ -47,9 +47,9 @@ func showNetworkInterfaces() error {
 		return err
 	}
 	for _, itf := range interfaces {
-		addresses, err := itf.Addrs()
-		if err != nil {
-			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, err)
+		addresses, addErr := itf.Addrs()
+		if addErr != nil {
+			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, addErr)
 			continue
 		}
 		var addrstr []string
