@@ -132,7 +132,7 @@ func (options *Options) writeDefaultConfig() {
 # WarmUpTime between scan phases
 # warm-up-time: 2
 # nmap command to invoke after scanning
-# nmap: nmap -SV
+# nmap: nmap -sV
 `
 	configFile, err := getDefaultConfigFile()
 	if err != nil {
