@@ -39,11 +39,8 @@ func (kvd *D) Has(k string, v int) bool {
 		return false
 	}
 	_, okv := vv[v]
-	if okv {
-		return true
-	}
 
-	return false
+	return okv
 }
 
 type KV struct {
