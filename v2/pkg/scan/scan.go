@@ -40,6 +40,14 @@ const (
 
 // Scanner is a scanner that scans for ports using SYN packets.
 type Scanner struct {
+	SourceIP           net.IP
+	tcpPacketlistener  net.PacketConn
+	icmpPacketListener net.PacketConn
+	retries            int
+	rate               int
+	listenPort         int
+	timeout            time.Duration
+
 	Ports          map[int]struct{}
 	ExcludedIps    map[string]struct{}
 	Targets        map[string]map[string]struct{}
@@ -47,25 +55,17 @@ type Scanner struct {
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
 
-	timeout            time.Duration
-	serializeOptions   gopacket.SerializeOptions
-	retries            int
-	rate               int
-	debug              bool
-	tcpPacketSend      chan *PkgSend
-	tcpPacketlistener  net.PacketConn
-	icmpPacketSend     chan *PkgSend
-	icmpPacketListener net.PacketConn
-	listenPort         int
-	tcpChan            chan *PkgResult
-	icmpChan           chan *PkgResult
-	State              State
-	ScanResults        *kv.D
-
+	tcpPacketSend    chan *PkgSend
+	icmpPacketSend   chan *PkgSend
+	tcpChan          chan *PkgResult
+	icmpChan         chan *PkgResult
+	State            State
+	ScanResults      *kv.D
 	NetworkInterface *net.Interface
-	SourceIP         net.IP
-	tcpsequencer     *TCPSequencer
 	cdn              *cdncheck.Client
+	tcpsequencer     *TCPSequencer
+	serializeOptions gopacket.SerializeOptions
+	debug            bool
 }
 
 type PkgSend struct {
