@@ -397,7 +397,7 @@ func ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	conn.Close()
 	return true, err
 }
 
