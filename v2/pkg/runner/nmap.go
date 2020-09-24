@@ -30,8 +30,7 @@ func (r *Runner) handleNmap() {
 		portsStr := strings.Join(ports, ",")
 		ipsStr := strings.Join(ips, ",")
 
-		args = append(args, "-p")
-		args = append(args, portsStr)
+		args = append(args, "-p", portsStr)
 		args = append(args, ips...)
 
 		if r.options.Nmap {
