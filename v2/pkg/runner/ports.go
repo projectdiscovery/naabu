@@ -83,7 +83,7 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 			// "-" equals to all ports
 			if p == "-" {
 				// Parse the custom ports list provided by the user
-				p = "1-65535"
+				p = Full
 			}
 			ports, err := parsePortsList(p)
 			if err != nil {
