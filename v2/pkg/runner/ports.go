@@ -121,11 +121,11 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
-		ports, err := parsePortsList(NmapTop100)
-		if err != nil {
-			return nil, fmt.Errorf("could not read ports: %s", err)
+		portsList, parsePortErr := parsePortsList(NmapTop100)
+		if parsePortErr != nil {
+			return nil, fmt.Errorf("could not read ports: %s", parsePortErr)
 		}
-		return excludePorts(options, ports)
+		return excludePorts(options, portsList)
 	}
 
 	return ports, nil
