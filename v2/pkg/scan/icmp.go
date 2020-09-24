@@ -33,7 +33,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 		return false
 	}
 
-	n, err := c.WriteTo(data, destAddr)
+	_, err = c.WriteTo(data, destAddr)
 	if err != nil {
 		return false
 	}
@@ -110,7 +110,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 		return false
 	}
 
-	n, err := c.WriteTo(data, destAddr)
+	_, err = c.WriteTo(data, destAddr)
 	if err != nil {
 		return false
 	}
@@ -120,6 +120,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
+
 	n, SourceIP, err := c.ReadFrom(reply)
 	// timeout
 	if err != nil {

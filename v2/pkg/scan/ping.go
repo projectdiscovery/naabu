@@ -78,7 +78,7 @@ func PingHosts(addresses []string) (*PingResult, error) {
 
 		// Send the packet
 		start := time.Now()
-		n, err := c.WriteTo(data, dst)
+		_, err = c.WriteTo(data, dst)
 		if err != nil {
 			results.Hosts = append(results.Hosts, Ping{Type: HostInactive, Error: err, Host: addr})
 			continue
@@ -90,7 +90,8 @@ func PingHosts(addresses []string) (*PingResult, error) {
 			results.Hosts = append(results.Hosts, Ping{Type: HostInactive, Error: err, Host: addr})
 			continue
 		}
-		n, _, err = c.ReadFrom(reply)
+
+		n, _, err := c.ReadFrom(reply)
 		if err != nil {
 			results.Hosts = append(results.Hosts, Ping{Type: HostInactive, Error: err, Host: addr})
 			continue

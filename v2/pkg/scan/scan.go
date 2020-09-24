@@ -378,7 +378,12 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		addresses, err := byNameInterface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+
 		for _, v := range addresses {
 			// Check if the IP for the current interface is our
 			// source IP. If yes, return the interface
