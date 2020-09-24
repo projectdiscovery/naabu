@@ -40,7 +40,7 @@ func (options *Options) validateOptions() error {
 
 	if options.Interface != "" {
 		if _, err := net.InterfaceByName(options.Interface); err != nil {
-			return fmt.Errorf("Interface %s not found", options.Interface)
+			return fmt.Errorf("interface %s not found", options.Interface)
 		}
 	}
 

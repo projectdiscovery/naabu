@@ -24,8 +24,8 @@ func parseExcludedIps(options *Options) (map[string]struct{}, error) {
 	}
 
 	if options.config != nil {
-		for _, excludeIp := range options.config.ExcludeIps {
-			allIps = append(allIps, strings.Split(excludeIp, ",")...)
+		for _, excludeIP := range options.config.ExcludeIps {
+			allIps = append(allIps, strings.Split(excludeIP, ",")...)
 		}
 	}
 

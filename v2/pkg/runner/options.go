@@ -38,8 +38,8 @@ type Options struct {
 	ExcludeCDN         bool   // Excludes ip of knows CDN ranges for full port scan
 	IcmpEchoProbe      bool   // Probe for Icmp Echo
 	IcmpTimestampProbe bool
-	// SourceIp to use in TCP packets
-	SourceIp string
+	// SourceIP to use in TCP packets
+	SourceIP string
 	// Interface to use for TCP packets
 	Interface string
 	// WarmUpTime between scan phases
@@ -80,7 +80,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.ExcludeIps, "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
 	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)")
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
-	flag.StringVar(&options.SourceIp, "source-ip", "", "Source Ip")
+	flag.StringVar(&options.SourceIP, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
 	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root - Use sudo if possible")
 	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
@@ -184,8 +184,8 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	options.ExcludeCDN = configFile.ExcludeCDN
 	options.IcmpEchoProbe = configFile.IcmpEchoProbe
 	options.IcmpTimestampProbe = configFile.IcmpTimestampProbe
-	if configFile.SourceIp != "" {
-		options.SourceIp = configFile.SourceIp
+	if configFile.SourceIP != "" {
+		options.SourceIP = configFile.SourceIP
 	}
 	if configFile.Interface != "" {
 		options.Interface = configFile.Interface

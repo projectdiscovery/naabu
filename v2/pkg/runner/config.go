@@ -45,8 +45,8 @@ type ConfigFile struct {
 	IcmpEchoProbe bool `yaml:"icmp-echo-probe,omitempty"`
 	// IcmpTimestampProbe before scanning
 	IcmpTimestampProbe bool `yaml:"icmp-timestamp-probe,omitempty"`
-	// SourceIp to use in TCP packets
-	SourceIp string `yaml:"source-ip,omitempty"`
+	// SourceIP to use in TCP packets
+	SourceIP string `yaml:"source-ip,omitempty"`
 	// Interface to use for TCP packets
 	Interface string `yaml:"interface,omitempty"`
 	// WarmUpTime between scan phases
