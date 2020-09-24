@@ -10,7 +10,7 @@ import (
 	"golang.org/x/net/ipv4"
 )
 
-// PingIcmpEchoRequest syncronous to the target ip address
+// PingIcmpEchoRequest synchronous to the target ip address
 func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
@@ -56,7 +56,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	return false
 }
 
-// PingIcmpEchoRequestAsync asyncronous to the target ip address
+// PingIcmpEchoRequestAsync asynchronous to the target ip address
 func (s *Scanner) PingIcmpEchoRequestAsync(ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
@@ -86,7 +86,7 @@ send:
 	}
 }
 
-// PingIcmpTimestampRequest syncronous to the target ip address
+// PingIcmpTimestampRequest synchronous to the target ip address
 func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	c, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
@@ -133,7 +133,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	return false
 }
 
-// PingIcmpTimestampRequestAsync syncronous to the target ip address
+// PingIcmpTimestampRequestAsync synchronous to the target ip address
 func (s *Scanner) PingIcmpTimestampRequestAsync(ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
