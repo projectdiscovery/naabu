@@ -70,13 +70,3 @@ func (kv *KV) Has(k string) bool {
 	_, ok := kv.M[k]
 	return ok
 }
-
-func sliceIntContains(s []int, v int) bool {
-	for _, p := range s {
-		if p == v {
-			return true
-		}
-	}
-
-	return false
-}

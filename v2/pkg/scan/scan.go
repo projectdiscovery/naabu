@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -43,7 +42,6 @@ const (
 type Scanner struct {
 	Ports          map[int]struct{}
 	ExcludedIps    map[string]struct{}
-	wg             sync.WaitGroup
 	Targets        map[string]map[string]struct{}
 	ProbeResults   *kv.KV
 	SynProbesPorts map[int]struct{}
@@ -54,10 +52,8 @@ type Scanner struct {
 	retries            int
 	rate               int
 	debug              bool
-	tcpPacketRecv      chan int
 	tcpPacketSend      chan *PkgSend
 	tcpPacketlistener  net.PacketConn
-	icmpPacketRecv     chan int
 	icmpPacketSend     chan *PkgSend
 	icmpPacketListener net.PacketConn
 	listenPort         int
