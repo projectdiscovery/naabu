@@ -23,8 +23,8 @@ func (r *Runner) pingprobes(ip string) bool {
 }
 
 func (r *Runner) pingprobesasync(ip string) {
-	r.scanner.EnqueueICMP(ip, scan.ICMP_ECHO_REQUEST)
-	r.scanner.EnqueueICMP(ip, scan.ICMP_TIMESTAMP_REQUEST)
+	r.scanner.EnqueueICMP(ip, scan.ICMPECHOREQUEST)
+	r.scanner.EnqueueICMP(ip, scan.ICMPTIMESTAMPREQUEST)
 }
 
 func (r *Runner) synprobes(ip string) bool {

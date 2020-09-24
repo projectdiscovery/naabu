@@ -171,21 +171,21 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 		if strings.Contains(r, "-") {
 			parts := strings.Split(r, "-")
 			if len(parts) != 2 {
-				return nil, fmt.Errorf("Invalid port selection segment: '%s'", r)
+				return nil, fmt.Errorf("invalid port selection segment: '%s'", r)
 			}
 
 			p1, err := strconv.Atoi(parts[0])
 			if err != nil {
-				return nil, fmt.Errorf("Invalid port number: '%s'", parts[0])
+				return nil, fmt.Errorf("invalid port number: '%s'", parts[0])
 			}
 
 			p2, err := strconv.Atoi(parts[1])
 			if err != nil {
-				return nil, fmt.Errorf("Invalid port number: '%s'", parts[1])
+				return nil, fmt.Errorf("invalid port number: '%s'", parts[1])
 			}
 
 			if p1 > p2 {
-				return nil, fmt.Errorf("Invalid port range: %d-%d", p1, p2)
+				return nil, fmt.Errorf("invalid port range: %d-%d", p1, p2)
 			}
 
 			for i := p1; i <= p2; i++ {
@@ -194,7 +194,7 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 		} else {
 			port, err := strconv.Atoi(r)
 			if err != nil {
-				return nil, fmt.Errorf("Invalid port number: '%s'", r)
+				return nil, fmt.Errorf("invalid port number: '%s'", r)
 			}
 			ports[port] = struct{}{}
 		}

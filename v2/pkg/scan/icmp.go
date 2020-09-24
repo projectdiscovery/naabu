@@ -43,13 +43,13 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	n, sourceIp, err := c.ReadFrom(reply)
+	n, SourceIP, err := c.ReadFrom(reply)
 	// timeout
 	if err != nil {
 		return false
 	}
 	// if anything is read from the connection it means that the host is alive
-	if destAddr.String() == sourceIp.String() && n > 0 {
+	if destAddr.String() == SourceIP.String() && n > 0 {
 		return true
 	}
 
@@ -120,13 +120,13 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	n, sourceIp, err := c.ReadFrom(reply)
+	n, SourceIP, err := c.ReadFrom(reply)
 	// timeout
 	if err != nil {
 		return false
 	}
 	// if anything is read from the connection it means that the host is alive
-	if destAddr.String() == sourceIp.String() && n > 0 {
+	if destAddr.String() == SourceIP.String() && n > 0 {
 		return true
 	}
 

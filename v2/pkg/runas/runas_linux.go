@@ -56,11 +56,11 @@ func switchUser(usr string) error {
 	}
 	cerr, errno := C.setgid(C.__gid_t(gid))
 	if cerr != 0 {
-		return fmt.Errorf("Unable to set GID due to error:%d", errno)
+		return fmt.Errorf("unable to set GID due to error:%d", errno)
 	}
 	cerr, errno = C.setuid(C.__uid_t(uid))
 	if cerr != 0 {
-		return fmt.Errorf("Unable to set UID due to error:%d", errno)
+		return fmt.Errorf("unable to set UID due to error:%d", errno)
 	}
 
 	return nil

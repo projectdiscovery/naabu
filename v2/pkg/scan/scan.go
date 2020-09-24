@@ -13,7 +13,7 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/KV"
+	"github.com/projectdiscovery/naabu/v2/pkg/kv"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -35,8 +35,8 @@ type PkgFlag int
 const (
 	SYN PkgFlag = iota
 	ACK
-	ICMP_ECHO_REQUEST
-	ICMP_TIMESTAMP_REQUEST
+	ICMPECHOREQUEST
+	ICMPTIMESTAMPREQUEST
 )
 
 // Scanner is a scanner that scans for ports using SYN packets.
@@ -45,7 +45,7 @@ type Scanner struct {
 	ExcludedIps    map[string]struct{}
 	wg             sync.WaitGroup
 	Targets        map[string]map[string]struct{}
-	ProbeResults   *KV.KV
+	ProbeResults   *kv.KV
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
 
@@ -64,7 +64,7 @@ type Scanner struct {
 	tcpChan            chan *PkgResult
 	icmpChan           chan *PkgResult
 	State              State
-	ScanResults        *KV.KVD
+	ScanResults        *kv.D
 
 	NetworkInterface *net.Interface
 	SourceIP         net.IP
@@ -76,7 +76,7 @@ type PkgSend struct {
 	ip       string
 	port     int
 	flag     PkgFlag
-	sourceIp string
+	SourceIP string
 }
 
 type PkgResult struct {
@@ -125,8 +125,8 @@ func NewScanner(options *Options) (*Scanner, error) {
 		scanner.tcpPacketSend = make(chan *PkgSend, 2500)
 	}
 
-	scanner.ProbeResults = KV.NewKV()
-	scanner.ScanResults = KV.NewKVResults()
+	scanner.ProbeResults = kv.NewKV()
+	scanner.ScanResults = kv.NewKVResults()
 
 	var err error
 	scanner.cdn, err = cdncheck.New()
@@ -228,9 +228,9 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
 		switch pkg.flag {
-		case ICMP_ECHO_REQUEST:
+		case ICMPECHOREQUEST:
 			s.PingIcmpEchoRequestAsync(pkg.ip)
-		case ICMP_TIMESTAMP_REQUEST:
+		case ICMPTIMESTAMPREQUEST:
 			s.PingIcmpTimestampRequestAsync(pkg.ip)
 		}
 	}

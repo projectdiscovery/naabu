@@ -51,7 +51,7 @@ func (r *Runner) Load() error {
 	}
 
 	if len(r.scanner.Targets) == 0 {
-		return errors.New("No targets specified")
+		return errors.New("no targets specified")
 	}
 
 	return nil
