@@ -37,7 +37,11 @@ func (r *Runner) handleNmap() {
 			gologger.Infof("Running nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
-			cmd.Run()
+			err := cmd.Run()
+			if err != nil {
+				gologger.Errorf("Could not get network interfaces: %s\n", err)
+				return
+			}
 		} else {
 			gologger.Infof("Suggested nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
 		}
