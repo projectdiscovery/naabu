@@ -152,12 +152,7 @@ func (s *Scanner) StartWorkers() {
 // TCPWriteWorker that sends out TCP packets
 func (s *Scanner) TCPWriteWorker() {
 	for pkg := range s.tcpPacketSend {
-		switch pkg.flag {
-		case SYN:
-			s.SynPortAsync(pkg.ip, pkg.port)
-		case ACK:
-			s.ACKPortAsync(pkg.ip, pkg.port)
-		}
+		s.SendAsyncPkg(pkg.ip, pkg.port, pkg.flag)
 	}
 }
 
@@ -437,9 +432,16 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
 
-	s.send(dstIP, conn, &tcp)
+	err = tcp.SetNetworkLayerForChecksum(&ip4)
+	if err != nil {
+		return false, err
+	}
+
+	_, err = s.send(dstIP, conn, &tcp)
+	if err != nil {
+		return false, err
+	}
 
 	data := make([]byte, 4096)
 	for {
@@ -480,8 +482,8 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	return false, nil
 }
 
-// SynPortAsync sends a single SYN packet to a port
-func (s *Scanner) SynPortAsync(ip string, port int) {
+// SendAsyncPkg sends a single packet to a port
+func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
 		SrcIP:    s.SourceIP,
@@ -499,42 +501,31 @@ func (s *Scanner) SynPortAsync(ip string, port int) {
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.listenPort),
 		DstPort: layers.TCPPort(port),
-		SYN:     true,
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
-	s.send(ip, s.tcpPacketlistener, &tcp)
-}
 
-// ACKPortAsync sends a single ACK packet to a port
-func (s *Scanner) ACKPortAsync(ip string, port int) {
-	// Construct all the network layers we need.
-	ip4 := layers.IPv4{
-		SrcIP:    s.SourceIP,
-		DstIP:    net.ParseIP(ip),
-		Version:  4,
-		TTL:      255,
-		Protocol: layers.IPProtocolTCP,
-	}
-	tcpOption := layers.TCPOption{
-		OptionType:   layers.TCPOptionKindMSS,
-		OptionLength: 4,
-		OptionData:   []byte{0x12, 0x34},
+	switch pkgFlag {
+	case SYN:
+		tcp.SYN = true
+	case ACK:
+		tcp.ACK = true
 	}
 
-	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(s.listenPort),
-		DstPort: layers.TCPPort(port),
-		ACK:     true,
-		Window:  1024,
-		Seq:     s.tcpsequencer.Next(),
-		Options: []layers.TCPOption{tcpOption},
+	err := tcp.SetNetworkLayerForChecksum(&ip4)
+	if err != nil {
+		if s.debug {
+			gologger.Debugf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+		}
+	} else {
+		_, err = s.send(ip, s.tcpPacketlistener, &tcp)
+		if err != nil {
+			if s.debug {
+				gologger.Debugf("Can not send async package to %s:%d port: %s\n", ip, port, err)
+			}
+		}
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
-
-	s.send(ip, s.tcpPacketlistener, &tcp)
 }
 
 // TuneSource automatically with ip and interface
