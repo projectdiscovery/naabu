@@ -152,7 +152,10 @@ func (s *Scanner) PingIcmpTimestampRequestAsync(ip string) {
 		return
 	}
 
-	s.icmpPacketListener.WriteTo(data, destAddr)
+	_, err = s.icmpPacketListener.WriteTo(data, destAddr)
+	if err != nil {
+		return
+	}
 }
 
 // Timestamp ICMP structure

@@ -89,7 +89,10 @@ func (r *Runner) RunEnumeration() error {
 		r.BackgroundWorkers()
 
 		if err := r.SetSourceIPAndInterface(); err != nil {
-			r.scanner.TuneSource(ExternalTargetForTune)
+			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
+			if tuneSourceErr != nil {
+				return tuneSourceErr
+			}
 		}
 
 		r.scanner.State = scan.Probe
@@ -253,7 +256,11 @@ func (r *Runner) handleOutput() {
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
 		if _, statErr := os.Stat(outputFolder); os.IsNotExist(statErr) {
-			os.MkdirAll(outputFolder, 0700)
+			mkdirErr := os.MkdirAll(outputFolder, 0700)
+			if mkdirErr != nil {
+				gologger.Errorf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
+				return
+			}
 		}
 
 		file, err = os.Create(output)
