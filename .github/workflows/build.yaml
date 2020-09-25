@@ -18,6 +18,7 @@ jobs:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: v1.29
           args: --timeout 5m
+          working-directory: v2/cmd/naabu/
 
           # Optional: working directory, useful for monorepos
           # working-directory: somedir
@@ -27,7 +28,7 @@ jobs:
 
           # Optional: show only new issues if it's a pull request. The default value is `false`.
           # only-new-issues: true
-        working-directory: v2/cmd/naabu/
+
   build:
     name: Build
     runs-on: ubuntu-latest
