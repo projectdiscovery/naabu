@@ -7,6 +7,8 @@ import (
 	"strings"
 )
 
+const portListStrParts = 2
+
 // List of default ports
 const (
 	Full        = "1-65535"
@@ -170,7 +172,7 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 		r = strings.TrimSpace(r)
 		if strings.Contains(r, "-") {
 			parts := strings.Split(r, "-")
-			if len(parts) != 2 {
+			if len(parts) != portListStrParts {
 				return nil, fmt.Errorf("invalid port selection segment: '%s'", r)
 			}
 

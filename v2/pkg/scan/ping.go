@@ -12,6 +12,7 @@ import (
 
 // Some constants
 const (
+	DeadlineSec  = 10
 	ProtocolICMP = 1
 )
 
@@ -85,7 +86,7 @@ func PingHosts(addresses []string) (*PingResult, error) {
 		}
 
 		reply := make([]byte, 1500)
-		err = c.SetReadDeadline(time.Now().Add(10 * time.Second))
+		err = c.SetReadDeadline(time.Now().Add(DeadlineSec * time.Second))
 		if err != nil {
 			results.Hosts = append(results.Hosts, Ping{Type: HostInactive, Error: err, Host: addr})
 			continue
