@@ -218,10 +218,9 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 // ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
-		switch pkg.flag {
-		case ICMPECHOREQUEST:
+		if pkg.flag == ICMPECHOREQUEST {
 			s.PingIcmpEchoRequestAsync(pkg.ip)
-		case ICMPTIMESTAMPREQUEST:
+		} else if pkg.flag == ICMPTIMESTAMPREQUEST {
 			s.PingIcmpTimestampRequestAsync(pkg.ip)
 		}
 	}
@@ -259,14 +258,9 @@ func (s *Scanner) ICMPReadWorker() {
 // ICMPResultWorker handles ICMP responses (used only during probes)
 func (s *Scanner) ICMPResultWorker() {
 	for ip := range s.icmpChan {
-		switch s.State {
-		case Guard:
-			// ignore as working internally on data structures
-		case Probe:
+		if s.State == Probe {
 			gologger.Debugf("Received ICMP response from %s\n", ip.ip)
 			s.ProbeResults.Set(ip.ip)
-		case Scan:
-			// Discard
 		}
 	}
 }
@@ -274,13 +268,10 @@ func (s *Scanner) ICMPResultWorker() {
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		switch s.State {
-		case Guard:
-			// ignore as working internally on data structures
-		case Probe:
+		if s.State == Probe {
 			gologger.Debugf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
 			s.ProbeResults.Set(ip.ip)
-		case Scan:
+		} else if s.State == Scan {
 			gologger.Debugf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
@@ -506,10 +497,9 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	switch pkgFlag {
-	case SYN:
+	if pkgFlag == SYN {
 		tcp.SYN = true
-	case ACK:
+	} else if pkgFlag == ACK {
 		tcp.ACK = true
 	}
 
