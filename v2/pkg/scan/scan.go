@@ -303,29 +303,29 @@ func GetSrcParameters(destIP string) (srcIP net.IP, networkInterface *net.Interf
 }
 
 // send sends the given layers as a single packet on the network.
-func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) (int, error) {
+func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, l...); err != nil {
-		return 0, err
+		return err
 	}
 
 	var (
-		retries, n int
-		err        error
+		retries int
+		err     error
 	)
 
 send:
 	if retries >= maxRetries {
-		return n, err
+		return err
 	}
-	n, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
+	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
 		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
 		goto send
 	}
-	return n, err
+	return err
 }
 
 // ScanSyn a target ip
@@ -438,7 +438,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		return false, err
 	}
 
-	_, err = s.send(dstIP, conn, &tcp)
+	err = s.send(dstIP, conn, &tcp)
 	if err != nil {
 		return false, err
 	}
@@ -518,7 +518,7 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 			gologger.Debugf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
 		}
 	} else {
-		_, err = s.send(ip, s.tcpPacketlistener, &tcp)
+		err = s.send(ip, s.tcpPacketlistener, &tcp)
 		if err != nil {
 			if s.debug {
 				gologger.Debugf("Can not send async package to %s:%d port: %s\n", ip, port, err)
