@@ -21,6 +21,13 @@ import (
 type State int
 
 const (
+	maxRetries     = 10
+	sendDelayMsec  = 10
+	chanSize       = 1000
+	packetSendSize = 2500
+)
+
+const (
 	Init State = iota
 	Probe
 	Scan
@@ -68,6 +75,7 @@ type Scanner struct {
 	debug            bool
 }
 
+// PkgSend is a TCP package
 type PkgSend struct {
 	ip       string
 	port     int
@@ -75,6 +83,7 @@ type PkgSend struct {
 	SourceIP string
 }
 
+// PkgResult contains the results of sending TCP packages
 type PkgResult struct {
 	ip   string
 	port int
@@ -113,12 +122,12 @@ func NewScanner(options *Options) (*Scanner, error) {
 		if err != nil {
 			return nil, err
 		}
-		scanner.icmpPacketListener = icmpConn
 
-		scanner.icmpChan = make(chan *PkgResult, 1000)
-		scanner.icmpPacketSend = make(chan *PkgSend, 2500)
-		scanner.tcpChan = make(chan *PkgResult, 1000)
-		scanner.tcpPacketSend = make(chan *PkgSend, 2500)
+		scanner.icmpPacketListener = icmpConn
+		scanner.icmpChan = make(chan *PkgResult, chanSize)
+		scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
+		scanner.tcpChan = make(chan *PkgResult, chanSize)
+		scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
 	}
 
 	scanner.ProbeResults = kv.NewKV()
@@ -306,14 +315,14 @@ func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.Seriali
 	)
 
 send:
-	if retries >= 10 {
+	if retries >= maxRetries {
 		return n, err
 	}
 	n, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
-		time.Sleep(time.Duration(10) * time.Millisecond)
+		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
 		goto send
 	}
 	return n, err
