@@ -13,7 +13,7 @@
 [![Chat on Discord](https://img.shields.io/discord/695645237418131507.svg?logo=discord)](https://discord.gg/KECAGdH)
 
 Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN scans on the host/list of hosts and lists
-all ports that return a reply. 
+all ports that return a reply.
 
 # Resources
 - [Resources](#resources)
@@ -45,7 +45,7 @@ all ports that return a reply.
  - Optimized for ease of use and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
  - Automatic handling of duplicate hosts between multiple subdomains
- - Flexible definitions for ports to scan 
+ - Flexible definitions for ports to scan
 
 # Usage
 
@@ -73,7 +73,7 @@ This will display help for the tool. Here are all the switches it supports.
 | -rate 	| Rate of port scan probe requests	| naabu -rate 1000 |
 | -icmp-echo-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-echo-probe |
 | -icmp-timestamp-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-timestamp-probe |
-| -interface 	| Network Interface to use for port scan | naabu -interface eth0 | 
+| -interface 	| Network Interface to use for port scan | naabu -interface eth0 |
 | -interface-list | List available interfaces and public ip | naabu -interface-list |
 | -nC 	| Don't Use colors in output | naabu -nC |
 | -no-probe 	| Skip all probes for verification of host | naabu -no-probe |
@@ -105,7 +105,7 @@ Download latest binary from https://github.com/projectdiscovery/naabu/releases
 
 ### From Source
 
-naabu requires **go1.14+** to install successfully. Run the following command to get the repo - 
+naabu requires **go1.14+** to install successfully. Run the following command to get the repo -
 
 ```sh
 ▶ GO111MODULE=on go get -u -v github.com/projectdiscovery/naabu/v2/cmd/naabu
@@ -119,7 +119,7 @@ naabu requires **go1.14+** to install successfully. Run the following command to
 
 ### From Docker
 
-You can use the official dockerhub image at [naabu](https://hub.docker.com/r/projectdiscovery/naabu). Simply run - 
+You can use the official dockerhub image at [naabu](https://hub.docker.com/r/projectdiscovery/naabu). Simply run -
 
 ```sh
 ▶ docker pull projectdiscovery/naabu
@@ -184,7 +184,7 @@ The ports to scan for on the host can be specified via `-p` parameter. It takes 
 ▶ naabu -p 80,443,21-23 -host hackerone.com
 ```
 
-By default, the Naabu checks for nmap's `Top 100` ports after a host discovery phase like nmap, that can be skipped by using the `-no-probe` flag. It supports following in-built port lists - 
+By default, the Naabu checks for nmap's `Top 100` ports after a host discovery phase like nmap, that can be skipped by using the `-no-probe` flag. It supports following in-built port lists -
 
 - `-top-ports 100` - Checks for nmap top 100 ports.
 - `-top-ports 1000` - Checks for nmap top 1000 ports.
@@ -208,7 +208,7 @@ To run the naabu on a list of hosts, `-iL` option can be used.
 ▶ naabu -iL hosts.txt
 ```
 
-You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format. 
+You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
 ```sh
 ▶ naabu -host hackerone.com -json
@@ -219,7 +219,7 @@ You can also get output in json format using `-json` switch. This switch saves t
 {"host":"hackerone.com","ip":"104.16.99.52","port":8080}
 ```
 
-Hosts can also be piped to naabu and port enumeration can be ran on them. For example - 
+Hosts can also be piped to naabu and port enumeration can be ran on them. For example -
 
 ```sh
 ▶ echo hackerone.com | naabu
@@ -237,7 +237,7 @@ http://hackerone.com:8080
 http://hackerone.com:80
 ```
 
-If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation 
+If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation
 
 ```sh
 ▶ naabu -host hackerone.com -verify
@@ -247,7 +247,7 @@ The speed can be controlled by changing the value of `rate` that represent the n
 
 # Configuration file
 
-We have added support for config file, it allows each and every flag to define in config file, so you don't have to write them everytime, it's optional and not used on default run, default location of config file is `$HOME/.config/naabu/naabu.conf`, custom config file can be provided using `config` flag. 
+We have added support for config file, it allows each and every flag to define in config file, so you don't have to write them everytime, it's optional and not used on default run, default location of config file is `$HOME/.config/naabu/naabu.conf`, custom config file can be provided using `config` flag.
 
 
 <details>
@@ -297,7 +297,7 @@ We have added support for config file, it allows each and every flag to define i
 # icmp-echo-probe: true
 # IcmpTimestampProbe before scanning
 # icmp-timestamp-probe: false
-# SourceIp to use in TCP packets
+# SourceIP to use in TCP packets
 # source-ip: 10.10.10.10
 # Interface to use for TCP packets
 # interface: eth0
@@ -317,7 +317,7 @@ To make use of `nmap` flag, make sure to remove the comments from the config fil
 
 ```yaml
 nmap: nmap -sV -oX naabu-output
-``` 
+```
 
 ```sh
 
@@ -353,7 +353,7 @@ PORT     STATE SERVICE       VERSION
 
 # CDN Exclusion
 
-Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag. 
+Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 

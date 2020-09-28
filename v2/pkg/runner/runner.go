@@ -61,9 +61,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	return runner, nil
 }
 
-func (r *Runner) SetSourceIpAndInterface() error {
-	if r.options.SourceIp != "" && r.options.Interface != "" {
-		r.scanner.SourceIP = net.ParseIP(r.options.SourceIp)
+func (r *Runner) SetSourceIPAndInterface() error {
+	if r.options.SourceIP != "" && r.options.Interface != "" {
+		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
 		var err error
 		r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
 		if err != nil {
@@ -71,7 +71,7 @@ func (r *Runner) SetSourceIpAndInterface() error {
 		}
 	}
 
-	return fmt.Errorf("Source Ip and Interface not specified")
+	return fmt.Errorf("source Ip and Interface not specified")
 }
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
@@ -88,8 +88,11 @@ func (r *Runner) RunEnumeration() error {
 	} else {
 		r.BackgroundWorkers()
 
-		if err := r.SetSourceIpAndInterface(); err != nil {
-			r.scanner.TuneSource(ExternalTargetForTune)
+		if err := r.SetSourceIPAndInterface(); err != nil {
+			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
+			if tuneSourceErr != nil {
+				return tuneSourceErr
+			}
 		}
 
 		r.scanner.State = scan.Probe
@@ -252,8 +255,12 @@ func (r *Runner) handleOutput() {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
-		if _, err := os.Stat(outputFolder); os.IsNotExist(err) {
-			os.MkdirAll(outputFolder, 0700)
+		if _, statErr := os.Stat(outputFolder); os.IsNotExist(statErr) {
+			mkdirErr := os.MkdirAll(outputFolder, 0700)
+			if mkdirErr != nil {
+				gologger.Errorf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
+				return
+			}
 		}
 
 		file, err = os.Create(output)
@@ -264,29 +271,29 @@ func (r *Runner) handleOutput() {
 		defer file.Close()
 	}
 
-	for hostIp, ports := range r.scanner.ScanResults.M {
-		hostsOrig, ok := r.scanner.Targets[hostIp]
+	for hostIP, ports := range r.scanner.ScanResults.M {
+		hostsOrig, ok := r.scanner.Targets[hostIP]
 		if !ok {
 			continue
 		}
 		// if no fqdn add the ip
 		if len(hostsOrig) == 0 {
-			hostsOrig[hostIp] = struct{}{}
+			hostsOrig[hostIP] = struct{}{}
 		}
 
 		for host := range hostsOrig {
-			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIp)
+			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 
 			// console output
 			if r.options.JSON {
-				data := JSONResult{Ip: hostIp}
-				if host != hostIp {
+				data := JSONResult{IP: hostIP}
+				if host != hostIP {
 					data.Host = host
 				}
 				for port := range ports {
 					data.Port = port
-					b, err := json.Marshal(data)
-					if err != nil {
+					b, marshallErr := json.Marshal(data)
+					if marshallErr != nil {
 						continue
 					}
 					gologger.Silentf("%s\n", string(b))
@@ -300,7 +307,7 @@ func (r *Runner) handleOutput() {
 			// file output
 			if file != nil {
 				if r.options.JSON {
-					err = WriteJSONOutput(host, hostIp, ports, file)
+					err = WriteJSONOutput(host, hostIP, ports, file)
 				} else {
 					err = WriteHostOutput(host, ports, file)
 				}

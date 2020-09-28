@@ -11,7 +11,7 @@ import (
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
 	Host string `json:"host,omitempty"`
-	Ip   string `json:"ip,omitempty"`
+	IP   string `json:"ip,omitempty"`
 	Port int    `json:"port"`
 }
 
@@ -44,7 +44,7 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) 
 	if host != ip {
 		data.Host = host
 	}
-	data.Ip = ip
+	data.IP = ip
 
 	for port := range ports {
 		data.Port = port

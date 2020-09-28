@@ -11,10 +11,10 @@ import (
 )
 
 const banner = `
-                  __       
+                  __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.2				 
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.2
 `
 
 // Version is the current version of naabu
@@ -47,9 +47,9 @@ func showNetworkInterfaces() error {
 		return err
 	}
 	for _, itf := range interfaces {
-		addresses, err := itf.Addrs()
-		if err != nil {
-			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, err)
+		addresses, addErr := itf.Addrs()
+		if addErr != nil {
+			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, addErr)
 			continue
 		}
 		var addrstr []string
@@ -125,7 +125,7 @@ func (options *Options) writeDefaultConfig() {
 # icmp-echo-probe: true
 # IcmpTimestampProbe before scanning
 # icmp-timestamp-probe: false
-# SourceIp to use in TCP packets
+# SourceIP to use in TCP packets
 # source-ip: 10.10.10.10
 # Interface to use for TCP packets
 # interface: eth0

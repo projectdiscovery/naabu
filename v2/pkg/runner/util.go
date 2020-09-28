@@ -29,7 +29,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 		}
 
 		if len(targetIPs) == 0 {
-			return targetIPs, fmt.Errorf("No IP addresses found for host: %s", target)
+			return targetIPs, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
 		targetIPs = append(targetIPs, target)

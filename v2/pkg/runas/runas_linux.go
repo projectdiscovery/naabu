@@ -42,25 +42,25 @@ func Nobody() error {
 
 func switchUser(usr string) error {
 	// downgrading to user nobody
-	user, err := user.Lookup(usr)
+	u, err := user.Lookup(usr)
 	if err != nil {
 		return err
 	}
-	uid, err := strconv.ParseInt(user.Uid, 10, 32)
+	uid, err := strconv.ParseInt(u.Uid, 10, 32)
 	if err != nil {
 		return err
 	}
-	gid, err := strconv.ParseInt(user.Gid, 10, 32)
+	gid, err := strconv.ParseInt(u.Gid, 10, 32)
 	if err != nil {
 		return err
 	}
 	cerr, errno := C.setgid(C.__gid_t(gid))
 	if cerr != 0 {
-		return fmt.Errorf("Unable to set GID due to error:%d", errno)
+		return fmt.Errorf("unable to set GID due to error:%d", errno)
 	}
 	cerr, errno = C.setuid(C.__uid_t(uid))
 	if cerr != 0 {
-		return fmt.Errorf("Unable to set UID due to error:%d", errno)
+		return fmt.Errorf("unable to set UID due to error:%d", errno)
 	}
 
 	return nil
