@@ -14,7 +14,10 @@ func (r *Runner) Load() error {
 	r.scanner.State = scan.Init
 	// target defined via CLI argument
 	if r.options.Host != "" {
-		r.AddTarget(r.options.Host)
+		err := r.AddTarget(r.options.Host)
+		if err != nil {
+			return err
+		}
 	}
 
 	// Targets from file
@@ -25,7 +28,11 @@ func (r *Runner) Load() error {
 		}
 		scanner := bufio.NewScanner(f)
 		for scanner.Scan() {
-			r.AddTarget(scanner.Text())
+			err := r.AddTarget(scanner.Text())
+			if err != nil {
+				f.Close()
+				return err
+			}
 		}
 		f.Close()
 	}
@@ -34,24 +41,33 @@ func (r *Runner) Load() error {
 	if r.options.Stdin {
 		scanner := bufio.NewScanner(os.Stdin)
 		for scanner.Scan() {
-			r.AddTarget(scanner.Text())
+			err := r.AddTarget(scanner.Text())
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	// all additional non-named cli arguments are interpreted as targets
 	for _, target := range flag.Args() {
-		r.AddTarget(target)
+		err := r.AddTarget(target)
+		if err != nil {
+			return err
+		}
 	}
 
 	// handles targets from config file if provided
 	if r.options.config != nil {
 		for _, target := range r.options.config.Host {
-			r.AddTarget(target)
+			err := r.AddTarget(target)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
 	if len(r.scanner.Targets) == 0 {
-		return errors.New("No targets specified")
+		return errors.New("no targets specified")
 	}
 
 	return nil
@@ -67,11 +83,18 @@ func (r *Runner) AddTarget(target string) error {
 			return err
 		}
 		for _, ip := range ips {
-			r.addOrExpand(ip)
+			err := r.addOrExpand(ip)
+			if err != nil {
+				return err
+			}
 		}
 		return nil
 	}
-	r.addOrExpand(target)
+	err := r.addOrExpand(target)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 

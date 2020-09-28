@@ -11,30 +11,12 @@ const ConfigDefaultFilename = "naabu.conf"
 
 // ConfigFile contains the fields stored in the configuration file
 type ConfigFile struct {
-	// Retries is the number of retries for the port
-	Retries int `yaml:"retries,omitempty"`
-	// Rate is the rate of port scan requests
-	Rate int `yaml:"rate,omitempty"`
-	// Timeout is the seconds to wait for ports to respond
-	Timeout int `yaml:"timeout,omitempty"`
-	// Hosts are the host to find ports for
-	Host []string `yaml:"host,omitempty"`
-	// Ports is the ports to use for enumeration
-	Ports []string `yaml:"ports,omitempty"`
-	// ExcludePorts is the list of ports to exclude from enumeration
-	ExcludePorts []string `yaml:"exclude-ports,omitempty"`
 	// Verify is used to check if the ports found were valid using CONNECT method
 	Verify bool `yaml:"verify,omitempty"`
 	// NoProbe skips probes to discover alive hosts
 	NoProbe bool `yaml:"no-probe,omitempty"`
 	// Ping uses ping probes to discover fastest active host and discover dead hosts
 	Ping bool `yaml:"ping,omitempty"`
-	// Port Probes (SYN-PORT, ACK-PORT)
-	PortProbes []string `yaml:"port-probes,omitempty"`
-	// Ips or cidr to be excluded from the scan
-	ExcludeIps []string `yaml:"exclude-ips,omitempty"`
-	// Top ports list
-	TopPorts string `yaml:"top-ports,omitempty"`
 	// Attempts to run as root
 	Privileged bool `yaml:"privileged,omitempty"`
 	// Drop root privileges
@@ -45,14 +27,32 @@ type ConfigFile struct {
 	IcmpEchoProbe bool `yaml:"icmp-echo-probe,omitempty"`
 	// IcmpTimestampProbe before scanning
 	IcmpTimestampProbe bool `yaml:"icmp-timestamp-probe,omitempty"`
-	// SourceIp to use in TCP packets
-	SourceIp string `yaml:"source-ip,omitempty"`
-	// Interface to use for TCP packets
-	Interface string `yaml:"interface,omitempty"`
+	// Retries is the number of retries for the port
+	Retries int `yaml:"retries,omitempty"`
+	// Rate is the rate of port scan requests
+	Rate int `yaml:"rate,omitempty"`
+	// Timeout is the seconds to wait for ports to respond
+	Timeout int `yaml:"timeout,omitempty"`
 	// WarmUpTime between scan phases
 	WarmUpTime int `yaml:"warm-up-time,omitempty"`
+	// Top ports list
+	TopPorts string `yaml:"top-ports,omitempty"`
+	// SourceIP to use in TCP packets
+	SourceIP string `yaml:"source-ip,omitempty"`
+	// Interface to use for TCP packets
+	Interface string `yaml:"interface,omitempty"`
 	// NMapCommand to invoke after scanning
 	NMapCommand string `yaml:"nmap,omitempty"`
+	// Hosts are the host to find ports for
+	Host []string `yaml:"host,omitempty"`
+	// Ports is the ports to use for enumeration
+	Ports []string `yaml:"ports,omitempty"`
+	// ExcludePorts is the list of ports to exclude from enumeration
+	ExcludePorts []string `yaml:"exclude-ports,omitempty"`
+	// Port Probes (SYN-PORT, ACK-PORT)
+	PortProbes []string `yaml:"port-probes,omitempty"`
+	// Ips or cidr to be excluded from the scan
+	ExcludeIps []string `yaml:"exclude-ips,omitempty"`
 }
 
 // GetConfigDirectory gets the subfinder config directory for a user

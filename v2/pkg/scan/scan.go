@@ -5,7 +5,6 @@ import (
 	"math/rand"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -13,13 +12,20 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/KV"
+	"github.com/projectdiscovery/naabu/v2/pkg/kv"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
 
 // State determines the internal scan state
 type State int
+
+const (
+	maxRetries     = 10
+	sendDelayMsec  = 10
+	chanSize       = 1000
+	packetSendSize = 2500
+)
 
 const (
 	Init State = iota
@@ -35,50 +41,49 @@ type PkgFlag int
 const (
 	SYN PkgFlag = iota
 	ACK
-	ICMP_ECHO_REQUEST
-	ICMP_TIMESTAMP_REQUEST
+	ICMPECHOREQUEST
+	ICMPTIMESTAMPREQUEST
 )
 
 // Scanner is a scanner that scans for ports using SYN packets.
 type Scanner struct {
+	SourceIP           net.IP
+	tcpPacketlistener  net.PacketConn
+	icmpPacketListener net.PacketConn
+	retries            int
+	rate               int
+	listenPort         int
+	timeout            time.Duration
+
 	Ports          map[int]struct{}
 	ExcludedIps    map[string]struct{}
-	wg             sync.WaitGroup
 	Targets        map[string]map[string]struct{}
-	ProbeResults   *KV.KV
+	ProbeResults   *kv.KV
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
 
-	timeout            time.Duration
-	serializeOptions   gopacket.SerializeOptions
-	retries            int
-	rate               int
-	debug              bool
-	tcpPacketRecv      chan int
-	tcpPacketSend      chan *PkgSend
-	tcpPacketlistener  net.PacketConn
-	icmpPacketRecv     chan int
-	icmpPacketSend     chan *PkgSend
-	icmpPacketListener net.PacketConn
-	listenPort         int
-	tcpChan            chan *PkgResult
-	icmpChan           chan *PkgResult
-	State              State
-	ScanResults        *KV.KVD
-
+	tcpPacketSend    chan *PkgSend
+	icmpPacketSend   chan *PkgSend
+	tcpChan          chan *PkgResult
+	icmpChan         chan *PkgResult
+	State            State
+	ScanResults      *kv.D
 	NetworkInterface *net.Interface
-	SourceIP         net.IP
-	tcpsequencer     *TCPSequencer
 	cdn              *cdncheck.Client
+	tcpsequencer     *TCPSequencer
+	serializeOptions gopacket.SerializeOptions
+	debug            bool
 }
 
+// PkgSend is a TCP package
 type PkgSend struct {
 	ip       string
 	port     int
 	flag     PkgFlag
-	sourceIp string
+	SourceIP string
 }
 
+// PkgResult contains the results of sending TCP packages
 type PkgResult struct {
 	ip   string
 	port int
@@ -117,16 +122,16 @@ func NewScanner(options *Options) (*Scanner, error) {
 		if err != nil {
 			return nil, err
 		}
-		scanner.icmpPacketListener = icmpConn
 
-		scanner.icmpChan = make(chan *PkgResult, 1000)
-		scanner.icmpPacketSend = make(chan *PkgSend, 2500)
-		scanner.tcpChan = make(chan *PkgResult, 1000)
-		scanner.tcpPacketSend = make(chan *PkgSend, 2500)
+		scanner.icmpPacketListener = icmpConn
+		scanner.icmpChan = make(chan *PkgResult, chanSize)
+		scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
+		scanner.tcpChan = make(chan *PkgResult, chanSize)
+		scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
 	}
 
-	scanner.ProbeResults = KV.NewKV()
-	scanner.ScanResults = KV.NewKVResults()
+	scanner.ProbeResults = kv.NewKV()
+	scanner.ScanResults = kv.NewKVResults()
 
 	var err error
 	scanner.cdn, err = cdncheck.New()
@@ -156,12 +161,7 @@ func (s *Scanner) StartWorkers() {
 // TCPWriteWorker that sends out TCP packets
 func (s *Scanner) TCPWriteWorker() {
 	for pkg := range s.tcpPacketSend {
-		switch pkg.flag {
-		case SYN:
-			s.SynPortAsync(pkg.ip, pkg.port)
-		case ACK:
-			s.ACKPortAsync(pkg.ip, pkg.port)
-		}
+		s.SendAsyncPkg(pkg.ip, pkg.port, pkg.flag)
 	}
 }
 
@@ -227,10 +227,9 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 // ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
-		switch pkg.flag {
-		case ICMP_ECHO_REQUEST:
+		if pkg.flag == ICMPECHOREQUEST {
 			s.PingIcmpEchoRequestAsync(pkg.ip)
-		case ICMP_TIMESTAMP_REQUEST:
+		} else if pkg.flag == ICMPTIMESTAMPREQUEST {
 			s.PingIcmpTimestampRequestAsync(pkg.ip)
 		}
 	}
@@ -268,14 +267,9 @@ func (s *Scanner) ICMPReadWorker() {
 // ICMPResultWorker handles ICMP responses (used only during probes)
 func (s *Scanner) ICMPResultWorker() {
 	for ip := range s.icmpChan {
-		switch s.State {
-		case Guard:
-			// ignore as working internally on data structures
-		case Probe:
+		if s.State == Probe {
 			gologger.Debugf("Received ICMP response from %s\n", ip.ip)
 			s.ProbeResults.Set(ip.ip)
-		case Scan:
-			// Discard
 		}
 	}
 }
@@ -283,13 +277,10 @@ func (s *Scanner) ICMPResultWorker() {
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		switch s.State {
-		case Guard:
-			// ignore as working internally on data structures
-		case Probe:
+		if s.State == Probe {
 			gologger.Debugf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
 			s.ProbeResults.Set(ip.ip)
-		case Scan:
+		} else if s.State == Scan {
 			gologger.Debugf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
@@ -312,29 +303,29 @@ func GetSrcParameters(destIP string) (srcIP net.IP, networkInterface *net.Interf
 }
 
 // send sends the given layers as a single packet on the network.
-func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) (int, error) {
+func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, s.serializeOptions, l...); err != nil {
-		return 0, err
+		return err
 	}
 
 	var (
-		retries, n int
-		err        error
+		retries int
+		err     error
 	)
 
 send:
-	if retries >= 10 {
-		return n, err
+	if retries >= maxRetries {
+		return err
 	}
-	n, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
+	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
-		time.Sleep(time.Duration(10) * time.Millisecond)
+		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
 		goto send
 	}
-	return n, err
+	return err
 }
 
 // ScanSyn a target ip
@@ -351,13 +342,17 @@ func GetSourceIP(dstip net.IP) (net.IP, error) {
 		return nil, err
 	}
 
-	if con, err := net.DialUDP("udp", nil, serverAddr); err == nil {
-		defer con.Close()
-		if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
-			return udpaddr.IP, nil
-		}
+	con, dialUpErr := net.DialUDP("udp", nil, serverAddr)
+	if dialUpErr != nil {
+		return nil, dialUpErr
 	}
-	return nil, err
+
+	defer con.Close()
+	if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
+		return udpaddr.IP, nil
+	}
+
+	return nil, nil
 }
 
 // GetInterfaceFromIP gets the name of the network interface from local ip address
@@ -374,7 +369,12 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 		if err != nil {
 			return nil, err
 		}
+
 		addresses, err := byNameInterface.Addrs()
+		if err != nil {
+			return nil, err
+		}
+
 		for _, v := range addresses {
 			// Check if the IP for the current interface is our
 			// source IP. If yes, return the interface
@@ -393,7 +393,7 @@ func ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	conn.Close()
 	return true, err
 }
 
@@ -432,9 +432,16 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
 
-	s.send(dstIP, conn, &tcp)
+	err = tcp.SetNetworkLayerForChecksum(&ip4)
+	if err != nil {
+		return false, err
+	}
+
+	err = s.send(dstIP, conn, &tcp)
+	if err != nil {
+		return false, err
+	}
 
 	data := make([]byte, 4096)
 	for {
@@ -446,7 +453,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		// not matching ip
 		if addr.String() != dstIP {
 			if s.debug {
-				gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String(), dstIP)
+				gologger.Debugf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
 			}
 			continue
 		}
@@ -475,8 +482,8 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	return false, nil
 }
 
-// SynPortAsync sends a single SYN packet to a port
-func (s *Scanner) SynPortAsync(ip string, port int) {
+// SendAsyncPkg sends a single packet to a port
+func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
 		SrcIP:    s.SourceIP,
@@ -494,42 +501,30 @@ func (s *Scanner) SynPortAsync(ip string, port int) {
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.listenPort),
 		DstPort: layers.TCPPort(port),
-		SYN:     true,
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
-	s.send(ip, s.tcpPacketlistener, &tcp)
-}
 
-// ACKPortAsync sends a single ACK packet to a port
-func (s *Scanner) ACKPortAsync(ip string, port int) {
-	// Construct all the network layers we need.
-	ip4 := layers.IPv4{
-		SrcIP:    s.SourceIP,
-		DstIP:    net.ParseIP(ip),
-		Version:  4,
-		TTL:      255,
-		Protocol: layers.IPProtocolTCP,
-	}
-	tcpOption := layers.TCPOption{
-		OptionType:   layers.TCPOptionKindMSS,
-		OptionLength: 4,
-		OptionData:   []byte{0x12, 0x34},
+	if pkgFlag == SYN {
+		tcp.SYN = true
+	} else if pkgFlag == ACK {
+		tcp.ACK = true
 	}
 
-	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(s.listenPort),
-		DstPort: layers.TCPPort(port),
-		ACK:     true,
-		Window:  1024,
-		Seq:     s.tcpsequencer.Next(),
-		Options: []layers.TCPOption{tcpOption},
+	err := tcp.SetNetworkLayerForChecksum(&ip4)
+	if err != nil {
+		if s.debug {
+			gologger.Debugf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+		}
+	} else {
+		err = s.send(ip, s.tcpPacketlistener, &tcp)
+		if err != nil {
+			if s.debug {
+				gologger.Debugf("Can not send async package to %s:%d port: %s\n", ip, port, err)
+			}
+		}
 	}
-	tcp.SetNetworkLayerForChecksum(&ip4)
-
-	s.send(ip, s.tcpPacketlistener, &tcp)
 }
 
 // TuneSource automatically with ip and interface
