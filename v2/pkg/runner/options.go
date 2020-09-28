@@ -144,12 +144,15 @@ func ParseOptions() *Options {
 }
 
 func hasStdin() bool {
-	fi, err := os.Stdin.Stat()
+	stat, err := os.Stdin.Stat()
 	if err != nil {
 		return false
 	}
 
-	return fi.Mode()&os.ModeNamedPipe != 0
+	isPipedFromChrDev := (stat.Mode() & os.ModeCharDevice) == 0
+	isPipedFromFIFO := (stat.Mode() & os.ModeNamedPipe) != 0
+
+	return isPipedFromChrDev || isPipedFromFIFO
 }
 
 func (options *Options) MergeFromConfig(configFileName string, ignoreError bool) {
