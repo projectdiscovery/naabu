@@ -1,6 +1,8 @@
 package scan
 
-import "time"
+import (
+	"time"
+)
 
 // Options of the scan
 type Options struct {
@@ -9,4 +11,5 @@ type Options struct {
 	Rate    int
 	Debug   bool
 	Root    bool
+	Cdn     bool
 }

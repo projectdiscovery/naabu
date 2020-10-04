@@ -133,10 +133,12 @@ func NewScanner(options *Options) (*Scanner, error) {
 	scanner.ProbeResults = kv.NewKV()
 	scanner.ScanResults = kv.NewKVResults()
 
-	var err error
-	scanner.cdn, err = cdncheck.New()
-	if err != nil {
-		return nil, err
+	if options.Cdn {
+		var err error
+		scanner.cdn, err = cdncheck.NewWithCache()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return scanner, nil
