@@ -35,6 +35,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		Rate:    options.Rate,
 		Debug:   options.Debug,
 		Root:    isRoot(),
+		Cdn:     !options.ExcludeCDN,
 	})
 	if err != nil {
 		return nil, err
@@ -200,7 +201,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	}
 
 	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
-	if !r.scanner.CdnCheck(host) {
+	if ok, err := r.scanner.CdnCheck(host); err == nil && !ok {
 		return true
 	}
 
