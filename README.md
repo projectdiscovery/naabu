@@ -357,6 +357,12 @@ Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
+# 📋 Notes
+- Naabu is desinged to scan ports on multiple hosts / mass port scanning. 
+- As default naabu is configured with a assumption that you are running it from VPS.
+- We suggest to tune the flags / rate if running naabu from local system.
+- For best results, run naabu as **root** user.
+
 # License
 
 naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
