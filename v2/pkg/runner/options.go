@@ -45,6 +45,7 @@ type Options struct {
 	SourceIP       string // SourceIP to use in TCP packets
 	Interface      string // Interface to use for TCP packets
 	ConfigFile     string // Config file contains a scan configuration
+	NmapCLI        string // Nmap command (has priority over config file)
 	config         *ConfigFile
 }
 
@@ -85,6 +86,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
 	flag.StringVar(&options.ConfigFile, "config", "", "Config file")
 	flag.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)")
+	flag.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)")
 
 	flag.Parse()
 
