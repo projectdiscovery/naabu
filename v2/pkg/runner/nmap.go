@@ -10,8 +10,16 @@ import (
 )
 
 func (r *Runner) handleNmap() {
-	if r.options.config != nil && r.options.config.NMapCommand != "" {
-		args := strings.Split(r.options.config.NMapCommand, " ")
+	// command from CLI
+	command := r.options.NmapCLI
+	hasCLI := r.options.NmapCLI != ""
+	// If empty load the one from config file
+	if command == "" && r.options.config != nil {
+		command = r.options.config.NMapCommand
+	}
+	// If at least one is defined handle it
+	if command != "" {
+		args := strings.Split(command, " ")
 		var (
 			ips   []string
 			ports []string
@@ -33,8 +41,9 @@ func (r *Runner) handleNmap() {
 		args = append(args, "-p", portsStr)
 		args = append(args, ips...)
 
-		if r.options.Nmap {
-			gologger.Infof("Running nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
+		// if requested via config file or via cli
+		if r.options.Nmap || hasCLI {
+			gologger.Infof("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
 			err := cmd.Run()
@@ -43,7 +52,7 @@ func (r *Runner) handleNmap() {
 				return
 			}
 		} else {
-			gologger.Infof("Suggested nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
+			gologger.Infof("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
 		}
 	}
 }
