@@ -12,6 +12,7 @@ import (
 func (r *Runner) handleNmap() {
 	// command from CLI
 	command := r.options.NmapCLI
+	hasCLI := r.options.NmapCLI != ""
 	// If empty load the one from config file
 	if command == "" && r.options.config != nil {
 		command = r.options.config.NMapCommand
@@ -40,8 +41,9 @@ func (r *Runner) handleNmap() {
 		args = append(args, "-p", portsStr)
 		args = append(args, ips...)
 
-		if r.options.Nmap {
-			gologger.Infof("Running nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
+		// if requested via config file or via cli
+		if r.options.Nmap || hasCLI {
+			gologger.Infof("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
 			err := cmd.Run()
