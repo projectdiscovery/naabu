@@ -18,7 +18,7 @@ func (r *Runner) handleNmap() {
 	}
 	// If at least one is defined handle it
 	if command != "" {
-		args := strings.Split(r.options.config.NMapCommand, " ")
+		args := strings.Split(command, " ")
 		var (
 			ips   []string
 			ports []string
@@ -50,7 +50,7 @@ func (r *Runner) handleNmap() {
 				return
 			}
 		} else {
-			gologger.Infof("Suggested nmap command: %s -p %s %s", r.options.config.NMapCommand, portsStr, ipsStr)
+			gologger.Infof("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
 		}
 	}
 }
