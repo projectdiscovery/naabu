@@ -10,7 +10,14 @@ import (
 )
 
 func (r *Runner) handleNmap() {
-	if r.options.config != nil && r.options.config.NMapCommand != "" {
+	// command from CLI
+	command := r.options.NmapCLI
+	// If empty load the one from config file
+	if command == "" && r.options.config != nil {
+		command = r.options.config.NMapCommand
+	}
+	// If at least one is defined handle it
+	if command != "" {
 		args := strings.Split(r.options.config.NMapCommand, " ")
 		var (
 			ips   []string
