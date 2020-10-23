@@ -31,7 +31,9 @@ func (r *Runner) Load() error {
 			err := r.AddTarget(scanner.Text())
 			if err != nil {
 				f.Close()
-				return err
+				gologger.Warningf("%s", err)
+				// ignore errors
+				continue
 			}
 		}
 		f.Close()
@@ -43,7 +45,9 @@ func (r *Runner) Load() error {
 		for scanner.Scan() {
 			err := r.AddTarget(scanner.Text())
 			if err != nil {
-				return err
+				gologger.Warningf("%s", err)
+				// ignore errors
+				continue
 			}
 		}
 	}
@@ -52,7 +56,9 @@ func (r *Runner) Load() error {
 	for _, target := range flag.Args() {
 		err := r.AddTarget(target)
 		if err != nil {
-			return err
+			gologger.Warningf("%s", err)
+			// ignore errors
+			continue
 		}
 	}
 
@@ -61,7 +67,9 @@ func (r *Runner) Load() error {
 		for _, target := range r.options.config.Host {
 			err := r.AddTarget(target)
 			if err != nil {
-				return err
+				gologger.Warningf("%s", err)
+				// ignore errors
+				continue
 			}
 		}
 	}
