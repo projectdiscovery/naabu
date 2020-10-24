@@ -10,7 +10,7 @@ require (
 	github.com/projectdiscovery/fdmax v0.0.2
 	github.com/projectdiscovery/gologger v1.0.1
 	github.com/projectdiscovery/mapcidr v0.0.4
-	github.com/yl2chen/cidranger v1.0.2 // indirect
+	github.com/yl2chen/cidranger v1.0.2
 	go.uber.org/atomic v1.7.0 // indirect
 	go.uber.org/ratelimit v0.1.0
 	golang.org/x/net v0.0.0-20201022231255-08b38378de70

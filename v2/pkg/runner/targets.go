@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"flag"
+	"net"
 	"os"
 
 	"github.com/projectdiscovery/gologger"
@@ -117,8 +118,7 @@ func (r *Runner) addOrExpand(target string) error {
 		hostIP       string
 	)
 	for _, ip := range ips {
-		_, toExclude := r.scanner.ExcludedIps[ip]
-		if toExclude {
+		if toExclude, _ := r.scanner.ExcludedIps.Contains(net.ParseIP(ip)); toExclude {
 			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
