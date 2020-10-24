@@ -13,6 +13,7 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/kv"
+	"github.com/yl2chen/cidranger"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -56,7 +57,7 @@ type Scanner struct {
 	timeout            time.Duration
 
 	Ports          map[int]struct{}
-	ExcludedIps    map[string]struct{}
+	ExcludedIps    cidranger.Ranger
 	Targets        map[string]map[string]struct{}
 	ProbeResults   *kv.KV
 	SynProbesPorts map[int]struct{}
