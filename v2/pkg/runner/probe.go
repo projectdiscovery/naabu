@@ -32,10 +32,13 @@ func (r *Runner) ProbeOrSkip() {
 	}
 
 	limiter := ratelimit.New(r.options.Rate)
-	for ip := range r.scanner.Targets {
+
+	r.scanner.Targets.Scan(func(k, _ []byte) error {
 		limiter.Take()
+		ip := string(k)
 		r.pingprobesasync(ip)
 		r.synprobesasync(ip)
 		r.ackprobesasync(ip)
-	}
+		return nil
+	})
 }
