@@ -12,6 +12,7 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/hmap/store/hybrid"
 	"github.com/projectdiscovery/naabu/v2/pkg/kv"
 	"github.com/yl2chen/cidranger"
 	"golang.org/x/net/icmp"
@@ -58,7 +59,8 @@ type Scanner struct {
 
 	Ports          map[int]struct{}
 	ExcludedIps    cidranger.Ranger
-	Targets        map[string]map[string]struct{}
+	Targets        *hybrid.HybridMap
+	TargetsIps     cidranger.Ranger
 	ProbeResults   *kv.KV
 	SynProbesPorts map[int]struct{}
 	AckProbesPorts map[int]struct{}
@@ -185,8 +187,7 @@ func (s *Scanner) TCPReadWorker() {
 			continue
 		}
 
-		_, ok := s.Targets[addr.String()]
-		if !ok {
+		if !RangerContains(s.TargetsIps, addr.String()) {
 			gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String())
 			continue
 		}

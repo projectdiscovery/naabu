@@ -4,8 +4,8 @@ import (
 	"bufio"
 	"errors"
 	"flag"
-	"net"
 	"os"
+	"strings"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -75,7 +75,7 @@ func (r *Runner) Load() error {
 		}
 	}
 
-	if len(r.scanner.Targets) == 0 {
+	if r.scanner.TargetsIps.Len() == 0 {
 		return errors.New("no targets specified")
 	}
 
@@ -87,6 +87,8 @@ func (r *Runner) AddTarget(target string) error {
 		return nil
 	}
 	if scan.IsCidr(target) {
+		// Add cidr directly to ranger, as single ips would allocate more resources later
+		scan.AddToRanger(r.scanner.TargetsIps, target)
 		ips, err := scan.Ips(target)
 		if err != nil {
 			return err
@@ -118,7 +120,7 @@ func (r *Runner) addOrExpand(target string) error {
 		hostIP       string
 	)
 	for _, ip := range ips {
-		if toExclude, _ := r.scanner.ExcludedIps.Contains(net.ParseIP(ip)); toExclude {
+		if scan.RangerContains(r.scanner.ExcludedIps, ip) {
 			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
@@ -159,11 +161,18 @@ func (r *Runner) addOrExpand(target string) error {
 		gologger.Debugf("Using host %s for enumeration\n", hostIP)
 	}
 
-	// we also keep track of ip => host for the output
-	if _, ok := r.scanner.Targets[hostIP]; !ok {
-		r.scanner.Targets[hostIP] = make(map[string]struct{})
+	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
+	if data, ok := r.scanner.Targets.Get(hostIP); ok {
+		hostnames := strings.Split(string(data), ",")
+		hostnames = append(hostnames, target)
+		r.scanner.Targets.Set(hostIP, []byte(strings.Join(hostnames, ",")))
+	} else {
+		r.scanner.Targets.Set(hostIP, []byte(target))
 	}
-	r.scanner.Targets[hostIP][target] = struct{}{}
+
+	if !scan.RangerContains(r.scanner.TargetsIps, hostIP) {
+		scan.AddToRanger(r.scanner.TargetsIps, hostIP)
+	}
 
 	return nil
 }

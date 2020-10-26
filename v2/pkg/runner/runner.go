@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -11,7 +12,9 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/hmap/store/hybrid"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/yl2chen/cidranger"
 	"go.uber.org/ratelimit"
 )
 
@@ -57,7 +60,12 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 
-	runner.scanner.Targets = make(map[string]map[string]struct{})
+	runner.scanner.Targets, err = hybrid.New(hybrid.DefaultDiskOptions)
+	if err != nil {
+		return nil, err
+	}
+
+	runner.scanner.TargetsIps = cidranger.NewPCTrieRanger()
 
 	return runner, nil
 }
@@ -107,11 +115,13 @@ func (r *Runner) RunEnumeration() error {
 
 		// update targets
 		if len(r.scanner.ProbeResults.M) > 0 {
-			for ip := range r.scanner.Targets {
-				if _, ok := r.scanner.ProbeResults.M[ip]; !ok {
-					delete(r.scanner.Targets, ip)
+			r.scanner.Targets.Scan(func(ip, _ []byte) error {
+				if _, ok := r.scanner.ProbeResults.M[string(ip)]; !ok {
+					// TODO: just temporary
+					r.scanner.Targets.Del(string(ip))
 				}
-			}
+				return nil
+			})
 		}
 
 		r.scanner.State = scan.Scan
@@ -166,10 +176,11 @@ func (r *Runner) RawSocketEnumeration() {
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
-			for target := range r.scanner.Targets {
+			r.scanner.Targets.Scan(func(target, _ []byte) error {
 				limiter.Take()
-				r.handleHostPortSyn(target, port)
-			}
+				r.handleHostPortSyn(string(target), port)
+				return nil
+			})
 		}
 	}
 }
@@ -182,11 +193,12 @@ func (r *Runner) ConnectEnumeration() {
 
 	for retry := 0; retry < r.options.Retries; retry++ {
 		for port := range r.scanner.Ports {
-			for target := range r.scanner.Targets {
+			r.scanner.Targets.Scan(func(target, _ []byte) error {
 				limiter.Take()
 				swg.Add(1)
-				go r.handleHostPort(&swg, target, port)
-			}
+				go r.handleHostPort(&swg, string(target), port)
+				return nil
+			})
 		}
 	}
 
@@ -273,23 +285,20 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIP, ports := range r.scanner.ScanResults.M {
-		hostsOrig, ok := r.scanner.Targets[hostIP]
+		dt, ok := r.scanner.Targets.Get(hostIP)
 		if !ok {
 			continue
 		}
-		// if no fqdn add the ip
-		if len(hostsOrig) == 0 {
-			hostsOrig[hostIP] = struct{}{}
-		}
 
-		for host := range hostsOrig {
-			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
+		for _, host := range bytes.Split(dt, []byte(",")) {
+			hostStr := string(host)
+			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), hostStr, hostIP)
 
 			// console output
 			if r.options.JSON {
 				data := JSONResult{IP: hostIP}
-				if host != hostIP {
-					data.Host = host
+				if hostStr != hostIP {
+					data.Host = hostStr
 				}
 				for port := range ports {
 					data.Port = port
@@ -301,19 +310,19 @@ func (r *Runner) handleOutput() {
 				}
 			} else {
 				for port := range ports {
-					gologger.Silentf("%s:%d\n", host, port)
+					gologger.Silentf("%s:%d\n", hostStr, port)
 				}
 			}
 
 			// file output
 			if file != nil {
 				if r.options.JSON {
-					err = WriteJSONOutput(host, hostIP, ports, file)
+					err = WriteJSONOutput(hostStr, hostIP, ports, file)
 				} else {
-					err = WriteHostOutput(host, ports, file)
+					err = WriteHostOutput(hostStr, ports, file)
 				}
 				if err != nil {
-					gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+					gologger.Errorf("Could not write results to file %s for %s: %s\n", output, hostStr, err)
 				}
 			}
 		}
