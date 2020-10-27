@@ -10,23 +10,20 @@ import (
 // Options contains the configuration options for tuning
 // the port enumeration process.
 type Options struct {
-	Verbose            bool // Verbose flag indicates whether to show verbose output or not
-	NoColor            bool // No-Color disables the colored output
-	JSON               bool // JSON specifies whether to use json for output format or text file
-	Silent             bool // Silent suppresses any extra text and only writes found host:port to screen
-	Stdin              bool // Stdin specifies whether stdin input was given to the process
-	Verify             bool // Verify is used to check if the ports found were valid using CONNECT method
-	Version            bool // Version specifies if we should just show version and exit
-	NoProbe            bool // NoProbe skips probes to discover alive hosts
-	Ping               bool // Ping uses ping probes to discover fastest active host and discover dead hosts
-	Debug              bool // Prints out debug information
-	Privileged         bool // Attempts to run as root
-	Unprivileged       bool // Drop root privileges
-	ExcludeCDN         bool // Excludes ip of knows CDN ranges for full port scan
-	IcmpEchoProbe      bool // Probe for Icmp Echo
-	IcmpTimestampProbe bool
-	Nmap               bool // Invoke nmap detailed scan on results
-	InterfacesList     bool // InterfacesList show interfaces list
+	Verbose        bool // Verbose flag indicates whether to show verbose output or not
+	NoColor        bool // No-Color disables the colored output
+	JSON           bool // JSON specifies whether to use json for output format or text file
+	Silent         bool // Silent suppresses any extra text and only writes found host:port to screen
+	Stdin          bool // Stdin specifies whether stdin input was given to the process
+	Verify         bool // Verify is used to check if the ports found were valid using CONNECT method
+	Version        bool // Version specifies if we should just show version and exit
+	Ping           bool // Ping uses ping probes to discover fastest active host and discover dead hosts
+	Debug          bool // Prints out debug information
+	Privileged     bool // Attempts to run as root
+	Unprivileged   bool // Drop root privileges
+	ExcludeCDN     bool // Excludes ip of knows CDN ranges for full port scan
+	Nmap           bool // Invoke nmap detailed scan on results
+	InterfacesList bool // InterfacesList show interfaces list
 
 	Retries        int    // Retries is the number of retries for the port
 	Rate           int    // Rate is the rate of port scan requests
@@ -38,7 +35,6 @@ type Options struct {
 	Ports          string // Ports is the ports to use for enumeration
 	PortsFile      string // PortsFile is the file containing ports to use for enumeration
 	ExcludePorts   string // ExcludePorts is the list of ports to exclude from enumeration
-	PortProbes     string // Port Probes (SYN-PORT, ACK-PORT)
 	ExcludeIps     string // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile string // File containing Ips or cidr to exclude from the scan
 	TopPorts       string // Tops ports to scan
@@ -57,10 +53,6 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
-	flag.StringVar(&options.PortProbes, "port-probe", "S80,A443", "Port probes for hosts (default SYN - 80, ACK - 443)")
-	flag.BoolVar(&options.IcmpEchoProbe, "icmp-echo-probe", true, "Use ICMP_ECHO_REQUEST probe")
-	flag.BoolVar(&options.IcmpTimestampProbe, "icmp-timestamp-probe", true, "Use ICMP_ECHO_REQUEST probe")
-	flag.BoolVar(&options.NoProbe, "no-probe", false, "Skip all probes for verification of host")
 	flag.BoolVar(&options.Ping, "ping", true, "Use ping probes for verification of host")
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
@@ -178,7 +170,6 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 		options.Timeout = configFile.Timeout
 	}
 	options.Verify = configFile.Verify
-	options.NoProbe = configFile.NoProbe
 	options.Ping = configFile.Ping
 	if configFile.TopPorts != "" {
 		options.TopPorts = configFile.TopPorts
@@ -186,8 +177,6 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	options.Privileged = configFile.Privileged
 	options.Unprivileged = configFile.Unprivileged
 	options.ExcludeCDN = configFile.ExcludeCDN
-	options.IcmpEchoProbe = configFile.IcmpEchoProbe
-	options.IcmpTimestampProbe = configFile.IcmpTimestampProbe
 	if configFile.SourceIP != "" {
 		options.SourceIP = configFile.SourceIP
 	}

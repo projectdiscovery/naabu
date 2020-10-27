@@ -12,9 +12,8 @@ import (
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/hmap/store/hybrid"
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/kv"
-	"github.com/yl2chen/cidranger"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -31,7 +30,6 @@ const (
 
 const (
 	Init State = iota
-	Probe
 	Scan
 	Done
 	Guard
@@ -57,13 +55,8 @@ type Scanner struct {
 	listenPort         int
 	timeout            time.Duration
 
-	Ports          map[int]struct{}
-	ExcludedIps    cidranger.Ranger
-	Targets        *hybrid.HybridMap
-	TargetsIps     cidranger.Ranger
-	ProbeResults   *kv.KV
-	SynProbesPorts map[int]struct{}
-	AckProbesPorts map[int]struct{}
+	Ports    map[int]struct{}
+	IPRanger *ipranger.IPRanger
 
 	tcpPacketSend    chan *PkgSend
 	icmpPacketSend   chan *PkgSend
@@ -96,6 +89,11 @@ type PkgResult struct {
 func NewScanner(options *Options) (*Scanner, error) {
 	rand.Seed(time.Now().UnixNano())
 
+	iprang, err := ipranger.New()
+	if err != nil {
+		return nil, err
+	}
+
 	scanner := &Scanner{
 		serializeOptions: gopacket.SerializeOptions{
 			FixLengths:       true,
@@ -106,6 +104,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		rate:         options.Rate,
 		debug:        options.Debug,
 		tcpsequencer: NewTCPSequencer(),
+		IPRanger:     iprang,
 	}
 
 	if options.Root {
@@ -121,19 +120,10 @@ func NewScanner(options *Options) (*Scanner, error) {
 		}
 		scanner.tcpPacketlistener = tcpConn
 
-		icmpConn, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-		if err != nil {
-			return nil, err
-		}
-
-		scanner.icmpPacketListener = icmpConn
-		scanner.icmpChan = make(chan *PkgResult, chanSize)
-		scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
 		scanner.tcpChan = make(chan *PkgResult, chanSize)
 		scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
 	}
 
-	scanner.ProbeResults = kv.NewKV()
 	scanner.ScanResults = kv.NewKVResults()
 
 	if options.Cdn {
@@ -150,16 +140,12 @@ func NewScanner(options *Options) (*Scanner, error) {
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
 	s.tcpPacketlistener.Close()
-	s.icmpPacketListener.Close()
 }
 
 // StartWorkers of the scanner
 func (s *Scanner) StartWorkers() {
 	go s.TCPReadWorker()
 	go s.TCPWriteWorker()
-	go s.ICMPReadWorker()
-	go s.ICMPWriteWorker()
-	go s.ICMPResultWorker()
 	go s.TCPResultWorker()
 }
 
@@ -187,7 +173,7 @@ func (s *Scanner) TCPReadWorker() {
 			continue
 		}
 
-		if !RangerContains(s.TargetsIps, addr.String()) {
+		if !s.IPRanger.Contains(addr.String()) {
 			gologger.Debugf("Discarding TCP packet from non target ip %s\n", addr.String())
 			continue
 		}
@@ -268,23 +254,10 @@ func (s *Scanner) ICMPReadWorker() {
 	}
 }
 
-// ICMPResultWorker handles ICMP responses (used only during probes)
-func (s *Scanner) ICMPResultWorker() {
-	for ip := range s.icmpChan {
-		if s.State == Probe {
-			gologger.Debugf("Received ICMP response from %s\n", ip.ip)
-			s.ProbeResults.Set(ip.ip)
-		}
-	}
-}
-
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		if s.State == Probe {
-			gologger.Debugf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
-			s.ProbeResults.Set(ip.ip)
-		} else if s.State == Scan {
+		if s.State == Scan {
 			gologger.Debugf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
