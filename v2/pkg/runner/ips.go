@@ -5,18 +5,17 @@ import (
 	"io/ioutil"
 	"strings"
 
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
-	"github.com/yl2chen/cidranger"
 )
 
-func parseExcludedIps(options *Options) (cidranger.Ranger, error) {
-	excludeipRanger := cidranger.NewPCTrieRanger()
+func parseExcludedIps(options *Options, scanner *scan.Scanner) error {
 	var allIps []string
 	if options.ExcludeIps != "" {
 		for _, ip := range strings.Split(options.ExcludeIps, ",") {
-			err := scan.AddToRanger(excludeipRanger, ip)
+			err := scanner.IPRanger.Exclude(ip)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
@@ -24,12 +23,12 @@ func parseExcludedIps(options *Options) (cidranger.Ranger, error) {
 	if options.ExcludeIpsFile != "" {
 		data, err := ioutil.ReadFile(options.ExcludeIpsFile)
 		if err != nil {
-			return nil, fmt.Errorf("could not read ips: %s", err)
+			return fmt.Errorf("could not read ips: %s", err)
 		}
 		for _, ip := range strings.Split(string(data), "\n") {
-			err := scan.AddToRanger(excludeipRanger, ip)
+			err := scanner.IPRanger.Exclude(ip)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		}
 	}
@@ -37,9 +36,9 @@ func parseExcludedIps(options *Options) (cidranger.Ranger, error) {
 	if options.config != nil {
 		for _, excludeIP := range options.config.ExcludeIps {
 			for _, ip := range strings.Split(excludeIP, ",") {
-				err := scan.AddToRanger(excludeipRanger, ip)
+				err := scanner.IPRanger.Exclude(ip)
 				if err != nil {
-					return nil, err
+					return err
 				}
 			}
 		}
@@ -48,15 +47,15 @@ func parseExcludedIps(options *Options) (cidranger.Ranger, error) {
 	for _, ip := range allIps {
 		if ip == "" {
 			continue
-		} else if scan.IsCidr(ip) || scan.IsIP(ip) {
-			err := scan.AddToRanger(excludeipRanger, ip)
+		} else if ipranger.IsCidr(ip) || ipranger.IsIP(ip) {
+			err := scanner.IPRanger.Exclude(ip)
 			if err != nil {
-				return nil, err
+				return err
 			}
 		} else {
-			return nil, fmt.Errorf("exclude element not ip or range")
+			return fmt.Errorf("exclude element not ip or range")
 		}
 	}
 
-	return excludeipRanger, nil
+	return nil
 }

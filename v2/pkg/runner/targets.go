@@ -5,9 +5,9 @@ import (
 	"errors"
 	"flag"
 	"os"
-	"strings"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
@@ -75,7 +75,7 @@ func (r *Runner) Load() error {
 		}
 	}
 
-	if r.scanner.TargetsIps.Len() == 0 {
+	if r.scanner.IPRanger.Len() == 0 {
 		return errors.New("no targets specified")
 	}
 
@@ -86,10 +86,10 @@ func (r *Runner) AddTarget(target string) error {
 	if target == "" {
 		return nil
 	}
-	if scan.IsCidr(target) {
+	if ipranger.IsCidr(target) {
 		// Add cidr directly to ranger, as single ips would allocate more resources later
-		scan.AddToRanger(r.scanner.TargetsIps, target)
-		ips, err := scan.Ips(target)
+		r.scanner.IPRanger.Add(target)
+		ips, err := ipranger.Ips(target)
 		if err != nil {
 			return err
 		}
@@ -120,7 +120,7 @@ func (r *Runner) addOrExpand(target string) error {
 		hostIP       string
 	)
 	for _, ip := range ips {
-		if scan.RangerContains(r.scanner.ExcludedIps, ip) {
+		if r.scanner.IPRanger.IsExcluded(ip) {
 			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
@@ -162,17 +162,9 @@ func (r *Runner) addOrExpand(target string) error {
 	}
 
 	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
-	if data, ok := r.scanner.Targets.Get(hostIP); ok {
-		hostnames := strings.Split(string(data), ",")
-		hostnames = append(hostnames, target)
-		r.scanner.Targets.Set(hostIP, []byte(strings.Join(hostnames, ",")))
-	} else {
-		r.scanner.Targets.Set(hostIP, []byte(target))
-	}
+	r.scanner.IPRanger.AddFqdn(hostIP, target)
 
-	if !scan.RangerContains(r.scanner.TargetsIps, hostIP) {
-		scan.AddToRanger(r.scanner.TargetsIps, hostIP)
-	}
+	r.scanner.IPRanger.Add(hostIP)
 
 	return nil
 }
