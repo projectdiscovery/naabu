@@ -22,3 +22,14 @@ func IsIP(ip string) bool {
 func Ips(cidr string) ([]string, error) {
 	return mapcidr.IPAddresses(cidr)
 }
+
+func ToCidr(item string) *net.IPNet {
+	if IsIP(item) {
+		item = item + "/32"
+	}
+	if IsCidr(item) {
+		_, ipnet, _ := net.ParseCIDR(item)
+		return ipnet
+	}
+	return nil
+}

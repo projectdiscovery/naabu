@@ -55,7 +55,7 @@ type Scanner struct {
 	listenPort         int
 	timeout            time.Duration
 
-	Ports    map[int]struct{}
+	Ports    []int
 	IPRanger *ipranger.IPRanger
 
 	tcpPacketSend    chan *PkgSend
@@ -307,7 +307,7 @@ send:
 
 // ScanSyn a target ip
 func (s *Scanner) ScanSyn(ip string) {
-	for port := range s.Ports {
+	for _, port := range s.Ports {
 		s.EnqueueTCP(ip, port, SYN)
 	}
 }

@@ -1,6 +1,7 @@
 package ipranger
 
 import (
+	"bytes"
 	"net"
 	"strings"
 
@@ -15,7 +16,7 @@ type IPRanger struct {
 	TotalExcludeIps uint64
 	RangerExclude   cidranger.Ranger
 	TotalFqdn       uint64
-	Fqdn2ip         *hybrid.HybridMap
+	Targets         *hybrid.HybridMap
 	ports           []int
 }
 
@@ -27,7 +28,7 @@ func New() (*IPRanger, error) {
 	rangerIn := cidranger.NewPCTrieRanger()
 	rangerExclude := cidranger.NewPCTrieRanger()
 
-	return &IPRanger{Ranger: rangerIn, RangerExclude: rangerExclude, Fqdn2ip: hm}, nil
+	return &IPRanger{Ranger: rangerIn, RangerExclude: rangerExclude, Targets: hm}, nil
 }
 
 func (ir *IPRanger) Add(ipcidr string) error {
@@ -45,6 +46,12 @@ func (ir *IPRanger) Add(ipcidr string) error {
 		return err
 	}
 
+	ir.TotalIps += mapcidr.AddressCountIpnet(network)
+
+	return ir.Ranger.Insert(cidranger.NewBasicRangerEntry(*network))
+}
+
+func (ir *IPRanger) AddIpNet(network *net.IPNet) error {
 	ir.TotalIps += mapcidr.AddressCountIpnet(network)
 
 	return ir.Ranger.Insert(cidranger.NewBasicRangerEntry(*network))
@@ -118,31 +125,37 @@ func (ir *IPRanger) Contains(ipcidr string) bool {
 
 func (ir *IPRanger) AddFqdn(ip string, fqdn string) error {
 	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
-	if data, ok := ir.Fqdn2ip.Get(ip); ok {
-		fqdns := strings.Split(string(data), ",")
-		fqdns = append(fqdns, fqdn)
-		return ir.Fqdn2ip.Set(ip, []byte(strings.Join(fqdns, ",")))
+	if data, ok := ir.Targets.Get(ip); ok {
+		// check if fqdn not contained
+		if !bytes.Contains(data, []byte(fqdn)) {
+			fqdns := strings.Split(string(data), ",")
+			fqdns = append(fqdns, fqdn)
+			return ir.Targets.Set(ip, []byte(strings.Join(fqdns, ",")))
+		}
+		// fqdn already contained
+		return nil
 	}
 
 	ir.TotalFqdn++
 
-	return ir.Fqdn2ip.Set(ip, []byte(fqdn))
+	return ir.Targets.Set(ip, []byte(fqdn))
 }
 
 func (ir *IPRanger) HasIp(ip string) bool {
-	_, ok := ir.Fqdn2ip.Get(ip)
+	_, ok := ir.Targets.Get(ip)
 	return ok
 }
 
 func (ir *IPRanger) GetFQDNByIp(ip string) ([]string, error) {
-	dt, ok := ir.Fqdn2ip.Get(ip)
+	dt, ok := ir.Targets.Get(ip)
 	if ok {
 		return strings.Split(string(dt), ","), nil
 	}
 
-	return []string{}, nil
+	// if not found return the ip
+	return []string{ip}, nil
 }
 
 func (ir *IPRanger) Close() error {
-	return ir.Fqdn2ip.Close()
+	return ir.Targets.Close()
 }

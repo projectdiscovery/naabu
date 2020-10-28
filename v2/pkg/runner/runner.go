@@ -3,6 +3,7 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -11,15 +12,21 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
 )
 
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options *Options
-	scanner *scan.Scanner
+	options     *Options
+	targetsFile string
+	scanner     *scan.Scanner
+	limiter     ratelimit.Limiter
+	wgscan      sizedwaitgroup.SizedWaitGroup
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -75,35 +82,64 @@ func (r *Runner) RunEnumeration() error {
 		return err
 	}
 
-	if !isRoot() {
-		// Connect Scan - perform ports spray scan
-		r.ConnectEnumeration()
-		r.scanner.State = scan.Done
-	} else {
-		r.BackgroundWorkers()
+	// Scan workers
+	r.wgscan = sizedwaitgroup.New(r.options.Rate)
+	r.limiter = ratelimit.New(r.options.Rate)
+	r.BackgroundWorkers()
 
-		if err := r.SetSourceIPAndInterface(); err != nil {
-			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
-			if tuneSourceErr != nil {
-				return tuneSourceErr
-			}
+	if err := r.SetSourceIPAndInterface(); err != nil {
+		tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
+		if tuneSourceErr != nil {
+			return tuneSourceErr
 		}
+	}
 
-		r.scanner.State = scan.Scan
+	// shrinks the ips to the minimum amount of cidr
+	var targets []*net.IPNet
+	r.scanner.IPRanger.Targets.Scan(func(k, v []byte) error {
+		targets = append(targets, ipranger.ToCidr(string(k)))
+		return nil
+	})
+	targets, _ = mapcidr.CoalesceCIDRs(targets)
+	// add targets to ranger
+	for _, target := range targets {
+		r.scanner.IPRanger.AddIpNet(target)
+	}
 
-		// Syn Scan - Perform scan with raw sockets
-		r.RawSocketEnumeration()
+	r.scanner.State = scan.Scan
 
-		if r.options.WarmUpTime > 0 {
-			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+	targetsCount := int64(r.scanner.IPRanger.CountIPS())
+	portsCount := int64(len(r.scanner.Ports))
+	Range := targetsCount * portsCount
+	b := ipranger.NewBlackRock(Range, 43)
+	for index := int64(0); index < Range; index++ {
+		xxx := b.Shuffle(index)
+		ipIndex := int64(math.Floor(float64(xxx / portsCount)))
+		portIndex := int(math.Floor(float64(xxx % portsCount)))
+		ip := r.PickIp(targets, ipIndex)
+		port := r.PickPort(portIndex)
+
+		r.limiter.Take()
+		// connect scan
+		if !isRoot() {
+			r.wgscan.Add()
+			go r.handleHostPort(ip, port)
+		} else {
+			r.RawSocketEnumeration(ip, port)
 		}
+	}
 
-		r.scanner.State = scan.Done
+	r.wgscan.Wait()
 
-		// Validate the hosts if the user has asked for second step validation
-		if r.options.Verify {
-			r.ConnectVerification()
-		}
+	if r.options.WarmUpTime > 0 {
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+	}
+
+	r.scanner.State = scan.Done
+
+	// Validate the hosts if the user has asked for second step validation
+	if r.options.Verify {
+		r.ConnectVerification()
 	}
 
 	r.handleOutput()
@@ -112,6 +148,32 @@ func (r *Runner) RunEnumeration() error {
 	r.handleNmap()
 
 	return nil
+}
+
+func (r *Runner) Close() {
+	os.RemoveAll(r.targetsFile)
+	r.scanner.IPRanger.Targets.Close()
+}
+
+func (r *Runner) PickIp(targets []*net.IPNet, index int64) string {
+	for _, target := range targets {
+		subnetIpsCount := int64(mapcidr.AddressCountIpnet(target))
+		if index < subnetIpsCount {
+			return r.PickSubnetIp(target, index)
+		}
+		index -= subnetIpsCount
+	}
+
+	return ""
+}
+
+func (r *Runner) PickSubnetIp(network *net.IPNet, index int64) string {
+	initialIp := network.IP
+	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(initialIp) + index).String()
+}
+
+func (r *Runner) PickPort(index int) int {
+	return r.scanner.Ports[index]
 }
 
 func (r *Runner) ConnectVerification() {
@@ -136,40 +198,8 @@ func (r *Runner) BackgroundWorkers() {
 	r.scanner.StartWorkers()
 }
 
-func (r *Runner) RawSocketEnumeration() {
-	limiter := ratelimit.New(r.options.Rate)
-
-	// masscan algorithm
-
-	for retry := 0; retry < r.options.Retries; retry++ {
-		for port := range r.scanner.Ports {
-			r.scanner.IPRanger.Fqdn2ip.Scan(func(target, _ []byte) error {
-				limiter.Take()
-				r.handleHostPortSyn(string(target), port)
-				return nil
-			})
-		}
-	}
-}
-
-func (r *Runner) ConnectEnumeration() {
-	r.scanner.State = scan.Scan
-	// naive algorithm - ports spray
-	var swg sync.WaitGroup
-	limiter := ratelimit.New(r.options.Rate)
-
-	for retry := 0; retry < r.options.Retries; retry++ {
-		for port := range r.scanner.Ports {
-			r.scanner.IPRanger.Fqdn2ip.Scan(func(target, _ []byte) error {
-				limiter.Take()
-				swg.Add(1)
-				go r.handleHostPort(&swg, string(target), port)
-				return nil
-			})
-		}
-	}
-
-	swg.Wait()
+func (r *Runner) RawSocketEnumeration(ip string, port int) {
+	r.handleHostPortSyn(ip, port)
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
@@ -188,8 +218,8 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(swg *sync.WaitGroup, host string, port int) {
-	defer swg.Done()
+func (r *Runner) handleHostPort(host string, port int) {
+	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
