@@ -210,18 +210,6 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 	return ports, nil
 }
 
-func checkPort(m map[int]struct{}, p, prefix string) error {
-	if strings.HasPrefix(p, prefix) {
-		port, err := strconv.Atoi(strings.TrimPrefix(p, prefix))
-		if err != nil {
-			return err
-		}
-		m[port] = struct{}{}
-	}
-
-	return nil
-}
-
 // merge maps in a new one
 func merge(maps ...map[int]struct{}) (m map[int]struct{}) {
 	m = make(map[int]struct{})

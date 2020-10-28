@@ -25,7 +25,7 @@ func Ips(cidr string) ([]string, error) {
 
 func ToCidr(item string) *net.IPNet {
 	if IsIP(item) {
-		item = item + "/32"
+		item += "/32"
 	}
 	if IsCidr(item) {
 		_, ipnet, _ := net.ParseCIDR(item)

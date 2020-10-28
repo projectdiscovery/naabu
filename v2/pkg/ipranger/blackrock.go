@@ -44,7 +44,7 @@ func (blackrock *BlackRock) Fe(r, a, b, m, seed int64) int64 {
 	)
 
 	L = m % a
-	R = int64(math.Floor(float64(m / a)))
+	R = m / a
 
 	for j = 1; j <= r; j++ {
 		if j&1 == 1 {
@@ -72,17 +72,17 @@ func (blackrock *BlackRock) Unfe(r, a, b, m, seed int64) int64 {
 
 	if r&1 == 1 {
 		R = m % a
-		L = int64(math.Floor(float64(m / a)))
+		L = m / a
 	} else {
 		L = m % a
-		R = int64(math.Floor(float64(m / a)))
+		R = m / a
 	}
 
 	for j = r; j >= 1; j-- {
 		if j&1 == 1 {
 			tmp = blackrock.F(j, L, seed)
 			if tmp > R {
-				tmp = tmp - R
+				tmp -= -R
 				tmp = a - (tmp % a)
 				if tmp == a {
 					tmp = 0
@@ -112,7 +112,7 @@ func (blackrock *BlackRock) Unfe(r, a, b, m, seed int64) int64 {
 }
 
 func (blackrock *BlackRock) Shuffle(m int64) int64 {
-	c := blackrock.Fe(blackrock.Rounds, blackrock.A, blackrock.B, int64(m), blackrock.Seed)
+	c := blackrock.Fe(blackrock.Rounds, blackrock.A, blackrock.B, m, blackrock.Seed)
 
 	for c >= blackrock.Range {
 		c = blackrock.Fe(blackrock.Rounds, blackrock.A, blackrock.B, c, blackrock.Seed)
@@ -122,7 +122,7 @@ func (blackrock *BlackRock) Shuffle(m int64) int64 {
 }
 
 func (blackrock *BlackRock) UnShuffle(m int64) int64 {
-	c := blackrock.Unfe(blackrock.Rounds, blackrock.A, blackrock.B, int64(m), blackrock.Seed)
+	c := blackrock.Unfe(blackrock.Rounds, blackrock.A, blackrock.B, m, blackrock.Seed)
 	for c >= blackrock.Range {
 		c = blackrock.Unfe(blackrock.Rounds, blackrock.A, blackrock.B, c, blackrock.Seed)
 	}

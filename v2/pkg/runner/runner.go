@@ -3,7 +3,6 @@ package runner
 import (
 	"encoding/json"
 	"fmt"
-	"math"
 	"net"
 	"os"
 	"path/filepath"
@@ -85,13 +84,15 @@ func (r *Runner) RunEnumeration() error {
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
-	r.BackgroundWorkers()
 
-	if err := r.SetSourceIPAndInterface(); err != nil {
-		tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
-		if tuneSourceErr != nil {
-			return tuneSourceErr
+	if isRoot() {
+		if err := r.SetSourceIPAndInterface(); err != nil {
+			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
+			if tuneSourceErr != nil {
+				return tuneSourceErr
+			}
 		}
+		r.BackgroundWorkers()
 	}
 
 	// shrinks the ips to the minimum amount of cidr
@@ -114,8 +115,8 @@ func (r *Runner) RunEnumeration() error {
 	b := ipranger.NewBlackRock(Range, 43)
 	for index := int64(0); index < Range; index++ {
 		xxx := b.Shuffle(index)
-		ipIndex := int64(math.Floor(float64(xxx / portsCount)))
-		portIndex := int(math.Floor(float64(xxx % portsCount)))
+		ipIndex := xxx / portsCount
+		portIndex := int(xxx % portsCount)
 		ip := r.PickIp(targets, ipIndex)
 		port := r.PickPort(portIndex)
 
