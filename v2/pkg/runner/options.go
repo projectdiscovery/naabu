@@ -54,7 +54,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
-	flag.BoolVar(&options.Ping, "ping", true, "Use ping probes for verification of host")
+	flag.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host")
 	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
 	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
 	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")

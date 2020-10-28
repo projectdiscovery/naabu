@@ -10,6 +10,10 @@ import (
 	"github.com/yl2chen/cidranger"
 )
 
+const (
+	singleIpSuffix = "/32"
+)
+
 type IPRanger struct {
 	TotalIps        uint64
 	Ranger          cidranger.Ranger
@@ -17,7 +21,6 @@ type IPRanger struct {
 	RangerExclude   cidranger.Ranger
 	TotalFqdn       uint64
 	Targets         *hybrid.HybridMap
-	ports           []int
 }
 
 func New() (*IPRanger, error) {
@@ -38,7 +41,7 @@ func (ir *IPRanger) Add(ipcidr string) error {
 
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += "/32"
+		ipcidr += singleIpSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -60,7 +63,7 @@ func (ir *IPRanger) AddIpNet(network *net.IPNet) error {
 func (ir *IPRanger) Delete(ipcidr string) error {
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += "/32"
+		ipcidr += singleIpSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -80,7 +83,7 @@ func (ir *IPRanger) Exclude(ipcidr string) error {
 	}
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += "/32"
+		ipcidr += singleIpSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -123,7 +126,7 @@ func (ir *IPRanger) Contains(ipcidr string) bool {
 	return !ir.IsExcluded(ipcidr) && ir.ContainsSkipExclude(ipcidr)
 }
 
-func (ir *IPRanger) AddFqdn(ip string, fqdn string) error {
+func (ir *IPRanger) AddFqdn(ip, fqdn string) error {
 	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
 	if data, ok := ir.Targets.Get(ip); ok {
 		// check if fqdn not contained

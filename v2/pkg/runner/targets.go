@@ -27,10 +27,6 @@ func (r *Runner) Load() error {
 	// pre-process all targets (resolves all non fqdn targets to ip address)
 	r.PreProcessTargets()
 
-	// if r.scanner.IPRanger.Len() == 0 {
-	// 	return errors.New("no targets specified")
-	// }
-
 	return nil
 }
 
@@ -99,7 +95,7 @@ func (r *Runner) PreProcessTargets() error {
 		wg.Add()
 		func(target string) {
 			defer wg.Done()
-			r.AddTarget(s.Text())
+			r.AddTarget(target)
 		}(s.Text())
 	}
 
