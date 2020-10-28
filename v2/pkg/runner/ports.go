@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"io/ioutil"
+	"sort"
 	"strconv"
 	"strings"
 )
@@ -17,7 +18,7 @@ const (
 )
 
 // ParsePorts parses the list of ports and creates a port map
-func ParsePorts(options *Options) (map[int]struct{}, error) {
+func ParsePorts(options *Options) ([]int, error) {
 	portsFileMap := make(map[int]struct{})
 	portsCLIMap := make(map[int]struct{})
 	topPortsCLIMap := make(map[int]struct{})
@@ -123,14 +124,18 @@ func ParsePorts(options *Options) (map[int]struct{}, error) {
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
-		portsList, parsePortErr := parsePortsList(NmapTop100)
-		if parsePortErr != nil {
-			return nil, fmt.Errorf("could not read ports: %s", parsePortErr)
+		portsList, err := parsePortsList(NmapTop100)
+		if err != nil {
+			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
-		return excludePorts(options, portsList)
+		m, err := excludePorts(options, portsList)
+		if err != nil {
+			return nil, err
+		}
+		return flatten(m), nil
 	}
 
-	return ports, nil
+	return flatten(ports), nil
 }
 
 // excludePorts excludes the list of ports from the exclusion list
@@ -225,5 +230,14 @@ func merge(maps ...map[int]struct{}) (m map[int]struct{}) {
 			m[p] = struct{}{}
 		}
 	}
+	return
+}
+
+func flatten(m map[int]struct{}) (s []int) {
+	for k := range m {
+		s = append(s, k)
+	}
+
+	sort.Ints(s)
 	return
 }
