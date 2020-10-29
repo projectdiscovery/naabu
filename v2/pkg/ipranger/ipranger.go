@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	singleIpSuffix = "/32"
+	singleIPSuffix = "/32"
 )
 
 type IPRanger struct {
@@ -41,7 +41,7 @@ func (ir *IPRanger) Add(ipcidr string) error {
 
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += singleIpSuffix
+		ipcidr += singleIPSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -54,7 +54,7 @@ func (ir *IPRanger) Add(ipcidr string) error {
 	return ir.Ranger.Insert(cidranger.NewBasicRangerEntry(*network))
 }
 
-func (ir *IPRanger) AddIpNet(network *net.IPNet) error {
+func (ir *IPRanger) AddIPNet(network *net.IPNet) error {
 	ir.TotalIps += mapcidr.AddressCountIpnet(network)
 
 	return ir.Ranger.Insert(cidranger.NewBasicRangerEntry(*network))
@@ -63,7 +63,7 @@ func (ir *IPRanger) AddIpNet(network *net.IPNet) error {
 func (ir *IPRanger) Delete(ipcidr string) error {
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += singleIpSuffix
+		ipcidr += singleIPSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -83,7 +83,7 @@ func (ir *IPRanger) Exclude(ipcidr string) error {
 	}
 	// if it's an ip convert it to cidr representation
 	if IsIP(ipcidr) {
-		ipcidr += singleIpSuffix
+		ipcidr += singleIPSuffix
 	}
 	// Check if it's a cidr
 	_, network, err := net.ParseCIDR(ipcidr)
@@ -144,12 +144,12 @@ func (ir *IPRanger) AddFqdn(ip, fqdn string) error {
 	return ir.Targets.Set(ip, []byte(fqdn))
 }
 
-func (ir *IPRanger) HasIp(ip string) bool {
+func (ir *IPRanger) HasIP(ip string) bool {
 	_, ok := ir.Targets.Get(ip)
 	return ok
 }
 
-func (ir *IPRanger) GetFQDNByIp(ip string) ([]string, error) {
+func (ir *IPRanger) GetFQDNByIP(ip string) ([]string, error) {
 	dt, ok := ir.Targets.Get(ip)
 	if ok {
 		return strings.Split(string(dt), ","), nil
