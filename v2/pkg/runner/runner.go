@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	DnsQueryTypeA = "A"
+	DNSQueryTypeA = "A"
 )
 
 // Runner is an instance of the port enumeration
@@ -66,15 +66,15 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	dnsOptions := dnsprobe.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
-	dnsOptions.QuestionType, err = dnsprobe.StringToRequestType(DnsQueryTypeA)
+	dnsOptions.QuestionType, err = dnsprobe.StringToRequestType(DNSQueryTypeA)
 	if err != nil {
 		return nil, err
 	}
-	dnsprobe, err := dnsprobe.New(dnsOptions)
+	dnsProbe, err := dnsprobe.New(dnsOptions)
 	if err != nil {
 		return nil, err
 	}
-	runner.dnsprobe = dnsprobe
+	runner.dnsprobe = dnsProbe
 
 	return runner, nil
 }
@@ -122,7 +122,10 @@ func (r *Runner) RunEnumeration() error {
 	targets, _ = mapcidr.CoalesceCIDRs(targets)
 	// add targets to ranger
 	for _, target := range targets {
-		r.scanner.IPRanger.AddIpNet(target)
+		err := r.scanner.IPRanger.AddIPNet(target)
+		if err != nil {
+			gologger.Warningf("%s\n", err)
+		}
 	}
 
 	r.scanner.State = scan.Scan
@@ -135,7 +138,7 @@ func (r *Runner) RunEnumeration() error {
 		xxx := b.Shuffle(index)
 		ipIndex := xxx / portsCount
 		portIndex := int(xxx % portsCount)
-		ip := r.PickIp(targets, ipIndex)
+		ip := r.PickIP(targets, ipIndex)
 		port := r.PickPort(portIndex)
 
 		r.limiter.Take()
@@ -174,11 +177,11 @@ func (r *Runner) Close() {
 	r.scanner.IPRanger.Targets.Close()
 }
 
-func (r *Runner) PickIp(targets []*net.IPNet, index int64) string {
+func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
 	for _, target := range targets {
 		subnetIpsCount := int64(mapcidr.AddressCountIpnet(target))
 		if index < subnetIpsCount {
-			return r.PickSubnetIp(target, index)
+			return r.PickSubnetIP(target, index)
 		}
 		index -= subnetIpsCount
 	}
@@ -186,9 +189,8 @@ func (r *Runner) PickIp(targets []*net.IPNet, index int64) string {
 	return ""
 }
 
-func (r *Runner) PickSubnetIp(network *net.IPNet, index int64) string {
-	initialIp := network.IP
-	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(initialIp) + index).String()
+func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
+	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(network.IP) + index).String()
 }
 
 func (r *Runner) PickPort(index int) int {
@@ -301,7 +303,7 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIP, ports := range r.scanner.ScanResults.M {
-		dt, err := r.scanner.IPRanger.GetFQDNByIp(hostIP)
+		dt, err := r.scanner.IPRanger.GetFQDNByIP(hostIP)
 		if err != nil {
 			continue
 		}
