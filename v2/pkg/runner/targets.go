@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
@@ -111,6 +112,7 @@ func (r *Runner) PreProcessTargets() error {
 }
 
 func (r *Runner) AddTarget(target string) error {
+	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
 	} else if ipranger.IsCidr(target) {

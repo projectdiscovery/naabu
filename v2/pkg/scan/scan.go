@@ -498,7 +498,7 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 		err = s.send(ip, s.tcpPacketlistener, &tcp)
 		if err != nil {
 			if s.debug {
-				gologger.Debugf("Can not send async package to %s:%d port: %s\n", ip, port, err)
+				gologger.Debugf("Can not send packet to %s:%d port: %s\n", ip, port, err)
 			}
 		}
 	}
