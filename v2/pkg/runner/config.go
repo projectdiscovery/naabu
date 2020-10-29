@@ -13,8 +13,6 @@ const ConfigDefaultFilename = "naabu.conf"
 type ConfigFile struct {
 	// Verify is used to check if the ports found were valid using CONNECT method
 	Verify bool `yaml:"verify,omitempty"`
-	// NoProbe skips probes to discover alive hosts
-	NoProbe bool `yaml:"no-probe,omitempty"`
 	// Ping uses ping probes to discover fastest active host and discover dead hosts
 	Ping bool `yaml:"ping,omitempty"`
 	// Attempts to run as root
@@ -23,10 +21,6 @@ type ConfigFile struct {
 	Unprivileged bool `yaml:"unprivileged,omitempty"`
 	// Excludes ip of knows CDN ranges
 	ExcludeCDN bool `yaml:"exclude-cdn,omitempty"`
-	// IcmpEchoProbe before scanning
-	IcmpEchoProbe bool `yaml:"icmp-echo-probe,omitempty"`
-	// IcmpTimestampProbe before scanning
-	IcmpTimestampProbe bool `yaml:"icmp-timestamp-probe,omitempty"`
 	// Retries is the number of retries for the port
 	Retries int `yaml:"retries,omitempty"`
 	// Rate is the rate of port scan requests
@@ -49,8 +43,6 @@ type ConfigFile struct {
 	Ports []string `yaml:"ports,omitempty"`
 	// ExcludePorts is the list of ports to exclude from enumeration
 	ExcludePorts []string `yaml:"exclude-ports,omitempty"`
-	// Port Probes (SYN-PORT, ACK-PORT)
-	PortProbes []string `yaml:"port-probes,omitempty"`
 	// Ips or cidr to be excluded from the scan
 	ExcludeIps []string `yaml:"exclude-ips,omitempty"`
 }
