@@ -2,21 +2,55 @@ package runner
 
 import (
 	"bufio"
-	"errors"
 	"flag"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/remeh/sizedwaitgroup"
 )
 
 func (r *Runner) Load() error {
 	r.scanner.State = scan.Init
+
+	// merge all target sources into a file
+	targetfile, err := r.mergeToFile()
+	if err != nil {
+		return err
+	}
+	r.targetsFile = targetfile
+
+	// pre-process all targets (resolves all non fqdn targets to ip address)
+	err = r.PreProcessTargets()
+	if err != nil {
+		gologger.Warningf("%s\n", err)
+	}
+
+	return nil
+}
+
+func (r *Runner) mergeToFile() (string, error) {
+	// merge all targets in a unique file
+	tempInput, err := ioutil.TempFile("", "stdin-input-*")
+	if err != nil {
+		return "", err
+	}
+	defer tempInput.Close()
+
 	// target defined via CLI argument
 	if r.options.Host != "" {
+		fmt.Fprintf(tempInput, "%s\n", r.options.Host)
+		if _, err := tempInput.WriteString(r.options.Host + "\n"); err != nil {
+			gologger.Warningf("%s\n", err)
+		}
 		err := r.AddTarget(r.options.Host)
 		if err != nil {
-			return err
+			return "", err
 		}
 	}
 
@@ -24,92 +58,89 @@ func (r *Runner) Load() error {
 	if r.options.HostsFile != "" {
 		f, err := os.Open(r.options.HostsFile)
 		if err != nil {
-			return err
+			return "", err
 		}
-		scanner := bufio.NewScanner(f)
-		for scanner.Scan() {
-			err := r.AddTarget(scanner.Text())
-			if err != nil {
-				f.Close()
-				gologger.Warningf("%s", err)
-				// ignore errors
-				continue
-			}
+		defer f.Close()
+		if _, err := io.Copy(tempInput, f); err != nil {
+			return "", err
 		}
-		f.Close()
 	}
 
 	// targets from STDIN
 	if r.options.Stdin {
-		scanner := bufio.NewScanner(os.Stdin)
-		for scanner.Scan() {
-			err := r.AddTarget(scanner.Text())
-			if err != nil {
-				gologger.Warningf("%s", err)
-				// ignore errors
-				continue
-			}
+		if _, err := io.Copy(tempInput, os.Stdin); err != nil {
+			return "", err
 		}
 	}
 
 	// all additional non-named cli arguments are interpreted as targets
 	for _, target := range flag.Args() {
-		err := r.AddTarget(target)
-		if err != nil {
-			gologger.Warningf("%s", err)
-			// ignore errors
-			continue
-		}
+		fmt.Fprintf(tempInput, "%s\n", target)
 	}
 
 	// handles targets from config file if provided
 	if r.options.config != nil {
 		for _, target := range r.options.config.Host {
-			err := r.AddTarget(target)
-			if err != nil {
-				gologger.Warningf("%s", err)
-				// ignore errors
-				continue
-			}
+			fmt.Fprintf(tempInput, "%s\n", target)
 		}
 	}
 
-	if len(r.scanner.Targets) == 0 {
-		return errors.New("no targets specified")
+	filename := tempInput.Name()
+	return filename, nil
+}
+
+func (r *Runner) PreProcessTargets() error {
+	wg := sizedwaitgroup.New(r.options.Threads)
+	f, err := os.Open(r.targetsFile)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	s := bufio.NewScanner(f)
+	for s.Scan() {
+		wg.Add()
+		func(target string) {
+			defer wg.Done()
+			if err := r.AddTarget(target); err != nil {
+				gologger.Warningf("%s\n", err)
+			}
+		}(s.Text())
 	}
 
+	wg.Wait()
 	return nil
 }
 
 func (r *Runner) AddTarget(target string) error {
+	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
-	}
-	if scan.IsCidr(target) {
-		ips, err := scan.Ips(target)
+	} else if ipranger.IsCidr(target) {
+		// Add cidr directly to ranger, as single ips would allocate more resources later
+		if err := r.scanner.IPRanger.AddFqdn(target, "cidr"); err != nil {
+			gologger.Warningf("%s\n", err)
+		}
+	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+		if err := r.scanner.IPRanger.AddFqdn(target, "ip"); err != nil {
+			gologger.Warningf("%s\n", err)
+		}
+	} else {
+		ip, err := r.resolveFQDN(target)
 		if err != nil {
 			return err
 		}
-		for _, ip := range ips {
-			err := r.addOrExpand(ip)
-			if err != nil {
-				return err
-			}
+		if err := r.scanner.IPRanger.AddFqdn(ip, target); err != nil {
+			gologger.Warningf("%s\n", err)
 		}
-		return nil
-	}
-	err := r.addOrExpand(target)
-	if err != nil {
-		return err
 	}
 
 	return nil
 }
 
-func (r *Runner) addOrExpand(target string) error {
+func (r *Runner) resolveFQDN(target string) (string, error) {
 	ips, err := r.host2ips(target)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	var (
@@ -117,8 +148,7 @@ func (r *Runner) addOrExpand(target string) error {
 		hostIP       string
 	)
 	for _, ip := range ips {
-		_, toExclude := r.scanner.ExcludedIps[ip]
-		if toExclude {
+		if r.scanner.IPRanger.IsExcluded(ip) {
 			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
@@ -127,7 +157,7 @@ func (r *Runner) addOrExpand(target string) error {
 	}
 
 	if len(initialHosts) == 0 {
-		return nil
+		return "", nil
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
@@ -136,7 +166,7 @@ func (r *Runner) addOrExpand(target string) error {
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {
 			gologger.Warningf("Could not perform ping scan on %s: %s\n", target, err)
-			return err
+			return "", err
 		}
 		for _, result := range pingResults.Hosts {
 			if result.Type == scan.HostActive {
@@ -150,7 +180,7 @@ func (r *Runner) addOrExpand(target string) error {
 		fastestHost, err := pingResults.GetFastestHost()
 		if err != nil {
 			gologger.Warningf("No active host found for %s: %s\n", target, err)
-			return err
+			return "", err
 		}
 		gologger.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
 		hostIP = fastestHost.Host
@@ -159,11 +189,14 @@ func (r *Runner) addOrExpand(target string) error {
 		gologger.Debugf("Using host %s for enumeration\n", hostIP)
 	}
 
-	// we also keep track of ip => host for the output
-	if _, ok := r.scanner.Targets[hostIP]; !ok {
-		r.scanner.Targets[hostIP] = make(map[string]struct{})
+	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
+	if err := r.scanner.IPRanger.AddFqdn(hostIP, target); err != nil {
+		gologger.Warningf("%s\n", err)
 	}
-	r.scanner.Targets[hostIP][target] = struct{}{}
 
-	return nil
+	if err := r.scanner.IPRanger.Add(hostIP); err != nil {
+		gologger.Warningf("%s\n", err)
+	}
+
+	return hostIP, nil
 }

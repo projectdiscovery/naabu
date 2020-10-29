@@ -10,16 +10,28 @@ import (
 	"sync"
 	"time"
 
+	dnsprobe "github.com/projectdiscovery/dnsprobe/lib"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
+)
+
+const (
+	DNSQueryTypeA = "A"
 )
 
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options *Options
-	scanner *scan.Scanner
+	options     *Options
+	targetsFile string
+	scanner     *scan.Scanner
+	limiter     ratelimit.Limiter
+	wgscan      sizedwaitgroup.SizedWaitGroup
+	dnsprobe    *dnsprobe.DnsProbe
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -47,17 +59,22 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, fmt.Errorf("could not parse ports: %s", err)
 	}
 
-	err = runner.parseProbesPorts(options)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse probes: %s", err)
-	}
-
-	runner.scanner.ExcludedIps, err = parseExcludedIps(options)
+	err = parseExcludedIps(options, scanner)
 	if err != nil {
 		return nil, err
 	}
 
-	runner.scanner.Targets = make(map[string]map[string]struct{})
+	dnsOptions := dnsprobe.DefaultOptions
+	dnsOptions.MaxRetries = runner.options.Retries
+	dnsOptions.QuestionType, err = dnsprobe.StringToRequestType(DNSQueryTypeA)
+	if err != nil {
+		return nil, err
+	}
+	dnsProbe, err := dnsprobe.New(dnsOptions)
+	if err != nil {
+		return nil, err
+	}
+	runner.dnsprobe = dnsProbe
 
 	return runner, nil
 }
@@ -82,53 +99,73 @@ func (r *Runner) RunEnumeration() error {
 		return err
 	}
 
-	if !isRoot() {
-		// Connect Scan - perform ports spray scan
-		r.ConnectEnumeration()
-		r.scanner.State = scan.Done
-	} else {
-		r.BackgroundWorkers()
+	// Scan workers
+	r.wgscan = sizedwaitgroup.New(r.options.Rate)
+	r.limiter = ratelimit.New(r.options.Rate)
 
+	if isRoot() {
 		if err := r.SetSourceIPAndInterface(); err != nil {
 			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
 			if tuneSourceErr != nil {
 				return tuneSourceErr
 			}
 		}
+		r.BackgroundWorkers()
+	}
 
-		r.scanner.State = scan.Probe
-		r.ProbeOrSkip()
+	// shrinks the ips to the minimum amount of cidr
+	var targets []*net.IPNet
+	r.scanner.IPRanger.Targets.Scan(func(k, v []byte) error {
+		targets = append(targets, ipranger.ToCidr(string(k)))
+		return nil
+	})
+	targets, _ = mapcidr.CoalesceCIDRs(targets)
+	// add targets to ranger
+	for _, target := range targets {
+		err := r.scanner.IPRanger.AddIPNet(target)
+		if err != nil {
+			gologger.Warningf("%s\n", err)
+		}
+	}
 
-		if r.options.WarmUpTime > 0 {
-			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+	r.scanner.State = scan.Scan
+
+	targetsCount := int64(r.scanner.IPRanger.CountIPS())
+	portsCount := int64(len(r.scanner.Ports))
+	Range := targetsCount * portsCount
+	b := ipranger.NewBlackRock(Range, 43)
+	for index := int64(0); index < Range; index++ {
+		xxx := b.Shuffle(index)
+		ipIndex := xxx / portsCount
+		portIndex := int(xxx % portsCount)
+		ip := r.PickIP(targets, ipIndex)
+		port := r.PickPort(portIndex)
+
+		if ip == "" || port <= 0 {
+			continue
 		}
 
-		r.scanner.State = scan.Guard
-
-		// update targets
-		if len(r.scanner.ProbeResults.M) > 0 {
-			for ip := range r.scanner.Targets {
-				if _, ok := r.scanner.ProbeResults.M[ip]; !ok {
-					delete(r.scanner.Targets, ip)
-				}
-			}
+		r.limiter.Take()
+		// connect scan
+		if !isRoot() {
+			r.wgscan.Add()
+			go r.handleHostPort(ip, port)
+		} else {
+			r.RawSocketEnumeration(ip, port)
 		}
+	}
 
-		r.scanner.State = scan.Scan
+	r.wgscan.Wait()
 
-		// Syn Scan - Perform scan with raw sockets
-		r.RawSocketEnumeration()
+	if r.options.WarmUpTime > 0 {
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+	}
 
-		if r.options.WarmUpTime > 0 {
-			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
-		}
+	r.scanner.State = scan.Done
 
-		r.scanner.State = scan.Done
-
-		// Validate the hosts if the user has asked for second step validation
-		if r.options.Verify {
-			r.ConnectVerification()
-		}
+	// Validate the hosts if the user has asked for second step validation
+	if r.options.Verify {
+		r.ConnectVerification()
 	}
 
 	r.handleOutput()
@@ -137,6 +174,31 @@ func (r *Runner) RunEnumeration() error {
 	r.handleNmap()
 
 	return nil
+}
+
+func (r *Runner) Close() {
+	os.RemoveAll(r.targetsFile)
+	r.scanner.IPRanger.Targets.Close()
+}
+
+func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
+	for _, target := range targets {
+		subnetIpsCount := int64(mapcidr.AddressCountIpnet(target))
+		if index < subnetIpsCount {
+			return r.PickSubnetIP(target, index)
+		}
+		index -= subnetIpsCount
+	}
+
+	return ""
+}
+
+func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
+	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(network.IP) + index).String()
+}
+
+func (r *Runner) PickPort(index int) int {
+	return r.scanner.Ports[index]
 }
 
 func (r *Runner) ConnectVerification() {
@@ -161,36 +223,9 @@ func (r *Runner) BackgroundWorkers() {
 	r.scanner.StartWorkers()
 }
 
-func (r *Runner) RawSocketEnumeration() {
-	limiter := ratelimit.New(r.options.Rate)
-
-	for retry := 0; retry < r.options.Retries; retry++ {
-		for port := range r.scanner.Ports {
-			for target := range r.scanner.Targets {
-				limiter.Take()
-				r.handleHostPortSyn(target, port)
-			}
-		}
-	}
-}
-
-func (r *Runner) ConnectEnumeration() {
-	r.scanner.State = scan.Scan
-	// naive algorithm - ports spray
-	var swg sync.WaitGroup
-	limiter := ratelimit.New(r.options.Rate)
-
-	for retry := 0; retry < r.options.Retries; retry++ {
-		for port := range r.scanner.Ports {
-			for target := range r.scanner.Targets {
-				limiter.Take()
-				swg.Add(1)
-				go r.handleHostPort(&swg, target, port)
-			}
-		}
-	}
-
-	swg.Wait()
+func (r *Runner) RawSocketEnumeration(ip string, port int) {
+	// skip invalid combinations
+	r.handleHostPortSyn(ip, port)
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
@@ -209,8 +244,8 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(swg *sync.WaitGroup, host string, port int) {
-	defer swg.Done()
+func (r *Runner) handleHostPort(host string, port int) {
+	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
@@ -273,16 +308,12 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIP, ports := range r.scanner.ScanResults.M {
-		hostsOrig, ok := r.scanner.Targets[hostIP]
-		if !ok {
+		dt, err := r.scanner.IPRanger.GetFQDNByIP(hostIP)
+		if err != nil {
 			continue
 		}
-		// if no fqdn add the ip
-		if len(hostsOrig) == 0 {
-			hostsOrig[hostIP] = struct{}{}
-		}
 
-		for host := range hostsOrig {
+		for _, host := range dt {
 			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 
 			// console output
