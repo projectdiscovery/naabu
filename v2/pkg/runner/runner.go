@@ -141,6 +141,10 @@ func (r *Runner) RunEnumeration() error {
 		ip := r.PickIP(targets, ipIndex)
 		port := r.PickPort(portIndex)
 
+		if ip == "" || port <= 0 {
+			continue
+		}
+
 		r.limiter.Take()
 		// connect scan
 		if !isRoot() {
@@ -220,6 +224,7 @@ func (r *Runner) BackgroundWorkers() {
 }
 
 func (r *Runner) RawSocketEnumeration(ip string, port int) {
+	// skip invalid combinations
 	r.handleHostPortSyn(ip, port)
 }
 
