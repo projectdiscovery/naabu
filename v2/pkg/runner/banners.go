@@ -14,11 +14,11 @@ const banner = `
                   __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.2
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.3
 `
 
 // Version is the current version of naabu
-const Version = `2.0.2`
+const Version = `2.0.3`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -102,13 +102,6 @@ func (options *Options) writeDefaultConfig() {
 # Verify is used to check if the ports found were valid using CONNECT method
 # verify: false
 # NoProbe skips probes to discover alive hosts
-# no-probe: false
-# Ping uses ping probes to discover fastest active host and discover dead hosts
-# ping: true
-# Port Probes (SYN-PORT, ACK-PORT)
-# port-probes:
-# 	- A80
-# 	- S110
 # Ips or cidr to be excluded from the scan
 # exclude-ips:
 # 	- 1.1.1.1
@@ -121,10 +114,6 @@ func (options *Options) writeDefaultConfig() {
 # unprivileged: true
 # Excludes ip of knows CDN ranges
 # exclude-cdn: true
-# IcmpEchoProbe before scanning
-# icmp-echo-probe: true
-# IcmpTimestampProbe before scanning
-# icmp-timestamp-probe: false
 # SourceIP to use in TCP packets
 # source-ip: 10.10.10.10
 # Interface to use for TCP packets
