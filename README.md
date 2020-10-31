@@ -40,7 +40,7 @@ all ports that return a reply.
 </h1>
 
  - Simple and modular code base making it easy to contribute.
- - Fast And Simple SYN/CONNECT probe based scanning.
+ - Fast And Simple SYN/TCP probe based scanning.
  - Multiple Output formats supported (JSON, File, Stdout)
  - Optimized for ease of use and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
@@ -56,28 +56,25 @@ This will display help for the tool. Here are all the switches it supports.
 
 | Flag | Description | Example |
 |------|-------------|---------|
+| -c | worker threads for fqdn to ip resolution | naabu -c 25  |
 | -config	| configuration file for naabu	| naabu -config naabu.conf	|
 | -p 	| Ports to scan (80, 80,443, 100-200, (-p - for full port scan) | naabu -p - |
 | -top-ports 	| Top Ports to scan (default top 100 | naabu -top-ports 1000 |
 | -host 	| host/domain/CIDR to scan ports for  | naabu -host example.com 1.1.1.1 192.168.0.1/24 |
 | -iL | File containing list of hosts to enumerate ports 	| naabu -iL hosts.txt |
-| -port-probe | Port probes for hosts (default SYN - 80, ACK - 443) (default "S80,A443") | naabu -port-probe |
 | -ports-file 	| File containing ports to enumerate for on hosts | naabu -ports-file ports.txt |
 | -exclude-cdn	| Skip full port scans for CDNs (only checks for 80,443) | naabu -exclude-cdn 	|
 | -exclude-file	| Skip port scans for hosts in file | naabu -exclude-file exclude.txt |
 | -exclude-hosts	| Skip port scans for given hosts | naabu -exclude-hosts 192.168.0.1/24 |
 | -exclude-ports	| Skip port scans for given ports | naabu -exclude-ports 22,80,443 |
 | -nmap 	| Invoke nmap scan on targets (nmap must be installed) | naabu -nmap |
+| -nmap-cli   | nmap command line (invoked as COMMAND + TARGETS) | naabu -nmap-cli 'nmap -sV' |
 | -o 	| File to write output to (optional) | naabu -o output.txt |
 | -json 	| Write output in JSON lines Format | naabu -json |
 | -rate 	| Rate of port scan probe requests	| naabu -rate 1000 |
-| -icmp-echo-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-echo-probe |
-| -icmp-timestamp-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-timestamp-probe |
 | -interface 	| Network Interface to use for port scan | naabu -interface eth0 |
 | -interface-list | List available interfaces and public ip | naabu -interface-list |
 | -nC 	| Don't Use colors in output | naabu -nC |
-| -no-probe 	| Skip all probes for verification of host | naabu -no-probe |
-| -ping | Use ping probes for verification of host (default true) | naabu -ping |
 | -privileged 	| Attempts to run as root - Use sudo if possible | naabu -privileged |
 | -retries 	| Number of retries for the port scan probe (default 1)| naabu -retries 2 |
 | -silent 	| Print found ports only in output | naabu -silent |
@@ -311,17 +308,15 @@ We have added support for config file, it allows each and every flag to define i
 
 # Nmap integration
 
-We have integrated nmap support with `nmap` flag and config file, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
+We have integrated nmap support with `nmap` and `nmap-cli` flag, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
 
 To make use of `nmap` flag, make sure to remove the comments from the config file at `$HOME/.config/naabu/naabu.conf`
 
-```yaml
-nmap: nmap -sV -oX naabu-output
-```
+We also added `nmap-cli` flag that let you run **nmap** commands directly on the results of naabu without making use of config file.
 
 ```sh
 
-▶ echo hackerone.com | naabu -nmap
+▶ echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX naabu-output'
                   __       
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
