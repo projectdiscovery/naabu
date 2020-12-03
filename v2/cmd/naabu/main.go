@@ -20,6 +20,3 @@ func main() {
 		gologger.Fatalf("Could not run enumeration: %s\n", err)
 	}
 }
-
-// implement this
-// https://github.com/robertdavidgraham/masscan/blob/1cb966862559effd5c585ac3a0ccd986a21f7c37/doc/algorithm.js

@@ -10,17 +10,13 @@ import (
 	"sync"
 	"time"
 
-	dnsprobe "github.com/projectdiscovery/dnsprobe/lib"
+	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
-)
-
-const (
-	DNSQueryTypeA = "A"
 )
 
 // Runner is an instance of the port enumeration
@@ -31,7 +27,7 @@ type Runner struct {
 	scanner     *scan.Scanner
 	limiter     ratelimit.Limiter
 	wgscan      sizedwaitgroup.SizedWaitGroup
-	dnsprobe    *dnsprobe.DnsProbe
+	dnsclient   *dnsx.DNSX
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -64,17 +60,16 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 
-	dnsOptions := dnsprobe.DefaultOptions
+	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
-	dnsOptions.QuestionType, err = dnsprobe.StringToRequestType(DNSQueryTypeA)
 	if err != nil {
 		return nil, err
 	}
-	dnsProbe, err := dnsprobe.New(dnsOptions)
+	dnsclient, err := dnsx.New(dnsOptions)
 	if err != nil {
 		return nil, err
 	}
-	runner.dnsprobe = dnsProbe
+	runner.dnsclient = dnsclient
 
 	return runner, nil
 }

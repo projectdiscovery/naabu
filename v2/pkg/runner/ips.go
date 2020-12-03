@@ -5,7 +5,7 @@ import (
 	"io/ioutil"
 	"strings"
 
-	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
+	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
