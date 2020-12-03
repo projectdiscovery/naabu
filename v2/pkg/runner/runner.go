@@ -71,6 +71,18 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.dnsclient = dnsclient
 
+	// Tune source
+	if isRoot() {
+		// Set values if those were specified via cli
+		if err := runner.SetSourceIPAndInterface(); err != nil {
+			// Otherwise try to obtain them automatically
+			err = runner.scanner.TuneSource(ExternalTargetForTune)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	return runner, nil
 }
 
@@ -99,12 +111,7 @@ func (r *Runner) RunEnumeration() error {
 	r.limiter = ratelimit.New(r.options.Rate)
 
 	if isRoot() {
-		if err := r.SetSourceIPAndInterface(); err != nil {
-			tuneSourceErr := r.scanner.TuneSource(ExternalTargetForTune)
-			if tuneSourceErr != nil {
-				return tuneSourceErr
-			}
-		}
+		r.scanner.SetupHandler()
 		r.BackgroundWorkers()
 	}
 
@@ -122,6 +129,8 @@ func (r *Runner) RunEnumeration() error {
 			gologger.Warningf("%s\n", err)
 		}
 	}
+
+	time.Sleep(time.Duration(10) * time.Second)
 
 	r.scanner.State = scan.Scan
 
@@ -309,6 +318,9 @@ func (r *Runner) handleOutput() {
 		}
 
 		for _, host := range dt {
+			if host == "ip" {
+				host = hostIP
+			}
 			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 
 			// console output
