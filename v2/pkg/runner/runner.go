@@ -130,8 +130,6 @@ func (r *Runner) RunEnumeration() error {
 		}
 	}
 
-	time.Sleep(time.Duration(10) * time.Second)
-
 	r.scanner.State = scan.Scan
 
 	targetsCount := int64(r.scanner.IPRanger.CountIPS())
@@ -210,7 +208,7 @@ func (r *Runner) ConnectVerification() {
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(r.options.Rate)
 
-	for host, ports := range r.scanner.ScanResults.M {
+	for host, ports := range r.scanner.ScanResults.IPPorts {
 		limiter.Take()
 		swg.Add(1)
 		go func(host string, ports map[int]struct{}) {
@@ -257,7 +255,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 		return
 	}
 
-	if r.scanner.ScanResults.Has(host, port) {
+	if r.scanner.ScanResults.IPHasPort(host, port) {
 		return
 	}
 
@@ -311,7 +309,7 @@ func (r *Runner) handleOutput() {
 		defer file.Close()
 	}
 
-	for hostIP, ports := range r.scanner.ScanResults.M {
+	for hostIP, ports := range r.scanner.ScanResults.IPPorts {
 		dt, err := r.scanner.IPRanger.GetFQDNByIP(hostIP)
 		if err != nil {
 			continue
