@@ -15,7 +15,7 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
-	"github.com/projectdiscovery/naabu/v2/pkg/kv"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -65,7 +65,7 @@ type Scanner struct {
 	tcpChan          chan *PkgResult
 	icmpChan         chan *PkgResult
 	State            State
-	ScanResults      *kv.D
+	ScanResults      *result.Result
 	NetworkInterface *net.Interface
 	cdn              *cdncheck.Client
 	tcpsequencer     *TCPSequencer
@@ -128,7 +128,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
 	}
 
-	scanner.ScanResults = kv.NewKVResults()
+	scanner.ScanResults = result.NewResult()
 
 	if options.Cdn {
 		var err error
