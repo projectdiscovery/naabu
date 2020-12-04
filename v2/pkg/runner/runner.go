@@ -38,12 +38,12 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	scanner, err := scan.NewScanner(&scan.Options{
-		Timeout: time.Duration(options.Timeout) * time.Millisecond,
-		Retries: options.Retries,
-		Rate:    options.Rate,
-		Debug:   options.Debug,
-		Root:    isRoot(),
-		Cdn:     !options.ExcludeCDN,
+		Timeout:    time.Duration(options.Timeout) * time.Millisecond,
+		Retries:    options.Retries,
+		Rate:       options.Rate,
+		Debug:      options.Debug,
+		Root:       isRoot(),
+		ExcludeCdn: options.ExcludeCDN,
 	})
 	if err != nil {
 		return nil, err
