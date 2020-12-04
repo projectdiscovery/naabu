@@ -6,7 +6,7 @@ require (
 	github.com/google/gopacket v1.1.19
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/projectdiscovery/cdncheck v0.0.1
-	github.com/projectdiscovery/clistats v0.0.5
+	github.com/projectdiscovery/clistats v0.0.6-0.20201204225035-4017b4e24862
 	github.com/projectdiscovery/dnsx v1.0.1
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/gologger v1.0.1

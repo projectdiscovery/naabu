@@ -402,7 +402,7 @@ func makePrintCallback() func(stats clistats.StatisticsClient) {
 		builder.WriteRune('[')
 		startedAt, _ := stats.GetStatic("startedAt")
 		duration := time.Since(startedAt.(time.Time))
-		builder.WriteString(fmtDuration(duration))
+		builder.WriteString(clistats.FmtDuration(duration))
 		builder.WriteRune(']')
 
 		hosts, _ := stats.GetStatic("hosts")
