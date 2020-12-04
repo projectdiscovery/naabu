@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
@@ -39,15 +38,4 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	}
 
 	return
-}
-
-// fmtDuration formats the duration for the time elapsed
-func fmtDuration(d time.Duration) string {
-	d = d.Round(time.Second)
-	h := d / time.Hour
-	d -= h * time.Hour
-	m := d / time.Minute
-	d -= m * time.Minute
-	s := d / time.Second
-	return fmt.Sprintf("%d:%02d:%02d", h, m, s)
 }

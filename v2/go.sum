@@ -22,6 +22,8 @@ github.com/projectdiscovery/cdncheck v0.0.1 h1:uJb9oqjHXp7IvgaKTfuLqsFGRGWlH4i1E
 github.com/projectdiscovery/cdncheck v0.0.1/go.mod h1:+CNeKlAVwecauIkA+PBNoA7zXGm4MZhL3KKFkkpIaZw=
 github.com/projectdiscovery/clistats v0.0.5 h1:vcvOR9PrFRawO/7FWD6pER9nYVSoSTD2F+/fkRs73a0=
 github.com/projectdiscovery/clistats v0.0.5/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
+github.com/projectdiscovery/clistats v0.0.6-0.20201204225035-4017b4e24862 h1:4lY1z67tCXWS2C+ZAmoQNT2/elZdKCony5s1GqoUnVU=
+github.com/projectdiscovery/clistats v0.0.6-0.20201204225035-4017b4e24862/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
 github.com/projectdiscovery/dnsx v1.0.1 h1:BDV9xHBxEoWESjIrcfeyNMG90vAwgwn23sDHDwlnqAk=
 github.com/projectdiscovery/dnsx v1.0.1/go.mod h1:m97qd/KUQmcKve/bhn9jIlJfM2hrpDmwm8Sp+fn2abk=
 github.com/projectdiscovery/fdmax v0.0.3 h1:FM6lv9expZ/rEEBI9tkRh6tx3DV0gtpwzdc0h7bGPqg=
