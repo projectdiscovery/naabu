@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
@@ -28,6 +29,7 @@ type Runner struct {
 	limiter     ratelimit.Limiter
 	wgscan      sizedwaitgroup.SizedWaitGroup
 	dnsclient   *dnsx.DNSX
+	stats       *clistats.Statistics
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -83,6 +85,15 @@ func NewRunner(options *Options) (*Runner, error) {
 		}
 	}
 
+	if options.EnableProgressBar {
+		stats, err := clistats.New()
+		if err != nil {
+			gologger.Warningf("Couldn't create progress engine: %s\n", err)
+		} else {
+			runner.stats = stats
+		}
+	}
+
 	return runner, nil
 }
 
@@ -135,6 +146,23 @@ func (r *Runner) RunEnumeration() error {
 	targetsCount := int64(r.scanner.IPRanger.CountIPS())
 	portsCount := int64(len(r.scanner.Ports))
 	Range := targetsCount * portsCount
+
+	if r.options.EnableProgressBar {
+		r.stats.AddStatic("ports", portsCount)
+		r.stats.AddStatic("hosts", targetsCount)
+		r.stats.AddStatic("retries", r.options.Retries)
+		r.stats.AddStatic("startedAt", time.Now())
+		r.stats.AddCounter("requests", uint64(0))
+		r.stats.AddCounter("errors", uint64(0))
+		r.stats.AddCounter("total", uint64(Range*int64(r.options.Retries)))
+		if err := r.stats.Start(makePrintCallback(), 5*time.Second); err != nil {
+			gologger.Warningf("Couldn't start statistics: %s\n", err)
+		}
+	}
+
+	var currentRetry int
+retry:
+
 	b := ipranger.NewBlackRock(Range, 43)
 	for index := int64(0); index < Range; index++ {
 		xxx := b.Shuffle(index)
@@ -155,6 +183,14 @@ func (r *Runner) RunEnumeration() error {
 		} else {
 			r.RawSocketEnumeration(ip, port)
 		}
+		if r.options.EnableProgressBar {
+			r.stats.IncrementCounter("requests", 1)
+		}
+	}
+
+	currentRetry++
+	if currentRetry <= r.options.Retries {
+		goto retry
 	}
 
 	r.wgscan.Wait()
@@ -353,5 +389,57 @@ func (r *Runner) handleOutput() {
 				}
 			}
 		}
+	}
+}
+
+const bufferSize = 128
+
+func makePrintCallback() func(stats clistats.StatisticsClient) {
+	builder := &strings.Builder{}
+	builder.Grow(bufferSize)
+
+	return func(stats clistats.StatisticsClient) {
+		builder.WriteRune('[')
+		startedAt, _ := stats.GetStatic("startedAt")
+		duration := time.Since(startedAt.(time.Time))
+		builder.WriteString(fmtDuration(duration))
+		builder.WriteRune(']')
+
+		hosts, _ := stats.GetStatic("hosts")
+		builder.WriteString(" | Hosts: ")
+		builder.WriteString(clistats.String(hosts))
+
+		ports, _ := stats.GetStatic("ports")
+		builder.WriteString(" | Ports: ")
+		builder.WriteString(clistats.String(ports))
+
+		retries, _ := stats.GetStatic("retries")
+		builder.WriteString(" | Retries: ")
+		builder.WriteString(clistats.String(retries))
+
+		requests, _ := stats.GetCounter("requests")
+		total, _ := stats.GetCounter("total")
+
+		builder.WriteString(" | RPS: ")
+		builder.WriteString(clistats.String(uint64(float64(requests) / duration.Seconds())))
+
+		errors, _ := stats.GetCounter("errors")
+		builder.WriteString(" | Errors: ")
+		builder.WriteString(clistats.String(errors))
+
+		builder.WriteString(" | Requests: ")
+		builder.WriteString(clistats.String(requests))
+		builder.WriteRune('/')
+		builder.WriteString(clistats.String(total))
+		builder.WriteRune(' ')
+		builder.WriteRune('(')
+		//nolint:gomnd // this is not a magic number
+		builder.WriteString(clistats.String(uint64(float64(requests) / float64(total) * 100.0)))
+		builder.WriteRune('%')
+		builder.WriteRune(')')
+		builder.WriteRune('\n')
+
+		fmt.Fprintf(os.Stderr, "%s", builder.String())
+		builder.Reset()
 	}
 }
