@@ -572,7 +572,7 @@ func (s *Scanner) SetupHandler() error {
 	// Strict BPF filter
 	// + Packets coming from target ip
 	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(fmt.Sprintf("tcp and port %d and ip host %s", s.listenPort, s.SourceIP.String()))
+	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d and dst host %s and tcp[13]=18", s.listenPort, s.SourceIP.String()))
 	if err != nil {
 		s.CleanupHandler()
 		return err
