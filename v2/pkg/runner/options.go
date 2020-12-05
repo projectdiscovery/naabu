@@ -43,7 +43,8 @@ type Options struct {
 	ConfigFile        string // Config file contains a scan configuration
 	NmapCLI           string // Nmap command (has priority over config file)
 	Threads           int    // Internal worker threads
-	EnableProgressBar bool   // Enable progrss bar
+	EnableProgressBar bool   // Enable progress bar
+	ScanAllIPS        bool   // Scan all the ips
 	config            *ConfigFile
 }
 
@@ -83,6 +84,7 @@ func ParseOptions() *Options {
 	flag.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)")
 	flag.IntVar(&options.Threads, "c", 25, "General internal worker threads")
 	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
+	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
 
 	flag.Parse()
 
