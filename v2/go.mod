@@ -10,7 +10,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.0.1
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/gologger v1.0.1
-	github.com/projectdiscovery/ipranger v0.0.2
+	github.com/projectdiscovery/ipranger v0.0.3-0.20201205200743-c80888f59bd9
 	github.com/projectdiscovery/mapcidr v0.0.5-0.20201116215403-0ced4c4d2041
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.1.0
