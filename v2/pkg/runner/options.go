@@ -9,6 +9,7 @@ import (
 
 // Options contains the configuration options for tuning
 // the port enumeration process.
+// nolint:maligned // just an option structure
 type Options struct {
 	Verbose        bool // Verbose flag indicates whether to show verbose output or not
 	NoColor        bool // No-Color disables the colored output
