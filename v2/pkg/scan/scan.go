@@ -28,6 +28,8 @@ const (
 	sendDelayMsec  = 10
 	chanSize       = 1000
 	packetSendSize = 2500
+	snaplen        = 65536
+	readtimeout    = 1500
 )
 
 const (
@@ -144,7 +146,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
 	s.CleanupHandler()
-	// s.tcpPacketlistener.Close()
+	s.tcpPacketlistener.Close()
 }
 
 // StartWorkers of the scanner
@@ -170,7 +172,7 @@ func (s *Scanner) TCPReadWorker() {
 		if s.State == Done {
 			break
 		}
-		// just empty the buffer
+		// nolint:errcheck // just empty the buffer
 		s.tcpPacketlistener.ReadFrom(data)
 	}
 }
@@ -207,8 +209,7 @@ func (s *Scanner) TCPReadWorkerPCAP() {
 			continue
 		}
 		for _, layerType := range decoded {
-			switch layerType {
-			case layers.LayerTypeTCP:
+			if layerType == layers.LayerTypeTCP {
 				if !s.IPRanger.Contains(ip4.SrcIP.String()) {
 					gologger.Debugf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
 					continue
@@ -223,7 +224,6 @@ func (s *Scanner) TCPReadWorkerPCAP() {
 			}
 		}
 	}
-
 }
 
 // EnqueueICMP outgoing ICMP packets
@@ -550,14 +550,21 @@ func (s *Scanner) SetupHandler() error {
 	if err != nil {
 		return err
 	}
-	inactive.SetSnapLen(65536)
 
-	readTimeout := time.Duration(1500) * time.Millisecond
+	err = inactive.SetSnapLen(snaplen)
+	if err != nil {
+		return err
+	}
+
+	readTimeout := time.Duration(readtimeout) * time.Millisecond
 	if err = inactive.SetTimeout(readTimeout); err != nil {
 		s.CleanupHandler()
 		return err
 	}
-	inactive.SetImmediateMode(true)
+	err = inactive.SetImmediateMode(true)
+	if err != nil {
+		return err
+	}
 
 	s.inactiveHandler = inactive
 
