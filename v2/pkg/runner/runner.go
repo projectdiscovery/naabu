@@ -152,7 +152,7 @@ func (r *Runner) RunEnumeration() error {
 		r.stats.AddStatic("hosts", targetsCount)
 		r.stats.AddStatic("retries", r.options.Retries)
 		r.stats.AddStatic("startedAt", time.Now())
-		r.stats.AddCounter("requests", uint64(0))
+		r.stats.AddCounter("packets", uint64(0))
 		r.stats.AddCounter("errors", uint64(0))
 		r.stats.AddCounter("total", uint64(Range*int64(r.options.Retries)))
 		if err := r.stats.Start(makePrintCallback(), 5*time.Second); err != nil {
@@ -184,7 +184,7 @@ retry:
 			r.RawSocketEnumeration(ip, port)
 		}
 		if r.options.EnableProgressBar {
-			r.stats.IncrementCounter("requests", 1)
+			r.stats.IncrementCounter("packets", 1)
 		}
 	}
 
@@ -417,24 +417,24 @@ func makePrintCallback() func(stats clistats.StatisticsClient) {
 		builder.WriteString(" | Retries: ")
 		builder.WriteString(clistats.String(retries))
 
-		requests, _ := stats.GetCounter("requests")
+		packets, _ := stats.GetCounter("packets")
 		total, _ := stats.GetCounter("total")
 
 		builder.WriteString(" | RPS: ")
-		builder.WriteString(clistats.String(uint64(float64(requests) / duration.Seconds())))
+		builder.WriteString(clistats.String(uint64(float64(packets) / duration.Seconds())))
 
 		errors, _ := stats.GetCounter("errors")
 		builder.WriteString(" | Errors: ")
 		builder.WriteString(clistats.String(errors))
 
-		builder.WriteString(" | Requests: ")
-		builder.WriteString(clistats.String(requests))
+		builder.WriteString(" | Packets: ")
+		builder.WriteString(clistats.String(packets))
 		builder.WriteRune('/')
 		builder.WriteString(clistats.String(total))
 		builder.WriteRune(' ')
 		builder.WriteRune('(')
 		//nolint:gomnd // this is not a magic number
-		builder.WriteString(clistats.String(uint64(float64(requests) / float64(total) * 100.0)))
+		builder.WriteString(clistats.String(uint64(float64(packets) / float64(total) * 100.0)))
 		builder.WriteRune('%')
 		builder.WriteRune(')')
 		builder.WriteRune('\n')
