@@ -36,6 +36,8 @@ github.com/projectdiscovery/ipranger v0.0.1 h1:UkEgXEVX3xFsA+uVP2sieGpP0gG+HFIGr
 github.com/projectdiscovery/ipranger v0.0.1/go.mod h1:cZy07MOOBd1bZk6xnZmpqeTUjkGZj4cDQOvEDSRDTI8=
 github.com/projectdiscovery/ipranger v0.0.2 h1:5GcKu+4QWNzD38IJZc3mFBrqboDix6cfJkcn2RsJFGM=
 github.com/projectdiscovery/ipranger v0.0.2/go.mod h1:kcAIk/lo5rW+IzUrFkeYyXnFJ+dKwYooEOHGVPP/RWE=
+github.com/projectdiscovery/ipranger v0.0.3-0.20201205200743-c80888f59bd9 h1:7BrACBSpncHOVvX9J8h+qyXkwhTVEhV6+Qtvc2/DWlY=
+github.com/projectdiscovery/ipranger v0.0.3-0.20201205200743-c80888f59bd9/go.mod h1:kcAIk/lo5rW+IzUrFkeYyXnFJ+dKwYooEOHGVPP/RWE=
 github.com/projectdiscovery/mapcidr v0.0.4 h1:2vBSjkmbQASAcO/m2L/dhdulMVu2y9HdyWOrWYJ74rU=
 github.com/projectdiscovery/mapcidr v0.0.4/go.mod h1:ALOIj6ptkWujNoX8RdQwB2mZ+kAmKuLJBq9T5gR5wG0=
 github.com/projectdiscovery/mapcidr v0.0.5-0.20201116215403-0ced4c4d2041 h1:/auTx90isOt3YXW+q19bwkr2zz0Na4lF7kOvHJ26mbQ=

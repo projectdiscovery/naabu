@@ -162,7 +162,6 @@ func (r *Runner) RunEnumeration() error {
 
 	var currentRetry int
 retry:
-
 	b := ipranger.NewBlackRock(Range, 43)
 	for index := int64(0); index < Range; index++ {
 		xxx := b.Shuffle(index)

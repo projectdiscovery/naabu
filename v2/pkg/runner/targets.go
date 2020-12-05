@@ -45,13 +45,6 @@ func (r *Runner) mergeToFile() (string, error) {
 	// target defined via CLI argument
 	if r.options.Host != "" {
 		fmt.Fprintf(tempInput, "%s\n", r.options.Host)
-		if _, err := tempInput.WriteString(r.options.Host + "\n"); err != nil {
-			gologger.Warningf("%s\n", err)
-		}
-		err := r.AddTarget(r.options.Host)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	// Targets from file
