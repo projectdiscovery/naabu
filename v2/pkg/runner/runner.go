@@ -426,12 +426,8 @@ func makePrintCallback() func(stats clistats.StatisticsClient) {
 		packets, _ := stats.GetCounter("packets")
 		total, _ := stats.GetCounter("total")
 
-		builder.WriteString(" | RPS: ")
+		builder.WriteString(" | PPS: ")
 		builder.WriteString(clistats.String(uint64(float64(packets) / duration.Seconds())))
-
-		errors, _ := stats.GetCounter("errors")
-		builder.WriteString(" | Errors: ")
-		builder.WriteString(clistats.String(errors))
 
 		builder.WriteString(" | Packets: ")
 		builder.WriteString(clistats.String(packets))
