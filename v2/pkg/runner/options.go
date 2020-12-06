@@ -9,6 +9,7 @@ import (
 
 // Options contains the configuration options for tuning
 // the port enumeration process.
+// nolint:maligned // just an option structure
 type Options struct {
 	Verbose        bool // Verbose flag indicates whether to show verbose output or not
 	NoColor        bool // No-Color disables the colored output
@@ -25,25 +26,27 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries        int    // Retries is the number of retries for the port
-	Rate           int    // Rate is the rate of port scan requests
-	Timeout        int    // Timeout is the seconds to wait for ports to respond
-	WarmUpTime     int    // WarmUpTime between scan phases
-	Host           string // Host is the host to find ports for
-	HostsFile      string // HostsFile is the file containing list of hosts to find port for
-	Output         string // Output is the file to write found ports to.
-	Ports          string // Ports is the ports to use for enumeration
-	PortsFile      string // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts   string // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps     string // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile string // File containing Ips or cidr to exclude from the scan
-	TopPorts       string // Tops ports to scan
-	SourceIP       string // SourceIP to use in TCP packets
-	Interface      string // Interface to use for TCP packets
-	ConfigFile     string // Config file contains a scan configuration
-	NmapCLI        string // Nmap command (has priority over config file)
-	Threads        int    // Internal worker threads
-	config         *ConfigFile
+	Retries           int    // Retries is the number of retries for the port
+	Rate              int    // Rate is the rate of port scan requests
+	Timeout           int    // Timeout is the seconds to wait for ports to respond
+	WarmUpTime        int    // WarmUpTime between scan phases
+	Host              string // Host is the host to find ports for
+	HostsFile         string // HostsFile is the file containing list of hosts to find port for
+	Output            string // Output is the file to write found ports to.
+	Ports             string // Ports is the ports to use for enumeration
+	PortsFile         string // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts      string // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps        string // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile    string // File containing Ips or cidr to exclude from the scan
+	TopPorts          string // Tops ports to scan
+	SourceIP          string // SourceIP to use in TCP packets
+	Interface         string // Interface to use for TCP packets
+	ConfigFile        string // Config file contains a scan configuration
+	NmapCLI           string // Nmap command (has priority over config file)
+	Threads           int    // Internal worker threads
+	EnableProgressBar bool   // Enable progress bar
+	ScanAllIPS        bool   // Scan all the ips
+	config            *ConfigFile
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -62,7 +65,7 @@ func ParseOptions() *Options {
 	flag.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe")
 	flag.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests")
 	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
-	flag.BoolVar(&options.NoColor, "nC", false, "Don't Use colors in output")
+	flag.BoolVar(&options.NoColor, "no-color", false, "Don't Use colors in output")
 	flag.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out")
 	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
 	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification")
@@ -81,6 +84,8 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)")
 	flag.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)")
 	flag.IntVar(&options.Threads, "c", 25, "General internal worker threads")
+	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
+	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
 
 	flag.Parse()
 
