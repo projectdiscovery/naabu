@@ -25,7 +25,7 @@ func (r *Runner) handleNmap() {
 			ports []string
 		)
 		allports := make(map[int]struct{})
-		for ip, p := range r.scanner.ScanResults.M {
+		for ip, p := range r.scanner.ScanResults.IPPorts {
 			ips = append(ips, ip)
 			for pp := range p {
 				allports[pp] = struct{}{}

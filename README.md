@@ -40,7 +40,7 @@ all ports that return a reply.
 </h1>
 
  - Simple and modular code base making it easy to contribute.
- - Fast And Simple SYN/CONNECT probe based scanning.
+ - Fast And Simple SYN/TCP probe based scanning.
  - Multiple Output formats supported (JSON, File, Stdout)
  - Optimized for ease of use and **lightweight** on resources
  - **Stdin** and **stdout** support for integrating in workflows
@@ -54,40 +54,37 @@ all ports that return a reply.
 ```
 This will display help for the tool. Here are all the switches it supports.
 
-| Flag | Description | Example |
-|------|-------------|---------|
-| -config	| configuration file for naabu	| naabu -config naabu.conf	|
-| -p 	| Ports to scan (80, 80,443, 100-200, (-p - for full port scan) | naabu -p - |
-| -top-ports 	| Top Ports to scan (default top 100 | naabu -top-ports 1000 |
-| -host 	| host/domain/CIDR to scan ports for  | naabu -host example.com 1.1.1.1 192.168.0.1/24 |
-| -iL | File containing list of hosts to enumerate ports 	| naabu -iL hosts.txt |
-| -port-probe | Port probes for hosts (default SYN - 80, ACK - 443) (default "S80,A443") | naabu -port-probe |
-| -ports-file 	| File containing ports to enumerate for on hosts | naabu -ports-file ports.txt |
-| -exclude-cdn	| Skip full port scans for CDNs (only checks for 80,443) | naabu -exclude-cdn 	|
-| -exclude-file	| Skip port scans for hosts in file | naabu -exclude-file exclude.txt |
-| -exclude-hosts	| Skip port scans for given hosts | naabu -exclude-hosts 192.168.0.1/24 |
-| -exclude-ports	| Skip port scans for given ports | naabu -exclude-ports 22,80,443 |
-| -nmap 	| Invoke nmap scan on targets (nmap must be installed) | naabu -nmap |
-| -o 	| File to write output to (optional) | naabu -o output.txt |
-| -json 	| Write output in JSON lines Format | naabu -json |
-| -rate 	| Rate of port scan probe requests	| naabu -rate 1000 |
-| -icmp-echo-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-echo-probe |
-| -icmp-timestamp-probe 	| Use ICMP_ECHO_REQUEST probe (default true) | naabu -icmp-timestamp-probe |
-| -interface 	| Network Interface to use for port scan | naabu -interface eth0 |
-| -interface-list | List available interfaces and public ip | naabu -interface-list |
-| -nC 	| Don't Use colors in output | naabu -nC |
-| -no-probe 	| Skip all probes for verification of host | naabu -no-probe |
-| -ping | Use ping probes for verification of host (default true) | naabu -ping |
-| -privileged 	| Attempts to run as root - Use sudo if possible | naabu -privileged |
-| -retries 	| Number of retries for the port scan probe (default 1)| naabu -retries 2 |
-| -silent 	| Print found ports only in output | naabu -silent |
-| -source-ip 	| Source IP 	| naabu -source-ip 10.10.10.10 |
-| -timeout 	| Millisecond to wait before timing out (default 700) | naabu -timeout 700 |
-| -unprivileged 	| Drop root privileges | naabu -unprivileged |
-| -verify 	| Validate the ports again with TCP verification | naabu -verify |
-| -debug	| Enable debugging information	| naabu -debug |
-| -version 	| Show version of naabu | naabu -version |
-| -warm-up-time 	| Time in seconds between scan phases (default 2) | naabu -warm-up-time |
+| Flag           | Description                                               | Example                                        |
+| :------------- | --------------------------------------------------------- | :--------------------------------------------- |
+| c              | Worker threads for fqdn to ip resolution                  | naabu -c 25                                    |
+| config         | Configuration file for naabu                              | naabu -config naabu.conf                       |
+| p              | Ports to scan (80,443, 100-200, (-p - for full port scan) | naabu -p -                                     |
+| top-ports      | Top Ports to scan (default top 100                        | naabu -top-ports 1000                          |
+| host           | host/domain/CIDR to scan ports for                        | naabu -host example.com 1.1.1.1 192.168.0.1/24 |
+| iL             | File containing list of hosts to enumerate ports          | naabu -iL hosts.txt                            |
+| ports-file     | File containing ports to enumerate for on hosts           | naabu -ports-file ports.txt                    |
+| exclude-cdn    | Skip full port scans for CDNs (only checks for 80,443)    | naabu -exclude-cdn                             |
+| exclude-file   | Skip port scans for given hosts in file                   | naabu -exclude-file exclude.txt                |
+| exclude-hosts  | Skip port scans for given hosts                           | naabu -exclude-hosts 192.168.0.1/24            |
+| exclude-ports  | Skip port scans for given ports                           | naabu -exclude-ports 22,80,443                 |
+| nmap           | nmap scans to run on results (works with config file)     | naabu -nmap                                    |
+| nmap-cli       | nmap scans to run on results                              | naabu -nmap-cli 'nmap -sV'                     |
+| o              | File to write output to (optional)                        | naabu -o output.txt                            |
+| json           | Write output in JSON lines Format                         | naabu -json                                    |
+| rate           | Rate of port scan probe requests                          | naabu -rate 1000                               |
+| interface      | Network Interface to use for port scan                    | naabu -interface eth0                          |
+| interface-list | List available interfaces and public ip                   | naabu -interface-list                          |
+| no-color       | Don't Use colors in output                                | naabu -no-color                                |
+| privileged     | Attempts to run as root - Use sudo if possible            | naabu -privileged                              |
+| retries        | Number of retries for the port scan probe (default 3)     | naabu -retries 10                              |
+| silent         | Print found ports only in output                          | naabu -silent                                  |
+| source-ip      | Source IP                                                 | naabu -source-ip 10.10.10.10                   |
+| timeout        | Millisecond to wait before timing out (default 700)       | naabu -timeout 700                             |
+| unprivileged   | Drop root privileges                                      | naabu -unprivileged                            |
+| verify         | Validate the ports again with TCP verification            | naabu -verify                                  |
+| debug          | Enable debugging information                              | naabu -debug                                   |
+| version        | Show version of naabu                                     | naabu -version                                 |
+| warm-up-time   | Time in seconds between scan phases (default 2)           | naabu -warm-up-time                            |
 
 # Installation Instructions
 
@@ -114,7 +111,7 @@ naabu requires **go1.14+** to install successfully. Run the following command to
 ### From Github
 
 ```sh
-▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/v2/cmd/naabu; go build; mv naabu /usr/local/bin/; naabu -h
+▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/v2/cmd/naabu; go build; cp naabu /usr/local/bin/; naabu -h
 ```
 
 ### From Docker
@@ -184,7 +181,7 @@ The ports to scan for on the host can be specified via `-p` parameter. It takes 
 ▶ naabu -p 80,443,21-23 -host hackerone.com
 ```
 
-By default, the Naabu checks for nmap's `Top 100` ports after a host discovery phase like nmap, that can be skipped by using the `-no-probe` flag. It supports following in-built port lists -
+By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
 
 - `-top-ports 100` - Checks for nmap top 100 ports.
 - `-top-ports 1000` - Checks for nmap top 1000 ports.
@@ -273,14 +270,6 @@ We have added support for config file, it allows each and every flag to define i
 # 	- 30
 # Verify is used to check if the ports found were valid using CONNECT method
 # verify: false
-# NoProbe skips probes to discover alive hosts
-# no-probe: false
-# Ping uses ping probes to discover fastest active host and discover dead hosts
-# ping: true
-# Port Probes (SYN-PORT, ACK-PORT)
-# port-probes:
-# 	- A80
-# 	- S110
 # Ips or cidr to be excluded from the scan
 # exclude-ips:
 # 	- 1.1.1.1
@@ -293,10 +282,6 @@ We have added support for config file, it allows each and every flag to define i
 # unprivileged: true
 # Excludes ip of knows CDN ranges
 # exclude-cdn: true
-# IcmpEchoProbe before scanning
-# icmp-echo-probe: true
-# IcmpTimestampProbe before scanning
-# icmp-timestamp-probe: false
 # SourceIP to use in TCP packets
 # source-ip: 10.10.10.10
 # Interface to use for TCP packets
@@ -311,17 +296,15 @@ We have added support for config file, it allows each and every flag to define i
 
 # Nmap integration
 
-We have integrated nmap support with `nmap` flag and config file, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
+We have integrated nmap support with `nmap` and `nmap-cli` flag, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
 
 To make use of `nmap` flag, make sure to remove the comments from the config file at `$HOME/.config/naabu/naabu.conf`
 
-```yaml
-nmap: nmap -sV -oX naabu-output
-```
+We also added `nmap-cli` flag that let you run **nmap** commands directly on the results of naabu without making use of config file.
 
 ```sh
 
-▶ echo hackerone.com | naabu -nmap
+▶ echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX naabu-output'
                   __       
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /

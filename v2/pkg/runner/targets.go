@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/ipranger"
+	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 )
@@ -45,13 +45,6 @@ func (r *Runner) mergeToFile() (string, error) {
 	// target defined via CLI argument
 	if r.options.Host != "" {
 		fmt.Fprintf(tempInput, "%s\n", r.options.Host)
-		if _, err := tempInput.WriteString(r.options.Host + "\n"); err != nil {
-			gologger.Warningf("%s\n", err)
-		}
-		err := r.AddTarget(r.options.Host)
-		if err != nil {
-			return "", err
-		}
 	}
 
 	// Targets from file
@@ -125,27 +118,29 @@ func (r *Runner) AddTarget(target string) error {
 			gologger.Warningf("%s\n", err)
 		}
 	} else {
-		ip, err := r.resolveFQDN(target)
+		ips, err := r.resolveFQDN(target)
 		if err != nil {
 			return err
 		}
-		if err := r.scanner.IPRanger.AddFqdn(ip, target); err != nil {
-			gologger.Warningf("%s\n", err)
+		for _, ip := range ips {
+			if err := r.scanner.IPRanger.AddFqdn(ip, target); err != nil {
+				gologger.Warningf("%s\n", err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (r *Runner) resolveFQDN(target string) (string, error) {
+func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	ips, err := r.host2ips(target)
 	if err != nil {
-		return "", err
+		return []string{}, err
 	}
 
 	var (
 		initialHosts []string
-		hostIP       string
+		hostIPS      []string
 	)
 	for _, ip := range ips {
 		if r.scanner.IPRanger.IsExcluded(ip) {
@@ -157,7 +152,7 @@ func (r *Runner) resolveFQDN(target string) (string, error) {
 	}
 
 	if len(initialHosts) == 0 {
-		return "", nil
+		return []string{}, nil
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
@@ -166,7 +161,7 @@ func (r *Runner) resolveFQDN(target string) (string, error) {
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {
 			gologger.Warningf("Could not perform ping scan on %s: %s\n", target, err)
-			return "", err
+			return []string{}, err
 		}
 		for _, result := range pingResults.Hosts {
 			if result.Type == scan.HostActive {
@@ -180,23 +175,27 @@ func (r *Runner) resolveFQDN(target string) (string, error) {
 		fastestHost, err := pingResults.GetFastestHost()
 		if err != nil {
 			gologger.Warningf("No active host found for %s: %s\n", target, err)
-			return "", err
+			return []string{}, err
 		}
 		gologger.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
-		hostIP = fastestHost.Host
+		hostIPS = append(hostIPS, fastestHost.Host)
+	} else if r.options.ScanAllIPS {
+		hostIPS = initialHosts
 	} else {
-		hostIP = initialHosts[0]
+		hostIPS = append(hostIPS, initialHosts[0])
+	}
+
+	for _, hostIP := range hostIPS {
 		gologger.Debugf("Using host %s for enumeration\n", hostIP)
+		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
+		if err := r.scanner.IPRanger.AddFqdn(hostIP, target); err != nil {
+			gologger.Warningf("%s\n", err)
+		}
+
+		if err := r.scanner.IPRanger.Add(hostIP); err != nil {
+			gologger.Warningf("%s\n", err)
+		}
 	}
 
-	// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
-	if err := r.scanner.IPRanger.AddFqdn(hostIP, target); err != nil {
-		gologger.Warningf("%s\n", err)
-	}
-
-	if err := r.scanner.IPRanger.Add(hostIP); err != nil {
-		gologger.Warningf("%s\n", err)
-	}
-
-	return hostIP, nil
+	return hostIPS, nil
 }

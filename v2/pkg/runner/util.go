@@ -18,7 +18,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	// addresses for a given host. Else use that host for port scanning
 	if net.ParseIP(target) == nil {
 		var ips []string
-		ips, err = r.dnsprobe.Lookup(target)
+		ips, err = r.dnsclient.Lookup(target)
 		if err != nil {
 			gologger.Warningf("Could not get IP for host: %s\n", target)
 			return
