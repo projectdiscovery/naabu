@@ -30,10 +30,10 @@ func showBanner() {
 }
 
 // showNetworkCapabilities shows the network capabilities/scan types possible with the running user
-func showNetworkCapabilities() {
+func showNetworkCapabilities(options *Options) {
 	accessLevel := "non root"
 	scanType := "CONNECT"
-	if isRoot() {
+	if isRoot() && !options.Unprivileged {
 		accessLevel = "root"
 		scanType = "TCP/ICMP/SYN"
 	}

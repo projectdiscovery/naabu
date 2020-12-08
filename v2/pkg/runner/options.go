@@ -133,7 +133,7 @@ func ParseOptions() *Options {
 		gologger.Fatalf("Program exiting: %s\n", err)
 	}
 
-	showNetworkCapabilities()
+	showNetworkCapabilities(options)
 
 	// Handle privileges - most probably elevation will fail as the process would need to invoke fork()
 	err = handlePrivileges(options)
