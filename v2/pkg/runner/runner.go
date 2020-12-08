@@ -125,8 +125,8 @@ func (r *Runner) RunEnumeration() error {
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
 
-	if isRoot() {
-		err = r.scanner.SetupHandler()
+	if isRoot() && !r.options.Unprivileged {
+		err = r.scanner.SetupHandlers()
 		if err != nil {
 			return err
 		}
@@ -183,7 +183,7 @@ retry:
 
 		r.limiter.Take()
 		// connect scan
-		if !isRoot() {
+		if !isRoot() || r.options.Unprivileged {
 			r.wgscan.Add()
 			go r.handleHostPort(ip, port)
 		} else {
@@ -220,11 +220,13 @@ retry:
 	return nil
 }
 
+// Close runner instance
 func (r *Runner) Close() {
 	os.RemoveAll(r.targetsFile)
 	r.scanner.IPRanger.Targets.Close()
 }
 
+// PickIP randomly
 func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
 	for _, target := range targets {
 		subnetIpsCount := int64(mapcidr.AddressCountIpnet(target))
