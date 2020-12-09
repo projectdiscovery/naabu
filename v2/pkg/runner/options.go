@@ -20,8 +20,6 @@ type Options struct {
 	Version        bool // Version specifies if we should just show version and exit
 	Ping           bool // Ping uses ping probes to discover fastest active host and discover dead hosts
 	Debug          bool // Prints out debug information
-	Privileged     bool // Attempts to run as root
-	Unprivileged   bool // Drop root privileges
 	ExcludeCDN     bool // Excludes ip of knows CDN ranges for full port scan
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
@@ -46,6 +44,7 @@ type Options struct {
 	Threads           int    // Internal worker threads
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
+	ScanType          string // Scan Type
 	config            *ConfigFile
 }
 
@@ -75,8 +74,6 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
 	flag.StringVar(&options.SourceIP, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
-	flag.BoolVar(&options.Privileged, "privileged", false, "Attempts to run as root - Use sudo if possible")
-	flag.BoolVar(&options.Unprivileged, "unprivileged", false, "Drop root privileges")
 	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Sikp full port scans for CDNs (only checks for 80,443)")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
 	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
@@ -86,6 +83,7 @@ func ParseOptions() *Options {
 	flag.IntVar(&options.Threads, "c", 25, "General internal worker threads")
 	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
 	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
+	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)")
 
 	flag.Parse()
 
@@ -133,13 +131,7 @@ func ParseOptions() *Options {
 		gologger.Fatalf("Program exiting: %s\n", err)
 	}
 
-	showNetworkCapabilities()
-
-	// Handle privileges - most probably elevation will fail as the process would need to invoke fork()
-	err = handlePrivileges(options)
-	if err != nil {
-		gologger.Warningf("Could not set privileges:%s\n", err)
-	}
+	showNetworkCapabilities(options)
 
 	return options
 }
@@ -181,8 +173,7 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	if configFile.TopPorts != "" {
 		options.TopPorts = configFile.TopPorts
 	}
-	options.Privileged = configFile.Privileged
-	options.Unprivileged = configFile.Unprivileged
+
 	options.ExcludeCDN = configFile.ExcludeCDN
 	if configFile.SourceIP != "" {
 		options.SourceIP = configFile.SourceIP

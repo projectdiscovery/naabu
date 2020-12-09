@@ -55,7 +55,7 @@ all ports that return a reply.
 This will display help for the tool. Here are all the switches it supports.
 
 | Flag           | Description                                               | Example                                        |
-| :------------- | --------------------------------------------------------- | :--------------------------------------------- |
+| -------------- | --------------------------------------------------------- | ---------------------------------------------- |
 | c              | Worker threads for fqdn to ip resolution                  | naabu -c 25                                    |
 | config         | Configuration file for naabu                              | naabu -config naabu.conf                       |
 | p              | Ports to scan (80,443, 100-200, (-p - for full port scan) | naabu -p -                                     |
@@ -75,12 +75,11 @@ This will display help for the tool. Here are all the switches it supports.
 | interface      | Network Interface to use for port scan                    | naabu -interface eth0                          |
 | interface-list | List available interfaces and public ip                   | naabu -interface-list                          |
 | no-color       | Don't Use colors in output                                | naabu -no-color                                |
-| privileged     | Attempts to run as root - Use sudo if possible            | naabu -privileged                              |
 | retries        | Number of retries for the port scan probe (default 3)     | naabu -retries 10                              |
 | silent         | Print found ports only in output                          | naabu -silent                                  |
 | source-ip      | Source IP                                                 | naabu -source-ip 10.10.10.10                   |
+| s              | Scan Type (s - SYN, c - CONNECT)                          | naabu -s c                                     |
 | timeout        | Millisecond to wait before timing out (default 700)       | naabu -timeout 700                             |
-| unprivileged   | Drop root privileges                                      | naabu -unprivileged                            |
 | verify         | Validate the ports again with TCP verification            | naabu -verify                                  |
 | debug          | Enable debugging information                              | naabu -debug                                   |
 | version        | Show version of naabu                                     | naabu -version                                 |
