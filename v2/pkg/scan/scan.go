@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -73,8 +74,8 @@ type Scanner struct {
 	tcpsequencer     *TCPSequencer
 	serializeOptions gopacket.SerializeOptions
 	debug            bool
-	handler          *pcap.Handle
-	inactiveHandler  *pcap.InactiveHandle
+	handlers         []*pcap.Handle
+	inactiveHandlers []*pcap.InactiveHandle
 }
 
 // PkgSend is a TCP package
@@ -145,7 +146,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
-	s.CleanupHandler()
+	s.CleanupHandlers()
 	s.tcpPacketlistener.Close()
 }
 
@@ -179,51 +180,64 @@ func (s *Scanner) TCPReadWorker() {
 
 // TCPReadWorkerPCAP reads and parse incoming TCP packets with pcap
 func (s *Scanner) TCPReadWorkerPCAP() {
-	defer s.CleanupHandler()
+	defer s.CleanupHandlers()
 
-	var (
-		eth    layers.Ethernet
-		ip4    layers.IPv4
-		tcp    layers.TCP
-		parser *gopacket.DecodingLayerParser
-	)
+	var wgread sync.WaitGroup
 
-	if s.NetworkInterface.HardwareAddr != nil {
-		// Interfaces with MAC (Physical + Virtualized)
-		parser = gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
-	} else {
-		// Interfaces without MAC (TUN/TAP)
-		parser = gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
-	}
+	for _, handler := range s.handlers {
+		wgread.Add(1)
+		go func(handler *pcap.Handle) {
+			defer wgread.Done()
 
-	decoded := []gopacket.LayerType{}
-	for {
-		data, _, err := s.handler.ReadPacketData()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			continue
-		}
+			var (
+				eth layers.Ethernet
+				ip4 layers.IPv4
+				tcp layers.TCP
+			)
 
-		if err := parser.DecodeLayers(data, &decoded); err != nil {
-			continue
-		}
-		for _, layerType := range decoded {
-			if layerType == layers.LayerTypeTCP {
-				if !s.IPRanger.Contains(ip4.SrcIP.String()) {
-					gologger.Debugf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
+			// Interfaces with MAC (Physical + Virtualized)
+			parserMac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
+			// Interfaces without MAC (TUN/TAP)
+			parserNoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
+
+			var parsers []*gopacket.DecodingLayerParser
+			parsers = append(parsers, parserMac, parserNoMac)
+
+			decoded := []gopacket.LayerType{}
+
+			for {
+				data, _, err := handler.ReadPacketData()
+				if err == io.EOF {
+					break
+				} else if err != nil {
 					continue
 				}
 
-				// We consider only incoming packets
-				if tcp.DstPort != layers.TCPPort(s.listenPort) {
-					continue
-				} else if tcp.SYN && tcp.ACK {
-					s.tcpChan <- &PkgResult{ip: ip4.SrcIP.String(), port: int(tcp.SrcPort)}
+				for _, parser := range parsers {
+					if err := parser.DecodeLayers(data, &decoded); err != nil {
+						continue
+					}
+					for _, layerType := range decoded {
+						if layerType == layers.LayerTypeTCP {
+							if !s.IPRanger.Contains(ip4.SrcIP.String()) {
+								gologger.Debugf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
+								continue
+							}
+
+							// We consider only incoming packets
+							if tcp.DstPort != layers.TCPPort(s.listenPort) {
+								continue
+							} else if tcp.SYN && tcp.ACK {
+								s.tcpChan <- &PkgResult{ip: ip4.SrcIP.String(), port: int(tcp.SrcPort)}
+							}
+						}
+					}
 				}
 			}
-		}
+		}(handler)
 	}
+
+	wgread.Wait()
 }
 
 // EnqueueICMP outgoing ICMP packets
@@ -501,7 +515,7 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
-		OptionData:   []byte{0x12, 0x34},
+		OptionData:   []byte{0x05, 0xB4},
 	}
 
 	tcp := layers.TCP{
@@ -544,9 +558,29 @@ func (s *Scanner) TuneSource(ip string) error {
 	return nil
 }
 
+// SetupHandlers to listen on all interfaces
+func (s *Scanner) SetupHandlers() error {
+	if s.NetworkInterface != nil {
+		return s.SetupHandler(s.NetworkInterface.Name)
+	}
+
+	itfs, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, itf := range itfs {
+		if itf.Flags&net.FlagUp == 0 {
+			continue // interface down
+		}
+		s.SetupHandler(itf.Name)
+	}
+
+	return nil
+}
+
 // SetupHandler to listen on the specified interface
-func (s *Scanner) SetupHandler() error {
-	inactive, err := pcap.NewInactiveHandle(s.NetworkInterface.Name)
+func (s *Scanner) SetupHandler(interfaceName string) error {
+	inactive, err := pcap.NewInactiveHandle(interfaceName)
 	if err != nil {
 		return err
 	}
@@ -558,7 +592,7 @@ func (s *Scanner) SetupHandler() error {
 
 	readTimeout := time.Duration(readtimeout) * time.Millisecond
 	if err = inactive.SetTimeout(readTimeout); err != nil {
-		s.CleanupHandler()
+		s.CleanupHandlers()
 		return err
 	}
 	err = inactive.SetImmediateMode(true)
@@ -566,33 +600,34 @@ func (s *Scanner) SetupHandler() error {
 		return err
 	}
 
-	s.inactiveHandler = inactive
+	s.inactiveHandlers = append(s.inactiveHandlers, inactive)
 
 	handle, err := inactive.Activate()
 	if err != nil {
-		s.CleanupHandler()
+		s.CleanupHandlers()
 		return err
 	}
 
-	s.handler = handle
+	s.handlers = append(s.handlers, handle)
 
 	// Strict BPF filter
 	// + Packets coming from target ip
 	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d and dst host %s and tcp[13]=18", s.listenPort, s.SourceIP.String()))
+	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d and tcp[13]=18", s.listenPort))
 	if err != nil {
-		s.CleanupHandler()
+		s.CleanupHandlers()
 		return err
 	}
 
 	return nil
 }
 
-func (s *Scanner) CleanupHandler() {
-	if s.handler != nil {
-		s.handler.Close()
+// CleanupHandlers for all interfaces
+func (s *Scanner) CleanupHandlers() {
+	for _, handler := range s.handlers {
+		handler.Close()
 	}
-	if s.inactiveHandler != nil {
-		s.inactiveHandler.CleanUp()
+	for _, inactiveHandler := range s.inactiveHandlers {
+		inactiveHandler.CleanUp()
 	}
 }

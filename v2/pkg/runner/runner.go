@@ -78,7 +78,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.dnsclient = dnsclient
 
 	// Tune source
-	if isRoot() {
+	if isRoot() && options.ScanType == SynScan {
 		// Set values if those were specified via cli
 		if err := runner.SetSourceIPAndInterface(); err != nil {
 			// Otherwise try to obtain them automatically
@@ -104,10 +104,12 @@ func NewRunner(options *Options) (*Runner, error) {
 func (r *Runner) SetSourceIPAndInterface() error {
 	if r.options.SourceIP != "" && r.options.Interface != "" {
 		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
-		var err error
-		r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
-		if err != nil {
-			return err
+		if r.options.Interface != "" {
+			var err error
+			r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
@@ -125,8 +127,8 @@ func (r *Runner) RunEnumeration() error {
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
 
-	if isRoot() {
-		err = r.scanner.SetupHandler()
+	if isRoot() && r.options.ScanType == SynScan {
+		err = r.scanner.SetupHandlers()
 		if err != nil {
 			return err
 		}
@@ -183,11 +185,11 @@ retry:
 
 		r.limiter.Take()
 		// connect scan
-		if !isRoot() {
+		if isRoot() && r.options.ScanType == SynScan {
+			r.RawSocketEnumeration(ip, port)
+		} else {
 			r.wgscan.Add()
 			go r.handleHostPort(ip, port)
-		} else {
-			r.RawSocketEnumeration(ip, port)
 		}
 		if r.options.EnableProgressBar {
 			r.stats.IncrementCounter("packets", 1)
@@ -220,11 +222,13 @@ retry:
 	return nil
 }
 
+// Close runner instance
 func (r *Runner) Close() {
 	os.RemoveAll(r.targetsFile)
 	r.scanner.IPRanger.Targets.Close()
 }
 
+// PickIP randomly
 func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
 	for _, target := range targets {
 		subnetIpsCount := int64(mapcidr.AddressCountIpnet(target))
