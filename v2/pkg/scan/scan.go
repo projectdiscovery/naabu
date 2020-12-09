@@ -572,10 +572,7 @@ func (s *Scanner) SetupHandlers() error {
 		if itf.Flags&net.FlagUp == 0 {
 			continue // interface down
 		}
-		err := s.SetupHandler(itf.Name)
-		if err != nil {
-			return err
-		}
+		s.SetupHandler(itf.Name)
 	}
 
 	return nil
