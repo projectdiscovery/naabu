@@ -34,7 +34,7 @@ func showNetworkCapabilities(options *Options) {
 	scanType := "CONNECT"
 	if isRoot() && options.ScanType == SynScan {
 		accessLevel = "root"
-		scanType = "TCP/ICMP/SYN"
+		scanType = "SYN"
 	}
 	gologger.Infof("Running %s scan with %s privileges\n", scanType, accessLevel)
 }
