@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/runas"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
@@ -33,7 +32,7 @@ func showBanner() {
 func showNetworkCapabilities(options *Options) {
 	accessLevel := "non root"
 	scanType := "CONNECT"
-	if isRoot() && !options.Unprivileged {
+	if isRoot() && options.ScanType == SynScan {
 		accessLevel = "root"
 		scanType = "TCP/ICMP/SYN"
 	}
@@ -64,18 +63,6 @@ func showNetworkInterfaces() error {
 		gologger.Warningf("Could not obtain public ip: %s\n", err)
 	}
 	gologger.Infof("External Ip: %s\n", externalIP)
-
-	return nil
-}
-
-func handlePrivileges(options *Options) error {
-	if options.Privileged {
-		return runas.Root()
-	}
-
-	if options.Unprivileged {
-		return runas.Nobody()
-	}
 
 	return nil
 }

@@ -15,10 +15,6 @@ type ConfigFile struct {
 	Verify bool `yaml:"verify,omitempty"`
 	// Ping uses ping probes to discover fastest active host and discover dead hosts
 	Ping bool `yaml:"ping,omitempty"`
-	// Attempts to run as root
-	Privileged bool `yaml:"privileged,omitempty"`
-	// Drop root privileges
-	Unprivileged bool `yaml:"unprivileged,omitempty"`
 	// Excludes ip of knows CDN ranges
 	ExcludeCDN bool `yaml:"exclude-cdn,omitempty"`
 	// Retries is the number of retries for the port

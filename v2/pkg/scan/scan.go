@@ -560,6 +560,10 @@ func (s *Scanner) TuneSource(ip string) error {
 
 // SetupHandlers to listen on all interfaces
 func (s *Scanner) SetupHandlers() error {
+	if s.NetworkInterface != nil {
+		return s.SetupHandler(s.NetworkInterface.Name)
+	}
+
 	itfs, err := net.Interfaces()
 	if err != nil {
 		return err
@@ -568,10 +572,7 @@ func (s *Scanner) SetupHandlers() error {
 		if itf.Flags&net.FlagUp == 0 {
 			continue // interface down
 		}
-		err := s.SetupHandler(itf.Name)
-		if err != nil {
-			return err
-		}
+		s.SetupHandler(itf.Name)
 	}
 
 	return nil
