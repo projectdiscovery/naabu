@@ -125,7 +125,7 @@ func (r *Runner) RunEnumeration() error {
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
 
-	if isRoot() && !r.options.Unprivileged {
+	if isRoot() && r.options.ScanType == SynScan {
 		err = r.scanner.SetupHandlers()
 		if err != nil {
 			return err
@@ -183,11 +183,11 @@ retry:
 
 		r.limiter.Take()
 		// connect scan
-		if !isRoot() || r.options.Unprivileged {
+		if isRoot() && r.options.ScanType == SynScan {
+			r.RawSocketEnumeration(ip, port)
+		} else {
 			r.wgscan.Add()
 			go r.handleHostPort(ip, port)
-		} else {
-			r.RawSocketEnumeration(ip, port)
 		}
 		if r.options.EnableProgressBar {
 			r.stats.IncrementCounter("packets", 1)
