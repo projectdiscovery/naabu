@@ -78,7 +78,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.dnsclient = dnsclient
 
 	// Tune source
-	if isRoot() && options.ScanType == SynScan && options.Interface != "" {
+	if isRoot() && options.ScanType == SynScan {
 		// Set values if those were specified via cli
 		if err := runner.SetSourceIPAndInterface(); err != nil {
 			// Otherwise try to obtain them automatically
@@ -104,10 +104,12 @@ func NewRunner(options *Options) (*Runner, error) {
 func (r *Runner) SetSourceIPAndInterface() error {
 	if r.options.SourceIP != "" && r.options.Interface != "" {
 		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
-		var err error
-		r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
-		if err != nil {
-			return err
+		if r.options.Interface != "" {
+			var err error
+			r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
+			if err != nil {
+				return err
+			}
 		}
 	}
 
