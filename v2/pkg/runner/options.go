@@ -83,7 +83,7 @@ func ParseOptions() *Options {
 	flag.IntVar(&options.Threads, "c", 25, "General internal worker threads")
 	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
 	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
-	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - Syn default, c - Connect)")
+	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)")
 
 	flag.Parse()
 
