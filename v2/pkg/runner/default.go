@@ -11,4 +11,7 @@ const (
 	DefaultRetriesConnectScan = 3
 
 	ExternalTargetForTune = "8.8.8.8"
+
+	SynScan     = "s"
+	ConnectScan = "c"
 )
