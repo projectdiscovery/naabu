@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"runtime"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
@@ -38,4 +39,8 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	}
 
 	return
+}
+
+func isOSSupported() bool {
+	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
 }
