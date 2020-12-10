@@ -77,18 +77,6 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.dnsclient = dnsclient
 
-	// Tune source
-	if isRoot() && options.ScanType == SynScan {
-		// Set values if those were specified via cli
-		if err := runner.SetSourceIPAndInterface(); err != nil {
-			// Otherwise try to obtain them automatically
-			err = runner.scanner.TuneSource(ExternalTargetForTune)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	if options.EnableProgressBar {
 		stats, err := clistats.New()
 		if err != nil {
@@ -103,6 +91,22 @@ func NewRunner(options *Options) (*Runner, error) {
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
 func (r *Runner) RunEnumeration() error {
+
+	if isRoot() && r.options.ScanType == SynScan {
+		if err := r.scanner.SetupHandlers(); err != nil {
+			return err
+		}
+		r.BackgroundWorkers()
+		// Set values if those were specified via cli
+		if err := r.SetSourceIPAndInterface(); err != nil {
+			// Otherwise try to obtain them automatically
+			err = r.scanner.TuneSource(ExternalTargetForTune)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
 	err := r.Load()
 	if err != nil {
 		return err
@@ -111,14 +115,6 @@ func (r *Runner) RunEnumeration() error {
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
-
-	if isRoot() && r.options.ScanType == SynScan {
-		err = r.scanner.SetupHandlers()
-		if err != nil {
-			return err
-		}
-		r.BackgroundWorkers()
-	}
 
 	// shrinks the ips to the minimum amount of cidr
 	var targets []*net.IPNet
@@ -305,6 +301,21 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 	}
 
 	r.scanner.EnqueueTCP(host, port, scan.SYN)
+}
+
+func (r *Runner) SetSourceIPAndInterface() error {
+	if r.options.SourceIP != "" && r.options.Interface != "" {
+		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
+		if r.options.Interface != "" {
+			var err error
+			r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return fmt.Errorf("source Ip and Interface not specified")
 }
 
 func (r *Runner) handleOutput() {
