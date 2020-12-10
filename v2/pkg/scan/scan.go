@@ -2,16 +2,13 @@ package scan
 
 import (
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
@@ -50,7 +47,6 @@ const (
 	ICMPTIMESTAMPREQUEST
 )
 
-// Scanner is a scanner that scans for ports using SYN packets.
 type Scanner struct {
 	SourceIP           net.IP
 	tcpPacketlistener  net.PacketConn
@@ -74,8 +70,7 @@ type Scanner struct {
 	tcpsequencer     *TCPSequencer
 	serializeOptions gopacket.SerializeOptions
 	debug            bool
-	handlers         []*pcap.Handle
-	inactiveHandlers []*pcap.InactiveHandle
+	handlers         interface{}
 }
 
 // PkgSend is a TCP package
@@ -91,6 +86,17 @@ type PkgResult struct {
 	ip   string
 	port int
 }
+
+var (
+	newScannerCallback                    func(s *Scanner) error
+	setupHandlerCallback                  func(s *Scanner, interfaceName string) error
+	tcpReadWorkerPCAPCallback             func(s *Scanner)
+	cleanupHandlersCallback               func(s *Scanner)
+	pingIcmpEchoRequestCallback           func(ip string, timeout time.Duration) bool
+	pingIcmpEchoRequestAsyncCallback      func(s *Scanner, ip string)
+	pingIcmpTimestampRequestCallback      func(ip string, timeout time.Duration) bool
+	pingIcmpTimestampRequestAsyncCallback func(s *Scanner, ip string)
+)
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
 func NewScanner(options *Options) (*Scanner, error) {
@@ -114,21 +120,10 @@ func NewScanner(options *Options) (*Scanner, error) {
 		IPRanger:     iprang,
 	}
 
-	if options.Root {
-		rawPort, err := freeport.GetFreePort()
-		if err != nil {
+	if options.Root && newScannerCallback != nil {
+		if err := newScannerCallback(scanner); err != nil {
 			return nil, err
 		}
-		scanner.listenPort = rawPort
-
-		tcpConn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", rawPort))})
-		if err != nil {
-			return nil, err
-		}
-		scanner.tcpPacketlistener = tcpConn
-
-		scanner.tcpChan = make(chan *PkgResult, chanSize)
-		scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
 	}
 
 	scanner.ScanResults = result.NewResult()
@@ -180,64 +175,9 @@ func (s *Scanner) TCPReadWorker() {
 
 // TCPReadWorkerPCAP reads and parse incoming TCP packets with pcap
 func (s *Scanner) TCPReadWorkerPCAP() {
-	defer s.CleanupHandlers()
-
-	var wgread sync.WaitGroup
-
-	for _, handler := range s.handlers {
-		wgread.Add(1)
-		go func(handler *pcap.Handle) {
-			defer wgread.Done()
-
-			var (
-				eth layers.Ethernet
-				ip4 layers.IPv4
-				tcp layers.TCP
-			)
-
-			// Interfaces with MAC (Physical + Virtualized)
-			parserMac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp)
-			// Interfaces without MAC (TUN/TAP)
-			parserNoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp)
-
-			var parsers []*gopacket.DecodingLayerParser
-			parsers = append(parsers, parserMac, parserNoMac)
-
-			decoded := []gopacket.LayerType{}
-
-			for {
-				data, _, err := handler.ReadPacketData()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					continue
-				}
-
-				for _, parser := range parsers {
-					if err := parser.DecodeLayers(data, &decoded); err != nil {
-						continue
-					}
-					for _, layerType := range decoded {
-						if layerType == layers.LayerTypeTCP {
-							if !s.IPRanger.Contains(ip4.SrcIP.String()) {
-								gologger.Debugf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
-								continue
-							}
-
-							// We consider only incoming packets
-							if tcp.DstPort != layers.TCPPort(s.listenPort) {
-								continue
-							} else if tcp.SYN && tcp.ACK {
-								s.tcpChan <- &PkgResult{ip: ip4.SrcIP.String(), port: int(tcp.SrcPort)}
-							}
-						}
-					}
-				}
-			}
-		}(handler)
+	if tcpReadWorkerPCAPCallback != nil {
+		tcpReadWorkerPCAPCallback(s)
 	}
-
-	wgread.Wait()
 }
 
 // EnqueueICMP outgoing ICMP packets
@@ -260,10 +200,10 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 // ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
-		if pkg.flag == ICMPECHOREQUEST {
-			s.PingIcmpEchoRequestAsync(pkg.ip)
-		} else if pkg.flag == ICMPTIMESTAMPREQUEST {
-			s.PingIcmpTimestampRequestAsync(pkg.ip)
+		if pkg.flag == ICMPECHOREQUEST && pingIcmpEchoRequestAsyncCallback != nil {
+			pingIcmpEchoRequestAsyncCallback(s, pkg.ip)
+		} else if pkg.flag == ICMPTIMESTAMPREQUEST && pingIcmpTimestampRequestAsyncCallback != nil {
+			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
 		}
 	}
 }
@@ -572,7 +512,9 @@ func (s *Scanner) SetupHandlers() error {
 		if itf.Flags&net.FlagUp == 0 {
 			continue // interface down
 		}
-		s.SetupHandler(itf.Name)
+		if err := s.SetupHandler(itf.Name); err != nil {
+			gologger.Warningf("Error on interface %s: %s", itf.Name, err)
+		}
 	}
 
 	return nil
@@ -580,43 +522,8 @@ func (s *Scanner) SetupHandlers() error {
 
 // SetupHandler to listen on the specified interface
 func (s *Scanner) SetupHandler(interfaceName string) error {
-	inactive, err := pcap.NewInactiveHandle(interfaceName)
-	if err != nil {
-		return err
-	}
-
-	err = inactive.SetSnapLen(snaplen)
-	if err != nil {
-		return err
-	}
-
-	readTimeout := time.Duration(readtimeout) * time.Millisecond
-	if err = inactive.SetTimeout(readTimeout); err != nil {
-		s.CleanupHandlers()
-		return err
-	}
-	err = inactive.SetImmediateMode(true)
-	if err != nil {
-		return err
-	}
-
-	s.inactiveHandlers = append(s.inactiveHandlers, inactive)
-
-	handle, err := inactive.Activate()
-	if err != nil {
-		s.CleanupHandlers()
-		return err
-	}
-
-	s.handlers = append(s.handlers, handle)
-
-	// Strict BPF filter
-	// + Packets coming from target ip
-	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d and tcp[13]=18", s.listenPort))
-	if err != nil {
-		s.CleanupHandlers()
-		return err
+	if setupHandlerCallback != nil {
+		return setupHandlerCallback(s, interfaceName)
 	}
 
 	return nil
@@ -624,10 +531,7 @@ func (s *Scanner) SetupHandler(interfaceName string) error {
 
 // CleanupHandlers for all interfaces
 func (s *Scanner) CleanupHandlers() {
-	for _, handler := range s.handlers {
-		handler.Close()
-	}
-	for _, inactiveHandler := range s.inactiveHandlers {
-		inactiveHandler.CleanUp()
+	if cleanupHandlersCallback != nil {
+		cleanupHandlersCallback(s)
 	}
 }
