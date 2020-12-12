@@ -1,3 +1,5 @@
+// +build linux darwin
+
 package scan
 
 import (
@@ -16,6 +18,13 @@ const (
 	receiveTimestamp  = 8
 	transmitTimestamp = 12
 )
+
+func init() {
+	pingIcmpEchoRequestCallback = PingIcmpEchoRequest
+	pingIcmpEchoRequestAsyncCallback = PingIcmpEchoRequestAsync
+	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
+	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
+}
 
 // PingIcmpEchoRequest synchronous to the target ip address
 func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
@@ -64,7 +73,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpEchoRequestAsync asynchronous to the target ip address
-func (s *Scanner) PingIcmpEchoRequestAsync(ip string) {
+func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
@@ -142,7 +151,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpTimestampRequestAsync synchronous to the target ip address
-func (s *Scanner) PingIcmpTimestampRequestAsync(ip string) {
+func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeTimestamp,
