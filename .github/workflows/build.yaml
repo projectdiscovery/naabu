@@ -10,6 +10,8 @@ jobs:
     name: golangci-lint
     runs-on: ubuntu-latest
     steps:
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
       - name: Checkout code
         uses: actions/checkout@v2
       - name: Run golangci-lint
@@ -33,6 +35,8 @@ jobs:
     name: Build
     runs-on: ubuntu-latest
     steps:
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
