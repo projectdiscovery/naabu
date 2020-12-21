@@ -104,7 +104,7 @@ Download latest binary from https://github.com/projectdiscovery/naabu/releases
 naabu requires **go1.14+** to install successfully. Run the following command to get the repo -
 
 ```sh
-▶ GO111MODULE=on go get -u -v github.com/projectdiscovery/naabu/v2/cmd/naabu
+▶ GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 ▶ naabu -version
 ```
 
