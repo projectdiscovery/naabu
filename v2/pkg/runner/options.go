@@ -53,7 +53,7 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
-	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100")
+	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100)")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
 	flag.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host")
