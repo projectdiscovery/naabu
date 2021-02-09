@@ -1,17 +1,8 @@
-# BUILDER
-FROM golang:1.14 AS builder
-WORKDIR /app
-COPY . .
-RUN apt update && apt install -y libpcap-dev
-RUN go get -d -v ./...
-RUN go build -o naabu ./v2/cmd/naabu/
+FROM golang:1.14-alpine3.12 AS builder
+RUN apk add build-base libpcap-dev
+RUN GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 
-# RUNNER
-FROM debian:buster
-RUN mkdir /app
-WORKDIR /app
-RUN apt update && apt install -y nmap libpcap-dev
-COPY --from=builder /app/naabu /app/naabu
-COPY --from=builder /app/scripts /app/scripts
-
-ENTRYPOINT ["/app/naabu"]
+FROM alpine:3.12
+RUN apk add nmap libpcap-dev
+COPY --from=builder /go/bin/naabu /usr/local/bin/naabu
+ENTRYPOINT ["naabu"]
