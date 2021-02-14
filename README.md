@@ -101,10 +101,16 @@ Download latest binary from https://github.com/projectdiscovery/naabu/releases
 
 ### From Source
 
-naabu requires **go1.14+** to install successfully. Run the following command to get the repo -
+naabu requires **go1.14+** to install successfully and have `libpcap-dev` installed on the system.
+
+To install libpcap-dev:-
 
 ```sh
-▶ GO111MODULE=on go get -u -v github.com/projectdiscovery/naabu/v2/cmd/naabu
+apt install -y libpcap-dev
+```
+
+```sh
+▶ GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 ▶ naabu -version
 ```
 

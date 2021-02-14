@@ -74,7 +74,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
 	flag.StringVar(&options.SourceIP, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
-	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Sikp full port scans for CDNs (only checks for 80,443)")
+	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
 	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
 	flag.StringVar(&options.ConfigFile, "config", "", "Config file")
