@@ -53,7 +53,7 @@ func ParseOptions() *Options {
 	options := &Options{}
 
 	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
-	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100")
+	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100)")
 	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
 	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
 	flag.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host")
@@ -74,7 +74,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
 	flag.StringVar(&options.SourceIP, "source-ip", "", "Source Ip")
 	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
-	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Sikp full port scans for CDNs (only checks for 80,443)")
+	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)")
 	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
 	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
 	flag.StringVar(&options.ConfigFile, "config", "", "Config file")
