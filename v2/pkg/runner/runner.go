@@ -91,7 +91,6 @@ func NewRunner(options *Options) (*Runner, error) {
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
 func (r *Runner) RunEnumeration() error {
-
 	if isRoot() && r.options.ScanType == SynScan {
 		if err := r.scanner.SetupHandlers(); err != nil {
 			return err
