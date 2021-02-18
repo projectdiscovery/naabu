@@ -100,7 +100,7 @@ func ParseOptions() *Options {
 	options.writeDefaultConfig()
 
 	if options.Version {
-		gologger.Infof("Current Version: %s\n", Version)
+		gologger.Info().Msgf("Current Version: %s\n", Version)
 		os.Exit(0)
 	}
 
@@ -108,7 +108,7 @@ func ParseOptions() *Options {
 	if options.InterfacesList {
 		err := showNetworkInterfaces()
 		if err != nil {
-			gologger.Errorf("Could not get network interfaces: %s\n", err)
+			gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 		}
 		os.Exit(0)
 	}
@@ -119,7 +119,7 @@ func ParseOptions() *Options {
 	} else {
 		defaultConfigPath, err := getDefaultConfigFile()
 		if err != nil {
-			gologger.Errorf("Program exiting: %s\n", err)
+			gologger.Error().Msgf("Program exiting: %s\n", err)
 		}
 		options.MergeFromConfig(defaultConfigPath, true)
 	}
@@ -128,7 +128,7 @@ func ParseOptions() *Options {
 	// invalid options have been used, exit.
 	err := options.validateOptions()
 	if err != nil {
-		gologger.Fatalf("Program exiting: %s\n", err)
+		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
 
 	showNetworkCapabilities(options)
@@ -152,10 +152,10 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	configFile, err := UnmarshalRead(configFileName)
 	if err != nil {
 		if ignoreError {
-			gologger.Warningf("Could not read configuration file %s: %s\n", configFileName, err)
+			gologger.Warning().Msgf("Could not read configuration file %s: %s\n", configFileName, err)
 			return
 		}
-		gologger.Fatalf("Could not read configuration file %s: %s\n", configFileName, err)
+		gologger.Fatal().Msgf("Could not read configuration file %s: %s\n", configFileName, err)
 	}
 	options.config = &configFile
 

@@ -21,7 +21,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 		var ips []string
 		ips, err = r.dnsclient.Lookup(target)
 		if err != nil {
-			gologger.Warningf("Could not get IP for host: %s\n", target)
+			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
 			return
 		}
 		for _, ip := range ips {
@@ -35,7 +35,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 		}
 	} else {
 		targetIPs = append(targetIPs, target)
-		gologger.Debugf("Found %d addresses for %s\n", len(targetIPs), target)
+		gologger.Debug().Msgf("Found %d addresses for %s\n", len(targetIPs), target)
 	}
 
 	return

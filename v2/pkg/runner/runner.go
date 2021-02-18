@@ -80,7 +80,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	if options.EnableProgressBar {
 		stats, err := clistats.New()
 		if err != nil {
-			gologger.Warningf("Couldn't create progress engine: %s\n", err)
+			gologger.Warning().Msgf("Couldn't create progress engine: %s\n", err)
 		} else {
 			runner.stats = stats
 		}
@@ -126,7 +126,7 @@ func (r *Runner) RunEnumeration() error {
 	for _, target := range targets {
 		err := r.scanner.IPRanger.AddIPNet(target)
 		if err != nil {
-			gologger.Warningf("%s\n", err)
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
 
@@ -145,7 +145,7 @@ func (r *Runner) RunEnumeration() error {
 		r.stats.AddCounter("errors", uint64(0))
 		r.stats.AddCounter("total", uint64(Range*int64(r.options.Retries)))
 		if err := r.stats.Start(makePrintCallback(), tickduration*time.Second); err != nil {
-			gologger.Warningf("Couldn't start statistics: %s\n", err)
+			gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
 		}
 	}
 
@@ -278,7 +278,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
-		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
+		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
 		return
 	}
 
@@ -295,7 +295,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 func (r *Runner) handleHostPortSyn(host string, port int) {
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
-		gologger.Debugf("Skipping cdn target: %s:%d\n", host, port)
+		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
 		return
 	}
 
@@ -338,14 +338,14 @@ func (r *Runner) handleOutput() {
 		if _, statErr := os.Stat(outputFolder); os.IsNotExist(statErr) {
 			mkdirErr := os.MkdirAll(outputFolder, 0700)
 			if mkdirErr != nil {
-				gologger.Errorf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
+				gologger.Error().Msgf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
 				return
 			}
 		}
 
 		file, err = os.Create(output)
 		if err != nil {
-			gologger.Errorf("Could not create file %s: %s\n", output, err)
+			gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
 			return
 		}
 		defer file.Close()
@@ -361,7 +361,7 @@ func (r *Runner) handleOutput() {
 			if host == "ip" {
 				host = hostIP
 			}
-			gologger.Infof("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
+			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 
 			// console output
 			if r.options.JSON {
@@ -375,11 +375,11 @@ func (r *Runner) handleOutput() {
 					if marshallErr != nil {
 						continue
 					}
-					gologger.Silentf("%s\n", string(b))
+					gologger.Silent().Msgf("%s\n", string(b))
 				}
 			} else {
 				for port := range ports {
-					gologger.Silentf("%s:%d\n", host, port)
+					gologger.Silent().Msgf("%s:%d\n", host, port)
 				}
 			}
 
@@ -391,7 +391,7 @@ func (r *Runner) handleOutput() {
 					err = WriteHostOutput(host, ports, file)
 				}
 				if err != nil {
-					gologger.Errorf("Could not write results to file %s for %s: %s\n", output, host, err)
+					gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
 				}
 			}
 		}
