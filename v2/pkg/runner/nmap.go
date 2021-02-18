@@ -43,16 +43,16 @@ func (r *Runner) handleNmap() {
 
 		// if requested via config file or via cli
 		if r.options.Nmap || hasCLI {
-			gologger.Infof("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
+			gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
 			cmd := exec.Command(args[0], args[1:]...)
 			cmd.Stdout = os.Stdout
 			err := cmd.Run()
 			if err != nil {
-				gologger.Errorf("Could not get network interfaces: %s\n", err)
+				gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 				return
 			}
 		} else {
-			gologger.Infof("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
+			gologger.Info().Msgf("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
 		}
 	}
 }
