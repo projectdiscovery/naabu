@@ -21,11 +21,11 @@ const Version = `2.0.3`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
-	gologger.Printf("%s\n", banner)
-	gologger.Printf("\t\tprojectdiscovery.io\n\n")
+	gologger.Print().Msgf("%s\n", banner)
+	gologger.Print().Msgf("\t\tprojectdiscovery.io\n\n")
 
-	gologger.Labelf("Use with caution. You are responsible for your actions\n")
-	gologger.Labelf("Developers assume no liability and are not responsible for any misuse or damage.\n")
+	gologger.Print().Msgf("Use with caution. You are responsible for your actions\n")
+	gologger.Print().Msgf("Developers assume no liability and are not responsible for any misuse or damage.\n")
 }
 
 // showNetworkCapabilities shows the network capabilities/scan types possible with the running user
@@ -36,7 +36,7 @@ func showNetworkCapabilities(options *Options) {
 		accessLevel = "root"
 		scanType = "SYN"
 	}
-	gologger.Infof("Running %s scan with %s privileges\n", scanType, accessLevel)
+	gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
 }
 
 func showNetworkInterfaces() error {
@@ -48,21 +48,21 @@ func showNetworkInterfaces() error {
 	for _, itf := range interfaces {
 		addresses, addErr := itf.Addrs()
 		if addErr != nil {
-			gologger.Warningf("Could not retrieve addresses for %s: %s\n", itf.Name, addErr)
+			gologger.Warning().Msgf("Could not retrieve addresses for %s: %s\n", itf.Name, addErr)
 			continue
 		}
 		var addrstr []string
 		for _, address := range addresses {
 			addrstr = append(addrstr, address.String())
 		}
-		gologger.Infof("Interface %s:\nMAC: %s\nAddresses: %s\nMTU: %d\nFlags: %s\n", itf.Name, itf.HardwareAddr, strings.Join(addrstr, " "), itf.MTU, itf.Flags.String())
+		gologger.Info().Msgf("Interface %s:\nMAC: %s\nAddresses: %s\nMTU: %d\nFlags: %s\n", itf.Name, itf.HardwareAddr, strings.Join(addrstr, " "), itf.MTU, itf.Flags.String())
 	}
 	// External ip
 	externalIP, err := scan.WhatsMyIP()
 	if err != nil {
-		gologger.Warningf("Could not obtain public ip: %s\n", err)
+		gologger.Warning().Msgf("Could not obtain public ip: %s\n", err)
 	}
-	gologger.Infof("External Ip: %s\n", externalIP)
+	gologger.Info().Msgf("External Ip: %s\n", externalIP)
 
 	return nil
 }
@@ -112,7 +112,7 @@ func (options *Options) writeDefaultConfig() {
 `
 	configFile, err := getDefaultConfigFile()
 	if err != nil {
-		gologger.Warningf("Could not get default configuration file: %s\n", err)
+		gologger.Warning().Msgf("Could not get default configuration file: %s\n", err)
 	}
 	if fileExists(configFile) {
 		return
@@ -120,8 +120,8 @@ func (options *Options) writeDefaultConfig() {
 
 	err = ioutil.WriteFile(configFile, []byte(dummyconfig), 0755)
 	if err != nil {
-		gologger.Warningf("Could not write configuration file to %s: %s\n", configFile, err)
+		gologger.Warning().Msgf("Could not write configuration file to %s: %s\n", configFile, err)
 		return
 	}
-	gologger.Infof("Configuration file saved to %s\n", configFile)
+	gologger.Info().Msgf("Configuration file saved to %s\n", configFile)
 }
