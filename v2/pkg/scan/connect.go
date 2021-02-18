@@ -15,7 +15,7 @@ func (s *Scanner) ConnectVerify(host string, ports map[int]struct{}) map[int]str
 			delete(ports, port)
 			continue
 		}
-		gologger.Debugf("Validated active port %d on %s\n", port, host)
+		gologger.Debug().Msgf("Validated active port %d on %s\n", port, host)
 		conn.Close()
 	}
 	return ports
