@@ -12,6 +12,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2.5.1
         with:
