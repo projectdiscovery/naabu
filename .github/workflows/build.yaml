@@ -19,8 +19,6 @@ jobs:
           version: v1.31
           args: --timeout 5m
 
-      - name: Install libpcap-dev
-        run: sudo apt install libpcap-dev
   build:
     runs-on: ubuntu-latest
     steps:
@@ -31,6 +29,9 @@ jobs:
         uses: actions/setup-go@v2
         with:
           go-version: 1.15
+
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
 
       - name: Test
         run: go test .
