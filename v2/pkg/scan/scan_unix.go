@@ -137,7 +137,7 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP {
 							if !s.IPRanger.Contains(ip4.SrcIP.String()) {
-								gologger.Debugf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
+								gologger.Debug().Msgf("Discarding TCP packet from non target ip %s\n", ip4.SrcIP.String())
 								continue
 							}
 

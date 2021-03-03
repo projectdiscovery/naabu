@@ -28,7 +28,7 @@ func (r *Runner) Load() error {
 	// pre-process all targets (resolves all non fqdn targets to ip address)
 	err = r.PreProcessTargets()
 	if err != nil {
-		gologger.Warningf("%s\n", err)
+		gologger.Warning().Msgf("%s\n", err)
 	}
 
 	return nil
@@ -95,7 +95,7 @@ func (r *Runner) PreProcessTargets() error {
 		func(target string) {
 			defer wg.Done()
 			if err := r.AddTarget(target); err != nil {
-				gologger.Warningf("%s\n", err)
+				gologger.Warning().Msgf("%s\n", err)
 			}
 		}(s.Text())
 	}
@@ -111,11 +111,11 @@ func (r *Runner) AddTarget(target string) error {
 	} else if ipranger.IsCidr(target) {
 		// Add cidr directly to ranger, as single ips would allocate more resources later
 		if err := r.scanner.IPRanger.AddFqdn(target, "cidr"); err != nil {
-			gologger.Warningf("%s\n", err)
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
 		if err := r.scanner.IPRanger.AddFqdn(target, "ip"); err != nil {
-			gologger.Warningf("%s\n", err)
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else {
 		ips, err := r.resolveFQDN(target)
@@ -124,7 +124,7 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		for _, ip := range ips {
 			if err := r.scanner.IPRanger.AddFqdn(ip, target); err != nil {
-				gologger.Warningf("%s\n", err)
+				gologger.Warning().Msgf("%s\n", err)
 			}
 		}
 	}
@@ -144,7 +144,7 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	)
 	for _, ip := range ips {
 		if r.scanner.IPRanger.IsExcluded(ip) {
-			gologger.Warningf("Skipping host %s as ip %s was excluded\n", target, ip)
+			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
 
@@ -160,24 +160,24 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 		// Scan the hosts found for ping probes
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {
-			gologger.Warningf("Could not perform ping scan on %s: %s\n", target, err)
+			gologger.Warning().Msgf("Could not perform ping scan on %s: %s\n", target, err)
 			return []string{}, err
 		}
 		for _, result := range pingResults.Hosts {
 			if result.Type == scan.HostActive {
-				gologger.Debugf("Ping probe succeed for %s: latency=%s\n", result.Host, result.Latency)
+				gologger.Debug().Msgf("Ping probe succeed for %s: latency=%s\n", result.Host, result.Latency)
 			} else {
-				gologger.Debugf("Ping probe failed for %s: error=%s\n", result.Host, result.Error)
+				gologger.Debug().Msgf("Ping probe failed for %s: error=%s\n", result.Host, result.Error)
 			}
 		}
 
 		// Get the fastest host in the list of hosts
 		fastestHost, err := pingResults.GetFastestHost()
 		if err != nil {
-			gologger.Warningf("No active host found for %s: %s\n", target, err)
+			gologger.Warning().Msgf("No active host found for %s: %s\n", target, err)
 			return []string{}, err
 		}
-		gologger.Infof("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
+		gologger.Info().Msgf("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
 		hostIPS = append(hostIPS, fastestHost.Host)
 	} else if r.options.ScanAllIPS {
 		hostIPS = initialHosts
@@ -186,14 +186,14 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	for _, hostIP := range hostIPS {
-		gologger.Debugf("Using host %s for enumeration\n", hostIP)
+		gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
 		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
 		if err := r.scanner.IPRanger.AddFqdn(hostIP, target); err != nil {
-			gologger.Warningf("%s\n", err)
+			gologger.Warning().Msgf("%s\n", err)
 		}
 
 		if err := r.scanner.IPRanger.Add(hostIP); err != nil {
-			gologger.Warningf("%s\n", err)
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
 
