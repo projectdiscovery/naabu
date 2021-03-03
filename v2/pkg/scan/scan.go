@@ -241,7 +241,7 @@ func (s *Scanner) ICMPReadWorker() {
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		if s.State == Scan {
-			gologger.Debugf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
+			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
 	}
@@ -413,7 +413,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 		// not matching ip
 		if addr.String() != dstIP {
 			if s.debug {
-				gologger.Debugf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
+				gologger.Debug().Msgf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
 			}
 			continue
 		}
@@ -427,12 +427,12 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 			// We consider only incoming packets
 			if tcp.DstPort != layers.TCPPort(rawPort) {
 				if s.debug {
-					gologger.Debugf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
+					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
 				}
 				continue
 			} else if tcp.RST {
 				if s.debug {
-					gologger.Debugf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
+					gologger.Debug().Msgf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
 					return true, nil
 				}
 			}
@@ -475,13 +475,13 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 	err := tcp.SetNetworkLayerForChecksum(&ip4)
 	if err != nil {
 		if s.debug {
-			gologger.Debugf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
 		}
 	} else {
 		err = s.send(ip, s.tcpPacketlistener, &tcp)
 		if err != nil {
 			if s.debug {
-				gologger.Debugf("Can not send packet to %s:%d port: %s\n", ip, port, err)
+				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, port, err)
 			}
 		}
 	}
@@ -513,7 +513,7 @@ func (s *Scanner) SetupHandlers() error {
 			continue // interface down
 		}
 		if err := s.SetupHandler(itf.Name); err != nil {
-			gologger.Warningf("Error on interface %s: %s", itf.Name, err)
+			gologger.Warning().Msgf("Error on interface %s: %s", itf.Name, err)
 		}
 	}
 
