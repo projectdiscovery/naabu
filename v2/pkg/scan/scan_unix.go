@@ -1,6 +1,5 @@
 // +build linux darwin
-// It contains global variables
-// nolint: gochecknoglobals, gochecknoinits, unused
+// nolint: gochecknoglobals, gochecknoinits, unused // It contains global variables
 
 package scan
 
