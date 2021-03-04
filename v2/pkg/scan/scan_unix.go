@@ -1,4 +1,5 @@
 // +build linux darwin
+// nolint: gochecknoglobals, gochecknoinits
 
 package scan
 
