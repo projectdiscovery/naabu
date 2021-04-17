@@ -82,8 +82,8 @@ github.com/projectdiscovery/cdncheck v0.0.2 h1:ZAaezMvVioC/8fC8iilylGT4FBBryzQdX
 github.com/projectdiscovery/cdncheck v0.0.2/go.mod h1:+vB8400d1Kxq5aDoi/XkVcdvpiqQjSrYJ8bRfUDdymQ=
 github.com/projectdiscovery/clistats v0.0.8 h1:tjmWb15mqsPf/yrQXVHLe2ThZX/5+mgKSfZBKWWLh20=
 github.com/projectdiscovery/clistats v0.0.8/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
-github.com/projectdiscovery/dnsx v1.0.2 h1:gxSqnL8jmzpwQ4FpGmuls0cgfvlaAg93XpOz1v4KVjo=
-github.com/projectdiscovery/dnsx v1.0.2/go.mod h1:+sdtAvtu4/A78xQvd9RMnZL3GoXgLDrqQc3HKPQbCYI=
+github.com/projectdiscovery/dnsx v1.0.2-0.20210417234210-3a4fe34e685d h1:cN+cUXE+1YX+l8D/A7mMcr89uOkEHnEd33tThDyLxkE=
+github.com/projectdiscovery/dnsx v1.0.2-0.20210417234210-3a4fe34e685d/go.mod h1:+sdtAvtu4/A78xQvd9RMnZL3GoXgLDrqQc3HKPQbCYI=
 github.com/projectdiscovery/fdmax v0.0.3 h1:FM6lv9expZ/rEEBI9tkRh6tx3DV0gtpwzdc0h7bGPqg=
 github.com/projectdiscovery/fdmax v0.0.3/go.mod h1:NWRcaR7JTO7fC27H4jCl9n7Z+KIredwpgw1fV+4KrKI=
 github.com/projectdiscovery/gologger v1.0.1/go.mod h1:Ok+axMqK53bWNwDSU1nTNwITLYMXMdZtRc8/y1c7sWE=
