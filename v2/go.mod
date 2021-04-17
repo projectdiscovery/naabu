@@ -7,7 +7,7 @@ require (
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/projectdiscovery/cdncheck v0.0.2
 	github.com/projectdiscovery/clistats v0.0.8
-	github.com/projectdiscovery/dnsx v1.0.2
+	github.com/projectdiscovery/dnsx v1.0.2-0.20210417234210-3a4fe34e685d
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/ipranger v0.0.3-0.20210130064744-03fda964a900
