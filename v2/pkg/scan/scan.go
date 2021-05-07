@@ -14,6 +14,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -106,6 +107,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var nPolicyOptions networkpolicy.Options
+	nPolicyOptions.DenyList = append(nPolicyOptions.DenyList, options.ExcludedIps...)
+	nPolicy, err := networkpolicy.New(nPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+	iprang.Np = nPolicy
 
 	scanner := &Scanner{
 		serializeOptions: gopacket.SerializeOptions{

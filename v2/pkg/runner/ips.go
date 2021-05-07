@@ -1,34 +1,26 @@
 package runner
 
 import (
-	"fmt"
-	"io/ioutil"
 	"strings"
 
-	"github.com/projectdiscovery/ipranger"
-	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/iputil"
 )
 
-func parseExcludedIps(options *Options, scanner *scan.Scanner) error {
-	var allIps []string
+func parseExcludedIps(options *Options) ([]string, error) {
+	var excludedIps []string
 	if options.ExcludeIps != "" {
-		for _, ip := range strings.Split(options.ExcludeIps, ",") {
-			err := scanner.IPRanger.Exclude(ip)
-			if err != nil {
-				return err
-			}
-		}
+		excludedIps = append(excludedIps, strings.Split(options.ExcludeIps, ",")...)
 	}
 
 	if options.ExcludeIpsFile != "" {
-		data, err := ioutil.ReadFile(options.ExcludeIpsFile)
+		cdata, err := fileutil.ReadFile(options.ExcludeIpsFile)
 		if err != nil {
-			return fmt.Errorf("could not read ips: %s", err)
+			return excludedIps, err
 		}
-		for _, ip := range strings.Split(string(data), "\n") {
-			err := scanner.IPRanger.Exclude(ip)
-			if err != nil {
-				return err
+		for ip := range cdata {
+			if isIpOrCidr(ip) {
+				excludedIps = append(excludedIps, ip)
 			}
 		}
 	}
@@ -36,26 +28,16 @@ func parseExcludedIps(options *Options, scanner *scan.Scanner) error {
 	if options.config != nil {
 		for _, excludeIP := range options.config.ExcludeIps {
 			for _, ip := range strings.Split(excludeIP, ",") {
-				err := scanner.IPRanger.Exclude(ip)
-				if err != nil {
-					return err
+				if isIpOrCidr(ip) {
+					excludedIps = append(excludedIps, ip)
 				}
 			}
 		}
 	}
 
-	for _, ip := range allIps {
-		if ip == "" {
-			continue
-		} else if ipranger.IsCidr(ip) || ipranger.IsIP(ip) {
-			err := scanner.IPRanger.Exclude(ip)
-			if err != nil {
-				return err
-			}
-		} else {
-			return fmt.Errorf("exclude element not ip or range")
-		}
-	}
+	return excludedIps, nil
+}
 
-	return nil
+func isIpOrCidr(s string) bool {
+	return iputil.IsIP(s) || iputil.IsCIDR(s)
 }
