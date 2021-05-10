@@ -96,10 +96,6 @@ func (r *Runner) RunEnumeration() error {
 	defer r.Close()
 
 	if isRoot() && r.options.ScanType == SynScan {
-		if err := r.scanner.SetupHandlers(); err != nil {
-			return err
-		}
-		r.BackgroundWorkers()
 		// Set values if those were specified via cli
 		if err := r.SetSourceIPAndInterface(); err != nil {
 			// Otherwise try to obtain them automatically
@@ -108,6 +104,11 @@ func (r *Runner) RunEnumeration() error {
 				return err
 			}
 		}
+		err := r.scanner.SetupHandlers()
+		if err != nil {
+			return err
+		}
+		r.BackgroundWorkers()
 	}
 
 	err := r.Load()
@@ -126,20 +127,14 @@ func (r *Runner) RunEnumeration() error {
 		return nil
 	})
 	targets, _ = mapcidr.CoalesceCIDRs(targets)
-	// add targets to ranger
+	var targetsCount, portsCount uint64
 	for _, target := range targets {
-		err := r.scanner.IPRanger.Add(target.String())
-		if err != nil {
-			gologger.Warning().Msgf("%s\n", err)
-		}
+		targetsCount = mapcidr.AddressCountIpnet(target)
 	}
+	portsCount = uint64(len(r.scanner.Ports))
 
 	r.scanner.State = scan.Scan
-
-	targetsCount := int64(r.scanner.IPRanger.Stats.IPS)
-	portsCount := int64(len(r.scanner.Ports))
 	Range := targetsCount * portsCount
-
 	if r.options.EnableProgressBar {
 		r.stats.AddStatic("ports", portsCount)
 		r.stats.AddStatic("hosts", targetsCount)
@@ -147,7 +142,7 @@ func (r *Runner) RunEnumeration() error {
 		r.stats.AddStatic("startedAt", time.Now())
 		r.stats.AddCounter("packets", uint64(0))
 		r.stats.AddCounter("errors", uint64(0))
-		r.stats.AddCounter("total", uint64(Range*int64(r.options.Retries)))
+		r.stats.AddCounter("total", Range*uint64(r.options.Retries))
 		if err := r.stats.Start(makePrintCallback(), tickduration*time.Second); err != nil {
 			gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
 		}
@@ -157,17 +152,13 @@ func (r *Runner) RunEnumeration() error {
 	// Retries are performed regardless of the previous scan results due to network unreliability
 	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
 		// Use current time as seed
-		b := blackrock.New(Range, time.Now().UnixNano())
-		for index := int64(0); index < Range; index++ {
+		b := blackrock.New(int64(Range), time.Now().UnixNano())
+		for index := int64(0); index < int64(Range); index++ {
 			xxx := b.Shuffle(index)
-			ipIndex := xxx / portsCount
-			portIndex := int(xxx % portsCount)
+			ipIndex := xxx / int64(portsCount)
+			portIndex := int(xxx % int64(portsCount))
 			ip := r.PickIP(targets, ipIndex)
 			port := r.PickPort(portIndex)
-
-			if ip == "" || port <= 0 {
-				continue
-			}
 
 			r.limiter.Take()
 			// connect scan
