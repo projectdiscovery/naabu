@@ -21,7 +21,7 @@ builds:
       goarch: '386'
 
   binary: '{{ .ProjectName }}'
-  main: v2/cmd/naabu/main.go
+  main: cmd/naabu/main.go
 
 archives:
 - format: zip
