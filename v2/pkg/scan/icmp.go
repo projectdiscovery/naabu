@@ -20,10 +20,7 @@ const (
 )
 
 func init() {
-	pingIcmpEchoRequestCallback = PingIcmpEchoRequest
 	pingIcmpEchoRequestAsyncCallback = PingIcmpEchoRequestAsync
-	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
-	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
 }
 
 // PingIcmpEchoRequest synchronous to the target ip address
