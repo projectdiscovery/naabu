@@ -1,36 +1,31 @@
-<h1 align="left">
-  <img src="static/naabu-logo.png" alt="naabu" width="170px"></a>
+<h1 align="center">
+  <img src="static/naabu-logo.png" alt="naabu" width="200px"></a>
   <br>
 </h1>
 
+<p align="center">
+<a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-_red.svg"></a>
+<a href="https://github.com/projectdiscovery/naabu/issues"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat"></a>
+<a href="https://goreportcard.com/badge/github.com/projectdiscovery/naabu"><img src="https://goreportcard.com/badge/github.com/projectdiscovery/naabu"></a>
+<a href="https://github.com/projectdiscovery/naabu/releases"><img src="https://img.shields.io/github/release/projectdiscovery/naabu"></a>
+<a href="https://twitter.com/pdiscoveryio"><img src="https://img.shields.io/twitter/follow/pdiscoveryio.svg?logo=twitter"></a>
+<a href="https://discord.gg/projectdiscovery"><img src="https://img.shields.io/discord/695645237418131507.svg?logo=discord"></a>
+<img src="https://github.com/projectdiscovery/nuclei/actions/workflows/build.yaml/badge.svg?branch=master">
+</p>
 
-[![License](https://img.shields.io/badge/license-MIT-_red.svg)](https://opensource.org/licenses/MIT)
-[![Go Report Card](https://goreportcard.com/badge/github.com/projectdiscovery/naabu)](https://goreportcard.com/report/github.com/projectdiscovery/naabu)
-[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/projectdiscovery/naabu/issues)
-[![GitHub Release](https://img.shields.io/github/release/projectdiscovery/naabu)](https://github.com/projectdiscovery/naabu/releases)
-[![Follow on Twitter](https://img.shields.io/twitter/follow/pdiscoveryio.svg?logo=twitter)](https://twitter.com/pdiscoveryio)
-[![Docker Images](https://img.shields.io/docker/pulls/projectdiscovery/naabu.svg)](https://hub.docker.com/r/projectdiscovery/naabu)
-[![Chat on Discord](https://img.shields.io/discord/695645237418131507.svg?logo=discord)](https://discord.gg/KECAGdH)
+<p align="center">
+  <a href="#features">Features</a> •
+  <a href="#installation-instructions">Installation</a> •
+  <a href="#usage">Usage</a> •
+  <a href="#running-naabu">Running naabu</a> •
+  <a href="#configuration-file">Configuration file</a> •
+  <a href="#nmap-integration">NMAP integration</a> •
+  <a href="#cdn-exclusion">CDN Exclusion</a> •
+  <a href="https://discord.gg/projectdiscovery">Join Discord</a>
+</p>
 
 Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN/CONNECT scans on the host/list of hosts and lists
 all ports that return a reply.
-
-# Resources
-- [Resources](#resources)
-- [Features](#features)
-- [Usage](#usage)
-- [Installation Instructions](#installation-instructions)
-    - [From Binary](#from-binary)
-    - [From Source](#from-source)
-    - [From Github](#from-github)
-    - [From Docker](#from-docker)
-    - [Windows](#windows)
-- [Running Naabu](#running-naabu)
-- [Configuration file](#configuration-file)
-- [Nmap integration](#nmap-integration)
-- [CDN Exclusion](#cdn-exclusion)
-- [License](#license)
-
 
 # Features
 
@@ -39,127 +34,115 @@ all ports that return a reply.
   <br>
 </h1>
 
- - Simple and modular code base making it easy to contribute.
  - Fast And Simple SYN/CONNECT probe based scanning.
- - Multiple Output formats supported (JSON, File, Stdout)
  - Optimized for ease of use and **lightweight** on resources
- - **Stdin** and **stdout** support for integrating in workflows
- - Automatic handling of duplicate hosts between multiple subdomains
- - Multiple input type support including HOST/IP/CIDR notation.
+ - **Automatic handling of duplicate hosts between multiple subdomains**
+ - NMAP Integration for service discovery
+ - Piped input / output support for integrating in workflows
+ - Multiple Output formats supported (JSON, File, Stdout)
+ - Multiple input support including HOST/IP/CIDR notation.
 
 # Usage
 
 ```sh
-▶ naabu -h
+naabu -h
 ```
+
 This will display help for the tool. Here are all the switches it supports.
 
-| Flag           | Description                                            | Example                             |
-| -------------- | ------------------------------------------------------ | ----------------------------------- |
-| c              | Worker threads for fqdn to ip resolution               | naabu -c 25                         |
-| config         | Configuration file for naabu                           | naabu -config naabu.conf            |
-| p              | Ports to scan (80,443, 100-200)                        | naabu -p -                          |
-| top-ports      | Top Ports to scan (default top 100                     | naabu -top-ports 1000               |
-| host           | host/domain/CIDR to scan ports for                     | naabu -host 192.168.0.1/24          |
-| iL             | File containing list of hosts to enumerate ports       | naabu -iL hosts.txt                 |
-| ports-file     | File containing ports to enumerate for on hosts        | naabu -ports-file ports.txt         |
-| exclude-cdn    | Skip full port scans for CDNs (only checks for 80,443) | naabu -exclude-cdn                  |
-| exclude-hosts  | Skip port scans for given hosts                        | naabu -exclude-hosts 192.168.0.1/24 |
-| exclude-file   | Skip port scans for given hosts in file                | naabu -exclude-file exclude.txt     |
-| exclude-ports  | Skip port scans on hosts for given ports               | naabu -exclude-ports 22,80,443      |
-| nmap           | nmap scans to run on results (works with config file)  | naabu -nmap                         |
-| nmap-cli       | nmap scans to run on results                           | naabu -nmap-cli 'nmap -sV'          |
-| o              | File to write output to (optional)                     | naabu -o output.txt                 |
-| json           | Write output in JSON lines Format                      | naabu -json                         |
-| rate           | Rate of port scan probes per requests                  | naabu -rate 1000                    |
-| interface      | Network Interface to use for port scan                 | naabu -interface eth0               |
-| interface-list | List available interfaces and public ip                | naabu -interface-list               |
-| no-color       | Don't Use colors in output                             | naabu -no-color                     |
-| retries        | Number of retries for the port scan probe (default 3)  | naabu -retries 10                   |
-| silent         | Print found ports only in output                       | naabu -silent                       |
-| source-ip      | Source IP                                              | naabu -source-ip 10.10.10.10        |
-| s              | Scan Type (s - SYN, c - CONNECT)                       | naabu -s c                          |
-| timeout        | Millisecond to wait before timing out (default 700)    | naabu -timeout 700                  |
-| verify         | Validate the ports again with TCP verification         | naabu -verify                       |
-| debug          | Enable debugging information                           | naabu -debug                        |
-| version        | Show version of naabu                                  | naabu -version                      |
-| warm-up-time   | Time in seconds between scan phases (default 2)        | naabu -warm-up-time                 |
+<details>
+<summary> 👉 naabu help menu 👈</summary>
+
+```
+Usage of ./naabu:
+  -c int
+      General internal worker threads (default 25)
+  -config string
+      Config file
+  -debug
+      Enable debugging information
+  -exclude-cdn
+      Skip full port scans for CDNs (only checks for 80,443)
+  -exclude-file string
+      Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
+  -exclude-hosts string
+      Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
+  -exclude-ports string
+      Ports to exclude from enumeration
+  -host string
+      Host to find ports for
+  -iL string
+      File containing list of hosts to enumerate ports
+  -interface string
+      Network Interface to use for port scan
+  -interface-list
+      List available interfaces and public ip
+  -json
+      Write output in JSON lines Format
+  -nmap
+      Invoke nmap scan on targets (nmap must be installed)
+  -nmap-cli string
+      Nmap command line (invoked as COMMAND + TARGETS)
+  -no-color
+      Don't Use colors in output
+  -o string
+      File to write output to (optional)
+  -p string
+      Ports to scan (80, 80,443, 100-200, (-p - for full port scan)
+  -ping
+      Use ping probes for verification of host
+  -ports-file string
+      File containing ports to enumerate for on hosts
+  -rate int
+      Rate of port scan probe requests (default 1000)
+  -retries int
+      Number of retries for the port scan probe (default 3)
+  -s string
+      Scan Type (s - SYN, c - CONNECT) (default "s")
+  -scan-all-ips
+      Scan all the ips
+  -silent
+      Show found ports only in output
+  -source-ip string
+      Source Ip
+  -stats
+      Display stats of the running scan
+  -timeout int
+      Millisecond to wait before timing out (default 1000)
+  -top-ports string
+      Top Ports to scan (default top 100)
+  -v  Show Verbose output
+  -verify
+      Validate the ports again with TCP verification
+  -version
+      Show version of naabu
+  -warm-up-time int
+      Time in seconds between scan phases (default 2)
+```
+
+</details>
 
 # Installation Instructions
 
-### From Binary
+Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
-The installation is easy. You can download the pre-built binaries for your platform from the [releases](https://github.com/projectdiscovery/naabu/releases/) page. Extract them using tar, move it to your `$PATH`and you're ready to go.
-
-Download latest binary from https://github.com/projectdiscovery/naabu/releases
+Before installing naabu, make sure to install `libpcap` library with `apt install -y libpcap-dev` on Linux
 
 ```sh
-▶ tar -xvf naabu-linux-amd64.tar
-▶ cp naabu-linux-amd64 /usr/local/bin/naabu
-▶ naabu -version
+GO111MODULE=on go get -v github.com/projectdiscovery/naabu/cmd/naabu
 ```
-
-### From Source
-
-naabu requires **go1.14+** to install successfully and have `libpcap-dev` installed on the system.
-
-To install libpcap-dev:-
-
-```sh
-apt install -y libpcap-dev
-```
-
-```sh
-▶ GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
-▶ naabu -version
-```
-
-### From Github
-
-```sh
-▶ git clone https://github.com/projectdiscovery/naabu.git; cd naabu/v2/cmd/naabu; go build; cp naabu /usr/local/bin/; naabu -version
-```
-
-### From Docker
-
-You can use the official dockerhub image at [naabu](https://hub.docker.com/r/projectdiscovery/naabu). Simply run -
-
-```sh
-▶ docker pull projectdiscovery/naabu
-```
-
-The above command will pull the latest tagged release from the dockerhub repository.
-
-- After pulling / building the container using either way, run the following -
-
-```sh
-docker run -it projectdiscovery/naabu -version
-```
-
-For example, this runs the tool against hackerone.com and output the results to your host file system -
-
-```sh
-docker run -it projectdiscovery/naabu -host hackerone.com > hackerone.com.txt
-```
-
-### Windows
-
-Windows version is currently not usable without docker.
-
-The docker install instructions are identical to the ones for other platforms. See the [From Docker](#from-docker) section for install instructions on Windows.
-
 
 # Running Naabu
 
 To run the tool on a target, just use the following command.
 ```sh
-▶ naabu -host hackerone.com
+naabu -host hackerone.com
 ```
 
 This will run the tool against hackerone.com. There are a number of configuration options that you can pass along with this command. The verbose switch `-v` can be used to display verbose information.
 
 ```sh
-▶ naabu -host hackerone.com
+naabu -host hackerone.com
 
                   __
   ___  ___  ___ _/ /  __ __
@@ -181,37 +164,37 @@ hackerone.com:8080
 The ports to scan for on the host can be specified via `-p` parameter. It takes nmap format ports and runs enumeration on them.
 
 ```sh
-▶ naabu -p 80,443,21-23 -host hackerone.com
+naabu -p 80,443,21-23 -host hackerone.com
 ```
 
 By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
 
-- `-top-ports 100` => Checks for nmap top 100 ports.
-- `-top-ports 1000` => Checks for nmap top 1000 ports.
-- `-p -` => Checks for all ports from `1-65535`.
+- `-top-ports 100` => Scans for nmap top 100 port
+- `-top-ports 1000` => Scans for nmap top 1000 port
+- `-p -` => Scans for all ports from `1-65535`.
 
 You can also specify specific ports which you would like to exclude from the scan.
 
 ```sh
-▶ naabu -p - -exclude-ports 80,443
+naabu -p - -exclude-ports 80,443
 ```
 
 The `o` flag can be used to specify an output file.
 
 ```sh
-▶ naabu -host hackerone.com -o output.txt
+naabu -host hackerone.com -o output.txt
 ```
 
 To run the naabu on a list of hosts, `-iL` option can be used.
 
 ```sh
-▶ naabu -iL hosts.txt
+naabu -iL hosts.txt
 ```
 
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
 ```sh
-▶ naabu -host hackerone.com -json
+naabu -host hackerone.com -json
 
 {"host":"hackerone.com","ip":"104.16.99.52","port":8443}
 {"host":"hackerone.com","ip":"104.16.99.52","port":80}
@@ -219,17 +202,10 @@ You can also get output in json format using `-json` switch. This switch saves t
 {"host":"hackerone.com","ip":"104.16.99.52","port":8080}
 ```
 
-Hosts can also be piped to naabu and port enumeration can be ran on them. For example -
+The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to `naabu` which will then find running http servers on the host.
 
 ```sh
-▶ echo hackerone.com | naabu
-▶ cat targets.txt | naabu
-```
-
-The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to `httpx` which will then find running http servers on the host.
-
-```sh
-▶ echo hackerone.com | naabu -silent | httpx -silent
+echo hackerone.com | naabu -silent | naabu -silent
 
 http://hackerone.com:8443
 http://hackerone.com:443
@@ -240,7 +216,7 @@ http://hackerone.com:80
 If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation
 
 ```sh
-▶ naabu -host hackerone.com -verify
+naabu -host hackerone.com -verify
 ```
 
 The speed can be controlled by changing the value of `rate` flag that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
@@ -251,7 +227,7 @@ We have added support for config file, it allows each and every flag to define i
 
 
 <details>
-<summary>Example config file </summary>
+<summary> 👉 Example Config File 👈</summary>
 
 ```yaml
 # Number of retries
@@ -262,21 +238,21 @@ We have added support for config file, it allows each and every flag to define i
 # timeout: 5
 # Hosts are the host to find ports for
 # host:
-# 	- 10.10.10.10
+#   - 10.10.10.10
 # Ports is the ports to use for enumeration
 # ports:
-# 	- 80
-# 	- 100
+#   - 80
+#   - 100
 # ExcludePorts is the list of ports to exclude from enumeration
 # exclude-ports:
-# 	- 20
-# 	- 30
+#   - 20
+#   - 30
 # Verify is used to check if the ports found were valid using CONNECT method
 # verify: false
 # Ips or cidr to be excluded from the scan
 # exclude-ips:
-# 	- 1.1.1.1
-# 	- 2.2.2.2
+#   - 1.1.1.1
+#   - 2.2.2.2
 # Top ports list
 # top-ports: 100
 # Attempts to run as root
@@ -299,21 +275,20 @@ We have added support for config file, it allows each and every flag to define i
 
 # Nmap integration
 
-We have integrated nmap support with `nmap` and `nmap-cli` flag, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
+We have integrated nmap support with `nmap` flag, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
 
 To make use of `nmap` flag, make sure to remove the comments from the config file at `$HOME/.config/naabu/naabu.conf`
 
 We also added `nmap-cli` flag that let you run **nmap** commands directly on the results of naabu without making use of config file.
 
 ```sh
-
-▶ echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX naabu-output'
+echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX naabu-output'
                   __       
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.0				 
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.0        
 
-		projectdiscovery.io
+    projectdiscovery.io
 
 [WRN] Use with caution. You are responsible for your actions
 [WRN] Developers assume no liability and are not responsible for any misuse or damage.
