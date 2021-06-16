@@ -93,9 +93,7 @@ var (
 	setupHandlerCallback                  func(s *Scanner, interfaceName string) error
 	tcpReadWorkerPCAPCallback             func(s *Scanner)
 	cleanupHandlersCallback               func(s *Scanner)
-	pingIcmpEchoRequestCallback           func(ip string, timeout time.Duration) bool
 	pingIcmpEchoRequestAsyncCallback      func(s *Scanner, ip string)
-	pingIcmpTimestampRequestCallback      func(ip string, timeout time.Duration) bool
 	pingIcmpTimestampRequestAsyncCallback func(s *Scanner, ip string)
 )
 
