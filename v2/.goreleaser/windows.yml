@@ -1,0 +1,39 @@
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+project_name: naabu
+builds:
+  - id: naabu-windows
+    ldflags:
+      - -s -w
+    binary: naabu
+    env:
+      - CGO_ENABLED=1
+      - CC=x86_64-w64-mingw32-gcc
+      - CXX=x86_64-w64-mingw32-g++
+    main: ./cmd/naabu/main.go
+    goos:
+      - windows
+    goarch:
+      - amd64
+      - 386
+archives:
+  - replacements:
+      windows: windows
+      386: i386
+      amd64: x86_64
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - none*
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+checksum:
+  name_template: "{{ .ProjectName }}-windows-checksums.txt"
