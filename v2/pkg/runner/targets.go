@@ -191,10 +191,6 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
-
-		if err := r.scanner.IPRanger.Add(hostIP); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
-		}
 	}
 
 	return hostIPS, nil
