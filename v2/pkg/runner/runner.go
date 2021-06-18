@@ -319,11 +319,6 @@ func (r *Runner) handleOutput() {
 	// ports to the output file.
 	if r.options.Output != "" {
 		output = r.options.Output
-		// If the output format is json, append .json
-		// else append .txt
-		if r.options.JSON && !strings.HasSuffix(output, ".json") {
-			output += ".json"
-		}
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
