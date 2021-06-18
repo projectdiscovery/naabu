@@ -16,17 +16,11 @@ builds:
       - darwin
     goarch:
       - amd64
+
 archives:
-  - replacements:
-      darwin: mac-os
-      amd64: x86_64
-    files:
-      - none*
-changelog:
-  sort: asc
-  filters:
-    exclude:
-      - "^docs:"
-      - "^test:"
+- format: zip
+  replacements:
+      darwin: macOS
+
 checksum:
   name_template: "{{ .ProjectName }}-mac-checksums.txt"
