@@ -129,7 +129,7 @@ func (r *Runner) RunEnumeration() error {
 	targets, _ = mapcidr.CoalesceCIDRs(targets)
 	var targetsCount, portsCount uint64
 	for _, target := range targets {
-		targetsCount = mapcidr.AddressCountIpnet(target)
+		targetsCount += mapcidr.AddressCountIpnet(target)
 	}
 	portsCount = uint64(len(r.scanner.Ports))
 
