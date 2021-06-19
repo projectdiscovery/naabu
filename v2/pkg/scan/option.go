@@ -6,10 +6,11 @@ import (
 
 // Options of the scan
 type Options struct {
-	Timeout    time.Duration
-	Retries    int
-	Rate       int
-	Debug      bool
-	Root       bool
-	ExcludeCdn bool
+	Timeout     time.Duration
+	Retries     int
+	Rate        int
+	Debug       bool
+	Root        bool
+	ExcludeCdn  bool
+	ExcludedIps []string
 }

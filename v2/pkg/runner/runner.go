@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
@@ -43,13 +44,19 @@ func NewRunner(options *Options) (*Runner, error) {
 		options: options,
 	}
 
+	excludedIps, err := parseExcludedIps(options)
+	if err != nil {
+		return nil, err
+	}
+
 	scanner, err := scan.NewScanner(&scan.Options{
-		Timeout:    time.Duration(options.Timeout) * time.Millisecond,
-		Retries:    options.Retries,
-		Rate:       options.Rate,
-		Debug:      options.Debug,
-		Root:       isRoot(),
-		ExcludeCdn: options.ExcludeCDN,
+		Timeout:     time.Duration(options.Timeout) * time.Millisecond,
+		Retries:     options.Retries,
+		Rate:        options.Rate,
+		Debug:       options.Debug,
+		Root:        isRoot(),
+		ExcludeCdn:  options.ExcludeCDN,
+		ExcludedIps: excludedIps,
 	})
 	if err != nil {
 		return nil, err
@@ -59,11 +66,6 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.scanner.Ports, err = ParsePorts(options)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse ports: %s", err)
-	}
-
-	err = parseExcludedIps(options, scanner)
-	if err != nil {
-		return nil, err
 	}
 
 	dnsOptions := dnsx.DefaultOptions
@@ -91,11 +93,9 @@ func NewRunner(options *Options) (*Runner, error) {
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
 func (r *Runner) RunEnumeration() error {
+	defer r.Close()
+
 	if isRoot() && r.options.ScanType == SynScan {
-		if err := r.scanner.SetupHandlers(); err != nil {
-			return err
-		}
-		r.BackgroundWorkers()
 		// Set values if those were specified via cli
 		if err := r.SetSourceIPAndInterface(); err != nil {
 			// Otherwise try to obtain them automatically
@@ -104,6 +104,11 @@ func (r *Runner) RunEnumeration() error {
 				return err
 			}
 		}
+		err := r.scanner.SetupHandlers()
+		if err != nil {
+			return err
+		}
+		r.BackgroundWorkers()
 	}
 
 	err := r.Load()
@@ -117,25 +122,19 @@ func (r *Runner) RunEnumeration() error {
 
 	// shrinks the ips to the minimum amount of cidr
 	var targets []*net.IPNet
-	r.scanner.IPRanger.Targets.Scan(func(k, v []byte) error {
+	r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
 		targets = append(targets, ipranger.ToCidr(string(k)))
 		return nil
 	})
 	targets, _ = mapcidr.CoalesceCIDRs(targets)
-	// add targets to ranger
+	var targetsCount, portsCount uint64
 	for _, target := range targets {
-		err := r.scanner.IPRanger.AddIPNet(target)
-		if err != nil {
-			gologger.Warning().Msgf("%s\n", err)
-		}
+		targetsCount += mapcidr.AddressCountIpnet(target)
 	}
+	portsCount = uint64(len(r.scanner.Ports))
 
 	r.scanner.State = scan.Scan
-
-	targetsCount := int64(r.scanner.IPRanger.CountIPS())
-	portsCount := int64(len(r.scanner.Ports))
 	Range := targetsCount * portsCount
-
 	if r.options.EnableProgressBar {
 		r.stats.AddStatic("ports", portsCount)
 		r.stats.AddStatic("hosts", targetsCount)
@@ -143,43 +142,36 @@ func (r *Runner) RunEnumeration() error {
 		r.stats.AddStatic("startedAt", time.Now())
 		r.stats.AddCounter("packets", uint64(0))
 		r.stats.AddCounter("errors", uint64(0))
-		r.stats.AddCounter("total", uint64(Range*int64(r.options.Retries)))
+		r.stats.AddCounter("total", Range*uint64(r.options.Retries))
 		if err := r.stats.Start(makePrintCallback(), tickduration*time.Second); err != nil {
 			gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
 		}
 	}
 
 	osSupported := isOSSupported()
-	var currentRetry int
-retry:
-	b := ipranger.NewBlackRock(Range, 43)
-	for index := int64(0); index < Range; index++ {
-		xxx := b.Shuffle(index)
-		ipIndex := xxx / portsCount
-		portIndex := int(xxx % portsCount)
-		ip := r.PickIP(targets, ipIndex)
-		port := r.PickPort(portIndex)
+	// Retries are performed regardless of the previous scan results due to network unreliability
+	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+		// Use current time as seed
+		b := blackrock.New(int64(Range), time.Now().UnixNano())
+		for index := int64(0); index < int64(Range); index++ {
+			xxx := b.Shuffle(index)
+			ipIndex := xxx / int64(portsCount)
+			portIndex := int(xxx % int64(portsCount))
+			ip := r.PickIP(targets, ipIndex)
+			port := r.PickPort(portIndex)
 
-		if ip == "" || port <= 0 {
-			continue
+			r.limiter.Take()
+			// connect scan
+			if osSupported && isRoot() && r.options.ScanType == SynScan {
+				r.RawSocketEnumeration(ip, port)
+			} else {
+				r.wgscan.Add()
+				go r.handleHostPort(ip, port)
+			}
+			if r.options.EnableProgressBar {
+				r.stats.IncrementCounter("packets", 1)
+			}
 		}
-
-		r.limiter.Take()
-		// connect scan
-		if osSupported && isRoot() && r.options.ScanType == SynScan {
-			r.RawSocketEnumeration(ip, port)
-		} else {
-			r.wgscan.Add()
-			go r.handleHostPort(ip, port)
-		}
-		if r.options.EnableProgressBar {
-			r.stats.IncrementCounter("packets", 1)
-		}
-	}
-
-	currentRetry++
-	if currentRetry <= r.options.Retries {
-		goto retry
 	}
 
 	r.wgscan.Wait()
@@ -206,7 +198,7 @@ retry:
 // Close runner instance
 func (r *Runner) Close() {
 	os.RemoveAll(r.targetsFile)
-	r.scanner.IPRanger.Targets.Close()
+	r.scanner.IPRanger.Hosts.Close()
 }
 
 // PickIP randomly
@@ -327,11 +319,6 @@ func (r *Runner) handleOutput() {
 	// ports to the output file.
 	if r.options.Output != "" {
 		output = r.options.Output
-		// If the output format is json, append .json
-		// else append .txt
-		if r.options.JSON && !strings.HasSuffix(output, ".json") {
-			output += ".json"
-		}
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
@@ -352,7 +339,7 @@ func (r *Runner) handleOutput() {
 	}
 
 	for hostIP, ports := range r.scanner.ScanResults.IPPorts {
-		dt, err := r.scanner.IPRanger.GetFQDNByIP(hostIP)
+		dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
 		if err != nil {
 			continue
 		}

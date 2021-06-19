@@ -1,0 +1,23 @@
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+project_name: naabu
+builds:
+  - id: naabu-linux
+    ldflags:
+      - -s -w
+    binary: naabu
+    env:
+      - CGO_ENABLED=1
+    main: ./cmd/naabu/main.go
+    goos:
+      - linux
+    goarch:
+      - amd64
+archives:
+- format: zip
+
+checksum:
+  name_template: "{{ .ProjectName }}-linux-checksums.txt"

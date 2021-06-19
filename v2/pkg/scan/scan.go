@@ -14,6 +14,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 )
@@ -92,9 +93,7 @@ var (
 	setupHandlerCallback                  func(s *Scanner, interfaceName string) error
 	tcpReadWorkerPCAPCallback             func(s *Scanner)
 	cleanupHandlersCallback               func(s *Scanner)
-	pingIcmpEchoRequestCallback           func(ip string, timeout time.Duration) bool
 	pingIcmpEchoRequestAsyncCallback      func(s *Scanner, ip string)
-	pingIcmpTimestampRequestCallback      func(ip string, timeout time.Duration) bool
 	pingIcmpTimestampRequestAsyncCallback func(s *Scanner, ip string)
 )
 
@@ -106,6 +105,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	var nPolicyOptions networkpolicy.Options
+	nPolicyOptions.DenyList = append(nPolicyOptions.DenyList, options.ExcludedIps...)
+	nPolicy, err := networkpolicy.New(nPolicyOptions)
+	if err != nil {
+		return nil, err
+	}
+	iprang.Np = nPolicy
 
 	scanner := &Scanner{
 		serializeOptions: gopacket.SerializeOptions{
