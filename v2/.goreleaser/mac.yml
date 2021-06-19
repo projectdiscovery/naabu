@@ -1,0 +1,26 @@
+env:
+  - GO111MODULE=on
+before:
+  hooks:
+    - go mod tidy
+project_name: naabu
+builds:
+  - id: naabu-darwin
+    ldflags:
+      - -s -w
+    binary: naabu
+    env:
+      - CGO_ENABLED=1
+    main: ./cmd/naabu/main.go
+    goos:
+      - darwin
+    goarch:
+      - amd64
+
+archives:
+- format: zip
+  replacements:
+      darwin: macOS
+
+checksum:
+  name_template: "{{ .ProjectName }}-mac-checksums.txt"

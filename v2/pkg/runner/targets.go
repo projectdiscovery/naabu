@@ -110,11 +110,11 @@ func (r *Runner) AddTarget(target string) error {
 		return nil
 	} else if ipranger.IsCidr(target) {
 		// Add cidr directly to ranger, as single ips would allocate more resources later
-		if err := r.scanner.IPRanger.AddFqdn(target, "cidr"); err != nil {
+		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
-		if err := r.scanner.IPRanger.AddFqdn(target, "ip"); err != nil {
+		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else {
@@ -123,7 +123,7 @@ func (r *Runner) AddTarget(target string) error {
 			return err
 		}
 		for _, ip := range ips {
-			if err := r.scanner.IPRanger.AddFqdn(ip, target); err != nil {
+			if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
 				gologger.Warning().Msgf("%s\n", err)
 			}
 		}
@@ -143,7 +143,7 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 		hostIPS      []string
 	)
 	for _, ip := range ips {
-		if r.scanner.IPRanger.IsExcluded(ip) {
+		if !r.scanner.IPRanger.Np.ValidateAddress(ip) {
 			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
 		}
@@ -188,11 +188,7 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	for _, hostIP := range hostIPS {
 		gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
 		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
-		if err := r.scanner.IPRanger.AddFqdn(hostIP, target); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
-		}
-
-		if err := r.scanner.IPRanger.Add(hostIP); err != nil {
+		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
