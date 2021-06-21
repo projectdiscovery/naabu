@@ -70,7 +70,7 @@ Usage of ./naabu:
       Ports to exclude from enumeration
   -host string
       Host to find ports for
-  -iL string
+  -hL string
       File containing list of hosts to enumerate ports
   -interface string
       Network Interface to use for port scan
@@ -187,7 +187,7 @@ naabu -host hackerone.com -o output.txt
 To run the naabu on a list of hosts, `-iL` option can be used.
 
 ```sh
-naabu -iL hosts.txt
+naabu -hL hosts.txt
 ```
 
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
