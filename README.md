@@ -128,7 +128,7 @@ Download the ready to run [binary](https://github.com/projectdiscovery/naabu/rel
 Before installing naabu, make sure to install `libpcap` library with `apt install -y libpcap-dev` on Linux
 
 ```sh
-GO111MODULE=on go get -v github.com/projectdiscovery/naabu/cmd/naabu
+GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
 ```
 
 # Running Naabu
