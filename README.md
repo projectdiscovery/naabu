@@ -201,10 +201,10 @@ naabu -host hackerone.com -json
 {"host":"hackerone.com","ip":"104.16.99.52","port":8080}
 ```
 
-The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to `naabu` which will then find running http servers on the host.
+The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to [httpx](https://github.com/projectdiscovery/httpx) which will then find running http servers on the host.
 
 ```sh
-echo hackerone.com | naabu -silent | naabu -silent
+echo hackerone.com | naabu -silent | httpx -silent
 
 http://hackerone.com:8443
 http://hackerone.com:443
