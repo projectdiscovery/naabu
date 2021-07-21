@@ -81,8 +81,8 @@ func ParsePorts(options *Options) ([]int, error) {
 	}
 
 	// ports from config file
-	if options.config != nil {
-		for _, p := range options.config.Ports {
+	if options.Config != nil {
+		for _, p := range options.Config.Ports {
 			// "-" equals to all ports
 			if p == "-" {
 				// Parse the custom ports list provided by the user
@@ -151,8 +151,8 @@ func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, e
 	}
 
 	var excludedPortsConfigList []map[int]struct{}
-	if options.config != nil {
-		for _, excludePorts := range options.config.ExcludePorts {
+	if options.Config != nil {
+		for _, excludePorts := range options.Config.ExcludePorts {
 			p, err := parsePortsList(excludePorts)
 			if err != nil {
 				return nil, fmt.Errorf("could not read exclusion ports: %s", err)

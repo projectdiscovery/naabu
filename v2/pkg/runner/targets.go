@@ -9,9 +9,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/namm2/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
-	"github.com/namm2/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 )
 
@@ -72,8 +72,8 @@ func (r *Runner) mergeToFile() (string, error) {
 	}
 
 	// handles targets from config file if provided
-	if r.options.config != nil {
-		for _, target := range r.options.config.Host {
+	if r.options.Config != nil {
+		for _, target := range r.options.Config.Host {
 			fmt.Fprintf(tempInput, "%s\n", target)
 		}
 	}

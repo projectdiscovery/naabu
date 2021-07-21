@@ -41,6 +41,8 @@ type ConfigFile struct {
 	ExcludePorts []string `yaml:"exclude-ports,omitempty"`
 	// Ips or cidr to be excluded from the scan
 	ExcludeIps []string `yaml:"exclude-ips,omitempty"`
+	// Output is the file to write found ports to.
+	Output string `yaml:output,omitempty`
 }
 
 // GetConfigDirectory gets the subfinder config directory for a user

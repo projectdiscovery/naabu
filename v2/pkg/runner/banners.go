@@ -5,8 +5,8 @@ import (
 	"net"
 	"strings"
 
-	"github.com/projectdiscovery/gologger"
 	"github.com/namm2/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/gologger"
 )
 
 const banner = `

@@ -14,8 +14,8 @@ func (r *Runner) handleNmap() {
 	command := r.options.NmapCLI
 	hasCLI := r.options.NmapCLI != ""
 	// If empty load the one from config file
-	if command == "" && r.options.config != nil {
-		command = r.options.config.NMapCommand
+	if command == "" && r.options.Config != nil {
+		command = r.options.Config.NMapCommand
 	}
 	// If at least one is defined handle it
 	if command != "" {
