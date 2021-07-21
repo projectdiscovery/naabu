@@ -17,6 +17,7 @@ import (
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/namm2/naabu/v2/pkg/scan"
+	"github.com/namm2/naabu/v2/pkg/result"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
 )
