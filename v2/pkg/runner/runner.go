@@ -16,7 +16,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/namm2/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
 )
@@ -92,7 +92,7 @@ func NewRunner(options *Options) (*Runner, error) {
 }
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
-func (r *Runner) RunEnumeration() error {
+func (r *Runner) RunEnumeration() (*result.Result error) {
 	defer r.Close()
 
 	if isRoot() && r.options.ScanType == SynScan {
@@ -192,7 +192,7 @@ func (r *Runner) RunEnumeration() error {
 	// handle nmap
 	r.handleNmap()
 
-	return nil
+	return r.scanner.ScanResults, nil
 }
 
 // Close runner instance

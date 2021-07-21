@@ -45,7 +45,7 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
-	config            *ConfigFile
+	Config            *ConfigFile
 }
 
 // ParseOptions parses the command line flags provided by a user

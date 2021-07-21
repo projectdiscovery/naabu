@@ -1,4 +1,4 @@
-module github.com/projectdiscovery/naabu/v2
+module github.com/namm2/naabu/v2
 
 go 1.14
 
