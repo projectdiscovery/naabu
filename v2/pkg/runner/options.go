@@ -45,7 +45,7 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
-	config            *ConfigFile
+	Config            *ConfigFile
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -91,7 +91,7 @@ func ParseOptions() *Options {
 	options.Stdin = hasStdin()
 
 	// Read the inputs and configure the logging
-	options.configureOutput()
+	options.ConfigureOutput()
 
 	// Show the user the banner
 	showBanner()
@@ -126,7 +126,7 @@ func ParseOptions() *Options {
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
-	err := options.validateOptions()
+	err := options.ValidateOptions()
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
@@ -157,7 +157,7 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 		}
 		gologger.Fatal().Msgf("Could not read configuration file %s: %s\n", configFileName, err)
 	}
-	options.config = &configFile
+	options.Config = &configFile
 
 	if configFile.Retries > 0 {
 		options.Retries = configFile.Retries
@@ -183,5 +183,8 @@ func (options *Options) MergeFromConfig(configFileName string, ignoreError bool)
 	}
 	if configFile.WarmUpTime > 0 {
 		options.WarmUpTime = configFile.WarmUpTime
+	}
+	if configFile.Output != "" {
+		options.Output = configFile.Output
 	}
 }

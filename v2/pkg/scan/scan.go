@@ -13,7 +13,7 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
-	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/namm2/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"

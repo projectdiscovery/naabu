@@ -10,13 +10,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/namm2/naabu/v2/pkg/result"
+	"github.com/namm2/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
 )
@@ -92,7 +93,7 @@ func NewRunner(options *Options) (*Runner, error) {
 }
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
-func (r *Runner) RunEnumeration() error {
+func (r *Runner) RunEnumeration() (*result.Result, error) {
 	defer r.Close()
 
 	if isRoot() && r.options.ScanType == SynScan {
@@ -101,19 +102,19 @@ func (r *Runner) RunEnumeration() error {
 			// Otherwise try to obtain them automatically
 			err = r.scanner.TuneSource(ExternalTargetForTune)
 			if err != nil {
-				return err
+				return nil, err
 			}
 		}
 		err := r.scanner.SetupHandlers()
 		if err != nil {
-			return err
+			return nil, err
 		}
 		r.BackgroundWorkers()
 	}
 
 	err := r.Load()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Scan workers
@@ -192,7 +193,7 @@ func (r *Runner) RunEnumeration() error {
 	// handle nmap
 	r.handleNmap()
 
-	return nil
+	return r.scanner.ScanResults, nil
 }
 
 // Close runner instance
@@ -350,26 +351,6 @@ func (r *Runner) handleOutput() {
 			}
 			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 
-			// console output
-			if r.options.JSON {
-				data := JSONResult{IP: hostIP}
-				if host != hostIP {
-					data.Host = host
-				}
-				for port := range ports {
-					data.Port = port
-					b, marshallErr := json.Marshal(data)
-					if marshallErr != nil {
-						continue
-					}
-					gologger.Silent().Msgf("%s\n", string(b))
-				}
-			} else {
-				for port := range ports {
-					gologger.Silent().Msgf("%s:%d\n", host, port)
-				}
-			}
-
 			// file output
 			if file != nil {
 				if r.options.JSON {
@@ -379,6 +360,26 @@ func (r *Runner) handleOutput() {
 				}
 				if err != nil {
 					gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
+				}
+			} else {
+				// console output
+				if r.options.JSON {
+					data := JSONResult{IP: hostIP}
+					if host != hostIP {
+						data.Host = host
+					}
+					for port := range ports {
+						data.Port = port
+						b, marshallErr := json.Marshal(data)
+						if marshallErr != nil {
+							continue
+						}
+						gologger.Silent().Msgf("%s\n", string(b))
+					}
+				} else {
+					for port := range ports {
+						gologger.Silent().Msgf("%s:%d\n", host, port)
+					}
 				}
 			}
 		}

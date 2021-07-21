@@ -15,7 +15,7 @@ func main() {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
 
-	err = naabuRunner.RunEnumeration()
+	_, err = naabuRunner.RunEnumeration()
 	if err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
