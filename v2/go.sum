@@ -100,12 +100,6 @@ github.com/projectdiscovery/gologger v1.1.4/go.mod h1:Bhb6Bdx2PV1nMaFLoXNBmHIU85
 github.com/projectdiscovery/hmap v0.0.1 h1:VAONbJw5jP+syI5smhsfkrq9XPGn4aiYy5pR6KR1wog=
 github.com/projectdiscovery/hmap v0.0.1/go.mod h1:VDEfgzkKQdq7iGTKz8Ooul0NuYHQ8qiDs6r8bPD1Sb0=
 github.com/projectdiscovery/ipranger v0.0.2/go.mod h1:kcAIk/lo5rW+IzUrFkeYyXnFJ+dKwYooEOHGVPP/RWE=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210617094855-9f69a5447f7f h1:9+WOis0hi24l77QmsALVdHrPUFm5KqET5pLeF0x3Oic=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210617094855-9f69a5447f7f/go.mod h1:oLFGr1vNeVX+nnNtpBDZs83gdPMftepBT2MID5ZqZpo=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210617100928-8be9d49fa47b h1:JAcPJoJbRcR6Vth7VXuaxeMnLYGXtbL6GNo9QZaWXHY=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210617100928-8be9d49fa47b/go.mod h1:prNZB2gIc/r1BjxM+Tb3Hf5JiiRkQKMJ05PeUlonSlA=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210618195032-5aea1b67f55f h1:YpL9yzoYyrSNlofZGkJ7FIGan9rYqMDHSqnTvobOoPQ=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210618195032-5aea1b67f55f/go.mod h1:J1iJbIhUvLKIhRuosEyI0wzjmsLaG4m7jQjx42u82So=
 github.com/projectdiscovery/ipranger v0.0.3-0.20210619173509-f9b366d18ac6 h1:NaQMBS3GN7PM0+nC+rYDLeLMbQt6YVoZU9QlxQKShLg=
 github.com/projectdiscovery/ipranger v0.0.3-0.20210619173509-f9b366d18ac6/go.mod h1:J1iJbIhUvLKIhRuosEyI0wzjmsLaG4m7jQjx42u82So=
 github.com/projectdiscovery/iputil v0.0.0-20210414194613-4b4d2517acf0 h1:OVOfLV23PbqzxTm+nPmeAhgFuxk4ich22zFxpOw+YC8=
@@ -113,7 +107,6 @@ github.com/projectdiscovery/iputil v0.0.0-20210414194613-4b4d2517acf0/go.mod h1:
 github.com/projectdiscovery/mapcidr v0.0.4/go.mod h1:ALOIj6ptkWujNoX8RdQwB2mZ+kAmKuLJBq9T5gR5wG0=
 github.com/projectdiscovery/mapcidr v0.0.6 h1:RRIrqNakUEF/pstIXWTD6yvCMF9N6SnOb9m4ju4xavc=
 github.com/projectdiscovery/mapcidr v0.0.6/go.mod h1:ZEBhMmBU3laUl3g9QGTrzJku1VJOzjdFwW01f/zVVzM=
-github.com/projectdiscovery/networkpolicy v0.0.0-20210414200240-b3fa8abf324c h1:WbnjctvqNZQjMBJjoZ3WEpp658dFU/559RCWNonjHeQ=
 github.com/projectdiscovery/networkpolicy v0.0.0-20210414200240-b3fa8abf324c/go.mod h1:KZIP5x7t+bH2dASgnYaqbiLI4z0gxXzekwUtarrQMdc=
 github.com/projectdiscovery/networkpolicy v0.0.0-20210617100800-060573865df4 h1:W9XcJV3lhDo29yuHsFejwCqZ4QETtQKzcRagmgqfZDM=
 github.com/projectdiscovery/networkpolicy v0.0.0-20210617100800-060573865df4/go.mod h1:asvdg5wMy3LPVMGALatebKeOYH5n5fV5RCTv6DbxpIs=
@@ -191,8 +184,8 @@ golang.org/x/sys v0.0.0-20210112080510-489259a85091/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20210303074136-134d130e1a04/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210330210617-4fbd30eecc44/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210403161142-5e06dd20ab57/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20210412220455-f1c623a9e750 h1:ZBu6861dZq7xBnG1bn5SRU0vA8nx42at4+kP07FMTog=
-golang.org/x/sys v0.0.0-20210412220455-f1c623a9e750/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
+golang.org/x/sys v0.0.0-20210819135213-f52c844e1c1c h1:Lyn7+CqXIiC+LOR9aHD6jDK+hPcmAuCfuXztd1v4w1Q=
+golang.org/x/sys v0.0.0-20210819135213-f52c844e1c1c/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/term v0.0.0-20201126162022-7de9c90e9dd1/go.mod h1:bj7SfCRtBDWHUb9snDiAeCFNEtKQo2Wmx5Cou7ajbmo=
 golang.org/x/text v0.3.0/go.mod h1:NqM8EUOU14njkJ3fqMW+pc6Ldnwhi/IjpwHt7yyuwOQ=
 golang.org/x/text v0.3.3/go.mod h1:5Zoc/QRtKVWzQhOtBMvqHzDpF6irO9z98xDceosuGiQ=
