@@ -45,6 +45,8 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
+	Resolvers         string // Resolvers (comma separated or file)
+	baseResolvers     []string
 	config            *ConfigFile
 }
 
@@ -84,6 +86,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
 	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
 	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)")
+	flag.StringVar(&options.Resolvers, "s", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)")
 
 	flag.Parse()
 
