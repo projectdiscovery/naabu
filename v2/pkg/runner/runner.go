@@ -70,6 +70,9 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
+	if len(runner.options.baseResolvers) > 0 {
+		dnsOptions.BaseResolvers = runner.options.baseResolvers
+	}
 	if err != nil {
 		return nil, err
 	}
