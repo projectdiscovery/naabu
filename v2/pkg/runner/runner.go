@@ -381,6 +381,10 @@ func (r *Runner) handleOutput() {
 					gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
 				}
 			}
+
+			if r.options.OnResult != nil {
+				r.options.OnResult(host, hostIP, mapKeysToSliceInt(ports))
+			}
 		}
 	}
 }
