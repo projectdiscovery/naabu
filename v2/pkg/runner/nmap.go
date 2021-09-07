@@ -37,7 +37,7 @@ func (r *Runner) handleNmap() {
 
 		// if we have no open ports we avoid running nmap
 		if len(ports) == 0 {
-			gologger.Info().Msgf("Skipping nmap phase as no open ports were found")
+			gologger.Info().Msgf("Skipping nmap scan as no open ports were found")
 			return
 		}
 
