@@ -26,8 +26,7 @@ require (
 
 require (
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/golang/snappy v0.0.3 // indirect
-	github.com/json-iterator/go v1.1.10 // indirect
+	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/karrick/godirwalk v1.16.1 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/miekg/dns v1.1.41 // indirect
@@ -36,6 +35,7 @@ require (
 	github.com/projectdiscovery/executil v0.0.0-20210414225944-2ad029b6a1fd // indirect
 	github.com/projectdiscovery/hmap v0.0.1 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.10 // indirect
+	github.com/projectdiscovery/stringsutil v0.0.0-20210830151154-f567170afdd9 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
