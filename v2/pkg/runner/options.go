@@ -46,6 +46,7 @@ type Options struct {
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
 	config            *ConfigFile
+	Proxy             string // Socks5 proxy
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -84,6 +85,7 @@ func ParseOptions() *Options {
 	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
 	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
 	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)")
+	flag.StringVar(&options.Proxy, "proxy", "", "Socks5 proxy")
 
 	flag.Parse()
 
