@@ -2,6 +2,7 @@ package scan
 
 import (
 	"fmt"
+	"log"
 	"math/rand"
 	"net"
 	"strings"
@@ -17,6 +18,7 @@ import (
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/proxy"
 )
 
 // State determines the internal scan state
@@ -56,6 +58,7 @@ type Scanner struct {
 	rate               int
 	listenPort         int
 	timeout            time.Duration
+	proxyDialer        proxy.Dialer
 
 	Ports    []int
 	IPRanger *ipranger.IPRanger
@@ -141,6 +144,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if options.Proxy != "" {
+		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, nil, &net.Dialer{Timeout: options.Timeout})
+		if err != nil {
+			log.Fatal(err)
+		}
+		scanner.proxyDialer = proxyDialer
 	}
 
 	return scanner, nil
@@ -355,8 +366,20 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 }
 
 // ConnectPort a single host and port
-func ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), timeout)
+func (s *Scanner) ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
+	hostport := net.JoinHostPort(host, fmt.Sprint(port))
+	var (
+		err  error
+		conn net.Conn
+	)
+	if s.proxyDialer != nil {
+		conn, err = s.proxyDialer.Dial("tcp", hostport)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		conn, err = net.DialTimeout("tcp", hostport, timeout)
+	}
 	if err != nil {
 		return false, err
 	}

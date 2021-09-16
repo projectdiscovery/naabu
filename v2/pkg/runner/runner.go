@@ -57,6 +57,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		Root:        isRoot(),
 		ExcludeCdn:  options.ExcludeCDN,
 		ExcludedIps: excludedIps,
+		Proxy:       options.Proxy,
 	})
 	if err != nil {
 		return nil, err
@@ -278,7 +279,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 		return
 	}
 
-	open, err := scan.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
+	open, err := r.scanner.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
 	if open && err == nil {
 		r.scanner.ScanResults.AddPort(host, port)
 	}
