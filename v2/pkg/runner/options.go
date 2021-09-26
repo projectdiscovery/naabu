@@ -46,7 +46,11 @@ type Options struct {
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
 	config            *ConfigFile
+	OnResult          OnResultCallback // OnResult callback
 }
+
+// OnResultCallback (hostname, ip, ports)
+type OnResultCallback func(string, string, []int)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
