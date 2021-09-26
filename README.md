@@ -125,10 +125,16 @@ Usage of ./naabu:
 
 Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
-Before installing naabu, make sure to install `libpcap` library with `apt install -y libpcap-dev` on Linux
+Before installing naabu, make sure to install `libpcap` library:
 
 ```sh
-GO111MODULE=on go get -v github.com/projectdiscovery/naabu/v2/cmd/naabu
+sudo apt install -y libpcap-dev
+```
+
+Installing Naabu:
+
+```sh
+go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 ```
 
 # Running Naabu
