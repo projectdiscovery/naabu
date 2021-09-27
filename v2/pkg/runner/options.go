@@ -47,7 +47,11 @@ type Options struct {
 	ScanType          string // Scan Type
 	config            *ConfigFile
 	Proxy             string // Socks5 proxy
+	OnResult          OnResultCallback // OnResult callback
 }
+
+// OnResultCallback (hostname, ip, ports)
+type OnResultCallback func(string, string, []int)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
