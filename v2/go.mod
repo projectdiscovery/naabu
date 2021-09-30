@@ -12,6 +12,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.0.2-0.20210417234210-3a4fe34e685d
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.0-20210507113701-c967952aea59
+	github.com/projectdiscovery/goflags v0.0.7 // indirect
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/ipranger v0.0.3-0.20210831161617-ac80efae0961
 	github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3
@@ -26,12 +27,14 @@ require (
 
 require (
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
+	github.com/cnf/structhash v0.0.0-20201127153200-e1b16c1ebc08 // indirect
 	github.com/json-iterator/go v1.1.11 // indirect
 	github.com/karrick/godirwalk v1.16.1 // indirect
 	github.com/logrusorgru/aurora v2.0.3+incompatible // indirect
 	github.com/miekg/dns v1.1.41 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.1 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/projectdiscovery/executil v0.0.0-20210414225944-2ad029b6a1fd // indirect
 	github.com/projectdiscovery/hmap v0.0.1 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.10 // indirect
@@ -39,4 +42,5 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
+	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
