@@ -54,69 +54,47 @@ This will display help for the tool. Here are all the switches it supports.
 
 ```
 Usage of ./naabu:
-  -c int
-      General internal worker threads (default 25)
-  -config string
-      Config file
-  -debug
-      Enable debugging information
-  -exclude-cdn
-      Skip full port scans for CDNs (only checks for 80,443)
-  -exclude-file string
-      Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
-  -exclude-hosts string
-      Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
-  -exclude-ports string
-      Ports to exclude from enumeration
-  -host string
-      Host to find ports for
-  -iL string
-      File containing list of hosts to enumerate ports
-  -interface string
-      Network Interface to use for port scan
-  -interface-list
-      List available interfaces and public ip
-  -json
-      Write output in JSON lines Format
-  -nmap
-      Invoke nmap scan on targets (nmap must be installed)
-  -nmap-cli string
-      Nmap command line (invoked as COMMAND + TARGETS)
-  -no-color
-      Don't Use colors in output
-  -o string
-      File to write output to (optional)
-  -p string
-      Ports to scan (80, 80,443, 100-200, (-p - for full port scan)
-  -ping
-      Use ping probes for verification of host
-  -ports-file string
-      File containing ports to enumerate for on hosts
-  -rate int
-      Rate of port scan probe requests (default 1000)
-  -retries int
-      Number of retries for the port scan probe (default 3)
-  -s string
-      Scan Type (s - SYN, c - CONNECT) (default "s")
-  -scan-all-ips
-      Scan all the ips
-  -silent
-      Show found ports only in output
-  -source-ip string
-      Source Ip
-  -stats
-      Display stats of the running scan
-  -timeout int
-      Millisecond to wait before timing out (default 1000)
-  -top-ports string
-      Top Ports to scan (default top 100)
-  -v  Show Verbose output
-  -verify
-      Validate the ports again with TCP verification
-  -version
-      Show version of naabu
-  -warm-up-time int
-      Time in seconds between scan phases (default 2)
+TARGET:
+   -interface-list        List available interfaces and public ip
+   -iL string             File containing list of hosts to enumerate ports
+   -host string           Host to find ports for
+   -top-ports string      Top Ports to scan (default top 100)
+   -p string              Ports to scan (80, 80,443, 100-200, (-p - for full port scan)
+   -s string              Scan Type (s - SYN, c - CONNECT) (default "s")
+   -exclude-ports string  Ports to exclude from enumeration
+   -exclude-hosts string  Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
+   -exclude-file string   Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
+   -ports-file string     File containing ports to enumerate for on hosts
+   -source-ip string      Source Ip
+
+TEMPLATE:
+   -retries int       Number of retries for the port scan probe (default 3)
+   -exclude-cdn       Skip full port scans for CDNs (only checks for 80,443)
+   -interface string  Network Interface to use for port scan
+   -warm-up-time int  Time in seconds between scan phases (default 2)
+   -ping              Use ping probes for verification of host
+   -rate int          Rate of port scan probe requests (default 1000)
+   -verify            Validate the ports again with TCP verification
+   -scan-all-ips      Scan all the ips
+   -nmap              Invoke nmap scan on targets (nmap must be installed)
+   -nmap-cli string   Nmap command line (invoked as COMMAND + TARGETS)
+   -timeout int       Millisecond to wait before timing out (default 1000)
+
+RATE-LIMIT:
+   -c int  General internal worker threads (default 25)
+
+OUTPUT:
+   -o string  File to write output to (optional)
+   -json      Write output in JSON lines Format
+   -silent    Show found ports only in output
+   -stats     Display stats of the running scan
+   -debug     Enable debugging information
+   -version   Show version of naabu
+   -no-color  Don't Use colors in output
+   -v         Show Verbose output
+
+CONFIGURATION:
+   -config string  Config file
 ```
 
 </details>
