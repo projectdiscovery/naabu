@@ -45,6 +45,8 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
+	Resolvers         string // Resolvers (comma separated or file)
+	baseResolvers     []string
 	config            *ConfigFile
 	OnResult          OnResultCallback // OnResult callback
 }
