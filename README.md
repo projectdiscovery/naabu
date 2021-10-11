@@ -49,55 +49,56 @@ naabu -h
 
 This will display help for the tool. Here are all the switches it supports.
 
-<details>
-<summary> 👉 naabu help menu 👈</summary>
+```console
+Usage:
+  ./naabu [flags]
 
-```
-Usage of ./naabu:
-TARGET:
-   -interface-list        List available interfaces and public ip
-   -iL string             File containing list of hosts to enumerate ports
-   -host string           Host to find ports for
-   -top-ports string      Top Ports to scan (default top 100)
-   -p string              Ports to scan (80, 80,443, 100-200, (-p - for full port scan)
-   -s string              Scan Type (s - SYN, c - CONNECT) (default "s")
-   -exclude-ports string  Ports to exclude from enumeration
-   -exclude-hosts string  Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
-   -exclude-file string   Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
-   -ports-file string     File containing ports to enumerate for on hosts
-   -source-ip string      Source Ip
+INPUT:
+   -host string                Host to scan ports for
+   -list, -l string            File containing list of hosts to scan ports
+   -exclude-hosts, -eh string  Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
+   -exclude-file, -ef string   Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
 
-TEMPLATE:
-   -retries int       Number of retries for the port scan probe (default 3)
-   -exclude-cdn       Skip full port scans for CDNs (only checks for 80,443)
-   -interface string  Network Interface to use for port scan
-   -warm-up-time int  Time in seconds between scan phases (default 2)
-   -ping              Use ping probes for verification of host
-   -rate int          Rate of port scan probe requests (default 1000)
-   -verify            Validate the ports again with TCP verification
-   -scan-all-ips      Scan all the ips
-   -nmap              Invoke nmap scan on targets (nmap must be installed)
-   -nmap-cli string   Nmap command line (invoked as COMMAND + TARGETS)
-   -timeout int       Millisecond to wait before timing out (default 1000)
+PORT:
+   -port, -p string            Ports to scan (80, 80,443, 100-200
+   -top-ports, -tp string      Top Ports to scan (default top 100)
+   -exclude-ports, -ep string  Ports to exclude from scan
+   -ports-file, -pf string     File containing ports to scan for
+   -exclude-cdn, -ec           Skip full port scans for CDNs (only checks for 80,443)
 
 RATE-LIMIT:
-   -c int  General internal worker threads (default 25)
+   -c int     General internal worker threads (default 25)
+   -rate int  Rate of port scan probe request (default 1000)
 
 OUTPUT:
-   -o string  File to write output to (optional)
-   -json      Write output in JSON lines Format
-   -silent    Show found ports only in output
-   -stats     Display stats of the running scan
-   -debug     Enable debugging information
-   -version   Show version of naabu
-   -no-color  Don't Use colors in output
-   -v         Show Verbose output
+   -o, -output string  File to write output to (optional)
+   -json               Write output in JSON lines Format
 
 CONFIGURATION:
-   -config string  Config file
-```
+   -config string         Config file
+   -scan-all-ips          Scan all the ips
+   -scan-type, -s string  Scan Type (s - SYN, c - CONNECT) (default "s")
+   -source-ip string      Source Ip
+   -interface-list, -il   List available interfaces and public ip
+   -interface, -i string  Network Interface to use for port scan
+   -nmap                  Invoke nmap scan on targets (nmap must be installed)
+   -nmap-cli string       Nmap command line (invoked as COMMAND + TARGETS)
 
-</details>
+OPTIMIZATION:
+   -retries int       Number of retries for the port scan probe (default 3)
+   -timeout int       Millisecond to wait before timing out (default 1000)
+   -warm-up-time int  Time in seconds between scan phases (default 2)
+   -ping              Use ping probes for verification of host
+   -verify            Validate the ports again with TCP verification
+
+DEBUG:
+   -debug          Enable debugging information
+   -v              Show Verbose output
+   -no-color, -nc  Don't Use colors in output
+   -silent         Show found ports only in output
+   -version        Show version of naabu
+   -stats          Display stats of the running scan
+```
 
 # Installation Instructions
 
