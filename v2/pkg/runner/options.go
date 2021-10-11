@@ -95,6 +95,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.Interface,"i", "interface", "", "Network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)"),
+		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
