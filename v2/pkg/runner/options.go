@@ -56,54 +56,61 @@ type OnResultCallback func(string, string, []int)
 func ParseOptions() *Options {
 	options := &Options{}
 	flagSet := goflags.NewFlagSet()
-	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN/CONNECT scans on the host/list of hosts and lists
-	all ports that return a reply.`)
+	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
-	createGroup(flagSet, "input", "Target",
-		flagSet.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip"),
-		flagSet.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports"),
-		flagSet.StringVar(&options.Host, "host", "", "Host to find ports for"),
-		flagSet.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100)"),
-		flagSet.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)"),
-		flagSet.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)"),
-		flagSet.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration"),
-		flagSet.StringVar(&options.ExcludeIps, "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)"),
-		flagSet.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)"),
-		flagSet.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "Source Ip"),
+	createGroup(flagSet, "input", "Input",
+		flagSet.StringVar(&options.Host, "host", "", "Host to scan ports for"),
+		flagSet.StringVarP(&options.HostsFile, "l", "list","", "File containing list of hosts to scan ports"),
+		flagSet.StringVarP(&options.ExcludeIps,"eh", "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)"),
+		flagSet.StringVarP(&options.ExcludeIpsFile,"ef", "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)"),
 	)
 
-	createGroup(flagSet, "template", "Template",
-		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe"),
-		flagSet.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)"),
-		flagSet.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan"),
-		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases"),
-		flagSet.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host"),
-		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests"),
-		flagSet.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification"),
-		flagSet.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips"),
-		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)"),
-		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)"),
-		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out"),
+	createGroup(flagSet, "port", "Port",
+		flagSet.StringVarP(&options.Ports, "p", "port","", "Ports to scan (80, 80,443, 100-200"),
+		flagSet.StringVarP(&options.TopPorts,"tp", "top-ports", "", "Top Ports to scan (default top 100)"),
+		flagSet.StringVarP(&options.ExcludePorts,"ep", "exclude-ports", "", "Ports to exclude from scan"),
+		flagSet.StringVarP(&options.PortsFile,"pf", "ports-file", "", "File containing ports to scan for"),
+		flagSet.BoolVarP(&options.ExcludeCDN,"ec", "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)"),
+
 	)
 
 	createGroup(flagSet, "rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", 25, "General internal worker threads"),
+		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe request"),
 	)
 
 	createGroup(flagSet, "output", "Output",
-		flagSet.StringVar(&options.Output, "o", "", "File to write output to (optional)"),
+		flagSet.StringVarP(&options.Output,"output", "o", "", "File to write output to (optional)"),
 		flagSet.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format"),
-		flagSet.BoolVar(&options.Silent, "silent", false, "Show found ports only in output"),
-		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan"),
-		flagSet.BoolVar(&options.Debug, "debug", false, "Enable debugging information"),
-		flagSet.BoolVar(&options.Version, "version", false, "Show version of naabu"),
-		flagSet.BoolVar(&options.NoColor, "no-color", false, "Don't Use colors in output"),
-		flagSet.BoolVar(&options.Verbose, "v", false, "Show Verbose output"),
 	)
 
 	createGroup(flagSet, "config", "Configuration",
 		flagSet.StringVar(&options.ConfigFile, "config", "", "Config file"),
+		flagSet.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips"),
+		flagSet.StringVarP(&options.ScanType,"s", "scan-type", SynScan, "Scan Type (s - SYN, c - CONNECT)"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "Source Ip"),
+		flagSet.BoolVarP(&options.InterfacesList,"il", "interface-list", false, "List available interfaces and public ip"),
+		flagSet.StringVarP(&options.Interface,"i", "interface", "", "Network Interface to use for port scan"),
+		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)"),
+		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)"),
+	)
+
+	createGroup(flagSet, "optimization", "Optimization",
+		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe"),
+		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out"),
+		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases"),
+		flagSet.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host"),
+		flagSet.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification"),
+	)
+
+	createGroup(flagSet, "debug", "Debug",
+		flagSet.BoolVar(&options.Debug, "debug", false, "Enable debugging information"),
+		flagSet.BoolVar(&options.Verbose, "v", false, "Show Verbose output"),
+		flagSet.BoolVarP(&options.NoColor, "nc","no-color", false, "Don't Use colors in output"),
+		flagSet.BoolVar(&options.Silent, "silent", false, "Show found ports only in output"),
+		flagSet.BoolVar(&options.Version, "version", false, "Show version of naabu"),
+		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan"),
+
 	)
 
 	_ = flagSet.Parse()
