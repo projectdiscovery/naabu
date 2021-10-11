@@ -5,6 +5,7 @@ import (
 	"net"
 	"strings"
 
+	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
@@ -114,7 +115,7 @@ func (options *Options) writeDefaultConfig() {
 	if err != nil {
 		gologger.Warning().Msgf("Could not get default configuration file: %s\n", err)
 	}
-	if fileExists(configFile) {
+	if fileutil.FileExists(configFile) {
 		return
 	}
 
