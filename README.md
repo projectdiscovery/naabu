@@ -170,10 +170,10 @@ The `o` flag can be used to specify an output file.
 naabu -host hackerone.com -o output.txt
 ```
 
-To run the naabu on a list of hosts, `-iL` option can be used.
+To run the naabu on a list of hosts, `-list` option can be used.
 
 ```sh
-naabu -iL hosts.txt
+naabu -list hosts.txt
 ```
 
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
