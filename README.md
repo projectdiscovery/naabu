@@ -75,7 +75,6 @@ OUTPUT:
    -json               Write output in JSON lines Format
 
 CONFIGURATION:
-   -config string         Config file
    -scan-all-ips          Scan all the ips
    -scan-type, -s string  Scan Type (s - SYN, c - CONNECT) (default "s")
    -source-ip string      Source Ip
