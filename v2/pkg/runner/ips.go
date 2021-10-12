@@ -25,16 +25,6 @@ func parseExcludedIps(options *Options) ([]string, error) {
 		}
 	}
 
-	if options.config != nil {
-		for _, excludeIP := range options.config.ExcludeIps {
-			for _, ip := range strings.Split(excludeIP, ",") {
-				if isIpOrCidr(ip) {
-					excludedIps = append(excludedIps, ip)
-				}
-			}
-		}
-	}
-
 	return excludedIps, nil
 }
 
