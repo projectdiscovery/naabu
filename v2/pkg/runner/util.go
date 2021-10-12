@@ -44,3 +44,10 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 func isOSSupported() bool {
 	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
 }
+
+func mapKeysToSliceInt(m map[int]struct{}) (s []int) {
+	for k := range m {
+		s = append(s, k)
+	}
+	return
+}
