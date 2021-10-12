@@ -86,12 +86,12 @@ func ParseOptions() *Options {
 
 	createGroup(flagSet, "config", "Configuration",
 		flagSet.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips"),
-		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "Scan Type (s - SYN, c - CONNECT)"),
+		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "Port scan type (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "Source Ip"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "List available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "Network Interface to use for port scan"),
-		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)"),
-		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)"),
+		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed) - Deprecated"),
+		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
 	)
 

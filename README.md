@@ -76,12 +76,12 @@ OUTPUT:
 
 CONFIGURATION:
    -scan-all-ips          Scan all the ips
-   -scan-type, -s string  Scan Type (s - SYN, c - CONNECT) (default "s")
+   -scan-type, -s string  Port scan type (SYN/CONNECT) (default s)
    -source-ip string      Source Ip
    -interface-list, -il   List available interfaces and public ip
    -interface, -i string  Network Interface to use for port scan
    -nmap                  Invoke nmap scan on targets (nmap must be installed)
-   -nmap-cli string       Nmap command line (invoked as COMMAND + TARGETS)
+   -nmap-cli string       nmap command to run on found results (example: -nmap-cli 'nmap -sV')
 
 OPTIMIZATION:
    -retries int       Number of retries for the port scan probe (default 3)
@@ -124,7 +124,7 @@ naabu -host hackerone.com
 
 This will run the tool against hackerone.com. There are a number of configuration options that you can pass along with this command. The verbose switch `-v` can be used to display verbose information.
 
-```sh
+```console
 naabu -host hackerone.com
 
                   __
@@ -152,9 +152,11 @@ naabu -p 80,443,21-23 -host hackerone.com
 
 By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
 
-- `-top-ports 100` => Scans for nmap top 100 port
-- `-top-ports 1000` => Scans for nmap top 1000 port
-- `-p -` => Scans for all ports from `1-65535`.
+| CMD               | Description                          |
+|-------------------|--------------------------------------|
+| `-top-ports 100`  | Scan for nmap top **100** port       |
+| `-top-ports 1000` | Scan for nmap top **1000** port      |
+| `-p - `           | Scan for full ports from **1-65535** |
 
 You can also specify specific ports which you would like to exclude from the scan.
 
@@ -176,7 +178,7 @@ naabu -iL hosts.txt
 
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
-```sh
+```console
 naabu -host hackerone.com -json
 
 {"host":"hackerone.com","ip":"104.16.99.52","port":8443}
@@ -187,7 +189,7 @@ naabu -host hackerone.com -json
 
 The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to [httpx](https://github.com/projectdiscovery/httpx) which will then find running http servers on the host.
 
-```sh
+```console
 echo hackerone.com | naabu -silent | httpx -silent
 
 http://hackerone.com:8443
@@ -196,76 +198,21 @@ http://hackerone.com:8080
 http://hackerone.com:80
 ```
 
-If you want a second layer validation of the ports found, you can instruct the tool to make a TCP connection for every port and verify if the connection succeeded. This method is very slow, but is really reliable.  This is similar to using nmap as a second layer validation
-
-```sh
-naabu -host hackerone.com -verify
-```
-
 The speed can be controlled by changing the value of `rate` flag that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
 
 # Configuration file
 
-We have added support for config file, it allows each and every flag to define in config file, so you don't have to write them everytime, it's optional and not used on default run, default location of config file is `$HOME/.config/naabu/naabu.conf`, custom config file can be provided using `config` flag.
+Naabu supports config file as default located at `$HOME/.config/naabu/config.yaml`, It allows you to define any flag in the config file and set default values to include for all scans.
 
-
-<details>
-<summary> 👉 Example Config File 👈</summary>
-
-```yaml
-# Number of retries
-# retries: 1
-# Packets rate
-# rate: 100
-# Timeout is the seconds to wait for ports to respond
-# timeout: 5
-# Hosts are the host to find ports for
-# host:
-#   - 10.10.10.10
-# Ports is the ports to use for enumeration
-# ports:
-#   - 80
-#   - 100
-# ExcludePorts is the list of ports to exclude from enumeration
-# exclude-ports:
-#   - 20
-#   - 30
-# Verify is used to check if the ports found were valid using CONNECT method
-# verify: false
-# Ips or cidr to be excluded from the scan
-# exclude-ips:
-#   - 1.1.1.1
-#   - 2.2.2.2
-# Top ports list
-# top-ports: 100
-# Attempts to run as root
-# privileged: true
-# Drop root privileges
-# unprivileged: true
-# Excludes ip of knows CDN ranges
-# exclude-cdn: true
-# SourceIP to use in TCP packets
-# source-ip: 10.10.10.10
-# Interface to use for TCP packets
-# interface: eth0
-# WarmUpTime between scan phases
-# warm-up-time: 2
-# nmap command to invoke after scanninginvoke after scanning
-# nmap: nmap -sV
-```
-
-</details>
 
 # Nmap integration
 
-We have integrated nmap support with `nmap` flag, in config file you can define any `nmap` command you wish to run on the result of naabu, make sure you have `nmap` installed to use this feature.
+We have integrated nmap support for service discovery or any additional scans supported by nmap on the found results by Naabu, make sure you have `nmap` installed to use this feature.
 
-To make use of `nmap` flag, make sure to remove the comments from the config file at `$HOME/.config/naabu/naabu.conf`
+To use,`nmap-cli` flag can be used followed by nmap command, for example:-
 
-We also added `nmap-cli` flag that let you run **nmap** commands directly on the results of naabu without making use of config file.
-
-```sh
-echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX naabu-output'
+```console
+echo hackerone.com | naabu -nmap-cli 'nmap -sV -oX nmap-output'
                   __       
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
