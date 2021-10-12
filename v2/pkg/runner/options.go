@@ -1,9 +1,9 @@
 package runner
 
 import (
-	"flag"
 	"os"
 
+	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
 )
 
@@ -45,47 +45,74 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
-	config            *ConfigFile
+	Resolvers         string // Resolvers (comma separated or file)
+	baseResolvers     []string
+	OnResult          OnResultCallback // OnResult callback
 }
+
+// OnResultCallback (hostname, ip, ports)
+type OnResultCallback func(string, string, []int)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{}
+	flagSet := goflags.NewFlagSet()
+	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
-	flag.StringVar(&options.Host, "host", "", "Host to find ports for")
-	flag.StringVar(&options.TopPorts, "top-ports", "", "Top Ports to scan (default top 100)")
-	flag.StringVar(&options.HostsFile, "iL", "", "File containing list of hosts to enumerate ports")
-	flag.StringVar(&options.Ports, "p", "", "Ports to scan (80, 80,443, 100-200, (-p - for full port scan)")
-	flag.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host")
-	flag.StringVar(&options.PortsFile, "ports-file", "", "File containing ports to enumerate for on hosts")
-	flag.StringVar(&options.Output, "o", "", "File to write output to (optional)")
-	flag.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format")
-	flag.BoolVar(&options.Silent, "silent", false, "Show found ports only in output")
-	flag.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe")
-	flag.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe requests")
-	flag.BoolVar(&options.Verbose, "v", false, "Show Verbose output")
-	flag.BoolVar(&options.NoColor, "no-color", false, "Don't Use colors in output")
-	flag.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out")
-	flag.StringVar(&options.ExcludePorts, "exclude-ports", "", "Ports to exclude from enumeration")
-	flag.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification")
-	flag.BoolVar(&options.Version, "version", false, "Show version of naabu")
-	flag.StringVar(&options.ExcludeIps, "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)")
-	flag.StringVar(&options.ExcludeIpsFile, "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)")
-	flag.BoolVar(&options.Debug, "debug", false, "Enable debugging information")
-	flag.StringVar(&options.SourceIP, "source-ip", "", "Source Ip")
-	flag.StringVar(&options.Interface, "interface", "", "Network Interface to use for port scan")
-	flag.BoolVar(&options.ExcludeCDN, "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)")
-	flag.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases")
-	flag.BoolVar(&options.InterfacesList, "interface-list", false, "List available interfaces and public ip")
-	flag.StringVar(&options.ConfigFile, "config", "", "Config file")
-	flag.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed)")
-	flag.StringVar(&options.NmapCLI, "nmap-cli", "", "Nmap command line (invoked as COMMAND + TARGETS)")
-	flag.IntVar(&options.Threads, "c", 25, "General internal worker threads")
-	flag.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan")
-	flag.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips")
-	flag.StringVar(&options.ScanType, "s", SynScan, "Scan Type (s - SYN, c - CONNECT)")
+	createGroup(flagSet, "input", "Input",
+		flagSet.StringVar(&options.Host, "host", "", "Host to scan ports for"),
+		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "File containing list of hosts to scan ports"),
+		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)"),
+		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)"),
+	)
 
-	flag.Parse()
+	createGroup(flagSet, "port", "Port",
+		flagSet.StringVarP(&options.Ports, "p", "port", "", "Ports to scan (80, 80,443, 100-200"),
+		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "Top Ports to scan (default top 100)"),
+		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "Ports to exclude from scan"),
+		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "File containing ports to scan for"),
+		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)"),
+	)
+
+	createGroup(flagSet, "rate-limit", "Rate-limit",
+		flagSet.IntVar(&options.Threads, "c", 25, "General internal worker threads"),
+		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe request"),
+	)
+
+	createGroup(flagSet, "output", "Output",
+		flagSet.StringVarP(&options.Output, "output", "o", "", "File to write output to (optional)"),
+		flagSet.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format"),
+	)
+
+	createGroup(flagSet, "config", "Configuration",
+		flagSet.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips"),
+		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "Port scan type (SYN/CONNECT)"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "Source Ip"),
+		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "List available interfaces and public ip"),
+		flagSet.StringVarP(&options.Interface, "i", "interface", "", "Network Interface to use for port scan"),
+		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed) - Deprecated"),
+		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
+		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
+	)
+
+	createGroup(flagSet, "optimization", "Optimization",
+		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe"),
+		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out"),
+		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases"),
+		flagSet.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host"),
+		flagSet.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification"),
+	)
+
+	createGroup(flagSet, "debug", "Debug",
+		flagSet.BoolVar(&options.Debug, "debug", false, "Enable debugging information"),
+		flagSet.BoolVar(&options.Verbose, "v", false, "Show Verbose output"),
+		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "Don't Use colors in output"),
+		flagSet.BoolVar(&options.Silent, "silent", false, "Show found ports only in output"),
+		flagSet.BoolVar(&options.Version, "version", false, "Show version of naabu"),
+		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan"),
+	)
+
+	_ = flagSet.Parse()
 
 	// Check if stdin pipe was given
 	options.Stdin = hasStdin()
@@ -95,9 +122,6 @@ func ParseOptions() *Options {
 
 	// Show the user the banner
 	showBanner()
-
-	// write default conf file template if it doesn't exist
-	options.writeDefaultConfig()
 
 	if options.Version {
 		gologger.Info().Msgf("Current Version: %s\n", Version)
@@ -111,17 +135,6 @@ func ParseOptions() *Options {
 			gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 		}
 		os.Exit(0)
-	}
-
-	// If a config file is provided, merge the options
-	if options.ConfigFile != "" {
-		options.MergeFromConfig(options.ConfigFile, false)
-	} else {
-		defaultConfigPath, err := getDefaultConfigFile()
-		if err != nil {
-			gologger.Error().Msgf("Program exiting: %s\n", err)
-		}
-		options.MergeFromConfig(defaultConfigPath, true)
 	}
 
 	// Validate the options passed by the user and if any
@@ -148,40 +161,9 @@ func hasStdin() bool {
 	return isPipedFromChrDev || isPipedFromFIFO
 }
 
-func (options *Options) MergeFromConfig(configFileName string, ignoreError bool) {
-	configFile, err := UnmarshalRead(configFileName)
-	if err != nil {
-		if ignoreError {
-			gologger.Warning().Msgf("Could not read configuration file %s: %s\n", configFileName, err)
-			return
-		}
-		gologger.Fatal().Msgf("Could not read configuration file %s: %s\n", configFileName, err)
-	}
-	options.config = &configFile
-
-	if configFile.Retries > 0 {
-		options.Retries = configFile.Retries
-	}
-	if configFile.Rate > 0 {
-		options.Rate = configFile.Rate
-	}
-	if configFile.Timeout > 0 {
-		options.Timeout = configFile.Timeout
-	}
-	options.Verify = configFile.Verify
-	options.Ping = configFile.Ping
-	if configFile.TopPorts != "" {
-		options.TopPorts = configFile.TopPorts
-	}
-
-	options.ExcludeCDN = configFile.ExcludeCDN
-	if configFile.SourceIP != "" {
-		options.SourceIP = configFile.SourceIP
-	}
-	if configFile.Interface != "" {
-		options.Interface = configFile.Interface
-	}
-	if configFile.WarmUpTime > 0 {
-		options.WarmUpTime = configFile.WarmUpTime
+func createGroup(flagSet *goflags.FlagSet, groupName, description string, flags ...*goflags.FlagData) {
+	flagSet.SetGroup(groupName, description)
+	for _, currentFlag := range flags {
+		currentFlag.Group(groupName)
 	}
 }

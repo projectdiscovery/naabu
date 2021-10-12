@@ -70,6 +70,10 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
+	dnsOptions.Hostsfile = true
+	if len(runner.options.baseResolvers) > 0 {
+		dnsOptions.BaseResolvers = runner.options.baseResolvers
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -380,6 +384,10 @@ func (r *Runner) handleOutput() {
 				if err != nil {
 					gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
 				}
+			}
+
+			if r.options.OnResult != nil {
+				r.options.OnResult(host, hostIP, mapKeysToSliceInt(ports))
 			}
 		}
 	}

@@ -13,10 +13,6 @@ func (r *Runner) handleNmap() {
 	// command from CLI
 	command := r.options.NmapCLI
 	hasCLI := r.options.NmapCLI != ""
-	// If empty load the one from config file
-	if command == "" && r.options.config != nil {
-		command = r.options.config.NMapCommand
-	}
 	// If at least one is defined handle it
 	if command != "" {
 		args := strings.Split(command, " ")
@@ -35,6 +31,12 @@ func (r *Runner) handleNmap() {
 			ports = append(ports, fmt.Sprintf("%d", p))
 		}
 
+		// if we have no open ports we avoid running nmap
+		if len(ports) == 0 {
+			gologger.Info().Msgf("Skipping nmap scan as no open ports were found")
+			return
+		}
+
 		portsStr := strings.Join(ports, ",")
 		ipsStr := strings.Join(ips, ",")
 
@@ -48,7 +50,7 @@ func (r *Runner) handleNmap() {
 			cmd.Stdout = os.Stdout
 			err := cmd.Run()
 			if err != nil {
-				gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
+				gologger.Error().Msgf("Could not run nmap command: %s\n", err)
 				return
 			}
 		} else {

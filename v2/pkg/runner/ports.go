@@ -80,27 +80,6 @@ func ParsePorts(options *Options) ([]int, error) {
 		}
 	}
 
-	// ports from config file
-	if options.config != nil {
-		for _, p := range options.config.Ports {
-			// "-" equals to all ports
-			if p == "-" {
-				// Parse the custom ports list provided by the user
-				p = Full
-			}
-			ports, err := parsePortsList(p)
-			if err != nil {
-				return nil, fmt.Errorf("could not read ports: %s", err)
-			}
-
-			pMap, err := excludePorts(options, ports)
-			if err != nil {
-				return nil, fmt.Errorf("could not read ports: %s", err)
-			}
-			portsConfigList = append(portsConfigList, pMap)
-		}
-	}
-
 	// If the user has specfied top option, use them too
 	if options.Ports != "" {
 		// "-" equals to all ports
@@ -150,21 +129,7 @@ func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, e
 		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
 	}
 
-	var excludedPortsConfigList []map[int]struct{}
-	if options.config != nil {
-		for _, excludePorts := range options.config.ExcludePorts {
-			p, err := parsePortsList(excludePorts)
-			if err != nil {
-				return nil, fmt.Errorf("could not read exclusion ports: %s", err)
-			}
-			excludedPortsConfigList = append(excludedPortsConfigList, p)
-		}
-	}
-
-	excludedPortsConfig := merge(excludedPortsConfigList...)
-	excludedPorts := merge(excludedPortsCLI, excludedPortsConfig)
-
-	for p := range excludedPorts {
+	for p := range excludedPortsCLI {
 		delete(ports, p)
 	}
 	return ports, nil
