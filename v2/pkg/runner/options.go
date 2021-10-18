@@ -95,7 +95,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed) - Deprecated"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
-    flagSet.StringVar(&options.Proxy, "proxy", "", "Socks5 proxy")
+		flagSet.StringVar(&options.Proxy, "proxy", "", "Socks5 proxy"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
@@ -116,7 +116,7 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
-  
+
 	// Check if stdin pipe was given
 	options.Stdin = hasStdin()
 
