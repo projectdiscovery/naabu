@@ -71,13 +71,6 @@ func (r *Runner) mergeToFile() (string, error) {
 		fmt.Fprintf(tempInput, "%s\n", target)
 	}
 
-	// handles targets from config file if provided
-	if r.options.config != nil {
-		for _, target := range r.options.config.Host {
-			fmt.Fprintf(tempInput, "%s\n", target)
-		}
-	}
-
 	filename := tempInput.Name()
 	return filename, nil
 }

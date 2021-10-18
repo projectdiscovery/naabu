@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"net"
+	"strings"
 
+	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
 	"github.com/projectdiscovery/gologger/levels"
@@ -15,7 +17,7 @@ import (
 func (options *Options) validateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
 	// If none was provided, then return.
-	if options.Host == "" && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 && (options.config != nil && len(options.config.Host) == 0) {
+	if options.Host == "" && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
 		return errors.New("no input list provided")
 	}
 
@@ -43,6 +45,20 @@ func (options *Options) validateOptions() error {
 	if options.Interface != "" {
 		if _, err := net.InterfaceByName(options.Interface); err != nil {
 			return fmt.Errorf("interface %s not found", options.Interface)
+		}
+	}
+
+	if fileutil.FileExists(options.Resolvers) {
+		chanResolvers, err := fileutil.ReadFile(options.Resolvers)
+		if err != nil {
+			return err
+		}
+		for resolver := range chanResolvers {
+			options.baseResolvers = append(options.baseResolvers, resolver)
+		}
+	} else if options.Resolvers != "" {
+		for _, resolver := range strings.Split(options.Resolvers, ",") {
+			options.baseResolvers = append(options.baseResolvers, strings.TrimSpace(resolver))
 		}
 	}
 
