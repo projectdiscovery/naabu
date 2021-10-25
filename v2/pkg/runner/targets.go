@@ -44,7 +44,14 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// target defined via CLI argument
 	if r.options.Host != "" {
-		fmt.Fprintf(tempInput, "%s\n", r.options.Host)
+		if strings.Contains(r.Options.Host, ","){
+			splitHosts := strings.Split(r.Options.Host, ",")
+			for _, host := range splitHosts{
+				fmt.Fprintf(tempInput, "%s\n", host)
+			}
+		}else{
+			fmt.Fprintf(tempInput, "%s\n", r.Options.Host)
+		}		
 	}
 
 	// Targets from file
