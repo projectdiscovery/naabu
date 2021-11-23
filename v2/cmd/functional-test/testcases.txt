@@ -7,13 +7,17 @@ example.com {{binary}} -silent -ep 200
 example.com {{binary}} -silent -ec 100,400
 example.com {{binary}} -silent -version
 example.com {{binary}} -silent -retries 5
-example.com {{binary}} -silent -source-ip
 example.com {{binary}} -silent -c 25
 example.com {{binary}} -silent -verify
+example.com {{binary}} -silent -timeout 30
 example.com {{binary}} -silent -r test-data/request.txt
 example.com {{binary}} -silent -warm-up-time 2
 example.com {{binary}} -silent -nmap-cli 'nmap -sV'
 example.com {{binary}} -silent -c 25
+www.projectdiscovery.io {{binary}} -silent -eh 127.0.0.1:8082,127.0.0.1:6089
+www.projectdiscovery.io {{binary}} -silent -stats
+1.1.1.1 {{binary}} -silent -s CONNECT
+1.1.1.1 {{binary}} -silent -json
 
 
 
