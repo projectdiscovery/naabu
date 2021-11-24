@@ -16,8 +16,9 @@ example.com {{binary}} -silent -nmap-cli 'nmap -sV'
 example.com {{binary}} -silent -c 25
 www.projectdiscovery.io {{binary}} -silent -eh 127.0.0.1:8082,127.0.0.1:6089
 www.projectdiscovery.io {{binary}} -silent -stats
-1.1.1.1 {{binary}} -silent -s CONNECT
 1.1.1.1 {{binary}} -silent -json
+1.1.1.1 {{binary}} -silent -s CONNECT
+
 
 
 
