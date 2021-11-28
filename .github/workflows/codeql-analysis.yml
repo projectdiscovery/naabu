@@ -22,6 +22,9 @@ jobs:
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python' ]
 
     steps:
+    - name: Install libpcap-dev
+      run: sudo apt install libpcap-dev
+      
     - name: Checkout repository
       uses: actions/checkout@v2
 
