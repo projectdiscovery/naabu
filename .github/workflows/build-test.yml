@@ -15,15 +15,22 @@ jobs:
         with:
           go-version: 1.17
 
-      - name: Install libpcap-dev
-        run: sudo apt install libpcap-dev
-
       - name: Check out code
         uses: actions/checkout@v2
 
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
+
+      - name: Install nmap
+        run: sudo apt install nmap
+
       - name: Test
-        run: go test .
-        working-directory: v2/cmd/naabu/
+        run: go test ./...
+        working-directory: v2/
+
+      # - name: Integration Tests
+      #   run: go run .
+      #   working-directory: v2/cmd/integration_tests/
 
       - name: Build
         run: go build .
