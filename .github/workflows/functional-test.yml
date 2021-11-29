@@ -17,6 +17,15 @@ jobs:
 
       - name: Install libpcap-dev
         run: sudo apt install libpcap-dev
+      
+      - name: Install nmap
+        run: sudo apt install nmap
+
+      - name: Install simplehttpserver
+        run: GO111MODULE=on go get -v github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver
+    
+      - name: Run the simplehttpserver on 127.0.0.1:8000
+        run: simplehttpserver -listen 127.0.0.1:8000
 
       - name: Check out code
         uses: actions/checkout@v2
