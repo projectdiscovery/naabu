@@ -22,7 +22,7 @@ jobs:
         run: sudo apt install nmap
 
       - name: Install simplehttpserver
-        run: GO111MODULE=on go get -v github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver
+        run: go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
     
       - name: Run the simplehttpserver on 127.0.0.1:8000
         run: |
