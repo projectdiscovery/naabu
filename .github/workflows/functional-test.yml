@@ -25,7 +25,7 @@ jobs:
         run: GO111MODULE=on go get -v github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver
     
       - name: Run the simplehttpserver on 127.0.0.1:8000
-        run: simplehttpserver -listen 127.0.0.1:8000
+        run: bash simplehttpserver -listen 127.0.0.1:8000
 
       - name: Check out code
         uses: actions/checkout@v2
