@@ -2,7 +2,6 @@ package scan
 
 import (
 	"fmt"
-	"log"
 	"math/rand"
 	"net"
 	"strings"
@@ -149,7 +148,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 	if options.Proxy != "" {
 		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, nil, &net.Dialer{Timeout: options.Timeout})
 		if err != nil {
-			log.Fatal(err)
+			return nil, err
 		}
 		scanner.proxyDialer = proxyDialer
 	}
@@ -375,7 +374,7 @@ func (s *Scanner) ConnectPort(host string, port int, timeout time.Duration) (boo
 	if s.proxyDialer != nil {
 		conn, err = s.proxyDialer.Dial("tcp", hostport)
 		if err != nil {
-			log.Fatal(err)
+			return false, err
 		}
 	} else {
 		conn, err = net.DialTimeout("tcp", hostport, timeout)
