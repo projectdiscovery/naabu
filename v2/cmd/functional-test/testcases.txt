@@ -1,23 +1,23 @@
-127.0.0.1 {{binary}} -silent
+127.0.0.1 {{binary}} -silent -p 8000
 127.0.0.1 {{binary}} -silent -il
-127.0.0.1 {{binary}} -silent -l test-data/request.txt
-127.0.0.1 {{binary}} -silent -p 80,443
-127.0.0.1 {{binary}} -silent -tp 100
-127.0.0.1 {{binary}} -silent -ep 200
-127.0.0.1 {{binary}} -silent -ec 100,400
+127.0.0.1 {{binary}} -silent -l test-data/request.txt -p 8000
+127.0.0.1 {{binary}} -silent -p 8000,443
+127.0.0.1 {{binary}} -silent -tp 100 -p 8000
+127.0.0.1 {{binary}} -silent -ep 200  -p 8000
+127.0.0.1 {{binary}} -silent -ec 100,400  -p 8000
 127.0.0.1 {{binary}} -silent -version
-127.0.0.1 {{binary}} -silent -retries 5
-127.0.0.1 {{binary}} -silent -c 25
-127.0.0.1 {{binary}} -silent -verify
-127.0.0.1 {{binary}} -silent -timeout 30
-127.0.0.1 {{binary}} -silent -r test-data/request.txt
-127.0.0.1 {{binary}} -silent -warm-up-time 2
-127.0.0.1 {{binary}} -silent -nmap-cli 'nmap -sV'
-127.0.0.1 {{binary}} -silent -c 25
-www.projectdiscovery.io {{binary}} -silent -eh 127.0.0.1:8082,127.0.0.1:6089
-www.projectdiscovery.io {{binary}} -silent -stats
-1.1.1.1 {{binary}} -silent -json
-1.1.1.1 {{binary}} -silent -s CONNECT
+127.0.0.1 {{binary}} -silent -retries 5  -p 8000
+127.0.0.1 {{binary}} -silent -c 25  -p 8000
+127.0.0.1 {{binary}} -silent -verify  -p 8000
+127.0.0.1 {{binary}} -silent -timeout 30  -p 8000
+127.0.0.1 {{binary}} -silent -r test-data/request.txt  -p 8000
+127.0.0.1 {{binary}} -silent -warm-up-time 2  -p 8000
+127.0.0.1 {{binary}} -silent -nmap-cli 'nmap -sV'  -p 8000
+127.0.0.1 {{binary}} -silent -eh 127.0.0.1:8082,127.0.0.1:6089
+127.0.0.1 {{binary}} -silent -stats
+127.0.0.1 {{binary}} -silent -json
+127.0.0.1 {{binary}} -silent -s CONNECT
+
 
 
 

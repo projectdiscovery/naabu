@@ -6,6 +6,26 @@ on:
 
 
 jobs:
+  setup-simplehttpserver:
+    name: Setup Simplehttpserver
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Install simplehttpserver
+        run: go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
+
+      - name: Install coreutils/gtimeout
+        run: sudo apt install coreutils
+
+      - name: Run the simplehttpserver on 127.0.0.1:8000
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          timeout -s SIGTERM  -k 3m 3m simplehttpserver -listen 127.0.0.1:8000 &
+
   functional:
     name: Functional Test
     runs-on: ubuntu-latest
@@ -20,14 +40,6 @@ jobs:
       
       - name: Install nmap
         run: sudo apt install nmap
-
-      - name: Install simplehttpserver
-        run: go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
-    
-      - name: Run the simplehttpserver on 127.0.0.1:8000
-        run: |
-          chmod +x simplehttpserver
-          bash simplehttpserver -listen 127.0.0.1:8000
 
       - name: Check out code
         uses: actions/checkout@v2
