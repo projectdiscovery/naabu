@@ -12,7 +12,7 @@
 127.0.0.1 {{binary}} -timeout 30 -p 8000
 127.0.0.1 {{binary}} -r test-data/request.txt -p 8000
 127.0.0.1 {{binary}} -warm-up-time 2 -p 8000
-127.0.0.1 {{binary}} -nmap-cli 'nmap -sV' -p 8000
+127.0.0.1 {{binary}} -nmap-cli 'nmap -Pn -sT' -p 8000
 127.0.0.1 {{binary}} -eh 127.0.0.1:8082,127.0.0.1:6089
 127.0.0.1 {{binary}} -stats
 127.0.0.1 {{binary}} -json
