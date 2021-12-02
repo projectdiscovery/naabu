@@ -194,9 +194,7 @@ func (r *Runner) RunEnumeration() error {
 	r.handleOutput()
 
 	// handle nmap
-	r.handleNmap()
-
-	return nil
+	return r.handleNmap()
 }
 
 // Close runner instance
