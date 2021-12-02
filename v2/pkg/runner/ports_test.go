@@ -62,8 +62,8 @@ func TestParsePorts(t *testing.T) {
 		wantErr bool
 	}{
 		{"full", 65535, false},
-		{"top-100", 100, false},
-		{"top-1000", 1000, false},
+		{"100", 100, false},
+		{"1000", 1000, false},
 		{"a", 0, true},
 	}
 	for _, tt := range tests {
