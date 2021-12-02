@@ -45,6 +45,7 @@ type Options struct {
 	EnableProgressBar bool   // Enable progress bar
 	ScanAllIPS        bool   // Scan all the ips
 	ScanType          string // Scan Type
+	Proxy             string // Socks5 proxy
 	Resolvers         string // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
@@ -56,6 +57,7 @@ type OnResultCallback func(string, string, []int)
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{}
+
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
@@ -93,6 +95,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed) - Deprecated"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
+		flagSet.StringVar(&options.Proxy, "proxy", "", "Socks5 proxy"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
