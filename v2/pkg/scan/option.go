@@ -13,4 +13,5 @@ type Options struct {
 	Root        bool
 	ExcludeCdn  bool
 	ExcludedIps []string
+	Proxy       string
 }
