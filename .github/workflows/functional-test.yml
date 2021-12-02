@@ -1,0 +1,39 @@
+name: 🧪 Functional Test
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+
+jobs:
+  functional:
+    name: Functional Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.17
+
+      - name: Install libpcap-dev
+        run: sudo apt install libpcap-dev
+      
+      - name: Install nmap
+        run: sudo apt install nmap
+      
+      - name: Install simplehttpserver
+        run: go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Run the simplehttpserver on 127.0.0.1:8000
+        run: |
+          export PATH=$PATH:$(go env GOPATH)/bin
+          simplehttpserver -listen 127.0.0.1:8000 &
+
+      - name: Functional Tests
+        run: |
+          chmod +x run.sh
+          bash run.sh
+        working-directory: v2/cmd/functional-test

@@ -1,3 +1,7 @@
 cmd/naabu/naabu*
 v2/cmd/naabu/naabu*
 vendor
+v2/cmd/functional-test/naabu_dev
+v2/cmd/functional-test/functional-test
+v2/cmd/functional-test/naabu
+v2/cmd/functional-test/*.cfg
