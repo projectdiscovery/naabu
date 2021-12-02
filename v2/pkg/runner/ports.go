@@ -55,7 +55,7 @@ func ParsePorts(options *Options) ([]int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
 			}
-		case "top-100": // If the user has specfied top-100, use them
+		case "100": // If the user has specfied 100, use them
 			ports, err := parsePortsList(NmapTop100)
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
@@ -64,7 +64,7 @@ func ParsePorts(options *Options) ([]int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
 			}
-		case "top-1000": // If the user has specfied top-1000, use them
+		case "1000": // If the user has specfied 1000, use them
 			ports, err := parsePortsList(NmapTop1000)
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
