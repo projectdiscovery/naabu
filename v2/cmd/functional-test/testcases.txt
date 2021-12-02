@@ -1,19 +1,7 @@
 127.0.0.1 {{binary}} -p 8000
-127.0.0.1 {{binary}} -silent -il
-127.0.0.1 {{binary}} -l test-data/request.txt -p 8000
 127.0.0.1 {{binary}} -p 8000,443
-127.0.0.1 {{binary}} -tp 100 -p 8000
-127.0.0.1 {{binary}} -ep 200 -p 8000
-127.0.0.1 {{binary}} -ec 100,400 -p 8000
-127.0.0.1 {{binary}} -version
-127.0.0.1 {{binary}} -retries 5 -p 8000
+127.0.0.1 {{binary}} -tp 100
+127.0.0.1 {{binary}} -ep 80 -p 8000
 127.0.0.1 {{binary}} -c 25 -p 8000
-127.0.0.1 {{binary}} -verify -p 8000
-127.0.0.1 {{binary}} -timeout 30 -p 8000
-127.0.0.1 {{binary}} -r test-data/request.txt -p 8000
-127.0.0.1 {{binary}} -warm-up-time 2 -p 8000
 127.0.0.1 {{binary}} -nmap-cli 'nmap -Pn -sT' -p 8000
-127.0.0.1 {{binary}} -eh 127.0.0.1:8082,127.0.0.1:6089
-127.0.0.1 {{binary}} -stats
 127.0.0.1 {{binary}} -json
-127.0.0.1 {{binary}} -s CONNECT
