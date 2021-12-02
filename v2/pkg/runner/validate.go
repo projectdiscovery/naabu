@@ -1,16 +1,23 @@
 package runner
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"strings"
 
+	"github.com/pkg/errors"
 	"github.com/projectdiscovery/fileutil"
+
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
 	"github.com/projectdiscovery/gologger/levels"
+)
+
+var (
+	errNoInputList = errors.New("no input list provided")
+	errOutputMode  = errors.New("both verbose and silent mode specified")
+	errZeroValue   = errors.New("cannot be zero")
 )
 
 // validateOptions validates the configuration options passed
@@ -18,22 +25,22 @@ func (options *Options) validateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
 	// If none was provided, then return.
 	if options.Host == "" && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
-		return errors.New("no input list provided")
+		return errNoInputList
 	}
 
 	// Both verbose and silent flags were used
 	if options.Verbose && options.Silent {
-		return errors.New("both verbose and silent mode specified")
+		return errOutputMode
 	}
 
 	if options.Timeout == 0 {
-		return errors.New("timeout cannot be zero")
+		return errors.Wrap(errZeroValue, "timeout")
 	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {
 		options.Timeout = DefaultPortTimeoutConnectScan
 	}
 
 	if options.Rate == 0 {
-		return errors.New("rate cannot be zero")
+		return errors.Wrap(errZeroValue, "rate")
 	} else if !isRoot() && options.Rate == DefaultRateSynScan {
 		options.Rate = DefaultRateConnectScan
 	}

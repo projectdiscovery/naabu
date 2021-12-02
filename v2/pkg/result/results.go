@@ -12,8 +12,8 @@ type Result struct {
 // NewResult structure
 func NewResult() *Result {
 	ipPorts := make(map[string]map[int]struct{})
-	ipDomains := make(map[string]struct{})
-	return &Result{IPPorts: ipPorts, IPS: ipDomains}
+	ips := make(map[string]struct{})
+	return &Result{IPPorts: ipPorts, IPS: ips}
 }
 
 // AddPort to a specific ip
@@ -26,6 +26,7 @@ func (r *Result) AddPort(k string, v int) {
 	}
 
 	r.IPPorts[k][v] = struct{}{}
+	r.IPS[k] = struct{}{}
 }
 
 // SetPorts for a specific ip
@@ -34,6 +35,7 @@ func (r *Result) SetPorts(k string, v map[int]struct{}) {
 	defer r.Unlock()
 
 	r.IPPorts[k] = v
+	r.IPS[k] = struct{}{}
 }
 
 // IPHasPort checks if an ip has a specific port
