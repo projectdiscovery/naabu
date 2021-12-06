@@ -28,7 +28,7 @@ type Options struct {
 	Rate              int    // Rate is the rate of port scan requests
 	Timeout           int    // Timeout is the seconds to wait for ports to respond
 	WarmUpTime        int    // WarmUpTime between scan phases
-	Host              string // Host is the host to find ports for
+	Host              goflags.NormalizedStringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile         string // HostsFile is the file containing list of hosts to find port for
 	Output            string // Output is the file to write found ports to.
 	Ports             string // Ports is the ports to use for enumeration
@@ -62,7 +62,7 @@ func ParseOptions() *Options {
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
 	createGroup(flagSet, "input", "Input",
-		flagSet.StringVar(&options.Host, "host", "", "Host to scan ports for"),
+		flagSet.NormalizedStringSliceVarP(&options.Host, "host", "",[]string{}, "Single Host or comma-separated list of hosts to scan ports for"),
 		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "File containing list of hosts to scan ports"),
 		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)"),
 		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)"),
