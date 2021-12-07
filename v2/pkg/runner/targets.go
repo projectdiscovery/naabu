@@ -43,9 +43,9 @@ func (r *Runner) mergeToFile() (string, error) {
 	defer tempInput.Close()
 
 	// target defined via CLI argument
-	if r.options.Host != "" {
-		for _, host := range strings.Split(r.options.Host, ",") {
-			fmt.Fprintf(tempInput, "%s\n", host)
+	if len(r.options.Host) > 0 {
+		for _,v :=range r.options.Host {
+			fmt.Fprintf(tempInput, "%s\n", v)
 		}
 	}
 
