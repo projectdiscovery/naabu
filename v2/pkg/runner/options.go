@@ -24,29 +24,29 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries           int    // Retries is the number of retries for the port
-	Rate              int    // Rate is the rate of port scan requests
-	Timeout           int    // Timeout is the seconds to wait for ports to respond
-	WarmUpTime        int    // WarmUpTime between scan phases
+	Retries           int                           // Retries is the number of retries for the port
+	Rate              int                           // Rate is the rate of port scan requests
+	Timeout           int                           // Timeout is the seconds to wait for ports to respond
+	WarmUpTime        int                           // WarmUpTime between scan phases
 	Host              goflags.NormalizedStringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile         string // HostsFile is the file containing list of hosts to find port for
-	Output            string // Output is the file to write found ports to.
-	Ports             string // Ports is the ports to use for enumeration
-	PortsFile         string // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts      string // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps        string // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile    string // File containing Ips or cidr to exclude from the scan
-	TopPorts          string // Tops ports to scan
-	SourceIP          string // SourceIP to use in TCP packets
-	Interface         string // Interface to use for TCP packets
-	ConfigFile        string // Config file contains a scan configuration
-	NmapCLI           string // Nmap command (has priority over config file)
-	Threads           int    // Internal worker threads
-	EnableProgressBar bool   // Enable progress bar
-	ScanAllIPS        bool   // Scan all the ips
-	ScanType          string // Scan Type
-	Proxy             string // Socks5 proxy
-	Resolvers         string // Resolvers (comma separated or file)
+	HostsFile         string                        // HostsFile is the file containing list of hosts to find port for
+	Output            string                        // Output is the file to write found ports to.
+	Ports             string                        // Ports is the ports to use for enumeration
+	PortsFile         string                        // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts      string                        // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps        string                        // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile    string                        // File containing Ips or cidr to exclude from the scan
+	TopPorts          string                        // Tops ports to scan
+	SourceIP          string                        // SourceIP to use in TCP packets
+	Interface         string                        // Interface to use for TCP packets
+	ConfigFile        string                        // Config file contains a scan configuration
+	NmapCLI           string                        // Nmap command (has priority over config file)
+	Threads           int                           // Internal worker threads
+	EnableProgressBar bool                          // Enable progress bar
+	ScanAllIPS        bool                          // Scan all the ips
+	ScanType          string                        // Scan Type
+	Proxy             string                        // Socks5 proxy
+	Resolvers         string                        // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
 }
@@ -62,57 +62,57 @@ func ParseOptions() *Options {
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
 	createGroup(flagSet, "input", "Input",
-		flagSet.NormalizedStringSliceVarP(&options.Host, "host", "",[]string{}, "Single Host or comma-separated list of hosts to scan ports for"),
-		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "File containing list of hosts to scan ports"),
-		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)"),
-		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)"),
+		flagSet.NormalizedStringSliceVarP(&options.Host, "host", "", []string{}, "hosts to scan ports for (comma-separated)"),
+		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "list of hosts to scan ports (file)"),
+		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "hosts to exclude from the scan (comma-separated)"),
+		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "list of hosts to exclude from scan (file)"),
 	)
 
 	createGroup(flagSet, "port", "Port",
-		flagSet.StringVarP(&options.Ports, "p", "port", "", "Ports to scan (80, 80,443, 100-200"),
-		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "Top Ports to scan (default top 100)"),
-		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "Ports to exclude from scan"),
-		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "File containing ports to scan for"),
-		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "Skip full port scans for CDNs (only checks for 80,443)"),
+		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200"),
+		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100)"),
+		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
+		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to exclude from scan (file)"),
+		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
 	)
 
 	createGroup(flagSet, "rate-limit", "Rate-limit",
-		flagSet.IntVar(&options.Threads, "c", 25, "General internal worker threads"),
-		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "Rate of port scan probe request"),
+		flagSet.IntVar(&options.Threads, "c", 25, "general internal worker threads"),
+		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
 	)
 
 	createGroup(flagSet, "output", "Output",
-		flagSet.StringVarP(&options.Output, "output", "o", "", "File to write output to (optional)"),
-		flagSet.BoolVar(&options.JSON, "json", false, "Write output in JSON lines Format"),
+		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
+		flagSet.BoolVar(&options.JSON, "json", false, "write output in JSON lines format"),
 	)
 
 	createGroup(flagSet, "config", "Configuration",
-		flagSet.BoolVar(&options.ScanAllIPS, "scan-all-ips", false, "Scan all the ips"),
-		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "Port scan type (SYN/CONNECT)"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "Source Ip"),
-		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "List available interfaces and public ip"),
-		flagSet.StringVarP(&options.Interface, "i", "interface", "", "Network Interface to use for port scan"),
-		flagSet.BoolVar(&options.Nmap, "nmap", false, "Invoke nmap scan on targets (nmap must be installed) - Deprecated"),
+		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
+		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
+		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
+		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
+		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
-		flagSet.StringVar(&options.Resolvers, "r", "", "Custom resolvers to use to resolve DNS names (comma separated or from file)"),
-		flagSet.StringVar(&options.Proxy, "proxy", "", "Socks5 proxy"),
+		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
+		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
-		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "Number of retries for the port scan probe"),
-		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "Millisecond to wait before timing out"),
-		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "Time in seconds between scan phases"),
-		flagSet.BoolVar(&options.Ping, "ping", false, "Use ping probes for verification of host"),
-		flagSet.BoolVar(&options.Verify, "verify", false, "Validate the ports again with TCP verification"),
+		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
+		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
+		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
+		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
+		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 	)
 
 	createGroup(flagSet, "debug", "Debug",
-		flagSet.BoolVar(&options.Debug, "debug", false, "Enable debugging information"),
-		flagSet.BoolVar(&options.Verbose, "v", false, "Show Verbose output"),
-		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "Don't Use colors in output"),
-		flagSet.BoolVar(&options.Silent, "silent", false, "Show found ports only in output"),
-		flagSet.BoolVar(&options.Version, "version", false, "Show version of naabu"),
-		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "Display stats of the running scan"),
+		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
+		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
+		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
+		flagSet.BoolVar(&options.Silent, "silent", false, "display only results in output"),
+		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
+		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan"),
 	)
 
 	_ = flagSet.Parse()
