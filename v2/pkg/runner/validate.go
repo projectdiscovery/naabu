@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
@@ -35,17 +36,17 @@ func (options *Options) validateOptions() error {
 
 	if options.Timeout == 0 {
 		return errors.Wrap(errZeroValue, "timeout")
-	} else if !isRoot() && options.Timeout == DefaultPortTimeoutSynScan {
+	} else if !privileges.IsPrivileged && options.Timeout == DefaultPortTimeoutSynScan {
 		options.Timeout = DefaultPortTimeoutConnectScan
 	}
 
 	if options.Rate == 0 {
 		return errors.Wrap(errZeroValue, "rate")
-	} else if !isRoot() && options.Rate == DefaultRateSynScan {
+	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
 		options.Rate = DefaultRateConnectScan
 	}
 
-	if !isRoot() && options.Retries == DefaultRetriesSynScan {
+	if !privileges.IsPrivileged && options.Retries == DefaultRetriesSynScan {
 		options.Retries = DefaultRetriesConnectScan
 	}
 

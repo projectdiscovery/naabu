@@ -16,6 +16,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
@@ -54,7 +55,6 @@ func NewRunner(options *Options) (*Runner, error) {
 		Retries:     options.Retries,
 		Rate:        options.Rate,
 		Debug:       options.Debug,
-		Root:        isRoot(),
 		ExcludeCdn:  options.ExcludeCDN,
 		ExcludedIps: excludedIps,
 		Proxy:       options.Proxy,
@@ -100,7 +100,7 @@ func NewRunner(options *Options) (*Runner, error) {
 func (r *Runner) RunEnumeration() error {
 	defer r.Close()
 
-	if isRoot() && r.options.ScanType == SynScan {
+	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli
 		if err := r.SetSourceIPAndInterface(); err != nil {
 			// Otherwise try to obtain them automatically
@@ -153,7 +153,7 @@ func (r *Runner) RunEnumeration() error {
 		}
 	}
 
-	osSupported := isOSSupported()
+	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 	// Retries are performed regardless of the previous scan results due to network unreliability
 	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
 		// Use current time as seed
@@ -167,7 +167,7 @@ func (r *Runner) RunEnumeration() error {
 
 			r.limiter.Take()
 			// connect scan
-			if osSupported && isRoot() && r.options.ScanType == SynScan {
+			if shouldUseRawPackets {
 				r.RawSocketEnumeration(ip, port)
 			} else {
 				r.wgscan.Add()

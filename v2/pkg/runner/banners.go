@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
@@ -31,7 +32,7 @@ func showBanner() {
 func showNetworkCapabilities(options *Options) {
 	accessLevel := "non root"
 	scanType := "CONNECT"
-	if isRoot() && options.ScanType == SynScan {
+	if privileges.IsPrivileged && options.ScanType == SynScan {
 		accessLevel = "root"
 		scanType = "SYN"
 	}
