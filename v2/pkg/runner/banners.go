@@ -34,6 +34,10 @@ func showNetworkCapabilities(options *Options) {
 	scanType := "CONNECT"
 	if privileges.IsPrivileged && options.ScanType == SynScan {
 		accessLevel = "root"
+		if isLinux() {
+			accessLevel = "CAP_NET_RAW"
+		}
+
 		scanType = "SYN"
 	}
 	gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)

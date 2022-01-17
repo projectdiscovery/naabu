@@ -36,7 +36,15 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 }
 
 func isOSSupported() bool {
-	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	return isLinux() || isOSX()
+}
+
+func isOSX() bool {
+	return runtime.GOOS == "darwin"
+}
+
+func isLinux() bool {
+	return runtime.GOOS == "linux"
 }
 
 func mapKeysToSliceInt(m map[int]struct{}) (s []int) {
