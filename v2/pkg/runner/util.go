@@ -2,16 +2,11 @@ package runner
 
 import (
 	"fmt"
-	"os"
 	"runtime"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
 )
-
-func isRoot() bool {
-	return os.Geteuid() == 0
-}
 
 func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	// If the host is a Domain, then perform resolution and discover all IP
@@ -41,7 +36,15 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 }
 
 func isOSSupported() bool {
-	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	return isLinux() || isOSX()
+}
+
+func isOSX() bool {
+	return runtime.GOOS == "darwin"
+}
+
+func isLinux() bool {
+	return runtime.GOOS == "linux"
 }
 
 func mapKeysToSliceInt(m map[int]struct{}) (s []int) {
