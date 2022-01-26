@@ -11,6 +11,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
 )
@@ -44,7 +45,7 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// target defined via CLI argument
 	if len(r.options.Host) > 0 {
-		for _,v :=range r.options.Host {
+		for _, v := range r.options.Host {
 			fmt.Fprintf(tempInput, "%s\n", v)
 		}
 	}
@@ -151,7 +152,7 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	// If the user has specified ping probes, perform ping on addresses
-	if isRoot() && r.options.Ping && len(initialHosts) > 1 {
+	if privileges.IsPrivileged && r.options.Ping && len(initialHosts) > 1 {
 		// Scan the hosts found for ping probes
 		pingResults, err := scan.PingHosts(initialHosts)
 		if err != nil {

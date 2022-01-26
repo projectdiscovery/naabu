@@ -13,6 +13,7 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
@@ -129,7 +130,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		IPRanger:     iprang,
 	}
 
-	if options.Root && newScannerCallback != nil {
+	if privileges.IsPrivileged && newScannerCallback != nil {
 		if err := newScannerCallback(scanner); err != nil {
 			return nil, err
 		}
@@ -532,7 +533,6 @@ func (s *Scanner) SetupHandlers() error {
 	if s.NetworkInterface != nil {
 		return s.SetupHandler(s.NetworkInterface.Name)
 	}
-
 	itfs, err := net.Interfaces()
 	if err != nil {
 		return err
