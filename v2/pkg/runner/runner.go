@@ -355,7 +355,7 @@ func (r *Runner) handleOutput() {
 
 			// console output
 			if r.options.JSON {
-				data := JSONResult{IP: hostIP}
+				data := JSONResult{IP: hostIP, TimeStamp: time.Now().UTC()}
 				if host != hostIP {
 					data.Host = host
 				}
