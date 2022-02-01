@@ -12,6 +12,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Install Dependences
+        run: sudo apt install libpcap-dev
+
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v2
         with:
