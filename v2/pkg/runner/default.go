@@ -12,6 +12,7 @@ const (
 
 	ExternalTargetForTune = "8.8.8.8"
 
-	SynScan     = "s"
-	ConnectScan = "c"
+	SynScan             = "s"
+	ConnectScan         = "c"
+	DefautStatsInterval = 5
 )
