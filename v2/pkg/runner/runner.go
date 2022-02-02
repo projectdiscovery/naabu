@@ -22,10 +22,6 @@ import (
 	"go.uber.org/ratelimit"
 )
 
-const (
-	tickduration = 5
-)
-
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
@@ -148,7 +144,7 @@ func (r *Runner) RunEnumeration() error {
 		r.stats.AddCounter("packets", uint64(0))
 		r.stats.AddCounter("errors", uint64(0))
 		r.stats.AddCounter("total", Range*uint64(r.options.Retries))
-		if err := r.stats.Start(makePrintCallback(), tickduration*time.Second); err != nil {
+		if err := r.stats.Start(makePrintCallback(), time.Duration(r.options.StatsInterval)*time.Second); err != nil {
 			gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
 		}
 	}
