@@ -16,9 +16,10 @@ import (
 )
 
 var (
-	errNoInputList = errors.New("no input list provided")
-	errOutputMode  = errors.New("both verbose and silent mode specified")
-	errZeroValue   = errors.New("cannot be zero")
+	errNoInputList   = errors.New("no input list provided")
+	errOutputMode    = errors.New("both verbose and silent mode specified")
+	errZeroValue     = errors.New("cannot be zero")
+	errTwoOutputMode = errors.New("both json and csv mode specified")
 )
 
 // validateOptions validates the configuration options passed
@@ -32,6 +33,10 @@ func (options *Options) validateOptions() error {
 	// Both verbose and silent flags were used
 	if options.Verbose && options.Silent {
 		return errOutputMode
+	}
+
+	if options.JSON && options.CSV {
+		return errTwoOutputMode
 	}
 
 	if options.Timeout == 0 {

@@ -49,6 +49,7 @@ type Options struct {
 	Resolvers         string                        // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
+	CSV             bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -84,6 +85,7 @@ func ParseOptions() *Options {
 	createGroup(flagSet, "output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
 		flagSet.BoolVar(&options.JSON, "json", false, "write output in JSON lines format"),
+		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
 
 	createGroup(flagSet, "config", "Configuration",

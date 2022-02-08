@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bufio"
+	"encoding/csv"
 	"encoding/json"
 	"io"
 	"strconv"
@@ -10,9 +11,9 @@ import (
 
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
-	Host string `json:"host,omitempty"`
-	IP   string `json:"ip,omitempty"`
-	Port int    `json:"port"`
+	Host string `json:"host,omitempty" csv:"host"`
+	IP   string `json:"ip,omitempty" csv:"ip"`
+	Port int    `json:"port" csv:"port"`
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
@@ -48,11 +49,30 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) 
 
 	for port := range ports {
 		data.Port = port
-
 		err := encoder.Encode(&data)
 		if err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
+func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer io.Writer) error {
+	encoder := csv.NewWriter(writer)
+	data := JSONResult{}
+	if header {
+		getHeader(data, encoder)
+	}
+	if host != ip {
+		data.Host = host
+	}
+	data.IP = ip
+
+	for port := range ports {
+		data.Port = port
+		getRows(data, encoder)
+	}
+	encoder.Flush()
 	return nil
 }

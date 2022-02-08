@@ -1,11 +1,14 @@
 package runner
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -340,43 +343,59 @@ func (r *Runner) handleOutput() {
 		}
 		defer file.Close()
 	}
-
+	csvFileHeaderEnabled := true
 	for hostIP, ports := range r.scanner.ScanResults.IPPorts {
+		csvHeaderEnabled := true
 		dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
 		if err != nil {
 			continue
 		}
-
+		buffer := bytes.Buffer{}
+		writer := csv.NewWriter(&buffer)
 		for _, host := range dt {
 			if host == "ip" {
 				host = hostIP
 			}
 			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
-
 			// console output
-			if r.options.JSON {
+			if r.options.JSON || r.options.CSV {
 				data := JSONResult{IP: hostIP}
 				if host != hostIP {
 					data.Host = host
 				}
 				for port := range ports {
 					data.Port = port
-					b, marshallErr := json.Marshal(data)
-					if marshallErr != nil {
-						continue
+					if r.options.JSON {
+						b, marshallErr := json.Marshal(data)
+						if marshallErr != nil {
+							continue
+						}
+						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+					} else if r.options.CSV {
+						if csvHeaderEnabled {
+							getHeader(data, writer)
+							csvHeaderEnabled = false
+						}
+						getRows(data, writer)
 					}
-					gologger.Silent().Msgf("%s\n", string(b))
 				}
+			}
+			if r.options.JSON {
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else if r.options.CSV {
+				writer.Flush()
+				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
 				for port := range ports {
 					gologger.Silent().Msgf("%s:%d\n", host, port)
 				}
 			}
-
 			// file output
 			if file != nil {
 				if r.options.JSON {
 					err = WriteJSONOutput(host, hostIP, ports, file)
+				} else if r.options.CSV {
+					err = WriteCsvOutput(host, hostIP, ports, csvFileHeaderEnabled, file)
 				} else {
 					err = WriteHostOutput(host, ports, file)
 				}
@@ -389,7 +408,24 @@ func (r *Runner) handleOutput() {
 				r.options.OnResult(host, hostIP, mapKeysToSliceInt(ports))
 			}
 		}
+		csvFileHeaderEnabled = false
 	}
+}
+func getHeader(data interface{}, writer *csv.Writer) {
+	ty := reflect.TypeOf(data)
+	var header []string
+	for i := 0; i < ty.NumField(); i++ {
+		header = append(header, ty.Field(i).Name)
+	}
+	writer.Write(header)
+}
+func getRows(data interface{}, writer *csv.Writer) {
+	vl := reflect.ValueOf(data)
+	var rows []string
+	for i := 0; i < vl.NumField(); i++ {
+		rows = append(rows, fmt.Sprint(vl.Field(i).Interface()))
+	}
+	writer.Write(rows)
 }
 
 const bufferSize = 128
