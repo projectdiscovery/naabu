@@ -7,13 +7,15 @@ import (
 	"io"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // JSONResult contains the result for a host in JSON format
 type JSONResult struct {
-	Host string `json:"host,omitempty" csv:"host"`
-	IP   string `json:"ip,omitempty" csv:"ip"`
-	Port int    `json:"port" csv:"port"`
+	Host      string    `json:"host,omitempty" csv:"host"`
+	IP        string    `json:"ip,omitempty" csv:"ip"`
+	Port      int       `json:"port" csv:"port"`
+	TimeStamp time.Time `json:"timestamp" csv:"timestamp"`
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
@@ -41,7 +43,7 @@ func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) erro
 func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
-	data := JSONResult{}
+	data := JSONResult{TimeStamp: time.Now().UTC()}
 	if host != ip {
 		data.Host = host
 	}
@@ -60,7 +62,7 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
 func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
-	data := JSONResult{}
+	data := JSONResult{TimeStamp: time.Now().UTC()}
 	if header {
 		getHeader(data, encoder)
 	}
