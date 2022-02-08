@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
@@ -354,7 +355,7 @@ func (r *Runner) handleOutput() {
 			}
 			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 			// console output
-			if r.options.JSON || r.options.CSV  {
+			if r.options.JSON || r.options.CSV {
 				data := JSONResult{IP: hostIP, TimeStamp: time.Now().UTC()}
 				if host != hostIP {
 					data.Host = host
@@ -413,7 +414,11 @@ func getHeader(data interface{}, writer *csv.Writer) {
 	for i := 0; i < ty.NumField(); i++ {
 		header = append(header, ty.Field(i).Name)
 	}
-	writer.Write(header)
+	err := writer.Write(header)
+	if err != nil {
+		errMsg := errors.Wrap(err, "Could not write to header")
+		gologger.Error().Msgf(errMsg.Error())
+	}
 }
 func getRows(data interface{}, writer *csv.Writer) {
 	vl := reflect.ValueOf(data)
@@ -421,7 +426,11 @@ func getRows(data interface{}, writer *csv.Writer) {
 	for i := 0; i < vl.NumField(); i++ {
 		rows = append(rows, fmt.Sprint(vl.Field(i).Interface()))
 	}
-	writer.Write(rows)
+	err := writer.Write(rows)
+	if err != nil {
+		errMsg := errors.Wrap(err, "Could not write to rows")
+		gologger.Error().Msgf(errMsg.Error())
+	}
 }
 
 const bufferSize = 128
