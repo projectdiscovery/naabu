@@ -28,7 +28,7 @@ jobs:
       - name: Run unit Tests
         working-directory: v2/
         run: |
-          go test -coverprofile=./cov.out ./...
+          go test -coverprofile=cov.out ./...
 
       - name: Run Gosec Security Scanner
         working-directory: v2/
