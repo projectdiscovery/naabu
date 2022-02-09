@@ -4,28 +4,28 @@ on:
   pull_request:
   workflow_dispatch:
 
-
 jobs:
   functional:
     name: Functional Test
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest] # Todo: windows-latest, macOS-latest
+
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: 1.17
 
-      - name: Install libpcap-dev
-        run: sudo apt install libpcap-dev
-      
-      - name: Install nmap
-        run: sudo apt install nmap
-      
-      - name: Install simplehttpserver
-        run: go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
-
       - name: Check out code
         uses: actions/checkout@v2
+
+      - name: Install required packages (libpcap-dev, nmap, simplehttpserver)
+        run: |
+          sudo apt install libpcap-dev
+          sudo apt install nmap
+          go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
 
       - name: Run the simplehttpserver on 127.0.0.1:8000
         run: |
