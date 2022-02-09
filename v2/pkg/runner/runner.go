@@ -3,12 +3,10 @@ package runner
 import (
 	"bytes"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
-	"reflect"
 	"strings"
 	"sync"
 	"time"
@@ -356,24 +354,24 @@ func (r *Runner) handleOutput() {
 			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
 			// console output
 			if r.options.JSON || r.options.CSV {
-				data := JSONResult{IP: hostIP, TimeStamp: time.Now().UTC()}
+				data := &Result{IP: hostIP, TimeStamp: time.Now().UTC()}
 				if host != hostIP {
 					data.Host = host
 				}
 				for port := range ports {
 					data.Port = port
 					if r.options.JSON {
-						b, marshallErr := json.Marshal(data)
+						b, marshallErr := data.JSON()
 						if marshallErr != nil {
 							continue
 						}
 						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 					} else if r.options.CSV {
 						if csvHeaderEnabled {
-							getHeader(data, writer)
+							writeCSVHeaders(data, writer)
 							csvHeaderEnabled = false
 						}
-						getRows(data, writer)
+						writeCSVRow(data, writer)
 					}
 				}
 			}
@@ -408,27 +406,27 @@ func (r *Runner) handleOutput() {
 		csvFileHeaderEnabled = false
 	}
 }
-func getHeader(data interface{}, writer *csv.Writer) {
-	ty := reflect.TypeOf(data)
-	var header []string
-	for i := 0; i < ty.NumField(); i++ {
-		header = append(header, ty.Field(i).Name)
-	}
-	err := writer.Write(header)
+func writeCSVHeaders(data *Result, writer *csv.Writer) {
+	headers, err := data.CSVHeaders()
 	if err != nil {
-		errMsg := errors.Wrap(err, "Could not write to header")
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+
+	if err := writer.Write(headers); err != nil {
+		errMsg := errors.Wrap(err, "Could not write headers")
 		gologger.Error().Msgf(errMsg.Error())
 	}
 }
-func getRows(data interface{}, writer *csv.Writer) {
-	vl := reflect.ValueOf(data)
-	var rows []string
-	for i := 0; i < vl.NumField(); i++ {
-		rows = append(rows, fmt.Sprint(vl.Field(i).Interface()))
-	}
-	err := writer.Write(rows)
+
+func writeCSVRow(data *Result, writer *csv.Writer) {
+	rowData, err := data.CSVFields()
 	if err != nil {
-		errMsg := errors.Wrap(err, "Could not write to rows")
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+	if err := writer.Write(rowData); err != nil {
+		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msgf(errMsg.Error())
 	}
 }

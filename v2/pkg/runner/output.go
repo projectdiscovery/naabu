@@ -4,18 +4,52 @@ import (
 	"bufio"
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"io"
+	"reflect"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/pkg/errors"
 )
 
-// JSONResult contains the result for a host in JSON format
-type JSONResult struct {
+// Result contains the result for a host
+type Result struct {
 	Host      string    `json:"host,omitempty" csv:"host"`
 	IP        string    `json:"ip,omitempty" csv:"ip"`
 	Port      int       `json:"port" csv:"port"`
 	TimeStamp time.Time `json:"timestamp" csv:"timestamp"`
+}
+
+func (r *Result) JSON() ([]byte, error) {
+	return json.Marshal(r)
+}
+
+var NumberOfCsvFieldsErr = errors.New("exported fields don't match csv tags")
+
+func (r *Result) CSVHeaders() ([]string, error) {
+	ty := reflect.TypeOf(*r)
+	var headers []string
+	for i := 0; i < ty.NumField(); i++ {
+		headers = append(headers, ty.Field(i).Tag.Get("csv"))
+	}
+	if len(headers) != ty.NumField() {
+		return nil, NumberOfCsvFieldsErr
+	}
+	return headers, nil
+}
+
+func (r *Result) CSVFields() ([]string, error) {
+	var fields []string
+	vl := reflect.ValueOf(*r)
+	for i := 0; i < vl.NumField(); i++ {
+		fields = append(fields, fmt.Sprint(vl.Field(i).Interface()))
+	}
+	if len(fields) != vl.NumField() {
+		return nil, NumberOfCsvFieldsErr
+	}
+	return fields, nil
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
@@ -43,7 +77,7 @@ func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) erro
 func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 
-	data := JSONResult{TimeStamp: time.Now().UTC()}
+	data := Result{TimeStamp: time.Now().UTC()}
 	if host != ip {
 		data.Host = host
 	}
@@ -62,9 +96,9 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
 func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
-	data := JSONResult{TimeStamp: time.Now().UTC()}
+	data := &Result{TimeStamp: time.Now().UTC()}
 	if header {
-		getHeader(data, encoder)
+		writeCSVHeaders(data, encoder)
 	}
 	if host != ip {
 		data.Host = host
@@ -73,7 +107,7 @@ func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer
 
 	for port := range ports {
 		data.Port = port
-		getRows(data, encoder)
+		writeCSVRow(data, encoder)
 	}
 	encoder.Flush()
 	return nil
