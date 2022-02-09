@@ -4,11 +4,13 @@ on:
   pull_request:
   workflow_dispatch:
 
-
 jobs:
   build:
-    name: Build Test
-    runs-on: ubuntu-latest
+    name: Test Builds
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest] # Todo: windows-latest, macOS-latest
     steps:
       - name: Set up Go
         uses: actions/setup-go@v2
@@ -24,10 +26,21 @@ jobs:
       - name: Install nmap
         run: sudo apt install nmap
 
+      - name: Build
+        run: go build .
+        working-directory: v2/cmd/naabu/
+
       - name: Test
         run: go test ./...
         working-directory: v2/
 
-      - name: Build
-        run: go build .
+      # Todo
+      # - name: Integration Tests
+      #   env:
+      #     GH_ACTION: true
+      #   run: bash run.sh
+      #   working-directory: integration_tests/
+        
+      - name: Race Condition Tests
+        run: go build -race .
         working-directory: v2/cmd/naabu/
