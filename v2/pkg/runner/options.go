@@ -49,7 +49,8 @@ type Options struct {
 	Resolvers         string                        // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
-	StatsInterval     int              // StatsInterval is the number of seconds to display stats after
+	CSV               bool
+	StatsInterval     int // StatsInterval is the number of seconds to display stats after
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -85,6 +86,7 @@ func ParseOptions() *Options {
 	createGroup(flagSet, "output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
 		flagSet.BoolVar(&options.JSON, "json", false, "write output in JSON lines format"),
+		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
 
 	createGroup(flagSet, "config", "Configuration",
