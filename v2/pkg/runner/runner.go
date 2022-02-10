@@ -1,7 +1,8 @@
 package runner
 
 import (
-	"encoding/json"
+	"bytes"
+	"encoding/csv"
 	"fmt"
 	"net"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
@@ -336,43 +338,59 @@ func (r *Runner) handleOutput() {
 		}
 		defer file.Close()
 	}
-
+	csvFileHeaderEnabled := true
 	for hostIP, ports := range r.scanner.ScanResults.IPPorts {
+		csvHeaderEnabled := true
 		dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
 		if err != nil {
 			continue
 		}
-
+		buffer := bytes.Buffer{}
+		writer := csv.NewWriter(&buffer)
 		for _, host := range dt {
 			if host == "ip" {
 				host = hostIP
 			}
 			gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
-
 			// console output
-			if r.options.JSON {
-				data := JSONResult{IP: hostIP, TimeStamp: time.Now().UTC()}
+			if r.options.JSON || r.options.CSV {
+				data := &Result{IP: hostIP, TimeStamp: time.Now().UTC()}
 				if host != hostIP {
 					data.Host = host
 				}
 				for port := range ports {
 					data.Port = port
-					b, marshallErr := json.Marshal(data)
-					if marshallErr != nil {
-						continue
+					if r.options.JSON {
+						b, marshallErr := data.JSON()
+						if marshallErr != nil {
+							continue
+						}
+						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+					} else if r.options.CSV {
+						if csvHeaderEnabled {
+							writeCSVHeaders(data, writer)
+							csvHeaderEnabled = false
+						}
+						writeCSVRow(data, writer)
 					}
-					gologger.Silent().Msgf("%s\n", string(b))
 				}
+			}
+			if r.options.JSON {
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else if r.options.CSV {
+				writer.Flush()
+				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
 				for port := range ports {
 					gologger.Silent().Msgf("%s:%d\n", host, port)
 				}
 			}
-
 			// file output
 			if file != nil {
 				if r.options.JSON {
 					err = WriteJSONOutput(host, hostIP, ports, file)
+				} else if r.options.CSV {
+					err = WriteCsvOutput(host, hostIP, ports, csvFileHeaderEnabled, file)
 				} else {
 					err = WriteHostOutput(host, ports, file)
 				}
@@ -385,6 +403,31 @@ func (r *Runner) handleOutput() {
 				r.options.OnResult(host, hostIP, mapKeysToSliceInt(ports))
 			}
 		}
+		csvFileHeaderEnabled = false
+	}
+}
+func writeCSVHeaders(data *Result, writer *csv.Writer) {
+	headers, err := data.CSVHeaders()
+	if err != nil {
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+
+	if err := writer.Write(headers); err != nil {
+		errMsg := errors.Wrap(err, "Could not write headers")
+		gologger.Error().Msgf(errMsg.Error())
+	}
+}
+
+func writeCSVRow(data *Result, writer *csv.Writer) {
+	rowData, err := data.CSVFields()
+	if err != nil {
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+	if err := writer.Write(rowData); err != nil {
+		errMsg := errors.Wrap(err, "Could not write row")
+		gologger.Error().Msgf(errMsg.Error())
 	}
 }
 
