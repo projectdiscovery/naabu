@@ -118,7 +118,6 @@ func (r *Runner) RunEnumeration() error {
 	if err != nil {
 		return err
 	}
-
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
@@ -162,18 +161,72 @@ func (r *Runner) RunEnumeration() error {
 			portIndex := int(xxx % int64(portsCount))
 			ip := r.PickIP(targets, ipIndex)
 			port := r.PickPort(portIndex)
-
 			r.limiter.Take()
+			//resume cfg logic
+			r.options.ResumeCfg.Lock()
+			currentInfo, ok := r.options.ResumeCfg.Current[ip]
+			if !ok {
+				currentInfo = &ResumeInfo{}
+				r.options.ResumeCfg.Current[ip] = currentInfo
+			}
+			if currentInfo.InFlight == nil {
+				currentInfo.InFlight = make(map[uint32]InFlightResume)
+			}
+			resumeFromInfo, ok := r.options.ResumeCfg.ResumeFrom[ip]
+			if !ok {
+				resumeFromInfo = &ResumeInfo{}
+				r.options.ResumeCfg.ResumeFrom[ip] = resumeFromInfo
+			}
+			r.options.ResumeCfg.Unlock()
+			cleanupInFlight := func(current *ResumeInfo, portParam uint32) {
+				current.Lock()
+				current.InFlight[portParam] = InFlightResume{
+					Completed: true,
+				}
+				current.Unlock()
+			}
+			skipHandler := func(portParam uint32) bool {
+				var skip bool
+				if _, isInFlight := resumeFromInfo.InFlight[portParam]; !isInFlight { // port wasn't found
+					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port not found\n", ip, port)
+					skip = false
+				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && !item.Completed { // port scan wasn't completed successfully
+					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port scan wasn't completed\n", ip, port)
+					skip = false
+				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && item.Completed { // port scan is already completed
+					gologger.Debug().Msgf("[%s] Skipping \"%v\": Resume - Port scan already completed\n", ip, port)
+					skip = true
+				}
+				return skip
+			}
 			// connect scan
-			if shouldUseRawPackets {
-				r.RawSocketEnumeration(ip, port)
-			} else {
-				r.wgscan.Add()
-				go r.handleHostPort(ip, port)
-			}
-			if r.options.EnableProgressBar {
-				r.stats.IncrementCounter("packets", 1)
-			}
+			go func(portParam uint32) {
+				currentInfo.Lock()
+				_, ok := currentInfo.InFlight[portParam]
+				if !ok {
+					currentInfo.InFlight[portParam] = InFlightResume{
+						Completed: false,
+					}
+				}
+				currentInfo.Unlock()
+				if skip := skipHandler(portParam); skip {
+					return
+				}
+				handler := func() {
+					// on scan complete cleanup the inflight data
+					cleanupInFlight(currentInfo, portParam)
+				}
+				if shouldUseRawPackets {
+					r.RawSocketEnumeration(ip, port, handler)
+				} else {
+					r.wgscan.Add()
+
+					go r.handleHostPort(ip, port, handler)
+				}
+				if r.options.EnableProgressBar {
+					r.stats.IncrementCounter("packets", 1)
+				}
+			}(uint32(port))
 		}
 	}
 
@@ -194,6 +247,14 @@ func (r *Runner) RunEnumeration() error {
 
 	// handle nmap
 	return r.handleNmap()
+}
+
+func (r *Runner) ShowScanResultOnExit() {
+	r.handleOutput()
+	err := r.handleNmap()
+	if err != nil {
+		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
+	}
 }
 
 // Close runner instance
@@ -245,9 +306,9 @@ func (r *Runner) BackgroundWorkers() {
 	r.scanner.StartWorkers()
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, port int) {
+func (r *Runner) RawSocketEnumeration(ip string, port int, handler func()) {
 	// skip invalid combinations
-	r.handleHostPortSyn(ip, port)
+	r.handleHostPortSyn(ip, port, handler)
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
@@ -266,7 +327,8 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(host string, port int) {
+func (r *Runner) handleHostPort(host string, port int, handler func()) {
+	defer handler()
 	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
@@ -285,7 +347,8 @@ func (r *Runner) handleHostPort(host string, port int) {
 	}
 }
 
-func (r *Runner) handleHostPortSyn(host string, port int) {
+func (r *Runner) handleHostPortSyn(host string, port int, handler func()) {
+	defer handler()
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
