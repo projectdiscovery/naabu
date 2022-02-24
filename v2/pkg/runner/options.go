@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"github.com/projectdiscovery/fileutil"
 	"os"
 
 	"github.com/projectdiscovery/goflags"
@@ -51,6 +52,8 @@ type Options struct {
 	OnResult          OnResultCallback // OnResult callback
 	CSV               bool
 	StatsInterval     int // StatsInterval is the number of seconds to display stats after
+	Resume            bool
+	ResumeCfg         *ResumeCfg
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -99,6 +102,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
+		flagSet.BoolVar(&options.Resume, "resume", false, "Resume"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
@@ -126,7 +130,12 @@ func ParseOptions() *Options {
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
-
+	options.ResumeCfg = NewResumeCfg()
+	if options.ShouldLoadResume() {
+		if err := options.ResumeCfg.ConfigureResume(); err != nil {
+			gologger.Fatal().Msgf("%s\n", err)
+		}
+	}
 	// Show the user the banner
 	showBanner()
 
@@ -154,6 +163,11 @@ func ParseOptions() *Options {
 	showNetworkCapabilities(options)
 
 	return options
+}
+
+// ShouldLoadResume resume file
+func (options *Options) ShouldLoadResume() bool {
+	return options.Resume && fileutil.FileExists(DefaultResumeFilePath())
 }
 
 func hasStdin() bool {
