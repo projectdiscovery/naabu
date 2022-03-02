@@ -175,7 +175,7 @@ func (r *Runner) RunEnumeration() error {
 			}
 			handler := func(key string) {
 				r.options.ResumeCfg.Lock()
-				r.options.ResumeCfg.hm.Set(key, []byte(""))
+				_ = r.options.ResumeCfg.hm.Set(key, []byte(""))
 				r.options.ResumeCfg.Unlock()
 		}
 			// connect scan
