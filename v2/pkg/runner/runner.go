@@ -162,71 +162,39 @@ func (r *Runner) RunEnumeration() error {
 			ip := r.PickIP(targets, ipIndex)
 			port := r.PickPort(portIndex)
 			r.limiter.Take()
-			//resume cfg logic
-			r.options.ResumeCfg.Lock()
-			currentInfo, ok := r.options.ResumeCfg.Current[ip]
-			if !ok {
-				currentInfo = &ResumeInfo{}
-				r.options.ResumeCfg.Current[ip] = currentInfo
-			}
-			if currentInfo.InFlight == nil {
-				currentInfo.InFlight = make(map[uint32]InFlightResume)
-			}
-			resumeFromInfo, ok := r.options.ResumeCfg.ResumeFrom[ip]
-			if !ok {
-				resumeFromInfo = &ResumeInfo{}
-				r.options.ResumeCfg.ResumeFrom[ip] = resumeFromInfo
-			}
-			r.options.ResumeCfg.Unlock()
-			cleanupInFlight := func(current *ResumeInfo, portParam uint32) {
-				current.Lock()
-				current.InFlight[portParam] = InFlightResume{
-					Completed: true,
-				}
-				current.Unlock()
-			}
-			skipHandler := func(portParam uint32) bool {
-				var skip bool
-				if _, isInFlight := resumeFromInfo.InFlight[portParam]; !isInFlight { // port wasn't found
-					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port not found\n", ip, port)
-					skip = false
-				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && !item.Completed { // port scan wasn't completed successfully
-					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port scan wasn't completed\n", ip, port)
-					skip = false
-				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && item.Completed { // port scan is already completed
+			uniqueKey := fmt.Sprintf("%s:%d", ip, port)
+			skipHandler := func(key string) bool {
+				r.options.ResumeCfg.Lock()
+				skip := false
+				_, skip = r.options.ResumeCfg.hm.Get(key)
+				if skip && currentRetry == 0 {
 					gologger.Debug().Msgf("[%s] Skipping \"%v\": Resume - Port scan already completed\n", ip, port)
-					skip = true
 				}
+				r.options.ResumeCfg.Unlock()
 				return skip
 			}
+			handler := func(key string) {
+				r.options.ResumeCfg.Lock()
+				r.options.ResumeCfg.hm.Set(key, []byte(""))
+				r.options.ResumeCfg.Unlock()
+		}
 			// connect scan
-			go func(portParam uint32) {
-				currentInfo.Lock()
-				_, ok := currentInfo.InFlight[portParam]
-				if !ok {
-					currentInfo.InFlight[portParam] = InFlightResume{
-						Completed: false,
+			go func() {
+				if r.options.ShouldLoadResume() {
+					if skip := skipHandler(uniqueKey); skip {
+						return
 					}
 				}
-				currentInfo.Unlock()
-				if skip := skipHandler(portParam); skip {
-					return
-				}
-				handler := func() {
-					// on scan complete cleanup the inflight data
-					cleanupInFlight(currentInfo, portParam)
-				}
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port, handler)
+					r.RawSocketEnumeration(ip, port, func() { handler(uniqueKey) })
 				} else {
 					r.wgscan.Add()
-
-					go r.handleHostPort(ip, port, handler)
+					go r.handleHostPort(ip, port, func() { handler(uniqueKey) })
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
 				}
-			}(uint32(port))
+			}()
 		}
 	}
 
@@ -328,7 +296,6 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 }
 
 func (r *Runner) handleHostPort(host string, port int, handler func()) {
-	defer handler()
 	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
@@ -344,6 +311,7 @@ func (r *Runner) handleHostPort(host string, port int, handler func()) {
 	open, err := r.scanner.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
 	if open && err == nil {
 		r.scanner.ScanResults.AddPort(host, port)
+		handler()
 	}
 }
 

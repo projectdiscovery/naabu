@@ -23,13 +23,6 @@ func main() {
 		for range c {
 			naabuRunner.ShowScanResultOnExit()
 			gologger.Info().Msgf("CTRL+C pressed: Exiting\n")
-			if options.ResumeCfg.ShouldSaveResume() {
-				gologger.Info().Msgf("Creating resume file: %s\n", runner.DefaultResumeFilePath())
-				err := options.ResumeCfg.SaveResumeConfig()
-				if err != nil {
-					gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
-				}
-			}
 			naabuRunner.Close()
 			os.Exit(1)
 		}
@@ -39,6 +32,6 @@ func main() {
 	if err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
-	// on successful execution remove the resume file in case it exists
+	// on successful execution cleanup the resume configurations
 	options.ResumeCfg.CleanupResumeConfig()
 }

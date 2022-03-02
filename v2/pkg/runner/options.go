@@ -130,14 +130,13 @@ func ParseOptions() *Options {
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
-	options.ResumeCfg = NewResumeCfg()
-	if options.ShouldLoadResume() {
-		if err := options.ResumeCfg.ConfigureResume(); err != nil {
-			gologger.Fatal().Msgf("%s\n", err)
-		}
-	}
 	// Show the user the banner
 	showBanner()
+	//Checking the resume flag
+	if options.ShouldLoadResume() {
+		gologger.Info().Msg("Resuming from save checkpoint")
+	}
+	options.ResumeCfg = NewResumeCfg()
 
 	if options.Version {
 		gologger.Info().Msgf("Current Version: %s\n", Version)
@@ -167,7 +166,7 @@ func ParseOptions() *Options {
 
 // ShouldLoadResume resume file
 func (options *Options) ShouldLoadResume() bool {
-	return options.Resume && fileutil.FileExists(DefaultResumeFilePath())
+	return options.Resume && fileutil.FolderExists(DefaultResumeFilePath())
 }
 
 func hasStdin() bool {
