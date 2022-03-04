@@ -84,32 +84,53 @@ func (r *Runner) PreProcessTargets() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
 	s := bufio.NewScanner(f)
-	for s.Scan() {
-		wg.Add()
-		func(target string) {
-			defer wg.Done()
-			if err := r.AddTarget(target); err != nil {
-				gologger.Warning().Msgf("%s\n", err)
+	if r.options.Stream {
+		go func() {
+			defer f.Close()
+			defer close(r.streamChannel)
+			for s.Scan() {
+				func(target string) {
+					if err := r.AddTarget(target); err != nil {
+						gologger.Warning().Msgf("%s\n", err)
+					}
+				}(s.Text())
 			}
-		}(s.Text())
-	}
+		}()
 
-	wg.Wait()
+	} else {
+		defer f.Close()
+		for s.Scan() {
+			wg.Add()
+			func(target string) {
+				defer wg.Done()
+				if err := r.AddTarget(target); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
+			}(s.Text())
+		}
+		wg.Wait()
+	}
 	return nil
 }
 
 func (r *Runner) AddTarget(target string) error {
 	target = strings.TrimSpace(target)
+	invokeStreamChannel := func(ip string) {
+		if r.options.Stream {
+			r.streamChannel <- ipranger.ToCidr(ip)
+		}
+	}
 	if target == "" {
 		return nil
 	} else if ipranger.IsCidr(target) {
+		invokeStreamChannel(target)
 		// Add cidr directly to ranger, as single ips would allocate more resources later
 		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+		invokeStreamChannel(target)
 		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
@@ -119,6 +140,7 @@ func (r *Runner) AddTarget(target string) error {
 			return err
 		}
 		for _, ip := range ips {
+			invokeStreamChannel(ip)
 			if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
 				gologger.Warning().Msgf("%s\n", err)
 			}

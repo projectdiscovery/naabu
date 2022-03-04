@@ -51,6 +51,7 @@ type Options struct {
 	OnResult          OnResultCallback // OnResult callback
 	CSV               bool
 	StatsInterval     int // StatsInterval is the number of seconds to display stats after
+	Stream            bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -99,6 +100,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
+		flagSet.BoolVarP(&options.Stream, "stream", "sm", false, "Stream mode - start elaborating input targets without sorting"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
