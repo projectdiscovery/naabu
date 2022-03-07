@@ -153,84 +153,69 @@ func (r *Runner) RunEnumeration() error {
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 	// Retries are performed regardless of the previous scan results due to network unreliability
 	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+		if currentRetry < r.options.ResumeCfg.Retry {
+			gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
+			continue
+		}
+
 		// Use current time as seed
-		b := blackrock.New(int64(Range), time.Now().UnixNano())
+		currentSeed := time.Now().UnixNano()
+		r.options.ResumeCfg.RLock()
+		if r.options.ResumeCfg.Seed > 0 {
+			currentSeed = r.options.ResumeCfg.Seed
+		}
+		r.options.ResumeCfg.RUnlock()
+
+		// keep track of current retry and seed for resume
+		r.options.ResumeCfg.Lock()
+		r.options.ResumeCfg.Retry = currentRetry
+		r.options.ResumeCfg.Seed = currentSeed
+		r.options.ResumeCfg.Unlock()
+
+		b := blackrock.New(int64(Range), currentSeed)
 		for index := int64(0); index < int64(Range); index++ {
 			xxx := b.Shuffle(index)
 			ipIndex := xxx / int64(portsCount)
 			portIndex := int(xxx % int64(portsCount))
 			ip := r.PickIP(targets, ipIndex)
 			port := r.PickPort(portIndex)
+
+			r.options.ResumeCfg.RLock()
+			resumeCfgIndex := r.options.ResumeCfg.Index
+			r.options.ResumeCfg.RUnlock()
+			if index < resumeCfgIndex {
+				gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+				continue
+			}
+
 			r.limiter.Take()
 			//resume cfg logic
 			r.options.ResumeCfg.Lock()
-			currentInfo, ok := r.options.ResumeCfg.Current[ip]
-			if !ok {
-				currentInfo = &ResumeInfo{}
-				r.options.ResumeCfg.Current[ip] = currentInfo
-			}
-			if currentInfo.InFlight == nil {
-				currentInfo.InFlight = make(map[uint32]InFlightResume)
-			}
-			resumeFromInfo, ok := r.options.ResumeCfg.ResumeFrom[ip]
-			if !ok {
-				resumeFromInfo = &ResumeInfo{}
-				r.options.ResumeCfg.ResumeFrom[ip] = resumeFromInfo
-			}
+			r.options.ResumeCfg.Index = index
 			r.options.ResumeCfg.Unlock()
-			cleanupInFlight := func(current *ResumeInfo, portParam uint32) {
-				current.Lock()
-				current.InFlight[portParam] = InFlightResume{
-					Completed: true,
-				}
-				current.Unlock()
-			}
-			skipHandler := func(portParam uint32) bool {
-				var skip bool
-				if _, isInFlight := resumeFromInfo.InFlight[portParam]; !isInFlight { // port wasn't found
-					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port not found\n", ip, port)
-					skip = false
-				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && !item.Completed { // port scan wasn't completed successfully
-					gologger.Debug().Msgf("[%s] Repeating \"%v\": Resume - Port scan wasn't completed\n", ip, port)
-					skip = false
-				} else if item, isInFlight := resumeFromInfo.InFlight[portParam]; isInFlight && item.Completed { // port scan is already completed
-					gologger.Debug().Msgf("[%s] Skipping \"%v\": Resume - Port scan already completed\n", ip, port)
-					skip = true
-				}
-				return skip
-			}
 			// connect scan
 			go func(portParam uint32) {
-				currentInfo.Lock()
-				_, ok := currentInfo.InFlight[portParam]
-				if !ok {
-					currentInfo.InFlight[portParam] = InFlightResume{
-						Completed: false,
-					}
-				}
-				currentInfo.Unlock()
-				if skip := skipHandler(portParam); skip {
-					return
-				}
-				handler := func() {
-					// on scan complete cleanup the inflight data
-					cleanupInFlight(currentInfo, portParam)
-				}
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port, handler)
+					r.RawSocketEnumeration(ip, port)
 				} else {
 					r.wgscan.Add()
 
-					go r.handleHostPort(ip, port, handler)
+					go r.handleHostPort(ip, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
 				}
 			}(uint32(port))
 		}
-	}
 
-	r.wgscan.Wait()
+		r.wgscan.Wait()
+
+		r.options.ResumeCfg.Lock()
+		if r.options.ResumeCfg.Seed > 0 {
+			r.options.ResumeCfg.Seed = 0
+		}
+		r.options.ResumeCfg.Unlock()
+	}
 
 	if r.options.WarmUpTime > 0 {
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
@@ -306,9 +291,9 @@ func (r *Runner) BackgroundWorkers() {
 	r.scanner.StartWorkers()
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, port int, handler func()) {
+func (r *Runner) RawSocketEnumeration(ip string, port int) {
 	// skip invalid combinations
-	r.handleHostPortSyn(ip, port, handler)
+	r.handleHostPortSyn(ip, port)
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
@@ -327,8 +312,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	return port == 80 || port == 443
 }
 
-func (r *Runner) handleHostPort(host string, port int, handler func()) {
-	defer handler()
+func (r *Runner) handleHostPort(host string, port int) {
 	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
@@ -347,8 +331,7 @@ func (r *Runner) handleHostPort(host string, port int, handler func()) {
 	}
 }
 
-func (r *Runner) handleHostPortSyn(host string, port int, handler func()) {
-	defer handler()
+func (r *Runner) handleHostPortSyn(host string, port int) {
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
