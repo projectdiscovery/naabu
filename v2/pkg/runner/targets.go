@@ -125,14 +125,18 @@ func (r *Runner) AddTarget(target string) error {
 		return nil
 	} else if ipranger.IsCidr(target) {
 		invokeStreamChannel(target)
-		// Add cidr directly to ranger, as single ips would allocate more resources later
-		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+		if !r.options.SkipDedupe {
+			// Add cidr directly to ranger, as single ips would allocate more resources later
+			if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
 		}
 	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
 		invokeStreamChannel(target)
-		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+		if !r.options.SkipDedupe {
+			if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
 		}
 	} else {
 		ips, err := r.resolveFQDN(target)
@@ -141,8 +145,10 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		for _, ip := range ips {
 			invokeStreamChannel(ip)
-			if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
-				gologger.Warning().Msgf("%s\n", err)
+			if !r.options.SkipDedupe {
+				if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
 			}
 		}
 	}

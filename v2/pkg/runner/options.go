@@ -52,6 +52,7 @@ type Options struct {
 	CSV               bool
 	StatsInterval     int // StatsInterval is the number of seconds to display stats after
 	Stream            bool
+	SkipDedupe        bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -101,6 +102,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
 		flagSet.BoolVarP(&options.Stream, "stream", "sm", false, "Stream mode - start elaborating input targets without sorting"),
+		flagSet.BoolVarP(&options.SkipDedupe, "skip-dedupe", "sd", false, "Disable dedupe input items (only used with stream mode)"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
