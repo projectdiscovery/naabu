@@ -2,12 +2,13 @@ package runner
 
 import (
 	"encoding/json"
-	"github.com/projectdiscovery/fileutil"
-	"github.com/projectdiscovery/gologger"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
+
+	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/gologger"
 )
 
 // Default resume file
@@ -24,34 +25,19 @@ func DefaultResumeFilePath() string {
 // ResumeCfg contains the scan progression
 type ResumeCfg struct {
 	sync.RWMutex
-	ResumeFrom map[string]*ResumeInfo `json:"resumeFrom"`
-	Current    map[string]*ResumeInfo `json:"-"`
-}
-
-// InFlightResume
-type InFlightResume struct {
-	Completed bool `json:"completed"`
-}
-
-// ResumeInfo
-type ResumeInfo struct {
-	sync.RWMutex
-	InFlight map[uint32]InFlightResume `json:"inFlight"`
+	Retry int   `json:"retry"`
+	Seed  int64 `json:"seed"`
+	Index int64 `json:"index"`
 }
 
 // NewResumeCfg creates a new scan progression structure
 func NewResumeCfg() *ResumeCfg {
-	return &ResumeCfg{
-		ResumeFrom: make(map[string]*ResumeInfo),
-		Current:    make(map[string]*ResumeInfo),
-	}
+	return &ResumeCfg{}
 }
 
 // SaveResumeConfig to file
 func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
-	newresumeCfg := NewResumeCfg()
-	newresumeCfg.ResumeFrom = resumeCfg.Current
-	data, _ := json.MarshalIndent(newresumeCfg, "", "\t")
+	data, _ := json.MarshalIndent(resumeCfg, "", "\t")
 	return os.WriteFile(DefaultResumeFilePath(), data, os.ModePerm)
 }
 
