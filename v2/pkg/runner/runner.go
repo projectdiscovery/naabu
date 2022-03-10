@@ -98,7 +98,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 	runner.hm = hm
-
+	runner.hm, _ = hybrid.New(hybrid.DefaultDiskOptions)
 	return runner, nil
 }
 
