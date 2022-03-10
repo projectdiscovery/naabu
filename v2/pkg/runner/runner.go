@@ -118,7 +118,6 @@ func (r *Runner) RunEnumeration() error {
 	if err != nil {
 		return err
 	}
-
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
@@ -154,8 +153,26 @@ func (r *Runner) RunEnumeration() error {
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 	// Retries are performed regardless of the previous scan results due to network unreliability
 	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+		if currentRetry < r.options.ResumeCfg.Retry {
+			gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
+			continue
+		}
+
 		// Use current time as seed
-		b := blackrock.New(int64(Range), time.Now().UnixNano())
+		currentSeed := time.Now().UnixNano()
+		r.options.ResumeCfg.RLock()
+		if r.options.ResumeCfg.Seed > 0 {
+			currentSeed = r.options.ResumeCfg.Seed
+		}
+		r.options.ResumeCfg.RUnlock()
+
+		// keep track of current retry and seed for resume
+		r.options.ResumeCfg.Lock()
+		r.options.ResumeCfg.Retry = currentRetry
+		r.options.ResumeCfg.Seed = currentSeed
+		r.options.ResumeCfg.Unlock()
+
+		b := blackrock.New(int64(Range), currentSeed)
 		for index := int64(0); index < int64(Range); index++ {
 			xxx := b.Shuffle(index)
 			ipIndex := xxx / int64(portsCount)
@@ -163,21 +180,42 @@ func (r *Runner) RunEnumeration() error {
 			ip := r.PickIP(targets, ipIndex)
 			port := r.PickPort(portIndex)
 
-			r.limiter.Take()
-			// connect scan
-			if shouldUseRawPackets {
-				r.RawSocketEnumeration(ip, port)
-			} else {
-				r.wgscan.Add()
-				go r.handleHostPort(ip, port)
+			r.options.ResumeCfg.RLock()
+			resumeCfgIndex := r.options.ResumeCfg.Index
+			r.options.ResumeCfg.RUnlock()
+			if index < resumeCfgIndex {
+				gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+				continue
 			}
-			if r.options.EnableProgressBar {
-				r.stats.IncrementCounter("packets", 1)
-			}
-		}
-	}
 
-	r.wgscan.Wait()
+			r.limiter.Take()
+			//resume cfg logic
+			r.options.ResumeCfg.Lock()
+			r.options.ResumeCfg.Index = index
+			r.options.ResumeCfg.Unlock()
+			// connect scan
+			go func(portParam uint32) {
+				if shouldUseRawPackets {
+					r.RawSocketEnumeration(ip, port)
+				} else {
+					r.wgscan.Add()
+
+					go r.handleHostPort(ip, port)
+				}
+				if r.options.EnableProgressBar {
+					r.stats.IncrementCounter("packets", 1)
+				}
+			}(uint32(port))
+		}
+
+		r.wgscan.Wait()
+
+		r.options.ResumeCfg.Lock()
+		if r.options.ResumeCfg.Seed > 0 {
+			r.options.ResumeCfg.Seed = 0
+		}
+		r.options.ResumeCfg.Unlock()
+	}
 
 	if r.options.WarmUpTime > 0 {
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
@@ -194,6 +232,14 @@ func (r *Runner) RunEnumeration() error {
 
 	// handle nmap
 	return r.handleNmap()
+}
+
+func (r *Runner) ShowScanResultOnExit() {
+	r.handleOutput()
+	err := r.handleNmap()
+	if err != nil {
+		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
+	}
 }
 
 // Close runner instance
