@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"github.com/projectdiscovery/fileutil"
 	"os"
 
 	"github.com/projectdiscovery/goflags"
@@ -53,6 +54,8 @@ type Options struct {
 	StatsInterval     int // StatsInterval is the number of seconds to display stats after
 	Stream            bool
 	SkipDedupe        bool
+	Resume            bool
+	ResumeCfg         *ResumeCfg
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -103,6 +106,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
 		flagSet.BoolVarP(&options.Stream, "stream", "sm", false, "Stream mode - start elaborating input targets without sorting"),
 		flagSet.BoolVarP(&options.SkipDedupe, "skip-dedupe", "sd", false, "Disable dedupe input items (only used with stream mode)"),
+		flagSet.BoolVar(&options.Resume, "resume", false, "Resume"),
 	)
 
 	createGroup(flagSet, "optimization", "Optimization",
@@ -130,7 +134,12 @@ func ParseOptions() *Options {
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
-
+	options.ResumeCfg = NewResumeCfg()
+	if options.ShouldLoadResume() {
+		if err := options.ResumeCfg.ConfigureResume(); err != nil {
+			gologger.Fatal().Msgf("%s\n", err)
+		}
+	}
 	// Show the user the banner
 	showBanner()
 
@@ -158,6 +167,11 @@ func ParseOptions() *Options {
 	showNetworkCapabilities(options)
 
 	return options
+}
+
+// ShouldLoadResume resume file
+func (options *Options) ShouldLoadResume() bool {
+	return options.Resume && fileutil.FileExists(DefaultResumeFilePath())
 }
 
 func hasStdin() bool {

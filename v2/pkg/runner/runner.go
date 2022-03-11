@@ -151,20 +151,67 @@ func (r *Runner) RunEnumeration() error {
 			targetsCount += mapcidr.AddressCountIpnet(target)
 		}
 		Range := targetsCount * portsCount
-		shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
-		// Retries are performed regardless of the previous scan results due to network unreliability
-		for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
-			// Use current time as seed
-			b := blackrock.New(int64(Range), time.Now().UnixNano())
-			for index := int64(0); index < int64(Range); index++ {
-				xxx := b.Shuffle(index)
-				ipIndex := xxx / int64(portsCount)
-				portIndex := int(xxx % int64(portsCount))
-				ip := r.PickIP(targets, ipIndex)
-				port := r.PickPort(portIndex)
+		// shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
+		// // Retries are performed regardless of the previous scan results due to network unreliability
+		// for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+		// 	// Use current time as seed
+		// 	b := blackrock.New(int64(Range), time.Now().UnixNano())
+		// 	for index := int64(0); index < int64(Range); index++ {
+		// 		xxx := b.Shuffle(index)
+		// 		ipIndex := xxx / int64(portsCount)
+		// 		portIndex := int(xxx % int64(portsCount))
+		// 		ip := r.PickIP(targets, ipIndex)
+		// 		port := r.PickPort(portIndex)
 
-				r.limiter.Take()
-				// connect scan
+		// 		r.limiter.Take()
+		// 		// connect scan
+		// 	}
+fmt.Println(targets,portsCount)
+	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
+	// Retries are performed regardless of the previous scan results due to network unreliability
+		for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+		if currentRetry < r.options.ResumeCfg.Retry {
+			gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
+			continue
+		}
+
+		// Use current time as seed
+		currentSeed := time.Now().UnixNano()
+		r.options.ResumeCfg.RLock()
+		if r.options.ResumeCfg.Seed > 0 {
+			currentSeed = r.options.ResumeCfg.Seed
+		}
+		r.options.ResumeCfg.RUnlock()
+
+		// keep track of current retry and seed for resume
+		r.options.ResumeCfg.Lock()
+		r.options.ResumeCfg.Retry = currentRetry
+		r.options.ResumeCfg.Seed = currentSeed
+		r.options.ResumeCfg.Unlock()
+
+		b := blackrock.New(int64(Range), currentSeed)
+		for index := int64(0); index < int64(Range); index++ {
+			xxx := b.Shuffle(index)
+			ipIndex := xxx / int64(portsCount)
+			portIndex := int(xxx % int64(portsCount))
+			ip := r.PickIP(targets, ipIndex)
+			port := r.PickPort(portIndex)
+
+			r.options.ResumeCfg.RLock()
+			resumeCfgIndex := r.options.ResumeCfg.Index
+			r.options.ResumeCfg.RUnlock()
+			if index < resumeCfgIndex {
+				gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+				continue
+			}
+
+			r.limiter.Take()
+			//resume cfg logic
+			r.options.ResumeCfg.Lock()
+			r.options.ResumeCfg.Index = index
+			r.options.ResumeCfg.Unlock()
+			// connect scan
+			go func(portParam uint32) {
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ip, port)
 				} else {
@@ -174,9 +221,11 @@ func (r *Runner) RunEnumeration() error {
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
 				}
-			}
+			}(uint32(port))
+		}
 		}
 	}
+
 	err := r.Load()
 	if err != nil {
 		return err
@@ -198,6 +247,12 @@ func (r *Runner) RunEnumeration() error {
 		processItem(targets, portsCount)
 	}
 	r.wgscan.Wait()
+		r.options.ResumeCfg.Lock()
+		if r.options.ResumeCfg.Seed > 0 {
+			r.options.ResumeCfg.Seed = 0
+		}
+		r.options.ResumeCfg.Unlock()
+	
 
 	if r.options.WarmUpTime > 0 {
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
@@ -213,6 +268,14 @@ func (r *Runner) RunEnumeration() error {
 
 	// handle nmap
 	return r.handleNmap()
+}
+
+func (r *Runner) ShowScanResultOnExit() {
+	r.handleOutput()
+	err := r.handleNmap()
+	if err != nil {
+		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
+	}
 }
 
 // Close runner instance
