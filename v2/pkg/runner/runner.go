@@ -151,6 +151,13 @@ func (r *Runner) RunEnumeration() error {
 			targetsCount += mapcidr.AddressCountIpnet(target)
 		}
 		Range := targetsCount * portsCount
+		defaultKey := "defaultJey"
+		var currentItem InFlight
+		if len(targets) > 1 {
+			currentItem = r.options.ResumeCfg.GetInFlightItem(defaultKey)
+		} else {
+			currentItem = r.options.ResumeCfg.GetInFlightItem(targets[0].String())
+		}
 		// shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 		// // Retries are performed regardless of the previous scan results due to network unreliability
 		// for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
@@ -166,63 +173,63 @@ func (r *Runner) RunEnumeration() error {
 		// 		r.limiter.Take()
 		// 		// connect scan
 		// 	}
-fmt.Println(targets,portsCount)
-	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
-	// Retries are performed regardless of the previous scan results due to network unreliability
+		fmt.Println(targets, portsCount)
+		shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
+		// Retries are performed regardless of the previous scan results due to network unreliability
 		for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
-		if currentRetry < r.options.ResumeCfg.Retry {
-			gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
-			continue
-		}
-
-		// Use current time as seed
-		currentSeed := time.Now().UnixNano()
-		r.options.ResumeCfg.RLock()
-		if r.options.ResumeCfg.Seed > 0 {
-			currentSeed = r.options.ResumeCfg.Seed
-		}
-		r.options.ResumeCfg.RUnlock()
-
-		// keep track of current retry and seed for resume
-		r.options.ResumeCfg.Lock()
-		r.options.ResumeCfg.Retry = currentRetry
-		r.options.ResumeCfg.Seed = currentSeed
-		r.options.ResumeCfg.Unlock()
-
-		b := blackrock.New(int64(Range), currentSeed)
-		for index := int64(0); index < int64(Range); index++ {
-			xxx := b.Shuffle(index)
-			ipIndex := xxx / int64(portsCount)
-			portIndex := int(xxx % int64(portsCount))
-			ip := r.PickIP(targets, ipIndex)
-			port := r.PickPort(portIndex)
-
-			r.options.ResumeCfg.RLock()
-			resumeCfgIndex := r.options.ResumeCfg.Index
-			r.options.ResumeCfg.RUnlock()
-			if index < resumeCfgIndex {
-				gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+			if currentRetry < r.options.ResumeCfg.Retry {
+				gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
 				continue
 			}
 
-			r.limiter.Take()
-			//resume cfg logic
+			// Use current time as seed
+			currentSeed := time.Now().UnixNano()
+			r.options.ResumeCfg.RLock()
+			if r.options.ResumeCfg.Seed > 0 {
+				currentSeed = r.options.ResumeCfg.Seed
+			}
+			r.options.ResumeCfg.RUnlock()
+
+			// keep track of current retry and seed for resume
 			r.options.ResumeCfg.Lock()
-			r.options.ResumeCfg.Index = index
+			r.options.ResumeCfg.Retry = currentRetry
+			r.options.ResumeCfg.Seed = currentSeed
 			r.options.ResumeCfg.Unlock()
-			// connect scan
-			go func(portParam uint32) {
-				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port)
-				} else {
-					r.wgscan.Add()
-					go r.handleHostPort(ip, port)
+
+			b := blackrock.New(int64(Range), currentSeed)
+			for index := int64(0); index < int64(Range); index++ {
+				xxx := b.Shuffle(index)
+				ipIndex := xxx / int64(portsCount)
+				portIndex := int(xxx % int64(portsCount))
+				ip := r.PickIP(targets, ipIndex)
+				port := r.PickPort(portIndex)
+
+				r.options.ResumeCfg.RLock()
+				resumeCfgIndex := r.options.ResumeCfg.Index
+				r.options.ResumeCfg.RUnlock()
+				if index < resumeCfgIndex {
+					gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+					continue
 				}
-				if r.options.EnableProgressBar {
-					r.stats.IncrementCounter("packets", 1)
-				}
-			}(uint32(port))
-		}
+
+				r.limiter.Take()
+				//resume cfg logic
+				r.options.ResumeCfg.Lock()
+				r.options.ResumeCfg.Index = index
+				r.options.ResumeCfg.Unlock()
+				// connect scan
+				go func(portParam uint32) {
+					if shouldUseRawPackets {
+						r.RawSocketEnumeration(ip, port)
+					} else {
+						r.wgscan.Add()
+						go r.handleHostPort(ip, port)
+					}
+					if r.options.EnableProgressBar {
+						r.stats.IncrementCounter("packets", 1)
+					}
+				}(uint32(port))
+			}
 		}
 	}
 
@@ -230,10 +237,18 @@ fmt.Println(targets,portsCount)
 	if err != nil {
 		return err
 	}
+	if r.options.ResumeCfg.InFlight == nil {
+		r.options.ResumeCfg.InFlight = make(map[string]InFlight)
+	}
 	if r.options.Stream {
 		for item := range r.streamChannel {
 			target := []*net.IPNet{item}
-			processItem(target, portsCount)
+			in := InFlight{}
+			in, found := r.options.ResumeCfg.InFlight[item.String()]
+			if !found {
+				r.options.ResumeCfg.InFlight[item.String()] = in
+			}
+			processItem(target, portsCount, in)
 		}
 	} else {
 		// shrinks the ips to the minimum amount of cidr
@@ -247,12 +262,11 @@ fmt.Println(targets,portsCount)
 		processItem(targets, portsCount)
 	}
 	r.wgscan.Wait()
-		r.options.ResumeCfg.Lock()
-		if r.options.ResumeCfg.Seed > 0 {
-			r.options.ResumeCfg.Seed = 0
-		}
-		r.options.ResumeCfg.Unlock()
-	
+	r.options.ResumeCfg.Lock()
+	if r.options.ResumeCfg.Seed > 0 {
+		r.options.ResumeCfg.Seed = 0
+	}
+	r.options.ResumeCfg.Unlock()
 
 	if r.options.WarmUpTime > 0 {
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)

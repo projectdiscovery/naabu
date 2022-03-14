@@ -23,11 +23,30 @@ func DefaultResumeFilePath() string {
 }
 
 // ResumeCfg contains the scan progression
+// type ResumeCfg struct {
+// 	sync.RWMutex
+// 	Retry int   `json:"retry"`
+// 	Seed  int64 `json:"seed"`
+// 	Index int64 `json:"index"`
+// }
 type ResumeCfg struct {
 	sync.RWMutex
+	InFlight map[string]InFlight
+}
+type InFlight struct {
 	Retry int   `json:"retry"`
 	Seed  int64 `json:"seed"`
 	Index int64 `json:"index"`
+}
+
+func (r *ResumeCfg) GetInFlightItem(key string) InFlight {
+	item := InFlight{}
+	var found bool
+	if item, found = r.InFlight[key]; found {
+		return item
+	}
+	r.InFlight[key] = item
+	return item
 }
 
 // NewResumeCfg creates a new scan progression structure
