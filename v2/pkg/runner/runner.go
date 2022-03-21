@@ -117,7 +117,7 @@ func (r *Runner) RunEnumeration() error {
 	}
 
 	if r.options.Stream {
-		go r.Load()
+		go r.Load() //nolint
 	} else {
 		err := r.Load()
 		if err != nil {
