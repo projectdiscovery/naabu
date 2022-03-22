@@ -304,7 +304,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	}
 
 	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
-	if ok, err := r.scanner.CdnCheck(host); err == nil && !ok {
+	if ok, _, err := r.scanner.CdnCheck(host); err == nil && !ok {
 		return true
 	}
 
