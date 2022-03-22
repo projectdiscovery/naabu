@@ -20,7 +20,7 @@ func TestCdnCheck(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.args, func(t *testing.T) {
-			isCdn, err := s.CdnCheck(tt.args)
+			isCdn, _, err := s.CdnCheck(tt.args)
 			if tt.wantErr {
 				assert.NotNil(t, err)
 			} else {
