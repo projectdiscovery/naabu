@@ -188,7 +188,6 @@ func (r *Runner) RunEnumeration() error {
 				continue
 			}
 
-			r.limiter.Take()
 			//resume cfg logic
 			r.options.ResumeCfg.Lock()
 			r.options.ResumeCfg.Index = index
@@ -325,6 +324,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 		return
 	}
 
+	r.limiter.Take()
 	open, err := r.scanner.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
 	if open && err == nil {
 		r.scanner.ScanResults.AddPort(host, port)
@@ -338,6 +338,7 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 		return
 	}
 
+	r.limiter.Take()
 	r.scanner.EnqueueTCP(host, port, scan.SYN)
 }
 
