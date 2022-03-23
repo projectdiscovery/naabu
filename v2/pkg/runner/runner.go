@@ -58,6 +58,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		ExcludeCdn:  options.ExcludeCDN,
 		ExcludedIps: excludedIps,
 		Proxy:       options.Proxy,
+		Stream:      options.Stream,
 	})
 	if err != nil {
 		return nil, err
@@ -132,7 +133,9 @@ func (r *Runner) RunEnumeration() error {
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 
 	if r.options.Stream {
+		r.scanner.State = scan.Scan
 		for cidr := range r.streamChannel {
+			r.scanner.IPRanger.Add(cidr.String())
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
