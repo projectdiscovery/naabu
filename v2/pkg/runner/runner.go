@@ -335,7 +335,7 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	}
 
 	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
-	if ok, err := r.scanner.CdnCheck(host); err == nil && !ok {
+	if ok, _, err := r.scanner.CdnCheck(host); err == nil && !ok {
 		return true
 	}
 
@@ -356,6 +356,7 @@ func (r *Runner) handleHostPort(host string, port int) {
 		return
 	}
 
+	r.limiter.Take()
 	open, err := r.scanner.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
 	if open && err == nil {
 		r.scanner.ScanResults.AddPort(host, port)
@@ -369,6 +370,7 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 		return
 	}
 
+	r.limiter.Take()
 	r.scanner.EnqueueTCP(host, port, scan.SYN)
 }
 
