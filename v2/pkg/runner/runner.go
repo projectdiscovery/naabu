@@ -27,13 +27,14 @@ import (
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options     *Options
-	targetsFile string
-	scanner     *scan.Scanner
-	limiter     ratelimit.Limiter
-	wgscan      sizedwaitgroup.SizedWaitGroup
-	dnsclient   *dnsx.DNSX
-	stats       *clistats.Statistics
+	options       *Options
+	targetsFile   string
+	scanner       *scan.Scanner
+	limiter       ratelimit.Limiter
+	wgscan        sizedwaitgroup.SizedWaitGroup
+	dnsclient     *dnsx.DNSX
+	stats         *clistats.Statistics
+	streamChannel chan *net.IPNet
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -42,6 +43,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
 		options: options,
 	}
+	runner.streamChannel = make(chan *net.IPNet)
 
 	excludedIps, err := parseExcludedIps(options)
 	if err != nil {
@@ -56,6 +58,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		ExcludeCdn:  options.ExcludeCDN,
 		ExcludedIps: excludedIps,
 		Proxy:       options.Proxy,
+		Stream:      options.Stream,
 	})
 	if err != nil {
 		return nil, err
@@ -114,123 +117,157 @@ func (r *Runner) RunEnumeration() error {
 		r.BackgroundWorkers()
 	}
 
-	err := r.Load()
-	if err != nil {
-		return err
+	if r.options.Stream {
+		go r.Load() //nolint
+	} else {
+		err := r.Load()
+		if err != nil {
+			return err
+		}
 	}
+
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
 
-	// shrinks the ips to the minimum amount of cidr
-	var targets []*net.IPNet
-	r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-		targets = append(targets, ipranger.ToCidr(string(k)))
-		return nil
-	})
-	targets, _ = mapcidr.CoalesceCIDRs(targets)
-	var targetsCount, portsCount uint64
-	for _, target := range targets {
-		targetsCount += mapcidr.AddressCountIpnet(target)
-	}
-	portsCount = uint64(len(r.scanner.Ports))
-
-	r.scanner.State = scan.Scan
-	Range := targetsCount * portsCount
-	if r.options.EnableProgressBar {
-		r.stats.AddStatic("ports", portsCount)
-		r.stats.AddStatic("hosts", targetsCount)
-		r.stats.AddStatic("retries", r.options.Retries)
-		r.stats.AddStatic("startedAt", time.Now())
-		r.stats.AddCounter("packets", uint64(0))
-		r.stats.AddCounter("errors", uint64(0))
-		r.stats.AddCounter("total", Range*uint64(r.options.Retries))
-		if err := r.stats.Start(makePrintCallback(), time.Duration(r.options.StatsInterval)*time.Second); err != nil {
-			gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
-		}
-	}
-
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
-	// Retries are performed regardless of the previous scan results due to network unreliability
-	for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
-		if currentRetry < r.options.ResumeCfg.Retry {
-			gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
-			continue
+
+	if r.options.Stream {
+		r.scanner.State = scan.Scan
+		for cidr := range r.streamChannel {
+			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
+				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
+			}
+			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
+			for ip := range ipStream {
+				for _, port := range r.scanner.Ports {
+					r.limiter.Take()
+					go func(ip string, port int) {
+						if shouldUseRawPackets {
+							r.RawSocketEnumeration(ip, port)
+						} else {
+							r.wgscan.Add()
+
+							go r.handleHostPort(ip, port)
+						}
+					}(ip, port)
+				}
+			}
+		}
+		r.wgscan.Wait()
+		r.handleOutput()
+		return nil
+	} else {
+		// shrinks the ips to the minimum amount of cidr
+		var targets []*net.IPNet
+		r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
+			targets = append(targets, ipranger.ToCidr(string(k)))
+			return nil
+		})
+		targets, _ = mapcidr.CoalesceCIDRs(targets)
+		var targetsCount, portsCount uint64
+		for _, target := range targets {
+			targetsCount += mapcidr.AddressCountIpnet(target)
+		}
+		portsCount = uint64(len(r.scanner.Ports))
+
+		r.scanner.State = scan.Scan
+		Range := targetsCount * portsCount
+		if r.options.EnableProgressBar {
+			r.stats.AddStatic("ports", portsCount)
+			r.stats.AddStatic("hosts", targetsCount)
+			r.stats.AddStatic("retries", r.options.Retries)
+			r.stats.AddStatic("startedAt", time.Now())
+			r.stats.AddCounter("packets", uint64(0))
+			r.stats.AddCounter("errors", uint64(0))
+			r.stats.AddCounter("total", Range*uint64(r.options.Retries))
+			if err := r.stats.Start(makePrintCallback(), time.Duration(r.options.StatsInterval)*time.Second); err != nil {
+				gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
+			}
 		}
 
-		// Use current time as seed
-		currentSeed := time.Now().UnixNano()
-		r.options.ResumeCfg.RLock()
-		if r.options.ResumeCfg.Seed > 0 {
-			currentSeed = r.options.ResumeCfg.Seed
-		}
-		r.options.ResumeCfg.RUnlock()
-
-		// keep track of current retry and seed for resume
-		r.options.ResumeCfg.Lock()
-		r.options.ResumeCfg.Retry = currentRetry
-		r.options.ResumeCfg.Seed = currentSeed
-		r.options.ResumeCfg.Unlock()
-
-		b := blackrock.New(int64(Range), currentSeed)
-		for index := int64(0); index < int64(Range); index++ {
-			xxx := b.Shuffle(index)
-			ipIndex := xxx / int64(portsCount)
-			portIndex := int(xxx % int64(portsCount))
-			ip := r.PickIP(targets, ipIndex)
-			port := r.PickPort(portIndex)
-
-			r.options.ResumeCfg.RLock()
-			resumeCfgIndex := r.options.ResumeCfg.Index
-			r.options.ResumeCfg.RUnlock()
-			if index < resumeCfgIndex {
-				gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+		// Retries are performed regardless of the previous scan results due to network unreliability
+		for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+			if currentRetry < r.options.ResumeCfg.Retry {
+				gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
 				continue
 			}
 
-			//resume cfg logic
+			// Use current time as seed
+			currentSeed := time.Now().UnixNano()
+			r.options.ResumeCfg.RLock()
+			if r.options.ResumeCfg.Seed > 0 {
+				currentSeed = r.options.ResumeCfg.Seed
+			}
+			r.options.ResumeCfg.RUnlock()
+
+			// keep track of current retry and seed for resume
 			r.options.ResumeCfg.Lock()
-			r.options.ResumeCfg.Index = index
+			r.options.ResumeCfg.Retry = currentRetry
+			r.options.ResumeCfg.Seed = currentSeed
 			r.options.ResumeCfg.Unlock()
-			// connect scan
-			go func(portParam uint32) {
-				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port)
-				} else {
-					r.wgscan.Add()
 
-					go r.handleHostPort(ip, port)
+			b := blackrock.New(int64(Range), currentSeed)
+			for index := int64(0); index < int64(Range); index++ {
+				xxx := b.Shuffle(index)
+				ipIndex := xxx / int64(portsCount)
+				portIndex := int(xxx % int64(portsCount))
+				ip := r.PickIP(targets, ipIndex)
+				port := r.PickPort(portIndex)
+
+				r.options.ResumeCfg.RLock()
+				resumeCfgIndex := r.options.ResumeCfg.Index
+				r.options.ResumeCfg.RUnlock()
+				if index < resumeCfgIndex {
+					gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+					continue
 				}
-				if r.options.EnableProgressBar {
-					r.stats.IncrementCounter("packets", 1)
-				}
-			}(uint32(port))
+
+				r.limiter.Take()
+				//resume cfg logic
+				r.options.ResumeCfg.Lock()
+				r.options.ResumeCfg.Index = index
+				r.options.ResumeCfg.Unlock()
+				// connect scan
+				go func(port int) {
+					if shouldUseRawPackets {
+						r.RawSocketEnumeration(ip, port)
+					} else {
+						r.wgscan.Add()
+
+						go r.handleHostPort(ip, port)
+					}
+					if r.options.EnableProgressBar {
+						r.stats.IncrementCounter("packets", 1)
+					}
+				}(port)
+			}
+
+			r.wgscan.Wait()
+
+			r.options.ResumeCfg.Lock()
+			if r.options.ResumeCfg.Seed > 0 {
+				r.options.ResumeCfg.Seed = 0
+			}
+			r.options.ResumeCfg.Unlock()
 		}
 
-		r.wgscan.Wait()
-
-		r.options.ResumeCfg.Lock()
-		if r.options.ResumeCfg.Seed > 0 {
-			r.options.ResumeCfg.Seed = 0
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
-		r.options.ResumeCfg.Unlock()
+
+		r.scanner.State = scan.Done
+
+		// Validate the hosts if the user has asked for second step validation
+		if r.options.Verify {
+			r.ConnectVerification()
+		}
+
+		r.handleOutput()
+
+		// handle nmap
+		return r.handleNmap()
 	}
-
-	if r.options.WarmUpTime > 0 {
-		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
-	}
-
-	r.scanner.State = scan.Done
-
-	// Validate the hosts if the user has asked for second step validation
-	if r.options.Verify {
-		r.ConnectVerification()
-	}
-
-	r.handleOutput()
-
-	// handle nmap
-	return r.handleNmap()
 }
 
 func (r *Runner) ShowScanResultOnExit() {

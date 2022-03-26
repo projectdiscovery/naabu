@@ -13,4 +13,5 @@ type Options struct {
 	ExcludeCdn  bool
 	ExcludedIps []string
 	Proxy       string
+	Stream      bool
 }

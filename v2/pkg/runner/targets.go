@@ -11,6 +11,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
@@ -79,6 +80,9 @@ func (r *Runner) mergeToFile() (string, error) {
 }
 
 func (r *Runner) PreProcessTargets() error {
+	if r.options.Stream {
+		defer close(r.streamChannel)
+	}
 	wg := sizedwaitgroup.New(r.options.Threads)
 	f, err := os.Open(r.targetsFile)
 	if err != nil {
@@ -105,12 +109,15 @@ func (r *Runner) AddTarget(target string) error {
 	if target == "" {
 		return nil
 	} else if ipranger.IsCidr(target) {
-		// Add cidr directly to ranger, as single ips would allocate more resources later
-		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil {
+		if r.options.Stream {
+			r.streamChannel <- iputil.ToCidr(target)
+		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
-		if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
+		if r.options.Stream {
+			r.streamChannel <- iputil.ToCidr(target)
+		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else {
@@ -119,7 +126,9 @@ func (r *Runner) AddTarget(target string) error {
 			return err
 		}
 		for _, ip := range ips {
-			if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
+			if r.options.Stream {
+				r.streamChannel <- iputil.ToCidr(ip)
+			} else if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
 				gologger.Warning().Msgf("%s\n", err)
 			}
 		}
