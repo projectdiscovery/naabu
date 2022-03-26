@@ -135,7 +135,9 @@ func (r *Runner) RunEnumeration() error {
 	if r.options.Stream {
 		r.scanner.State = scan.Scan
 		for cidr := range r.streamChannel {
-			r.scanner.IPRanger.Add(cidr.String())
+			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
+				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
+			}
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
