@@ -1,8 +1,9 @@
 package runner
 
 import (
-	"github.com/projectdiscovery/fileutil"
 	"os"
+
+	"github.com/projectdiscovery/fileutil"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -54,6 +55,7 @@ type Options struct {
 	StatsInterval     int // StatsInterval is the number of seconds to display stats after
 	Resume            bool
 	ResumeCfg         *ResumeCfg
+	Stream            bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -66,14 +68,14 @@ func ParseOptions() *Options {
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
-	createGroup(flagSet, "input", "Input",
+	flagSet.CreateGroup("input", "Input",
 		flagSet.NormalizedStringSliceVarP(&options.Host, "host", "", []string{}, "hosts to scan ports for (comma-separated)"),
 		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "list of hosts to scan ports (file)"),
 		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "hosts to exclude from the scan (comma-separated)"),
 		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "list of hosts to exclude from scan (file)"),
 	)
 
-	createGroup(flagSet, "port", "Port",
+	flagSet.CreateGroup("port", "Port",
 		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200"),
 		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100)"),
 		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
@@ -81,18 +83,18 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
 	)
 
-	createGroup(flagSet, "rate-limit", "Rate-limit",
+	flagSet.CreateGroup("rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", 25, "general internal worker threads"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
 	)
 
-	createGroup(flagSet, "output", "Output",
+	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
 		flagSet.BoolVar(&options.JSON, "json", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
 
-	createGroup(flagSet, "config", "Configuration",
+	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
@@ -103,9 +105,10 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "Resume"),
+		flagSet.BoolVar(&options.Stream, "stream", false, "Stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 	)
 
-	createGroup(flagSet, "optimization", "Optimization",
+	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
 		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
@@ -113,7 +116,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 	)
 
-	createGroup(flagSet, "debug", "Debug",
+	flagSet.CreateGroup("debug", "Debug",
 		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
 		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
@@ -126,7 +129,7 @@ func ParseOptions() *Options {
 	_ = flagSet.Parse()
 
 	// Check if stdin pipe was given
-	options.Stdin = hasStdin()
+	options.Stdin = fileutil.HasStdin()
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
@@ -168,23 +171,4 @@ func ParseOptions() *Options {
 // ShouldLoadResume resume file
 func (options *Options) ShouldLoadResume() bool {
 	return options.Resume && fileutil.FileExists(DefaultResumeFilePath())
-}
-
-func hasStdin() bool {
-	stat, err := os.Stdin.Stat()
-	if err != nil {
-		return false
-	}
-
-	isPipedFromChrDev := (stat.Mode() & os.ModeCharDevice) == 0
-	isPipedFromFIFO := (stat.Mode() & os.ModeNamedPipe) != 0
-
-	return isPipedFromChrDev || isPipedFromFIFO
-}
-
-func createGroup(flagSet *goflags.FlagSet, groupName, description string, flags ...*goflags.FlagData) {
-	flagSet.SetGroup(groupName, description)
-	for _, currentFlag := range flags {
-		currentFlag.Group(groupName)
-	}
 }

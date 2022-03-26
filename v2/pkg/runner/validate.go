@@ -75,6 +75,21 @@ func (options *Options) validateOptions() error {
 		}
 	}
 
+	if options.Stream {
+		if options.Resume {
+			return errors.New("resume not supported in stream mode")
+		}
+		if options.EnableProgressBar {
+			return errors.New("stats not supported in stream mode")
+		}
+		if options.Verify {
+			return errors.New("verify not supported in stream mode")
+		}
+		if options.Nmap {
+			return errors.New("nmap not supported in stream mode")
+		}
+	}
+
 	return nil
 }
 

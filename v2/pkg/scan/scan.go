@@ -75,6 +75,7 @@ type Scanner struct {
 	serializeOptions gopacket.SerializeOptions
 	debug            bool
 	handlers         interface{}
+	stream           bool
 }
 
 // PkgSend is a TCP package
@@ -153,6 +154,8 @@ func NewScanner(options *Options) (*Scanner, error) {
 		}
 		scanner.proxyDialer = proxyDialer
 	}
+
+	scanner.stream = options.Stream
 
 	return scanner, nil
 }
@@ -258,7 +261,7 @@ func (s *Scanner) ICMPReadWorker() {
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		if s.State == Scan {
+		if s.State == Scan || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
