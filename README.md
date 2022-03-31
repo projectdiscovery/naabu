@@ -72,6 +72,7 @@ RATE-LIMIT:
 OUTPUT:
    -o, -output string  file to write output to (optional)
    -json               write output in JSON lines format
+   -csv                write output in csv format
 
 CONFIGURATION:
    -scan-all-ips, -sa     scan all the IP's associated with DNS record
@@ -83,6 +84,8 @@ CONFIGURATION:
    -nmap-cli string       nmap command to run on found results (example: -nmap-cli 'nmap -sV')
    -r string              list of custom resolver dns resolution (comma separated or from file)
    -proxy string          socks5 proxy
+   -resume                resume scan using resume.cfg
+   -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -92,12 +95,13 @@ OPTIMIZATION:
    -verify            validate the ports again with TCP verification
 
 DEBUG:
-   -debug          display debugging information
-   -verbose, -v    display verbose output
-   -no-color, -nc  disable colors in CLI output
-   -silent         display only results in output
-   -version        display version of naabu
-   -stats          display stats of the running scan
+   -debug                    display debugging information
+   -verbose, -v              display verbose output
+   -no-color, -nc            disable colors in CLI output
+   -silent                   display only results in output
+   -version                  display version of naabu
+   -stats                    display stats of the running scan
+   -si, -stats-interval int  number of seconds to wait between showing a statistics update (default 5)
 ```
 
 # Installation Instructions

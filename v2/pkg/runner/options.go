@@ -104,8 +104,8 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
-		flagSet.BoolVar(&options.Resume, "resume", false, "Resume"),
-		flagSet.BoolVar(&options.Stream, "stream", false, "Stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
+		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
+		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
