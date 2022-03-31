@@ -2,22 +2,16 @@ package runner
 
 import (
 	"fmt"
-	"net"
-	"os"
 	"runtime"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/iputil"
 )
-
-func isRoot() bool {
-	return os.Geteuid() == 0
-}
 
 func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
-	if net.ParseIP(target) == nil {
+	if !iputil.IsIP(target) {
 		var ips []string
 		ips, err = r.dnsclient.Lookup(target)
 		if err != nil {
@@ -25,7 +19,7 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 			return
 		}
 		for _, ip := range ips {
-			if mapcidr.IsIPv4(net.ParseIP(ip)) {
+			if iputil.IsIPv4(ip) {
 				targetIPs = append(targetIPs, ip)
 			}
 		}
@@ -42,7 +36,15 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 }
 
 func isOSSupported() bool {
-	return runtime.GOOS == "linux" || runtime.GOOS == "darwin"
+	return isLinux() || isOSX()
+}
+
+func isOSX() bool {
+	return runtime.GOOS == "darwin"
+}
+
+func isLinux() bool {
+	return runtime.GOOS == "linux"
 }
 
 func mapKeysToSliceInt(m map[int]struct{}) (s []int) {

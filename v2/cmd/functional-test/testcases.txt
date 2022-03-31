@@ -1,0 +1,7 @@
+127.0.0.1 {{binary}} -p 8000
+127.0.0.1 {{binary}} -p 8000,443
+127.0.0.1 {{binary}} -tp 100
+127.0.0.1 {{binary}} -ep 80 -p 8000
+127.0.0.1 {{binary}} -c 25 -p 8000
+127.0.0.1 {{binary}} -nmap-cli 'nmap -Pn -sT' -p 8000
+127.0.0.1 {{binary}} -json

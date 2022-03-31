@@ -6,10 +6,12 @@ import (
 	"os/exec"
 	"strings"
 
+	"github.com/pkg/errors"
+
 	"github.com/projectdiscovery/gologger"
 )
 
-func (r *Runner) handleNmap() {
+func (r *Runner) handleNmap() error {
 	// command from CLI
 	command := r.options.NmapCLI
 	hasCLI := r.options.NmapCLI != ""
@@ -33,8 +35,9 @@ func (r *Runner) handleNmap() {
 
 		// if we have no open ports we avoid running nmap
 		if len(ports) == 0 {
-			gologger.Info().Msgf("Skipping nmap scan as no open ports were found")
-			return
+			errMsg := errors.New("Skipping nmap scan as no open ports were found")
+			gologger.Info().Msgf(errMsg.Error())
+			return errMsg
 		}
 
 		portsStr := strings.Join(ports, ",")
@@ -50,11 +53,14 @@ func (r *Runner) handleNmap() {
 			cmd.Stdout = os.Stdout
 			err := cmd.Run()
 			if err != nil {
-				gologger.Error().Msgf("Could not run nmap command: %s\n", err)
-				return
+				errMsg := errors.Wrap(err, "Could not run nmap command")
+				gologger.Error().Msgf(errMsg.Error())
+				return errMsg
 			}
 		} else {
 			gologger.Info().Msgf("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
 		}
 	}
+
+	return nil
 }

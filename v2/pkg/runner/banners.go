@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
 
@@ -12,11 +13,11 @@ const banner = `
                   __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.5
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.6
 `
 
 // Version is the current version of naabu
-const Version = `2.0.5`
+const Version = `2.0.6`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -31,8 +32,12 @@ func showBanner() {
 func showNetworkCapabilities(options *Options) {
 	accessLevel := "non root"
 	scanType := "CONNECT"
-	if isRoot() && options.ScanType == SynScan {
+	if privileges.IsPrivileged && options.ScanType == SynScan {
 		accessLevel = "root"
+		if isLinux() {
+			accessLevel = "CAP_NET_RAW"
+		}
+
 		scanType = "SYN"
 	}
 	gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
