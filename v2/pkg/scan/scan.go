@@ -13,10 +13,12 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/proxy"
 )
 
 // State determines the internal scan state
@@ -56,6 +58,7 @@ type Scanner struct {
 	rate               int
 	listenPort         int
 	timeout            time.Duration
+	proxyDialer        proxy.Dialer
 
 	Ports    []int
 	IPRanger *ipranger.IPRanger
@@ -72,6 +75,7 @@ type Scanner struct {
 	serializeOptions gopacket.SerializeOptions
 	debug            bool
 	handlers         interface{}
+	stream           bool
 }
 
 // PkgSend is a TCP package
@@ -127,7 +131,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		IPRanger:     iprang,
 	}
 
-	if options.Root && newScannerCallback != nil {
+	if privileges.IsPrivileged && newScannerCallback != nil {
 		if err := newScannerCallback(scanner); err != nil {
 			return nil, err
 		}
@@ -142,6 +146,16 @@ func NewScanner(options *Options) (*Scanner, error) {
 			return nil, err
 		}
 	}
+
+	if options.Proxy != "" {
+		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, nil, &net.Dialer{Timeout: options.Timeout})
+		if err != nil {
+			return nil, err
+		}
+		scanner.proxyDialer = proxyDialer
+	}
+
+	scanner.stream = options.Stream
 
 	return scanner, nil
 }
@@ -247,7 +261,7 @@ func (s *Scanner) ICMPReadWorker() {
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		if s.State == Scan {
+		if s.State == Scan || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
@@ -355,8 +369,20 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 }
 
 // ConnectPort a single host and port
-func ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
-	conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%d", host, port), timeout)
+func (s *Scanner) ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
+	hostport := net.JoinHostPort(host, fmt.Sprint(port))
+	var (
+		err  error
+		conn net.Conn
+	)
+	if s.proxyDialer != nil {
+		conn, err = s.proxyDialer.Dial("tcp", hostport)
+		if err != nil {
+			return false, err
+		}
+	} else {
+		conn, err = net.DialTimeout("tcp", hostport, timeout)
+	}
 	if err != nil {
 		return false, err
 	}
@@ -510,7 +536,6 @@ func (s *Scanner) SetupHandlers() error {
 	if s.NetworkInterface != nil {
 		return s.SetupHandler(s.NetworkInterface.Name)
 	}
-
 	itfs, err := net.Interfaces()
 	if err != nil {
 		return err

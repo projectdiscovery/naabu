@@ -2,6 +2,7 @@ name: 🚨 CodeQL Analysis
 
 on:
   workflow_dispatch:
+  push:
   pull_request:
     branches:
       - dev
@@ -22,8 +23,11 @@ jobs:
         # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python' ]
 
     steps:
+    - name: Install libpcap-dev
+      run: sudo apt install libpcap-dev
+      
     - name: Checkout repository
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

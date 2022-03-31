@@ -10,7 +10,8 @@ type Options struct {
 	Retries     int
 	Rate        int
 	Debug       bool
-	Root        bool
 	ExcludeCdn  bool
 	ExcludedIps []string
+	Proxy       string
+	Stream      bool
 }

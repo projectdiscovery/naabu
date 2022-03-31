@@ -6,6 +6,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const portListStrParts = 2
@@ -42,8 +44,8 @@ func ParsePorts(options *Options) ([]int, error) {
 
 	// If the user has specfied top ports, use them as well
 	if options.TopPorts != "" {
-		// If the user has specfied full ports, use them
-		if strings.EqualFold(options.TopPorts, "full") {
+		switch strings.ToLower(options.TopPorts) {
+		case "full": // If the user has specfied full ports, use them
 			var err error
 			ports, err := parsePortsList(Full)
 			if err != nil {
@@ -53,10 +55,7 @@ func ParsePorts(options *Options) ([]int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
 			}
-		}
-
-		// If the user has specfied top-100, use them
-		if strings.EqualFold(options.TopPorts, "top-100") {
+		case "100": // If the user has specfied 100, use them
 			ports, err := parsePortsList(NmapTop100)
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
@@ -65,10 +64,7 @@ func ParsePorts(options *Options) ([]int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
 			}
-		}
-
-		// If the user has specfied top-1000, use them
-		if strings.EqualFold(options.TopPorts, "top-1000") {
+		case "1000": // If the user has specfied 1000, use them
 			ports, err := parsePortsList(NmapTop1000)
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
@@ -77,10 +73,12 @@ func ParsePorts(options *Options) ([]int, error) {
 			if err != nil {
 				return nil, fmt.Errorf("could not read ports: %s", err)
 			}
+		default:
+			return nil, errors.New("invalid top ports option")
 		}
 	}
 
-	// If the user has specfied top option, use them too
+	// If the user has specfied ports option, use them too
 	if options.Ports != "" {
 		// "-" equals to all ports
 		if options.Ports == "-" {
@@ -97,7 +95,7 @@ func ParsePorts(options *Options) ([]int, error) {
 		}
 	}
 
-	// merge all the specified ports (meaningless is "all" is used)
+	// merge all the specified ports (meaningless if "all" is used)
 	portsConfigMap := merge(portsConfigList...)
 	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigMap)
 

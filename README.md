@@ -33,13 +33,12 @@ all ports that return a reply.
   <br>
 </h1>
 
- - Fast And Simple SYN/CONNECT probe based scanning.
+ - Fast And Simple **SYN/CONNECT** probe based scanning
  - Optimized for ease of use and **lightweight** on resources
- - **Automatic handling of duplicate hosts between multiple subdomains**
- - NMAP Integration for service discovery
- - Piped input / output support for integrating in workflows
- - Multiple Output formats supported (JSON, File, Stdout)
- - Multiple input support including HOST/IP/CIDR notation.
+ - **Automatic IP deduplication for port scan**
+ - **NMAP** integration for service discovery
+ - Multiple input support - **STDIN/HOST/IP/CIDR**
+ - Multiple output format support - **JSON/TXT/STDOUT**
 
 # Usage
 
@@ -49,54 +48,60 @@ naabu -h
 
 This will display help for the tool. Here are all the switches it supports.
 
-```console
+```yaml
 Usage:
   ./naabu [flags]
 
 INPUT:
-   -host string                Host to scan ports for
-   -list, -l string            File containing list of hosts to scan ports
-   -exclude-hosts, -eh string  Specifies a comma-separated list of targets to be excluded from the scan (ip, cidr)
-   -exclude-file, -ef string   Specifies a newline-delimited file with targets to be excluded from the scan (ip, cidr)
+   -host string[]              hosts to scan ports for (comma-separated)
+   -list, -l string            list of hosts to scan ports (file)
+   -exclude-hosts, -eh string  hosts to exclude from the scan (comma-separated)
+   -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            Ports to scan (80, 80,443, 100-200
-   -top-ports, -tp string      Top Ports to scan (default top 100)
-   -exclude-ports, -ep string  Ports to exclude from scan
-   -ports-file, -pf string     File containing ports to scan for
-   -exclude-cdn, -ec           Skip full port scans for CDNs (only checks for 80,443)
+   -port, -p string            ports to scan (80,443, 100-200
+   -top-ports, -tp string      top ports to scan (default 100)
+   -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
+   -ports-file, -pf string     list of ports to exclude from scan (file)
+   -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
 
 RATE-LIMIT:
-   -c int     General internal worker threads (default 25)
-   -rate int  Rate of port scan probe request (default 1000)
+   -c int     general internal worker threads (default 25)
+   -rate int  packets to send per second (default 1000)
 
 OUTPUT:
-   -o, -output string  File to write output to (optional)
-   -json               Write output in JSON lines Format
+   -o, -output string  file to write output to (optional)
+   -json               write output in JSON lines format
+   -csv                write output in csv format
 
 CONFIGURATION:
-   -scan-all-ips          Scan all the ips
-   -scan-type, -s string  Port scan type (SYN/CONNECT) (default s)
-   -source-ip string      Source Ip
-   -interface-list, -il   List available interfaces and public ip
-   -interface, -i string  Network Interface to use for port scan
-   -nmap                  Invoke nmap scan on targets (nmap must be installed)
+   -scan-all-ips, -sa     scan all the IP's associated with DNS record
+   -scan-type, -s string  type of port scan (SYN/CONNECT) (default "s")
+   -source-ip string      source ip
+   -interface-list, -il   list available interfaces and public ip
+   -interface, -i string  network Interface to use for port scan
+   -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
    -nmap-cli string       nmap command to run on found results (example: -nmap-cli 'nmap -sV')
+   -r string              list of custom resolver dns resolution (comma separated or from file)
+   -proxy string          socks5 proxy
+   -resume                resume scan using resume.cfg
+   -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
 
 OPTIMIZATION:
-   -retries int       Number of retries for the port scan probe (default 3)
-   -timeout int       Millisecond to wait before timing out (default 1000)
-   -warm-up-time int  Time in seconds between scan phases (default 2)
-   -ping              Use ping probes for verification of host
-   -verify            Validate the ports again with TCP verification
+   -retries int       number of retries for the port scan (default 3)
+   -timeout int       millisecond to wait before timing out (default 1000)
+   -warm-up-time int  time in seconds between scan phases (default 2)
+   -ping              ping probes for verification of host
+   -verify            validate the ports again with TCP verification
 
 DEBUG:
-   -debug          Enable debugging information
-   -v              Show Verbose output
-   -no-color, -nc  Don't Use colors in output
-   -silent         Show found ports only in output
-   -version        Show version of naabu
-   -stats          Display stats of the running scan
+   -debug                    display debugging information
+   -verbose, -v              display verbose output
+   -no-color, -nc            disable colors in CLI output
+   -silent                   display only results in output
+   -version                  display version of naabu
+   -stats                    display stats of the running scan
+   -si, -stats-interval int  number of seconds to wait between showing a statistics update (default 5)
 ```
 
 # Installation Instructions
@@ -138,6 +143,7 @@ naabu -host hackerone.com
 [WRN] Developers assume no liability and are not responsible for any misuse or damage.
 [INF] Running SYN scan with root privileges
 [INF] Found 4 ports on host hackerone.com (104.16.100.52)
+
 hackerone.com:80
 hackerone.com:443
 hackerone.com:8443
@@ -152,7 +158,7 @@ naabu -p 80,443,21-23 -host hackerone.com
 
 By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
 
-| CMD               | Description                          |
+| Flag              | Description                          |
 |-------------------|--------------------------------------|
 | `-top-ports 100`  | Scan for nmap top **100** port       |
 | `-top-ports 1000` | Scan for nmap top **1000** port      |
@@ -164,12 +170,6 @@ You can also specify specific ports which you would like to exclude from the sca
 naabu -p - -exclude-ports 80,443
 ```
 
-The `o` flag can be used to specify an output file.
-
-```sh
-naabu -host hackerone.com -o output.txt
-```
-
 To run the naabu on a list of hosts, `-list` option can be used.
 
 ```sh
@@ -179,12 +179,10 @@ naabu -list hosts.txt
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
 ```console
-naabu -host hackerone.com -json
+naabu -host 104.16.99.52 -json
 
-{"host":"hackerone.com","ip":"104.16.99.52","port":8443}
-{"host":"hackerone.com","ip":"104.16.99.52","port":80}
-{"host":"hackerone.com","ip":"104.16.99.52","port":443}
-{"host":"hackerone.com","ip":"104.16.99.52","port":8080}
+{"ip":"104.16.99.52","port":443}
+{"ip":"104.16.99.52","port":80}
 ```
 
 The ports discovered can be piped to other tools too. For example, you can pipe the ports discovered by naabu to [httpx](https://github.com/projectdiscovery/httpx) which will then find running http servers on the host.
