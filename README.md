@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="static/naabu-logo.png" alt="naabu" width="200px"></a>
+  <img src="static/naabu-logo.png" alt="naabu" width="200px">
   <br>
 </h1>
 
@@ -29,7 +29,7 @@ all ports that return a reply.
 # Features
 
 <h1 align="center">
-  <img src="static/naabu-run.png" alt="naabu" width="700px"></a>
+  <img src="static/naabu-run.png" alt="naabu" width="700px">
   <br>
 </h1>
 
@@ -249,7 +249,7 @@ Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for
 # 📋 Notes
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
-- We suggest to tune the flags / rate if running naabu from local system.
+- We suggest tuning the flags / rate if running naabu from local system.
 - For best results, run naabu as **root** user.
 
-naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
+`naabu` is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
