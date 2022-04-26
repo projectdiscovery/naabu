@@ -15,7 +15,7 @@ require (
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/ipranger v0.0.3-0.20210831161617-ac80efae0961
 	github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3
-	github.com/projectdiscovery/mapcidr v0.0.8
+	github.com/projectdiscovery/mapcidr v0.0.9
 	github.com/projectdiscovery/networkpolicy v0.0.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
