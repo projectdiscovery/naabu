@@ -30,16 +30,23 @@ func showBanner() {
 
 // showNetworkCapabilities shows the network capabilities/scan types possible with the running user
 func showNetworkCapabilities(options *Options) {
-	accessLevel := "non root"
-	scanType := "CONNECT"
-	if privileges.IsPrivileged && options.ScanType == SynScan {
+	var accessLevel, scanType string
+
+	switch {
+	case privileges.IsPrivileged && options.ScanType == SynScan:
 		accessLevel = "root"
 		if isLinux() {
 			accessLevel = "CAP_NET_RAW"
 		}
-
 		scanType = "SYN"
+	case options.Passive:
+		accessLevel = "non root"
+		scanType = "PASSIVE"
+	default:
+		accessLevel = "non root"
+		scanType = "CONNECT"
 	}
+
 	gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
 }
 
