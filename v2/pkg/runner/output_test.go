@@ -14,7 +14,8 @@ func TestWriteHostOutput(t *testing.T) {
 	var s string
 	buf := bytes.NewBufferString(s)
 	assert.Nil(t, WriteHostOutput(host, ports, buf))
-	assert.Equal(t, "127.0.0.1:80\n127.0.0.1:8080\n", buf.String())
+	assert.Contains(t, buf.String(), "127.0.0.1:80")
+	assert.Contains(t, buf.String(), "127.0.0.1:8080")
 }
 
 func TestWriteJSONOutput(t *testing.T) {
