@@ -75,19 +75,27 @@ func (options *Options) validateOptions() error {
 		}
 	}
 
+	// passive mode enables automatically stream
+	if options.Passive {
+		options.Stream = true
+	}
+
+	// stream
 	if options.Stream {
 		if options.Resume {
-			return errors.New("resume not supported in stream mode")
+			return errors.New("resume not supported in stream active mode")
 		}
 		if options.EnableProgressBar {
-			return errors.New("stats not supported in stream mode")
-		}
-		if options.Verify {
-			return errors.New("verify not supported in stream mode")
+			return errors.New("stats not supported in stream active mode")
 		}
 		if options.Nmap {
-			return errors.New("nmap not supported in stream mode")
+			return errors.New("nmap not supported in stream active mode")
 		}
+	}
+
+	// stream passive
+	if options.Verify && !options.Passive {
+		return errors.New("verify not supported in stream active mode")
 	}
 
 	return nil
