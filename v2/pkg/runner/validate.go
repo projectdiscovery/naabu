@@ -75,9 +75,9 @@ func (options *Options) validateOptions() error {
 		}
 	}
 
-	// passive is available only with stream
-	if options.Passive && !options.Stream {
-		return errors.New("passive supported in stream mode only")
+	// passive mode enables automatically stream
+	if options.Passive {
+		options.Stream = true
 	}
 
 	// stream
