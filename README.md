@@ -1,5 +1,5 @@
 <h1 align="center">
-  <img src="static/naabu-logo.png" alt="naabu" width="200px"></a>
+  <img src="static/naabu-logo.png" alt="naabu" width="200px">
   <br>
 </h1>
 
@@ -29,11 +29,12 @@ all ports that return a reply.
 # Features
 
 <h1 align="center">
-  <img src="static/naabu-run.png" alt="naabu" width="700px"></a>
+  <img src="static/naabu-run.png" alt="naabu" width="700px">
   <br>
 </h1>
 
  - Fast And Simple **SYN/CONNECT** probe based scanning
+ - Passive Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
  - Optimized for ease of use and **lightweight** on resources
  - **Automatic IP deduplication for port scan**
  - **NMAP** integration for service discovery
@@ -81,11 +82,12 @@ CONFIGURATION:
    -interface-list, -il   list available interfaces and public ip
    -interface, -i string  network Interface to use for port scan
    -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
-   -nmap-cli string       nmap command to run on found results (example: -nmap-cli 'nmap -sV')
+   -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
    -r string              list of custom resolver dns resolution (comma separated or from file)
    -proxy string          socks5 proxy
    -resume                resume scan using resume.cfg
    -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
+   -passive               display passive open ports using shodan internetdb api
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -249,7 +251,7 @@ Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for
 # 📋 Notes
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
-- We suggest to tune the flags / rate if running naabu from local system.
+- We suggest tuning the flags / rate if running naabu from local system.
 - For best results, run naabu as **root** user.
 
-naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
+`naabu` is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.

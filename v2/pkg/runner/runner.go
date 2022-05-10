@@ -3,8 +3,11 @@ package runner
 import (
 	"bytes"
 	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -15,11 +18,14 @@ import (
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
+	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/retryablehttp-go"
+	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
 )
@@ -132,7 +138,8 @@ func (r *Runner) RunEnumeration() error {
 
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 
-	if r.options.Stream {
+	switch {
+	case r.options.Stream && !r.options.Passive: // stream active
 		r.scanner.State = scan.Scan
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
@@ -157,7 +164,61 @@ func (r *Runner) RunEnumeration() error {
 		r.wgscan.Wait()
 		r.handleOutput()
 		return nil
-	} else {
+	case r.options.Stream && r.options.Passive: // stream passive
+		// create retryablehttp instance
+		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
+		r.scanner.State = scan.Scan
+		for cidr := range r.streamChannel {
+			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
+				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
+			}
+			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
+			for ip := range ipStream {
+				r.wgscan.Add()
+				go func(ip string) {
+					defer r.wgscan.Done()
+
+					// obtain ports from shodan idb
+					shodanURL := fmt.Sprintf(shodanidb.URL, url.QueryEscape(ip))
+					request, err := retryablehttp.NewRequest(http.MethodGet, shodanURL, nil)
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't create http request for %s: %s\n", ip, err)
+						return
+					}
+					r.limiter.Take()
+					response, err := httpClient.Do(request)
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
+						return
+					}
+					if response.StatusCode != http.StatusOK {
+						gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
+						return
+					}
+
+					// unmarshal the response
+					data := &shodanidb.ShodanResponse{}
+					if err := json.NewDecoder(response.Body).Decode(data); err != nil {
+						gologger.Warning().Msgf("Couldn't unmarshal json data for %s: %s\n", ip, err)
+						return
+					}
+
+					for _, port := range data.Ports {
+						r.scanner.ScanResults.AddPort(ip, port)
+					}
+				}(ip)
+			}
+		}
+		r.wgscan.Wait()
+
+		// Validate the hosts if the user has asked for second step validation
+		if r.options.Verify {
+			r.ConnectVerification()
+		}
+
+		r.handleOutput()
+		return nil
+	default:
 		// shrinks the ips to the minimum amount of cidr
 		var targets []*net.IPNet
 		r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
@@ -407,7 +468,7 @@ func (r *Runner) handleOutput() {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
-		if _, statErr := os.Stat(outputFolder); os.IsNotExist(statErr) {
+		if fileutil.FolderExists(outputFolder) {
 			mkdirErr := os.MkdirAll(outputFolder, 0700)
 			if mkdirErr != nil {
 				gologger.Error().Msgf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
@@ -432,6 +493,7 @@ func (r *Runner) handleOutput() {
 		buffer := bytes.Buffer{}
 		writer := csv.NewWriter(&buffer)
 		for _, host := range dt {
+			buffer.Reset()
 			if host == "ip" {
 				host = hostIP
 			}
