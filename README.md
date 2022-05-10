@@ -34,6 +34,7 @@ all ports that return a reply.
 </h1>
 
  - Fast And Simple **SYN/CONNECT** probe based scanning
+ - Passive Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
  - Optimized for ease of use and **lightweight** on resources
  - **Automatic IP deduplication for port scan**
  - **NMAP** integration for service discovery
@@ -81,11 +82,12 @@ CONFIGURATION:
    -interface-list, -il   list available interfaces and public ip
    -interface, -i string  network Interface to use for port scan
    -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
-   -nmap-cli string       nmap command to run on found results (example: -nmap-cli 'nmap -sV')
+   -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
    -r string              list of custom resolver dns resolution (comma separated or from file)
    -proxy string          socks5 proxy
    -resume                resume scan using resume.cfg
    -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
+   -passive               display passive open ports using shodan internetdb api
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
