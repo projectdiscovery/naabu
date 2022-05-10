@@ -11,11 +11,11 @@ require (
 	github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.0-20220215113056-ba188a0c8abc
-	github.com/projectdiscovery/goflags v0.0.8-0.20220304165250-2530b305a4a9
+	github.com/projectdiscovery/goflags v0.0.8-0.20220411122653-4f7127a41268
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/ipranger v0.0.3-0.20210831161617-ac80efae0961
 	github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3
-	github.com/projectdiscovery/mapcidr v0.0.8
+	github.com/projectdiscovery/mapcidr v0.0.9
 	github.com/projectdiscovery/networkpolicy v0.0.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
@@ -26,7 +26,9 @@ require (
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/pkg/errors v0.9.1
-	github.com/stretchr/testify v1.7.0
+	github.com/projectdiscovery/retryablehttp-go v1.0.2
+	github.com/projectdiscovery/uncover v0.0.5
+	github.com/stretchr/testify v1.7.1
 )
 
 require (
@@ -43,7 +45,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/hmap v0.0.1 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.13-0.20210927160332-db15799e2e4d // indirect
-	github.com/projectdiscovery/retryablehttp-go v1.0.2 // indirect
 	github.com/projectdiscovery/stringsutil v0.0.0-20210830151154-f567170afdd9 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
