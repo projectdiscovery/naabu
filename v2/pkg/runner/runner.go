@@ -493,6 +493,7 @@ func (r *Runner) handleOutput() {
 		buffer := bytes.Buffer{}
 		writer := csv.NewWriter(&buffer)
 		for _, host := range dt {
+			buffer.Reset()
 			if host == "ip" {
 				host = hostIP
 			}
