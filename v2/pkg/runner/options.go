@@ -107,7 +107,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
-		flagSet.BoolVar(&options.Passive, "passive", false, "Pulls ports from shodan internetdb"),
+		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
