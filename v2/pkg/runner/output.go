@@ -19,6 +19,8 @@ type Result struct {
 	Host      string    `json:"host,omitempty" csv:"host"`
 	IP        string    `json:"ip,omitempty" csv:"ip"`
 	Port      int       `json:"port" csv:"port"`
+	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
 	TimeStamp time.Time `json:"timestamp" csv:"timestamp"`
 }
 
@@ -74,15 +76,15 @@ func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) erro
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnName string, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
-
 	data := Result{TimeStamp: time.Now().UTC()}
 	if host != ip {
 		data.Host = host
 	}
 	data.IP = ip
-
+	data.IsCDNIP = isCdn
+	data.CDNName = cdnName
 	for port := range ports {
 		data.Port = port
 		err := encoder.Encode(&data)
@@ -94,7 +96,7 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, writer io.Writer) 
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnName string, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{TimeStamp: time.Now().UTC()}
 	if header {
@@ -104,7 +106,8 @@ func WriteCsvOutput(host, ip string, ports map[int]struct{}, header bool, writer
 		data.Host = host
 	}
 	data.IP = ip
-
+	data.IsCDNIP = isCdn
+	data.CDNName = cdnName
 	for port := range ports {
 		data.Port = port
 		writeCSVRow(data, encoder)
