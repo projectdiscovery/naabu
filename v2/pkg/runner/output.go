@@ -55,7 +55,7 @@ func (r *Result) CSVFields() ([]string, error) {
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) error {
+func WriteHostOutput(host string, ports map[int]struct{}, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
 
@@ -63,6 +63,9 @@ func WriteHostOutput(host string, ports map[int]struct{}, writer io.Writer) erro
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(port))
+		if cdnName != "" {
+			sb.WriteString(" [" + cdnName + "]")
+		}
 		sb.WriteString("\n")
 
 		_, err := bufwriter.WriteString(sb.String())
