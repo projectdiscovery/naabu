@@ -530,7 +530,7 @@ func (r *Runner) handleOutput() {
 				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
 				for port := range ports {
-					if r.options.OutputCDN {
+					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s:%d [%s]\n", host, port, cdnName)
 					} else {
 						gologger.Silent().Msgf("%s:%d\n", host, port)
@@ -544,7 +544,7 @@ func (r *Runner) handleOutput() {
 				} else if r.options.CSV {
 					err = WriteCsvOutput(host, hostIP, ports, isCDNIP, cdnName, csvFileHeaderEnabled, file)
 				} else {
-					err = WriteHostOutput(host, ports,cdnName, file)
+					err = WriteHostOutput(host, ports, cdnName, file)
 				}
 				if err != nil {
 					gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
