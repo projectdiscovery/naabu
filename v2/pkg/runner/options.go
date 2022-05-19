@@ -57,6 +57,7 @@ type Options struct {
 	ResumeCfg         *ResumeCfg
 	Stream            bool
 	Passive           bool
+	OutputCDN         bool // display cdn in use
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -82,6 +83,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
 		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to exclude from scan (file)"),
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
+		flagSet.BoolVarP(&options.OutputCDN, "cdn", "display-cdn", false, "display cdn in use"),
 	)
 
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
