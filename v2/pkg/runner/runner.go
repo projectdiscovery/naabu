@@ -227,8 +227,14 @@ func (r *Runner) RunEnumeration() error {
 			return nil
 		})
 		targets, _ = mapcidr.CoalesceCIDRs(targets)
+		if len(targets) == 0 {
+			return errors.New("no valid ipv4 targets were found")
+		}
 		var targetsCount, portsCount uint64
 		for _, target := range targets {
+			if target == nil {
+				continue
+			}
 			targetsCount += mapcidr.AddressCountIpnet(target)
 		}
 		portsCount = uint64(len(r.scanner.Ports))

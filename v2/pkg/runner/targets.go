@@ -108,13 +108,15 @@ func (r *Runner) AddTarget(target string) error {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
+	} else if iputil.IsIPv6(target) {
+		return fmt.Errorf("Skipping IPV6 address: %s", target)
 	} else if ipranger.IsCidr(target) {
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
-	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+	} else if iputil.IsIPv4(target) && !r.scanner.IPRanger.Contains(target) {
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
