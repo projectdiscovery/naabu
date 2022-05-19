@@ -11,6 +11,7 @@ type Options struct {
 	Rate        int
 	Debug       bool
 	ExcludeCdn  bool
+	OutputCdn   bool
 	ExcludedIps []string
 	Proxy       string
 	Stream      bool

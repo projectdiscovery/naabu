@@ -138,8 +138,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	scanner.ScanResults = result.NewResult()
-
-	if options.ExcludeCdn {
+	if options.ExcludeCdn || options.OutputCdn {
 		var err error
 		scanner.cdn, err = cdncheck.NewWithCache()
 		if err != nil {
