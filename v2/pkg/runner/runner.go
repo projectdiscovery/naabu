@@ -311,6 +311,10 @@ func (r *Runner) RunEnumeration() error {
 			if r.options.ResumeCfg.Seed > 0 {
 				r.options.ResumeCfg.Seed = 0
 			}
+			if r.options.ResumeCfg.Index > 0 {
+				// zero also the current index as we are restarting the scan
+				r.options.ResumeCfg.Index = 0
+			}
 			r.options.ResumeCfg.Unlock()
 		}
 
