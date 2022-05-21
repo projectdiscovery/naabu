@@ -87,8 +87,11 @@ func (r *Runner) handleNmap() error {
 			args = append(args, "-p", portsStr)
 			args = append(args, ips...)
 
+			// if the command is not executable, we just suggest it
+			commandCanBeExecuted := isCommandExecutable(args)
+
 			// if requested via config file or via cli
-			if r.options.Nmap || hasCLI {
+			if (r.options.Nmap || hasCLI) && commandCanBeExecuted {
 				gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
 				cmd := exec.Command(args[0], args[1:]...)
 				cmd.Stdout = os.Stdout
@@ -105,4 +108,25 @@ func (r *Runner) handleNmap() error {
 	}
 
 	return nil
+}
+
+func isCommandExecutable(args []string) bool {
+	commandLength := calculateCmdLength(args)
+	if isWindows() {
+		// windows has a hard limit of
+		// - 2048 characters in XP
+		// - 32768 characters in Win7
+		return commandLength < 2040
+	}
+	// linux and darwin
+	return true
+}
+
+func calculateCmdLength(args []string) int {
+	var commandLength int
+	for _, arg := range args {
+		commandLength += len(arg)
+		commandLength += 1 // space character
+	}
+	return commandLength
 }
