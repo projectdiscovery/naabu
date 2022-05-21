@@ -116,7 +116,7 @@ func isCommandExecutable(args []string) bool {
 		// windows has a hard limit of
 		// - 2048 characters in XP
 		// - 32768 characters in Win7
-		return commandLength < 2040
+		return commandLength < 2048
 	}
 	// linux and darwin
 	return true
