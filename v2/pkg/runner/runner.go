@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -226,12 +227,12 @@ func (r *Runner) RunEnumeration() error {
 			targets = append(targets, ipranger.ToCidr(string(k)))
 			return nil
 		})
-		targets, _ = mapcidr.CoalesceCIDRs(targets)
-		if len(targets) == 0 {
-			return errors.New("no valid ipv4 targets were found")
+		targetsV4, targetsv6 := mapcidr.CoalesceCIDRs(targets)
+		if len(targetsV4) == 0 && len(targetsv6) == 0 {
+			return errors.New("no valid ipv4 or ipv6 targets were found")
 		}
 		var targetsCount, portsCount uint64
-		for _, target := range targets {
+		for _, target := range append(targetsV4, targetsv6...) {
 			if target == nil {
 				continue
 			}
@@ -366,7 +367,14 @@ func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
 }
 
 func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
-	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(network.IP) + index).String()
+	ipInt, bits, err := mapcidr.IPToInteger(network.IP)
+	if err != nil {
+		gologger.Warning().Msgf("%s\n", err)
+		return ""
+	}
+	subnetIpInt := big.NewInt(0).Add(ipInt, big.NewInt(index))
+	ip := mapcidr.IntegerToIP(subnetIpInt, bits)
+	return ip.String()
 }
 
 func (r *Runner) PickPort(index int) int {
@@ -456,10 +464,10 @@ func (r *Runner) SetSourceIPAndInterface() error {
 			if err != nil {
 				return err
 			}
+			return nil
 		}
 	}
-
-	return fmt.Errorf("source Ip and Interface not specified")
+	return errors.New("source Ip and Interface not specified")
 }
 
 func (r *Runner) handleOutput() {

@@ -13,6 +13,7 @@ import (
 	"github.com/projectdiscovery/cdncheck"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
@@ -52,7 +53,8 @@ const (
 
 type Scanner struct {
 	SourceIP           net.IP
-	tcpPacketlistener  net.PacketConn
+	tcpPacketlistener4 net.PacketConn
+	tcpPacketlistener6 net.PacketConn
 	icmpPacketListener net.PacketConn
 	retries            int
 	rate               int
@@ -162,7 +164,8 @@ func NewScanner(options *Options) (*Scanner, error) {
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
 	s.CleanupHandlers()
-	s.tcpPacketlistener.Close()
+	s.tcpPacketlistener4.Close()
+	s.tcpPacketlistener6.Close()
 }
 
 // StartWorkers of the scanner
@@ -182,14 +185,14 @@ func (s *Scanner) TCPWriteWorker() {
 
 // TCPReadWorker reads and parse incoming TCP packets
 func (s *Scanner) TCPReadWorker() {
-	defer s.tcpPacketlistener.Close()
+	defer s.tcpPacketlistener4.Close()
 	data := make([]byte, 4096)
 	for {
 		if s.State == Done {
 			break
 		}
 		// nolint:errcheck // just empty the buffer
-		s.tcpPacketlistener.ReadFrom(data)
+		s.tcpPacketlistener4.ReadFrom(data)
 	}
 }
 
@@ -476,6 +479,15 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 
 // SendAsyncPkg sends a single packet to a port
 func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
+	switch {
+	case iputil.IsIPv4(ip):
+		s.sendAsync4(ip, port, pkgFlag)
+	case iputil.IsIPv6(ip):
+		s.sendAsync6(ip, port, pkgFlag)
+	}
+}
+
+func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
 		SrcIP:    s.SourceIP,
@@ -510,7 +522,51 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
 		}
 	} else {
-		err = s.send(ip, s.tcpPacketlistener, &tcp)
+		err = s.send(ip, s.tcpPacketlistener4, &tcp)
+		if err != nil {
+			if s.debug {
+				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, port, err)
+			}
+		}
+	}
+}
+
+func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
+	// Construct all the network layers we need.
+	ip6 := layers.IPv6{
+		SrcIP:      s.SourceIP,
+		DstIP:      net.ParseIP(ip),
+		Version:    6,
+		HopLimit:   128,
+		NextHeader: layers.IPProtocolTCP,
+	}
+	tcpOption := layers.TCPOption{
+		OptionType:   layers.TCPOptionKindMSS,
+		OptionLength: 4,
+		OptionData:   []byte{0x05, 0xB4},
+	}
+
+	tcp := layers.TCP{
+		SrcPort: layers.TCPPort(s.listenPort),
+		DstPort: layers.TCPPort(port),
+		Window:  1024,
+		Seq:     s.tcpsequencer.Next(),
+		Options: []layers.TCPOption{tcpOption},
+	}
+
+	if pkgFlag == SYN {
+		tcp.SYN = true
+	} else if pkgFlag == ACK {
+		tcp.ACK = true
+	}
+
+	err := tcp.SetNetworkLayerForChecksum(&ip6)
+	if err != nil {
+		if s.debug {
+			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+		}
+	} else {
+		err = s.send(ip, s.tcpPacketlistener6, &tcp)
 		if err != nil {
 			if s.debug {
 				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, port, err)
