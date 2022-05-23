@@ -21,7 +21,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -224,7 +224,7 @@ func (r *Runner) RunEnumeration() error {
 		// shrinks the ips to the minimum amount of cidr
 		var targets []*net.IPNet
 		r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-			targets = append(targets, ipranger.ToCidr(string(k)))
+			targets = append(targets, iputil.ToCidr(string(k)))
 			return nil
 		})
 		targetsV4, targetsv6 := mapcidr.CoalesceCIDRs(targets)

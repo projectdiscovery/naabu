@@ -10,11 +10,11 @@ require (
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698
 	github.com/projectdiscovery/fdmax v0.0.3
-	github.com/projectdiscovery/fileutil v0.0.0-20220215113056-ba188a0c8abc
+	github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483
 	github.com/projectdiscovery/goflags v0.0.8-0.20220411122653-4f7127a41268
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/ipranger v0.0.3-0.20220522183814-23bcedf99882
-	github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3
+	github.com/projectdiscovery/ipranger v0.0.3-0.20220523155529-652c9066bf01
+	github.com/projectdiscovery/iputil v0.0.0-20220523155204-a04b03c5a533
 	github.com/projectdiscovery/mapcidr v0.0.9
 	github.com/projectdiscovery/networkpolicy v0.0.1
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -45,7 +45,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/hmap v0.0.1 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.13-0.20210927160332-db15799e2e4d // indirect
-	github.com/projectdiscovery/stringsutil v0.0.0-20210830151154-f567170afdd9 // indirect
+	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
