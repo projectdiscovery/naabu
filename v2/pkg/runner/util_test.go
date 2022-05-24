@@ -14,7 +14,7 @@ func Test_host2ips(t *testing.T) {
 		wantErr bool
 	}{
 		{"10.10.10.10", []string{"10.10.10.10"}, false},
-		{"localhost", []string{"127.0.0.1"}, false},
+		{"localhost", []string{"127.0.0.1", "::1"}, false},
 		{"aaaa", nil, true},
 		{"10.10.10.0/24", nil, true},
 	}
