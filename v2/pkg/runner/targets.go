@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 
@@ -114,6 +115,11 @@ func (r *Runner) AddTarget(target string) error {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	} else if iputil.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+		ip := net.ParseIP(target)
+		// convert ip4 expressed as ip6 back to ip4
+		if ip.To4() != nil {
+			target = ip.To4().String()
+		}
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
