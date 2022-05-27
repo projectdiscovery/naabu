@@ -107,8 +107,8 @@ github.com/projectdiscovery/gologger v1.1.4/go.mod h1:Bhb6Bdx2PV1nMaFLoXNBmHIU85
 github.com/projectdiscovery/hmap v0.0.1 h1:VAONbJw5jP+syI5smhsfkrq9XPGn4aiYy5pR6KR1wog=
 github.com/projectdiscovery/hmap v0.0.1/go.mod h1:VDEfgzkKQdq7iGTKz8Ooul0NuYHQ8qiDs6r8bPD1Sb0=
 github.com/projectdiscovery/ipranger v0.0.2/go.mod h1:kcAIk/lo5rW+IzUrFkeYyXnFJ+dKwYooEOHGVPP/RWE=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210831161617-ac80efae0961 h1:WqZewGI1Oe8uAwiFaHb8NNM1CLxoxxy6OV5NNePmyxM=
-github.com/projectdiscovery/ipranger v0.0.3-0.20210831161617-ac80efae0961/go.mod h1:lh3xQA3Hv7PSwA5t0L9MwTq/mhE6io7zMXmiKHxrxGg=
+github.com/projectdiscovery/ipranger v0.0.3-0.20220525173146-ec0a378199dc h1:z1krK+Mtsjd4i7zRPz/Empr2UwW4S7j42akIfazXHKs=
+github.com/projectdiscovery/ipranger v0.0.3-0.20220525173146-ec0a378199dc/go.mod h1:wmkh6yG5XSw3hyJ5oACwy6rliprdwWoWUr6NcXSGfBI=
 github.com/projectdiscovery/iputil v0.0.0-20210414194613-4b4d2517acf0/go.mod h1:PQAqn5h5NXsQTF4ZA00ZTYLRzGCjOtcCq8llAqrsd1A=
 github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3 h1:VZ9H51A7tI7R/9I5W5l960Nkq7eMJqGd3y1wsuwzdjE=
 github.com/projectdiscovery/iputil v0.0.0-20210804143329-3a30fcde43f3/go.mod h1:blmYJkS8lSrrx3QcmcgS2tZIxlojeVmoGeA9twslCBU=
@@ -121,6 +121,8 @@ github.com/projectdiscovery/mapcidr v0.0.9/go.mod h1:zgsrc+UXwcLcBopUNboiI4tpTIC
 github.com/projectdiscovery/networkpolicy v0.0.0-20210414200240-b3fa8abf324c/go.mod h1:KZIP5x7t+bH2dASgnYaqbiLI4z0gxXzekwUtarrQMdc=
 github.com/projectdiscovery/networkpolicy v0.0.1 h1:RGRuPlxE8WLFF9tdKSjTsYiTIKHNHW20Kl0nGGiRb1I=
 github.com/projectdiscovery/networkpolicy v0.0.1/go.mod h1:asvdg5wMy3LPVMGALatebKeOYH5n5fV5RCTv6DbxpIs=
+github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d h1:QXaK3yzoEWI8n+hLAqEgTJEWhkp1WZM8ThbKwrlXFks=
+github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d/go.mod h1:asvdg5wMy3LPVMGALatebKeOYH5n5fV5RCTv6DbxpIs=
 github.com/projectdiscovery/reflectutil v0.0.0-20210804085554-4d90952bf92f/go.mod h1:3L0WfNIcVWXIDur8k+gKDLZLWY2F+rs0SQXtcn/3AYU=
 github.com/projectdiscovery/retryabledns v1.0.13-0.20210927160332-db15799e2e4d h1:tFPD9+3lq+XMHpQ/zMMp41RdXEl90h+KZli7UQt1LNY=
 github.com/projectdiscovery/retryabledns v1.0.13-0.20210927160332-db15799e2e4d/go.mod h1:c5lCypH3Wv7PNRHFsTbmTWlOAV502VlqUmS9A/2wlNU=
