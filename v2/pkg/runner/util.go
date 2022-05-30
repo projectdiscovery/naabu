@@ -47,6 +47,10 @@ func isLinux() bool {
 	return runtime.GOOS == "linux"
 }
 
+func isWindows() bool {
+	return runtime.GOOS == "windows"
+}
+
 func mapKeysToSliceInt(m map[int]struct{}) (s []int) {
 	for k := range m {
 		s = append(s, k)
