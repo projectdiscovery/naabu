@@ -6,12 +6,14 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
+	"github.com/google/gopacket/routing"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
 )
@@ -52,6 +54,18 @@ func NewScannerUnix(scanner *Scanner) error {
 
 	scanner.tcpChan = make(chan *PkgResult, chanSize)
 	scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
+	switch runtime.GOOS {
+	case "linux":
+		scanner.Router, err = routing.New()
+		if err != nil {
+			return err
+		}
+	case "darwin":
+		scanner.Router, err = newDarwinRouter()
+		if err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

@@ -51,8 +51,12 @@ const (
 	ICMPTIMESTAMPREQUEST
 )
 
+var router interface{}
+
 type Scanner struct {
-	SourceIP           net.IP
+	Router             Router
+	SourceIP4          net.IP
+	SourceIP6          net.IP
 	tcpPacketlistener4 net.PacketConn
 	tcpPacketlistener6 net.PacketConn
 	icmpPacketListener net.PacketConn
@@ -270,21 +274,6 @@ func (s *Scanner) TCPResultWorker() {
 	}
 }
 
-// GetSrcParameters gets the network parameters from the destination ip
-func GetSrcParameters(destIP string) (srcIP net.IP, networkInterface *net.Interface, err error) {
-	srcIP, err = GetSourceIP(net.ParseIP(destIP))
-	if err != nil {
-		return
-	}
-
-	networkInterface, err = GetInterfaceFromIP(srcIP)
-	if err != nil {
-		return
-	}
-
-	return
-}
-
 // send sends the given layers as a single packet on the network.
 func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	buf := gopacket.NewSerializeBuffer()
@@ -319,8 +308,9 @@ func (s *Scanner) ScanSyn(ip string) {
 }
 
 // GetSourceIP gets the local ip based on our destination ip
-func GetSourceIP(dstip net.IP) (net.IP, error) {
-	serverAddr, err := net.ResolveUDPAddr("udp", dstip.String()+":12345")
+func GetSourceIP(target string) (net.IP, error) {
+	hostPort := net.JoinHostPort(target, "12345")
+	serverAddr, err := net.ResolveUDPAddr("udp", hostPort)
 	if err != nil {
 		return nil, err
 	}
@@ -407,12 +397,22 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
-		SrcIP:    s.SourceIP,
 		DstIP:    net.ParseIP(dstIP),
 		Version:  4,
 		TTL:      255,
 		Protocol: layers.IPProtocolTCP,
 	}
+
+	if s.SourceIP4 != nil {
+		ip4.SrcIP = s.SourceIP4
+	} else {
+		_, _, sourceIP, err := s.Router.Route(ip4.DstIP)
+		if err != nil {
+			return false, err
+		}
+		ip4.SrcIP = sourceIP
+	}
+
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
@@ -490,12 +490,23 @@ func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
 func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
-		SrcIP:    s.SourceIP,
 		DstIP:    net.ParseIP(ip),
 		Version:  4,
 		TTL:      255,
 		Protocol: layers.IPProtocolTCP,
 	}
+
+	if s.SourceIP4 != nil {
+		ip4.SrcIP = s.SourceIP4
+	} else {
+		_, _, sourceIP, err := s.Router.Route(ip4.DstIP)
+		if err != nil {
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
+			return
+		}
+		ip4.SrcIP = sourceIP
+	}
+
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
@@ -534,12 +545,23 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip6 := layers.IPv6{
-		SrcIP:      s.SourceIP,
 		DstIP:      net.ParseIP(ip),
 		Version:    6,
 		HopLimit:   128,
 		NextHeader: layers.IPProtocolTCP,
 	}
+
+	if s.SourceIP6 != nil {
+		ip6.SrcIP = s.SourceIP6
+	} else {
+		_, _, sourceIP, err := s.Router.Route(ip6.DstIP)
+		if err != nil {
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
+			return
+		}
+		ip6.SrcIP = sourceIP
+	}
+
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
@@ -575,36 +597,13 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	}
 }
 
-// TuneSource automatically with ip and interface
-func (s *Scanner) TuneSource(ip string) error {
-	var err error
-	s.SourceIP, s.NetworkInterface, err = GetSrcParameters(ip)
-	if err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // SetupHandlers to listen on all interfaces
 func (s *Scanner) SetupHandlers() error {
 	if s.NetworkInterface != nil {
 		return s.SetupHandler(s.NetworkInterface.Name)
 	}
-	itfs, err := net.Interfaces()
-	if err != nil {
-		return err
-	}
-	for _, itf := range itfs {
-		if itf.Flags&net.FlagUp == 0 {
-			continue // interface down
-		}
-		if err := s.SetupHandler(itf.Name); err != nil {
-			gologger.Warning().Msgf("Error on interface %s: %s", itf.Name, err)
-		}
-	}
 
-	return nil
+	return s.SetupHandler("any")
 }
 
 // SetupHandler to listen on the specified interface

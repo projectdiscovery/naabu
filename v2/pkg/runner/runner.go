@@ -114,14 +114,20 @@ func (r *Runner) RunEnumeration() error {
 	defer r.Close()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
-		// Set values if those were specified via cli
-		if err := r.SetSourceIPAndInterface(); err != nil {
-			// Otherwise try to obtain them automatically
-			err = r.scanner.TuneSource(ExternalTargetForTune)
+		// Set values if those were specified via cli, errors are fatal
+		if r.options.SourceIP != "" {
+			err := r.SetSourceIP(r.options.SourceIP)
 			if err != nil {
 				return err
 			}
 		}
+		if r.options.Interface != "" {
+			err := r.SetInterface(r.options.Interface)
+			if err != nil {
+				return err
+			}
+		}
+
 		err := r.scanner.SetupHandlers()
 		if err != nil {
 			return err
@@ -463,19 +469,32 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 	r.scanner.EnqueueTCP(host, port, scan.SYN)
 }
 
-func (r *Runner) SetSourceIPAndInterface() error {
-	if r.options.SourceIP != "" && r.options.Interface != "" {
-		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
-		if r.options.Interface != "" {
-			var err error
-			r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
-			if err != nil {
-				return err
-			}
-			return nil
-		}
+func (r *Runner) SetSourceIP(sourceIP string) error {
+	ip := net.ParseIP(sourceIP)
+	if ip == nil {
+		return errors.New("invalid source ip")
 	}
-	return errors.New("source Ip and Interface not specified")
+
+	switch {
+	case iputil.IsIPv4(sourceIP):
+		r.scanner.SourceIP4 = ip
+	case iputil.IsIPv6(sourceIP):
+		r.scanner.SourceIP6 = ip
+	default:
+		return errors.New("invalid ip type")
+	}
+
+	return nil
+}
+
+func (r *Runner) SetInterface(interfaceName string) error {
+	networkInterface, err := net.InterfaceByName(r.options.Interface)
+	if err != nil {
+		return err
+	}
+
+	r.scanner.NetworkInterface = networkInterface
+	return nil
 }
 
 func (r *Runner) handleOutput() {
