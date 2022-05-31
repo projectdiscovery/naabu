@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func newDarwinRouter() (Router, error) {
+func newRouter() (Router, error) {
 	srcIP4, err := GetSourceIP("8.8.8.8")
 	if err != nil {
 		return nil, err
