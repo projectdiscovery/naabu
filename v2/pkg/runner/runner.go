@@ -217,7 +217,9 @@ func (r *Runner) RunEnumeration() error {
 		}
 
 		r.handleOutput()
-		return nil
+
+		// handle nmap
+		return r.handleNmap()
 	default:
 		// shrinks the ips to the minimum amount of cidr
 		var targets []*net.IPNet
