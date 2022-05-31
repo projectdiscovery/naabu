@@ -51,8 +51,6 @@ const (
 	ICMPTIMESTAMPREQUEST
 )
 
-var router interface{}
-
 type Scanner struct {
 	Router             Router
 	SourceIP4          net.IP
