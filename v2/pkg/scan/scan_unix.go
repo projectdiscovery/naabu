@@ -90,7 +90,6 @@ func SetupHandlerUnix(s *Scanner, interfaceName string) error {
 	handlers.Active = append(handlers.Active, handle)
 
 	// Strict BPF filter
-	// + Packets coming from target ip
 	// + Destination port equals to sender socket source port
 	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d", s.listenPort))
 	if err != nil {

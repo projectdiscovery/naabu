@@ -493,7 +493,6 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 		TTL:      255,
 		Protocol: layers.IPProtocolTCP,
 	}
-
 	if s.SourceIP4 != nil {
 		ip4.SrcIP = s.SourceIP4
 	} else {
@@ -601,7 +600,23 @@ func (s *Scanner) SetupHandlers() error {
 		return s.SetupHandler(s.NetworkInterface.Name)
 	}
 
-	return s.SetupHandler("any")
+	// listen on all interfaces manually
+	// unfortunately s.SetupHandler("any") causes ip4 to be ignored
+	itfs, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, itf := range itfs {
+		isInterfaceDown := itf.Flags&net.FlagUp == 0
+		if isInterfaceDown {
+			continue
+		}
+		if err := s.SetupHandler(itf.Name); err != nil {
+			gologger.Warning().Msgf("Error on interface %s: %s", itf.Name, err)
+		}
+	}
+
+	return nil
 }
 
 // SetupHandler to listen on the specified interface
