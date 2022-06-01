@@ -5,6 +5,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net"
 	"net/http"
 	"net/url"
@@ -14,13 +15,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/ipranger"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -80,6 +82,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
 	dnsOptions.Hostsfile = true
+	if options.IncludeIPv6 {
+		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
+	}
 	if len(runner.options.baseResolvers) > 0 {
 		dnsOptions.BaseResolvers = runner.options.baseResolvers
 	}
@@ -109,14 +114,20 @@ func (r *Runner) RunEnumeration() error {
 	defer r.Close()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
-		// Set values if those were specified via cli
-		if err := r.SetSourceIPAndInterface(); err != nil {
-			// Otherwise try to obtain them automatically
-			err = r.scanner.TuneSource(ExternalTargetForTune)
+		// Set values if those were specified via cli, errors are fatal
+		if r.options.SourceIP != "" {
+			err := r.SetSourceIP(r.options.SourceIP)
 			if err != nil {
 				return err
 			}
 		}
+		if r.options.Interface != "" {
+			err := r.SetInterface(r.options.Interface)
+			if err != nil {
+				return err
+			}
+		}
+
 		err := r.scanner.SetupHandlers()
 		if err != nil {
 			return err
@@ -225,15 +236,15 @@ func (r *Runner) RunEnumeration() error {
 		// shrinks the ips to the minimum amount of cidr
 		var targets []*net.IPNet
 		r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-			targets = append(targets, ipranger.ToCidr(string(k)))
+			targets = append(targets, iputil.ToCidr(string(k)))
 			return nil
 		})
-		targets, _ = mapcidr.CoalesceCIDRs(targets)
-		if len(targets) == 0 {
-			return errors.New("no valid ipv4 targets were found")
+		targetsV4, targetsv6 := mapcidr.CoalesceCIDRs(targets)
+		if len(targetsV4) == 0 && len(targetsv6) == 0 {
+			return errors.New("no valid ipv4 or ipv6 targets were found")
 		}
 		var targetsCount, portsCount uint64
-		for _, target := range targets {
+		for _, target := range append(targetsV4, targetsv6...) {
 			if target == nil {
 				continue
 			}
@@ -372,7 +383,14 @@ func (r *Runner) PickIP(targets []*net.IPNet, index int64) string {
 }
 
 func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
-	return mapcidr.Inet_ntoa(mapcidr.Inet_aton(network.IP) + index).String()
+	ipInt, bits, err := mapcidr.IPToInteger(network.IP)
+	if err != nil {
+		gologger.Warning().Msgf("%s\n", err)
+		return ""
+	}
+	subnetIpInt := big.NewInt(0).Add(ipInt, big.NewInt(index))
+	ip := mapcidr.IntegerToIP(subnetIpInt, bits)
+	return ip.String()
 }
 
 func (r *Runner) PickPort(index int) int {
@@ -453,19 +471,32 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 	r.scanner.EnqueueTCP(host, port, scan.SYN)
 }
 
-func (r *Runner) SetSourceIPAndInterface() error {
-	if r.options.SourceIP != "" && r.options.Interface != "" {
-		r.scanner.SourceIP = net.ParseIP(r.options.SourceIP)
-		if r.options.Interface != "" {
-			var err error
-			r.scanner.NetworkInterface, err = net.InterfaceByName(r.options.Interface)
-			if err != nil {
-				return err
-			}
-		}
+func (r *Runner) SetSourceIP(sourceIP string) error {
+	ip := net.ParseIP(sourceIP)
+	if ip == nil {
+		return errors.New("invalid source ip")
 	}
 
-	return fmt.Errorf("source Ip and Interface not specified")
+	switch {
+	case iputil.IsIPv4(sourceIP):
+		r.scanner.SourceIP4 = ip
+	case iputil.IsIPv6(sourceIP):
+		r.scanner.SourceIP6 = ip
+	default:
+		return errors.New("invalid ip type")
+	}
+
+	return nil
+}
+
+func (r *Runner) SetInterface(interfaceName string) error {
+	networkInterface, err := net.InterfaceByName(r.options.Interface)
+	if err != nil {
+		return err
+	}
+
+	r.scanner.NetworkInterface = networkInterface
+	return nil
 }
 
 func (r *Runner) handleOutput() {

@@ -200,6 +200,11 @@ http://hackerone.com:80
 
 The speed can be controlled by changing the value of `rate` flag that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
 
+# IPv4 and IPv6
+
+Naabu supports both ipv4 and ipv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
+The option `-ipv6` makes the tool use IPv6 addresses while resolving domain names.
+
 # Configuration file
 
 Naabu supports config file as default located at `$HOME/.config/naabu/config.yaml`, It allows you to define any flag in the config file and set default values to include for all scans.
