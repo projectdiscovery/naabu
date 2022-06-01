@@ -100,7 +100,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved toIP6"),
+		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved to IPv6"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
