@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"net"
@@ -403,12 +404,14 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 
 	if s.SourceIP4 != nil {
 		ip4.SrcIP = s.SourceIP4
-	} else {
+	} else if s.Router != nil {
 		_, _, sourceIP, err := s.Router.Route(ip4.DstIP)
 		if err != nil {
 			return false, err
 		}
 		ip4.SrcIP = sourceIP
+	} else {
+		return false, errors.New("could not find routes")
 	}
 
 	tcpOption := layers.TCPOption{
@@ -500,6 +503,9 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
 			return
+		} else if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, port)
+			return
 		}
 		ip4.SrcIP = sourceIP
 	}
@@ -554,6 +560,9 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 		_, _, sourceIP, err := s.Router.Route(ip6.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
+			return
+		} else if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, port)
 			return
 		}
 		ip6.SrcIP = sourceIP

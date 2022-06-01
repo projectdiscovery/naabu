@@ -6,6 +6,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/gologger"
 )
 
 func newRouter() (Router, error) {
@@ -13,7 +14,12 @@ func newRouter() (Router, error) {
 	if err != nil {
 		return nil, err
 	}
-	srcIP6, _ := GetSourceIP("2001:4860:4860::8888")
+
+	// ignores errors on ipv6 routing
+	srcIP6, err := GetSourceIP("2001:4860:4860::8888")
+	if err != nil {
+		gologger.Warning().Msgf("couldn't determine ipv6 routing interface: %s\n", err)
+	}
 
 	return &RouterDarwin{SourceIP4: srcIP4, SourceIP6: srcIP6}, nil
 }
