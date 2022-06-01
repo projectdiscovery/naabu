@@ -13,9 +13,9 @@ require (
 	github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483
 	github.com/projectdiscovery/goflags v0.0.8-0.20220411122653-4f7127a41268
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/ipranger v0.0.3-0.20220525173146-ec0a378199dc
+	github.com/projectdiscovery/ipranger v0.0.3-0.20220527173555-3bd361b7ad93
 	github.com/projectdiscovery/iputil v0.0.0-20220523155204-a04b03c5a533
-	github.com/projectdiscovery/mapcidr v0.0.9
+	github.com/projectdiscovery/mapcidr v0.0.9-0.20220522183402-dd5c57284d9e
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
