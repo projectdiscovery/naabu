@@ -12,18 +12,13 @@ func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
 	if !iputil.IsIP(target) {
-		var ips []string
-		ips, err = r.dnsclient.Lookup(target)
-		if err != nil {
+		dnsData, err := r.dnsclient.QueryMultiple(target)
+		if err != nil || dnsData == nil {
 			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-			return
+			return nil, err
 		}
-		for _, ip := range ips {
-			if iputil.IsIPv4(ip) {
-				targetIPs = append(targetIPs, ip)
-			}
-		}
-
+		targetIPs = append(targetIPs, dnsData.A...)
+		targetIPs = append(targetIPs, dnsData.AAAA...)
 		if len(targetIPs) == 0 {
 			return targetIPs, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
