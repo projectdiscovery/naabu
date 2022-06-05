@@ -515,11 +515,17 @@ func (r *Runner) handleHostDiscovery(host string) {
 	if r.options.IcmpEchoRequestProbe {
 		r.scanner.EnqueueICMP(host, scan.IcmpEchoRequest)
 	}
+	// - Icmp Timestamp Request
 	if r.options.IcmpTimestampRequestProbe {
 		r.scanner.EnqueueICMP(host, scan.IcmpTimestampRequest)
 	}
+	// - Icmp Netmask Request
 	if r.options.IcmpAddressMaskRequestProbe {
 		r.scanner.EnqueueICMP(host, scan.IcmpAddressMaskRequest)
+	}
+	// ARP scan
+	if r.options.ArpPing {
+		r.scanner.EnqueueEthernet(host, scan.Arp)
 	}
 }
 

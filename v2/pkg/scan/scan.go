@@ -52,6 +52,15 @@ const (
 	IcmpEchoRequest
 	IcmpTimestampRequest
 	IcmpAddressMaskRequest
+	Arp
+)
+
+type Protocol int
+
+const (
+	TCP Protocol = iota
+	UDP
+	ARP
 )
 
 type Scanner struct {
@@ -71,19 +80,21 @@ type Scanner struct {
 	Ports    []int
 	IPRanger *ipranger.IPRanger
 
-	tcpPacketSend    chan *PkgSend
-	icmpPacketSend   chan *PkgSend
-	tcpChan          chan *PkgResult
-	icmpChan         chan *PkgResult
-	State            State
-	ScanResults      *result.Result
-	NetworkInterface *net.Interface
-	cdn              *cdncheck.Client
-	tcpsequencer     *TCPSequencer
-	serializeOptions gopacket.SerializeOptions
-	debug            bool
-	handlers         interface{}
-	stream           bool
+	tcpPacketSend      chan *PkgSend
+	icmpPacketSend     chan *PkgSend
+	ethernetPacketSend chan *PkgSend
+	tcpChan            chan *PkgResult
+	icmpChan           chan *PkgResult
+	State              State
+	ScanResults        *result.Result
+	NetworkInterface   *net.Interface
+	cdn                *cdncheck.Client
+	tcpsequencer       *TCPSequencer
+	serializeOptions   gopacket.SerializeOptions
+	debug              bool
+	handlers           interface{}
+	ethernetHandler    interface{}
+	stream             bool
 }
 
 // PkgSend is a TCP package
@@ -102,7 +113,7 @@ type PkgResult struct {
 
 var (
 	newScannerCallback                      func(s *Scanner) error
-	setupHandlerCallback                    func(s *Scanner, interfaceName string) error
+	setupHandlerCallback                    func(s *Scanner, interfaceName, bpfFilter string, protocol Protocol) error
 	tcpReadWorkerPCAPCallback               func(s *Scanner)
 	cleanupHandlersCallback                 func(s *Scanner)
 	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool
@@ -110,6 +121,7 @@ var (
 	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool
 	pingIcmpTimestampRequestAsyncCallback   func(s *Scanner, ip string)
 	pingIcmpAddressMaskRequestAsyncCallback func(s *Scanner, ip string)
+	arpRequestAsyncCallback                 func(s *Scanner, ip string)
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -186,6 +198,7 @@ func (s *Scanner) StartWorkers() {
 	go s.TCPReadWorkerPCAP()
 	go s.TCPWriteWorker()
 	go s.TCPResultWorker()
+	go s.EthernetWriteWorker()
 }
 
 // TCPWriteWorker that sends out TCP packets
@@ -223,6 +236,14 @@ func (s *Scanner) EnqueueICMP(ip string, pkgtype PkgFlag) {
 	}
 }
 
+// EnqueueEthernet outgoing Ethernet packets
+func (s *Scanner) EnqueueEthernet(ip string, pkgtype PkgFlag) {
+	s.ethernetPacketSend <- &PkgSend{
+		ip:   ip,
+		flag: pkgtype,
+	}
+}
+
 // EnqueueTCP outgoing TCP packets
 func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 	s.tcpPacketSend <- &PkgSend{
@@ -242,6 +263,16 @@ func (s *Scanner) ICMPWriteWorker() {
 			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
 		case pkg.flag == IcmpAddressMaskRequest && pingIcmpAddressMaskRequestAsyncCallback != nil:
 			pingIcmpAddressMaskRequestAsyncCallback(s, pkg.ip)
+		}
+	}
+}
+
+// EthernetWriteWorker writes packet to the network layer
+func (s *Scanner) EthernetWriteWorker() {
+	for pkg := range s.ethernetPacketSend {
+		switch {
+		case pkg.flag == Arp && arpRequestAsyncCallback != nil:
+			arpRequestAsyncCallback(s, pkg.ip)
 		}
 	}
 }
@@ -690,8 +721,22 @@ func (s *Scanner) SetupHandlers() error {
 
 // SetupHandler to listen on the specified interface
 func (s *Scanner) SetupHandler(interfaceName string) error {
+	bpfFilter := fmt.Sprintf("tcp and dst port %d", s.listenPort)
 	if setupHandlerCallback != nil {
-		return setupHandlerCallback(s, interfaceName)
+		err := setupHandlerCallback(s, interfaceName, bpfFilter, TCP)
+		if err != nil {
+			return err
+		}
+	}
+	// arp filter should be improved with source mac
+	// https://stackoverflow.com/questions/40196549/bpf-expression-to-capture-only-arp-reply-packets
+	// (arp[6:2] = 2) and dst host host and ether dst mac
+	bpfFilter = "arp"
+	if setupHandlerCallback != nil {
+		err := setupHandlerCallback(s, interfaceName, bpfFilter, ARP)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
