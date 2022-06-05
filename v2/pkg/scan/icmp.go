@@ -24,6 +24,7 @@ func init() {
 	pingIcmpEchoRequestAsyncCallback = PingIcmpEchoRequestAsync
 	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
 	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
+	pingIcmpAddressMaskRequestAsyncCallback = PingIcmpAddressMaskRequestAsync
 }
 
 // PingIcmpEchoRequest synchronous to the target ip address
@@ -232,4 +233,69 @@ func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 	p.TransmitTimestamp = parseInt(transmitTimestamp)
 
 	return p, nil
+}
+
+// PingIcmpAddressMaskRequestAsync asynchronous to the target ip address
+func PingIcmpAddressMaskRequestAsync(s *Scanner, ip string) {
+	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
+	m := icmp.Message{
+		Type: ipv4.ICMPType(17),
+		Code: 0,
+		Body: &AddressMask{
+			ID:          os.Getpid() & 0xffff,
+			Seq:         0,
+			AddressMask: 0,
+		},
+	}
+
+	data, err := m.Marshal(nil)
+	if err != nil {
+		return
+	}
+	retries := 0
+send:
+	if retries >= maxRetries {
+		return
+	}
+	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	if err != nil {
+		retries++
+		// introduce a small delay to allow the network interface to flush the queue
+		time.Sleep(time.Duration(DeadlineSec) * time.Millisecond)
+		goto send
+	}
+}
+
+// AddressMask ICMP structure
+type AddressMask struct {
+	ID          int
+	Seq         int
+	AddressMask uint32
+}
+
+const marshalledAddressMaskLen = 8
+
+// Len returns default timestamp length
+func (a *AddressMask) Len(_ int) int {
+	if a == nil {
+		return 0
+	}
+	return marshalledAddressMaskLen
+}
+
+// Marshal the address mask structure
+func (a *AddressMask) Marshal(_ int) ([]byte, error) {
+	bSize := marshalledAddressMaskLen / 2
+	b := make([]byte, marshalledAddressMaskLen)
+	b[0], b[1] = byte(a.ID>>bSize), byte(a.ID)
+	b[2], b[3] = byte(a.Seq>>bSize), byte(a.Seq)
+
+	unparseInt := func(i uint32) (byte, byte, byte, byte) {
+		bs := make([]byte, 4)
+		binary.LittleEndian.PutUint32(bs, i)
+		return bs[3], bs[2], bs[1], bs[0]
+	}
+
+	b[4], b[5], b[6], b[7] = unparseInt(a.AddressMask)
+	return b, nil
 }

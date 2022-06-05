@@ -101,14 +101,15 @@ type PkgResult struct {
 }
 
 var (
-	newScannerCallback                    func(s *Scanner) error
-	setupHandlerCallback                  func(s *Scanner, interfaceName string) error
-	tcpReadWorkerPCAPCallback             func(s *Scanner)
-	cleanupHandlersCallback               func(s *Scanner)
-	pingIcmpEchoRequestCallback           func(ip string, timeout time.Duration) bool
-	pingIcmpEchoRequestAsyncCallback      func(s *Scanner, ip string)
-	pingIcmpTimestampRequestCallback      func(ip string, timeout time.Duration) bool
-	pingIcmpTimestampRequestAsyncCallback func(s *Scanner, ip string)
+	newScannerCallback                      func(s *Scanner) error
+	setupHandlerCallback                    func(s *Scanner, interfaceName string) error
+	tcpReadWorkerPCAPCallback               func(s *Scanner)
+	cleanupHandlersCallback                 func(s *Scanner)
+	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool
+	pingIcmpEchoRequestAsyncCallback        func(s *Scanner, ip string)
+	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool
+	pingIcmpTimestampRequestAsyncCallback   func(s *Scanner, ip string)
+	pingIcmpAddressMaskRequestAsyncCallback func(s *Scanner, ip string)
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -234,10 +235,13 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 // ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
-		if pkg.flag == IcmpEchoRequest && pingIcmpEchoRequestAsyncCallback != nil {
+		switch {
+		case pkg.flag == IcmpEchoRequest && pingIcmpEchoRequestAsyncCallback != nil:
 			pingIcmpEchoRequestAsyncCallback(s, pkg.ip)
-		} else if pkg.flag == IcmpTimestampRequest && pingIcmpTimestampRequestAsyncCallback != nil {
+		case pkg.flag == IcmpTimestampRequest && pingIcmpTimestampRequestAsyncCallback != nil:
 			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
+		case pkg.flag == IcmpAddressMaskRequest && pingIcmpAddressMaskRequestAsyncCallback != nil:
+			pingIcmpAddressMaskRequestAsyncCallback(s, pkg.ip)
 		}
 	}
 }
