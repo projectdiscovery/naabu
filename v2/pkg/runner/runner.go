@@ -151,7 +151,40 @@ func (r *Runner) RunEnumeration() error {
 	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
 
 	switch {
+	case r.options.HostDiscovery:
+		// perform host discovery
+		showNetworkCapabilities(r.options)
+		r.scanner.State = scan.HostDiscovery
+		// shrinks the ips to the minimum amount of cidr
+		_, targetsV4, targetsv6, err := r.GetTargetIps()
+		if err != nil {
+			return err
+		}
+
+		discoverCidr := func(cidr *net.IPNet) {
+			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
+			for ip := range ipStream {
+				r.handleHostDiscovery(ip)
+			}
+		}
+
+		for _, target4 := range targetsV4 {
+			discoverCidr(target4)
+		}
+		for _, target6 := range targetsv6 {
+			discoverCidr(target6)
+		}
+
+		if r.options.WarmUpTime > 0 {
+			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+		}
+
+		// continue with other options
+		r.handleOutput()
+		return nil
+
 	case r.options.Stream && !r.options.Passive: // stream active
+		showNetworkCapabilities(r.options)
 		r.scanner.State = scan.Scan
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
@@ -177,6 +210,7 @@ func (r *Runner) RunEnumeration() error {
 		r.handleOutput()
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
+		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
 		r.scanner.State = scan.Scan
@@ -233,15 +267,11 @@ func (r *Runner) RunEnumeration() error {
 		// handle nmap
 		return r.handleNmap()
 	default:
+		showNetworkCapabilities(r.options)
 		// shrinks the ips to the minimum amount of cidr
-		var targets []*net.IPNet
-		r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-			targets = append(targets, iputil.ToCidr(string(k)))
-			return nil
-		})
-		targetsV4, targetsv6 := mapcidr.CoalesceCIDRs(targets)
-		if len(targetsV4) == 0 && len(targetsv6) == 0 {
-			return errors.New("no valid ipv4 or ipv6 targets were found")
+		targets, targetsV4, targetsv6, err := r.GetTargetIps()
+		if err != nil {
+			return err
 		}
 		var targetsCount, portsCount uint64
 		for _, target := range append(targetsV4, targetsv6...) {
@@ -355,6 +385,20 @@ func (r *Runner) RunEnumeration() error {
 	}
 }
 
+func (r *Runner) GetTargetIps() (targets, targetsV4, targetsv6 []*net.IPNet, err error) {
+	// shrinks the ips to the minimum amount of cidr
+	r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
+		targets = append(targets, iputil.ToCidr(string(k)))
+		return nil
+	})
+
+	targetsV4, targetsv6 = mapcidr.CoalesceCIDRs(targets)
+	if len(targetsV4) == 0 && len(targetsv6) == 0 {
+		return nil, nil, nil, errors.New("no valid ipv4 or ipv6 targets were found")
+	}
+	return targets, targetsV4, targetsv6, nil
+}
+
 func (r *Runner) ShowScanResultOnExit() {
 	r.handleOutput()
 	err := r.handleNmap()
@@ -419,6 +463,10 @@ func (r *Runner) BackgroundWorkers() {
 	r.scanner.StartWorkers()
 }
 
+func (r *Runner) RawSocketHostDiscovery(ip string) {
+	r.handleHostDiscovery(ip)
+}
+
 func (r *Runner) RawSocketEnumeration(ip string, port int) {
 	// skip invalid combinations
 	r.handleHostPortSyn(ip, port)
@@ -460,6 +508,21 @@ func (r *Runner) handleHostPort(host string, port int) {
 	}
 }
 
+func (r *Runner) handleHostDiscovery(host string) {
+	r.limiter.Take()
+	// Pings
+	// - Icmp Echo Request
+	if r.options.IcmpEchoRequestProbe {
+		r.scanner.EnqueueICMP(host, scan.IcmpEchoRequest)
+	}
+	if r.options.IcmpTimestampRequestProbe {
+		r.scanner.EnqueueICMP(host, scan.IcmpTimestampRequest)
+	}
+	if r.options.IcmpAddressMaskRequestProbe {
+		r.scanner.EnqueueICMP(host, scan.IcmpAddressMaskRequest)
+	}
+}
+
 func (r *Runner) handleHostPortSyn(host string, port int) {
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(host, port) {
@@ -468,7 +531,7 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 	}
 
 	r.limiter.Take()
-	r.scanner.EnqueueTCP(host, port, scan.SYN)
+	r.scanner.EnqueueTCP(host, port, scan.Syn)
 }
 
 func (r *Runner) SetSourceIP(sourceIP string) error {

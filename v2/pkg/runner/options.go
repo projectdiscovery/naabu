@@ -26,39 +26,51 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries           int                           // Retries is the number of retries for the port
-	Rate              int                           // Rate is the rate of port scan requests
-	Timeout           int                           // Timeout is the seconds to wait for ports to respond
-	WarmUpTime        int                           // WarmUpTime between scan phases
-	Host              goflags.NormalizedStringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile         string                        // HostsFile is the file containing list of hosts to find port for
-	Output            string                        // Output is the file to write found ports to.
-	Ports             string                        // Ports is the ports to use for enumeration
-	PortsFile         string                        // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts      string                        // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps        string                        // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile    string                        // File containing Ips or cidr to exclude from the scan
-	TopPorts          string                        // Tops ports to scan
-	SourceIP          string                        // SourceIP to use in TCP packets
-	Interface         string                        // Interface to use for TCP packets
-	ConfigFile        string                        // Config file contains a scan configuration
-	NmapCLI           string                        // Nmap command (has priority over config file)
-	Threads           int                           // Internal worker threads
-	EnableProgressBar bool                          // Enable progress bar
-	ScanAllIPS        bool                          // Scan all the ips
-	IncludeIPv6       bool                          // Include resolved IP6 for dns records
-	ScanType          string                        // Scan Type
-	Proxy             string                        // Socks5 proxy
-	Resolvers         string                        // Resolvers (comma separated or file)
-	baseResolvers     []string
-	OnResult          OnResultCallback // OnResult callback
-	CSV               bool
-	StatsInterval     int // StatsInterval is the number of seconds to display stats after
-	Resume            bool
-	ResumeCfg         *ResumeCfg
-	Stream            bool
-	Passive           bool
-	OutputCDN         bool // display cdn in use
+	Retries                     int                           // Retries is the number of retries for the port
+	Rate                        int                           // Rate is the rate of port scan requests
+	Timeout                     int                           // Timeout is the seconds to wait for ports to respond
+	WarmUpTime                  int                           // WarmUpTime between scan phases
+	Host                        goflags.NormalizedStringSlice // Host is the single host or comma-separated list of hosts to find ports for
+	HostsFile                   string                        // HostsFile is the file containing list of hosts to find port for
+	Output                      string                        // Output is the file to write found ports to.
+	Ports                       string                        // Ports is the ports to use for enumeration
+	PortsFile                   string                        // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts                string                        // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps                  string                        // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile              string                        // File containing Ips or cidr to exclude from the scan
+	TopPorts                    string                        // Tops ports to scan
+	SourceIP                    string                        // SourceIP to use in TCP packets
+	Interface                   string                        // Interface to use for TCP packets
+	ConfigFile                  string                        // Config file contains a scan configuration
+	NmapCLI                     string                        // Nmap command (has priority over config file)
+	Threads                     int                           // Internal worker threads
+	EnableProgressBar           bool                          // Enable progress bar
+	ScanAllIPS                  bool                          // Scan all the ips
+	IncludeIPv6                 bool                          // Include resolved IP6 for dns records
+	ScanType                    string                        // Scan Type
+	Proxy                       string                        // Socks5 proxy
+	Resolvers                   string                        // Resolvers (comma separated or file)
+	baseResolvers               []string
+	OnResult                    OnResultCallback // OnResult callback
+	CSV                         bool
+	StatsInterval               int // StatsInterval is the number of seconds to display stats after
+	Resume                      bool
+	ResumeCfg                   *ResumeCfg
+	Stream                      bool
+	Passive                     bool
+	OutputCDN                   bool // display cdn in use
+	HostDiscovery               bool // Enable Host Discovery
+	TcpSynPingProbes            goflags.StringSlice
+	TcpAckPingProbes            goflags.StringSlice
+	UdpPingProbes               goflags.StringSlice
+	STcpInitPingProbes          goflags.StringSlice
+	IcmpEchoRequestProbe        bool
+	IcmpTimestampRequestProbe   bool
+	IcmpAddressMaskRequestProbe bool
+	IpProtocolPingProbes        goflags.StringSlice
+	ArpPing                     bool
+	IPv6NeighborDiscoveryPing   bool
+	HostDiscoveryIgnoreRST      bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -112,6 +124,18 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
+		flagSet.BoolVarP(&options.HostDiscovery, "host-discvoery", "sn", false, "Host Discovery"),
+		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", []string{}, "TCP SYN Ping"),
+		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", []string{}, "TCP ACK Ping"),
+		flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
+		flagSet.StringSliceVarP(&options.STcpInitPingProbes, "probe-stcp-init", "py", []string{}, "SCTP INIT Ping"),
+		flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping"),
+		flagSet.BoolVarP(&options.IcmpTimestampRequestProbe, "probe-icmp-timestamp", "pp", false, "ICMP timestamp request Ping"),
+		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping"),
+		flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),
+		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping"),
+		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery"),
+		flagSet.BoolVarP(&options.HostDiscoveryIgnoreRST, "discovery-ignore-rst", "irst", false, "Ignore RST packets during host discovery"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -168,8 +192,6 @@ func ParseOptions() *Options {
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
-
-	showNetworkCapabilities(options)
 
 	return options
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
+	"golang.org/x/net/icmp"
 )
 
 func init() {
@@ -49,9 +50,24 @@ func NewScannerUnix(scanner *Scanner) error {
 
 	var handlers Handlers
 	scanner.handlers = handlers
-
 	scanner.tcpChan = make(chan *PkgResult, chanSize)
 	scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
+
+	icmpConn4, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return err
+	}
+	scanner.icmpPacketListener4 = icmpConn4
+
+	icmpConn6, err := icmp.ListenPacket("ip6:icmp", "::")
+	if err != nil {
+		return err
+	}
+	scanner.icmpPacketListener6 = icmpConn6
+
+	scanner.icmpChan = make(chan *PkgResult, chanSize)
+	scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
+
 	scanner.Router, err = newRouter()
 
 	return err

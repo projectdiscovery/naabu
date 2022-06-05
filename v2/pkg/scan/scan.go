@@ -37,6 +37,7 @@ const (
 
 const (
 	Init State = iota
+	HostDiscovery
 	Scan
 	Done
 	Guard
@@ -46,24 +47,26 @@ const (
 type PkgFlag int
 
 const (
-	SYN PkgFlag = iota
-	ACK
-	ICMPECHOREQUEST
-	ICMPTIMESTAMPREQUEST
+	Syn PkgFlag = iota
+	Ack
+	IcmpEchoRequest
+	IcmpTimestampRequest
+	IcmpAddressMaskRequest
 )
 
 type Scanner struct {
-	Router             Router
-	SourceIP4          net.IP
-	SourceIP6          net.IP
-	tcpPacketlistener4 net.PacketConn
-	tcpPacketlistener6 net.PacketConn
-	icmpPacketListener net.PacketConn
-	retries            int
-	rate               int
-	listenPort         int
-	timeout            time.Duration
-	proxyDialer        proxy.Dialer
+	Router              Router
+	SourceIP4           net.IP
+	SourceIP6           net.IP
+	tcpPacketlistener4  net.PacketConn
+	tcpPacketlistener6  net.PacketConn
+	icmpPacketListener4 net.PacketConn
+	icmpPacketListener6 net.PacketConn
+	retries             int
+	rate                int
+	listenPort          int
+	timeout             time.Duration
+	proxyDialer         proxy.Dialer
 
 	Ports    []int
 	IPRanger *ipranger.IPRanger
@@ -102,7 +105,9 @@ var (
 	setupHandlerCallback                  func(s *Scanner, interfaceName string) error
 	tcpReadWorkerPCAPCallback             func(s *Scanner)
 	cleanupHandlersCallback               func(s *Scanner)
+	pingIcmpEchoRequestCallback           func(ip string, timeout time.Duration) bool
 	pingIcmpEchoRequestAsyncCallback      func(s *Scanner, ip string)
+	pingIcmpTimestampRequestCallback      func(ip string, timeout time.Duration) bool
 	pingIcmpTimestampRequestAsyncCallback func(s *Scanner, ip string)
 )
 
@@ -173,6 +178,9 @@ func (s *Scanner) Close() {
 
 // StartWorkers of the scanner
 func (s *Scanner) StartWorkers() {
+	go s.ICMPReadWorker()
+	go s.ICMPWriteWorker()
+	go s.ICMPResultWorker()
 	go s.TCPReadWorker()
 	go s.TCPReadWorkerPCAP()
 	go s.TCPWriteWorker()
@@ -226,23 +234,58 @@ func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
 // ICMPWriteWorker writes packet to the network layer
 func (s *Scanner) ICMPWriteWorker() {
 	for pkg := range s.icmpPacketSend {
-		if pkg.flag == ICMPECHOREQUEST && pingIcmpEchoRequestAsyncCallback != nil {
+		if pkg.flag == IcmpEchoRequest && pingIcmpEchoRequestAsyncCallback != nil {
 			pingIcmpEchoRequestAsyncCallback(s, pkg.ip)
-		} else if pkg.flag == ICMPTIMESTAMPREQUEST && pingIcmpTimestampRequestAsyncCallback != nil {
+		} else if pkg.flag == IcmpTimestampRequest && pingIcmpTimestampRequestAsyncCallback != nil {
 			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
 		}
 	}
 }
 
-// ICMPReadWorker reads packets from the network layer
 func (s *Scanner) ICMPReadWorker() {
-	defer s.icmpPacketListener.Close()
+	go s.ICMPReadWorker4()
+	go s.ICMPReadWorker6()
+}
+
+// ICMPReadWorker reads packets from the network layer
+func (s *Scanner) ICMPReadWorker4() {
+	defer s.icmpPacketListener4.Close()
+
 	data := make([]byte, 1500)
 	for {
 		if s.State == Done {
 			break
 		}
-		n, addr, err := s.icmpPacketListener.ReadFrom(data)
+		n, addr, err := s.icmpPacketListener4.ReadFrom(data)
+		if err != nil {
+			continue
+		}
+
+		if s.State == Guard {
+			continue
+		}
+
+		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
+		if err != nil {
+			continue
+		}
+
+		switch rm.Type {
+		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestampReply:
+			s.icmpChan <- &PkgResult{ip: addr.String()}
+		}
+	}
+}
+
+func (s *Scanner) ICMPReadWorker6() {
+	defer s.icmpPacketListener4.Close()
+
+	data := make([]byte, 1500)
+	for {
+		if s.State == Done {
+			break
+		}
+		n, addr, err := s.icmpPacketListener6.ReadFrom(data)
 		if err != nil {
 			continue
 		}
@@ -263,10 +306,23 @@ func (s *Scanner) ICMPReadWorker() {
 	}
 }
 
+// ICMPResultWorker handles ICMP responses (used only during probes)
+func (s *Scanner) ICMPResultWorker() {
+	for ip := range s.icmpChan {
+		// Todo: move this into a proper output structure
+		if s.State == HostDiscovery {
+			gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ip)
+			gologger.Silent().Msgf("%s\n", ip.ip)
+		}
+	}
+}
+
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		if s.State == Scan || s.stream {
+		if s.State == HostDiscovery {
+			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
+		} else if s.State == Scan || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
@@ -302,7 +358,7 @@ send:
 // ScanSyn a target ip
 func (s *Scanner) ScanSyn(ip string) {
 	for _, port := range s.Ports {
-		s.EnqueueTCP(ip, port, SYN)
+		s.EnqueueTCP(ip, port, Syn)
 	}
 }
 
@@ -524,9 +580,9 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == SYN {
+	if pkgFlag == Syn {
 		tcp.SYN = true
-	} else if pkgFlag == ACK {
+	} else if pkgFlag == Ack {
 		tcp.ACK = true
 	}
 
@@ -582,9 +638,9 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == SYN {
+	if pkgFlag == Syn {
 		tcp.SYN = true
-	} else if pkgFlag == ACK {
+	} else if pkgFlag == Ack {
 		tcp.ACK = true
 	}
 
