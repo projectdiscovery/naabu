@@ -59,6 +59,7 @@ type Options struct {
 	Stream            bool
 	Passive           bool
 	OutputCDN         bool // display cdn in use
+	HealthCheck       bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -123,6 +124,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
+		flagSet.BoolVar(&options.HealthCheck, "health-check", false, "health check"),
 		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
 		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
@@ -133,6 +135,11 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
+
+	if options.HealthCheck {
+		gologger.Print().Msgf("%s\n", DoHealthCheck(options))
+		os.Exit(0)
+	}
 
 	// Check if stdin pipe was given
 	options.Stdin = fileutil.HasStdin()

@@ -41,7 +41,6 @@ github.com/json-iterator/go v1.1.11/go.mod h1:KdQUCv79m/52Kvf8AW2vK1V8akMuk1QjK/
 github.com/json-iterator/go v1.1.12 h1:PV8peI4a0ysnczrg+LtxykD8LfKY9ML6u2jnxaEnrnM=
 github.com/json-iterator/go v1.1.12/go.mod h1:e30LSqwooZae/UwlEbR2852Gd8hjQvJoHmT4TnhNGBo=
 github.com/jtolds/gls v4.20.0+incompatible/go.mod h1:QJZ7F/aHp+rZTRtaJ1ow/lLfFfVYBRgL+9YlvaHOwJU=
-github.com/karrick/godirwalk v1.16.1 h1:DynhcF+bztK8gooS0+NDJFrdNZjJ3gzVzC545UNA9iw=
 github.com/karrick/godirwalk v1.16.1/go.mod h1:j4mkqPuvaLI8mp1DroR3P6ad7cyYd4c1qeJ3RV7ULlk=
 github.com/kr/pretty v0.2.1 h1:Fmg33tUaq4/8ym9TJN1x7sLJnHVwhP33CNkpYV/7rwI=
 github.com/kr/pretty v0.2.1/go.mod h1:ipq/a2n7PKx3OHsz4KJII5eveXtPO4qwEXGdVfWzfnI=
@@ -95,8 +94,10 @@ github.com/projectdiscovery/fdmax v0.0.3/go.mod h1:NWRcaR7JTO7fC27H4jCl9n7Z+KIre
 github.com/projectdiscovery/fileutil v0.0.0-20210926202739-6050d0acf73c/go.mod h1:U+QCpQnX8o2N2w0VUGyAzjM3yBAe4BKedVElxiImsx0=
 github.com/projectdiscovery/fileutil v0.0.0-20210928100737-cab279c5d4b5/go.mod h1:U+QCpQnX8o2N2w0VUGyAzjM3yBAe4BKedVElxiImsx0=
 github.com/projectdiscovery/fileutil v0.0.0-20220214145203-ee3ead95c0b9/go.mod h1:Pm0f+MWgDFMSSI9NBedNh48LyYPs8gD3Jd8DXGmp4aQ=
-github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483 h1:0as/e36wk1cnnqK3FojbdOx7fsm9yH6Gy5q9v6Sg/88=
 github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483/go.mod h1:wjS/oBWbzlayJ/aTK0KW0oOHGO03G8oEYzuN6stI8Ho=
+github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e h1:Xe/e4sQv08fCh+CuKCbPsAVlG0Mf1bZ9ZGR4BEHic18=
+github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e/go.mod h1:qcx3tdBzVDlUvr5nMKrgzNkCNQpCV7kGbYlXBAtXz0o=
+github.com/projectdiscovery/folderutil v0.0.0-20220212074351-38f1c1d2fdd4 h1:rPA+enZtrHCBO0XVGsvoGzBKv9TlqZyqZguh1AOT+gs=
 github.com/projectdiscovery/folderutil v0.0.0-20220212074351-38f1c1d2fdd4/go.mod h1:BMqXH4jNGByVdE2iLtKvc/6XStaiZRuCIaKv1vw9PnI=
 github.com/projectdiscovery/goconfig v0.0.0-20210804090219-f893ccd0c69c/go.mod h1:mBv7GRD5n3WNbFE9blG8ynzXTM5eh9MmwaK6EOyn6Pk=
 github.com/projectdiscovery/goflags v0.0.7/go.mod h1:Jjwsf4eEBPXDSQI2Y+6fd3dBumJv/J1U0nmpM+hy2YY=
