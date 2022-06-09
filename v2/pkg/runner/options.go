@@ -40,6 +40,7 @@ type Options struct {
 	ExcludeIpsFile    string                        // File containing Ips or cidr to exclude from the scan
 	TopPorts          string                        // Tops ports to scan
 	SourceIP          string                        // SourceIP to use in TCP packets
+	SourcePort        string                        // Source Port to use in packets
 	Interface         string                        // Interface to use for TCP packets
 	ConfigFile        string                        // Config file contains a scan configuration
 	NmapCLI           string                        // Nmap command (has priority over config file)
@@ -102,7 +103,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved to IPv6"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),

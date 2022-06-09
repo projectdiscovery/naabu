@@ -8,6 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 
 	"github.com/projectdiscovery/gologger"
@@ -96,6 +97,18 @@ func (options *Options) validateOptions() error {
 	// stream passive
 	if options.Verify && !options.Passive {
 		return errors.New("verify not supported in stream active mode")
+	}
+
+	// Parse and validate source ip and source port
+	// checks if source ip is ip only
+	isOnlyIP := iputil.IsIP(options.SourceIP)
+	if options.SourceIP != "" && !isOnlyIP {
+		ip, port, err := net.SplitHostPort(options.SourceIP)
+		if err != nil {
+			return err
+		}
+		options.SourceIP = ip
+		options.SourcePort = port
 	}
 
 	return nil
