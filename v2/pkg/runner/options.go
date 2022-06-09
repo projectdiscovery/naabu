@@ -124,7 +124,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
-		flagSet.BoolVar(&options.HealthCheck, "health-check", false, "health check"),
+		flagSet.BoolVarP(&options.HealthCheck, "hc", "health-check", false, "run diagnostic check up"),
 		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
 		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),

@@ -37,7 +37,7 @@ func DoHealthCheck(options *Options) string {
 	if err != nil {
 		testResult += fmt.Sprintf(" (%s)", err)
 	}
-	test.WriteString(fmt.Sprintf("config file \"%s\" Read => %s\n", cfgFilePath, testResult))
+	test.WriteString(fmt.Sprintf("Config file \"%s\" Read => %s\n", cfgFilePath, testResult))
 	ok, err = fileutil.IsWriteable(cfgFilePath)
 	if ok {
 		testResult = "Ok"
@@ -47,7 +47,7 @@ func DoHealthCheck(options *Options) string {
 	if err != nil {
 		testResult += fmt.Sprintf(" (%s)", err)
 	}
-	test.WriteString(fmt.Sprintf("config file \"%s\" Write => %s\n", cfgFilePath, testResult))
+	test.WriteString(fmt.Sprintf("Config file \"%s\" Write => %s\n", cfgFilePath, testResult))
 	c4, err := net.Dial("tcp4", "scanme.sh:80")
 	if err == nil && c4 != nil {
 		c4.Close()
