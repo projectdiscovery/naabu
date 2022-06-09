@@ -61,7 +61,7 @@ type Scanner struct {
 	icmpPacketListener net.PacketConn
 	retries            int
 	rate               int
-	listenPort         int
+	SourcePort         int
 	timeout            time.Duration
 	proxyDialer        proxy.Dialer
 
@@ -517,7 +517,7 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 	}
 
 	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(s.listenPort),
+		SrcPort: layers.TCPPort(s.SourcePort),
 		DstPort: layers.TCPPort(port),
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
@@ -575,7 +575,7 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	}
 
 	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(s.listenPort),
+		SrcPort: layers.TCPPort(s.SourcePort),
 		DstPort: layers.TCPPort(port),
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
