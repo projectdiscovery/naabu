@@ -3,22 +3,23 @@ package runner
 import (
 	"fmt"
 	"net"
-	"path/filepath"
 	"runtime"
 	"strings"
 
 	"github.com/projectdiscovery/fileutil"
-	"github.com/projectdiscovery/folderutil"
+	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 )
 
 func DoHealthCheck(options *Options) string {
 	// RW permissions on config file
-	cfgFilePath := filepath.Join(folderutil.HomeDirOrDefault("$home"), ".config/naabu/config.yaml")
+	cfgFilePath, _ := goflags.GetConfigFilePath()
 	var test strings.Builder
 	test.WriteString(fmt.Sprintf("Version: %s\n", Version))
 	test.WriteString(fmt.Sprintf("Operative System: %s\n", runtime.GOOS))
 	test.WriteString(fmt.Sprintf("Architecture: %s\n", runtime.GOARCH))
+	test.WriteString(fmt.Sprintf("Go Version: %s\n", runtime.Version()))
+	test.WriteString(fmt.Sprintf("Compiler: %s\n", runtime.Compiler))
 
 	var testResult string
 	if privileges.IsPrivileged {
