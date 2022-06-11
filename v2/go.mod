@@ -10,8 +10,8 @@ require (
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698
 	github.com/projectdiscovery/fdmax v0.0.3
-	github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483
-	github.com/projectdiscovery/goflags v0.0.8-0.20220411122653-4f7127a41268
+	github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e
+	github.com/projectdiscovery/goflags v0.0.8-0.20220610065908-6a16a6bc848c
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220527173555-3bd361b7ad93
 	github.com/projectdiscovery/iputil v0.0.0-20220523155204-a04b03c5a533
@@ -27,6 +27,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.49
 	github.com/pkg/errors v0.9.1
+	github.com/projectdiscovery/folderutil v0.0.0-20220212074351-38f1c1d2fdd4
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220611084746-f38f8821a68a
 	github.com/projectdiscovery/uncover v0.0.5
@@ -40,7 +41,6 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
-	github.com/karrick/godirwalk v1.16.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect

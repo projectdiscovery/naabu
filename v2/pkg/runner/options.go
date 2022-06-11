@@ -59,6 +59,7 @@ type Options struct {
 	Stream                      bool
 	Passive                     bool
 	OutputCDN                   bool // display cdn in use
+	HealthCheck                 bool
 	HostDiscovery               bool // Enable Host Discovery
 	TcpSynPingProbes            goflags.StringSlice
 	TcpAckPingProbes            goflags.StringSlice
@@ -114,7 +115,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved to IPv6"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),
@@ -147,6 +148,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
+		flagSet.BoolVarP(&options.HealthCheck, "hc", "health-check", false, "run diagnostic check up"),
 		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
 		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
@@ -157,6 +159,11 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
+
+	if options.HealthCheck {
+		gologger.Print().Msgf("%s\n", DoHealthCheck(options))
+		os.Exit(0)
+	}
 
 	// Check if stdin pipe was given
 	options.Stdin = fileutil.HasStdin()

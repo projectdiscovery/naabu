@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -124,6 +125,12 @@ func (r *Runner) RunEnumeration() error {
 		}
 		if r.options.Interface != "" {
 			err := r.SetInterface(r.options.Interface)
+			if err != nil {
+				return err
+			}
+		}
+		if r.options.SourcePort != "" {
+			err := r.SetSourcePort(r.options.SourcePort)
 			if err != nil {
 				return err
 			}
@@ -569,6 +576,22 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 	default:
 		return errors.New("invalid ip type")
 	}
+
+	return nil
+}
+
+func (r *Runner) SetSourcePort(sourcePort string) error {
+	isValidPort := iputil.IsPort(sourcePort)
+	if !isValidPort {
+		return errors.New("invalid source port")
+	}
+
+	port, err := strconv.Atoi(sourcePort)
+	if err != nil {
+		return err
+	}
+
+	r.scanner.SourcePort = port
 
 	return nil
 }

@@ -32,20 +32,26 @@ type Handlers struct {
 	EthernetInactive []*pcap.InactiveHandle
 }
 
-func NewScannerUnix(scanner *Scanner) error {
-	rawPort, err := freeport.GetFreePort()
-	if err != nil {
-		return err
-	}
-	scanner.listenPort = rawPort
+func getFreePort() (int, error) {
+	return freeport.GetFreePort()
+}
 
-	tcpConn4, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", rawPort))})
+func NewScannerUnix(scanner *Scanner) error {
+	if scanner.SourcePort <= 0 {
+		rawport, err := getFreePort()
+		if err != nil {
+			return err
+		}
+		scanner.SourcePort = rawport
+	}
+
+	tcpConn4, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", scanner.SourcePort))})
 	if err != nil {
 		return err
 	}
 	scanner.tcpPacketlistener4 = tcpConn4
 
-	tcpConn6, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", rawPort))})
+	tcpConn6, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", scanner.SourcePort))})
 	if err != nil {
 		return err
 	}
@@ -193,7 +199,7 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 							}
 
 							// We consider only incoming packets
-							if tcp.DstPort != layers.TCPPort(s.listenPort) {
+							if tcp.DstPort != layers.TCPPort(s.SourcePort) {
 								continue
 							} else if s.State == HostDiscovery {
 								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
