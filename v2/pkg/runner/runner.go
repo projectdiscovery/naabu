@@ -27,6 +27,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/retryablehttp-go"
+	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
@@ -527,6 +528,16 @@ func (r *Runner) handleHostDiscovery(host string) {
 	if r.options.ArpPing {
 		r.scanner.EnqueueEthernet(host, scan.Arp)
 	}
+	// Syn Probes
+	if len(r.options.TcpSynPingProbes) > 0 {
+		ports, _ := sliceutil.ToInt(r.options.TcpSynPingProbes)
+		r.scanner.EnqueueTCP(host, scan.Syn, ports...)
+	}
+	// Ack Probes
+	if len(r.options.TcpAckPingProbes) > 0 {
+		ports, _ := sliceutil.ToInt(r.options.TcpAckPingProbes)
+		r.scanner.EnqueueTCP(host, scan.Ack, ports...)
+	}
 }
 
 func (r *Runner) handleHostPortSyn(host string, port int) {
@@ -537,7 +548,7 @@ func (r *Runner) handleHostPortSyn(host string, port int) {
 	}
 
 	r.limiter.Take()
-	r.scanner.EnqueueTCP(host, port, scan.Syn)
+	r.scanner.EnqueueTCP(host, scan.Syn, port)
 }
 
 func (r *Runner) SetSourceIP(sourceIP string) error {

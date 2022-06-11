@@ -113,19 +113,18 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Prot
 		return err
 	}
 
+	// Strict BPF filter
+	// + Destination port equals to sender socket source port
+	err = handle.SetBPFFilter(bpfFilter)
+	if err != nil {
+		return err
+	}
+
 	switch protocol {
 	case TCP:
 		handlers.TcpActive = append(handlers.TcpActive, handle)
 	case ARP:
 		handlers.EthernetActive = append(handlers.EthernetActive, handle)
-	}
-
-	// Strict BPF filter
-	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(bpfFilter)
-	if err != nil {
-		s.CleanupHandlers()
-		return err
 	}
 	s.handlers = handlers
 
@@ -196,6 +195,8 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 							// We consider only incoming packets
 							if tcp.DstPort != layers.TCPPort(s.listenPort) {
 								continue
+							} else if s.State == HostDiscovery {
+								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
 							} else if tcp.SYN && tcp.ACK {
 								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
 							}
@@ -207,7 +208,6 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 	}
 
 	// Ethernet Readers
-	// Tcp Readers
 	for _, handler := range handlers.EthernetActive {
 		wgread.Add(1)
 		go func(handler *pcap.Handle) {
@@ -242,7 +242,10 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 						if layerType == layers.LayerTypeARP {
 							// check if the packet was sent out
 							isReply := arp.Operation == layers.ARPReply
-							sourceMacIsInterfaceMac := bytes.Equal([]byte(s.NetworkInterface.HardwareAddr), arp.SourceHwAddress)
+							var sourceMacIsInterfaceMac bool
+							if s.NetworkInterface != nil {
+								sourceMacIsInterfaceMac = bytes.Equal([]byte(s.NetworkInterface.HardwareAddr), arp.SourceHwAddress)
+							}
 							isOutgoingPacket := !isReply || sourceMacIsInterfaceMac
 							if isOutgoingPacket {
 								continue

@@ -245,11 +245,13 @@ func (s *Scanner) EnqueueEthernet(ip string, pkgtype PkgFlag) {
 }
 
 // EnqueueTCP outgoing TCP packets
-func (s *Scanner) EnqueueTCP(ip string, port int, pkgtype PkgFlag) {
-	s.tcpPacketSend <- &PkgSend{
-		ip:   ip,
-		port: port,
-		flag: pkgtype,
+func (s *Scanner) EnqueueTCP(ip string, pkgtype PkgFlag, ports ...int) {
+	for _, port := range ports {
+		s.tcpPacketSend <- &PkgSend{
+			ip:   ip,
+			port: port,
+			flag: pkgtype,
+		}
 	}
 }
 
@@ -357,6 +359,7 @@ func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		if s.State == HostDiscovery {
 			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
+			gologger.Silent().Msgf("%s\n", ip.ip)
 		} else if s.State == Scan || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
@@ -393,7 +396,7 @@ send:
 // ScanSyn a target ip
 func (s *Scanner) ScanSyn(ip string) {
 	for _, port := range s.Ports {
-		s.EnqueueTCP(ip, port, Syn)
+		s.EnqueueTCP(ip, Syn, port)
 	}
 }
 
