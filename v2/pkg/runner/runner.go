@@ -538,6 +538,10 @@ func (r *Runner) handleHostDiscovery(host string) {
 		ports, _ := sliceutil.ToInt(r.options.TcpAckPingProbes)
 		r.scanner.EnqueueTCP(host, scan.Ack, ports...)
 	}
+	// IPv6-ND (for now we broadcast ICMPv6 to ff02::1)
+	if r.options.IPv6NeighborDiscoveryPing {
+		r.scanner.EnqueueICMP("ff02::1", scan.Ndp)
+	}
 }
 
 func (r *Runner) handleHostPortSyn(host string, port int) {

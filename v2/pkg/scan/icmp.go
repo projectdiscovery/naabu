@@ -25,6 +25,7 @@ func init() {
 	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
 	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
 	pingIcmpAddressMaskRequestAsyncCallback = PingIcmpAddressMaskRequestAsync
+	pingNdpRequestAsyncCallback = PingNdpRequestAsync
 }
 
 // PingIcmpEchoRequest synchronous to the target ip address

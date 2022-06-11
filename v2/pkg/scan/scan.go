@@ -18,8 +18,10 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
+	"github.com/projectdiscovery/stringsutil"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 	"golang.org/x/net/proxy"
 )
 
@@ -53,6 +55,7 @@ const (
 	IcmpTimestampRequest
 	IcmpAddressMaskRequest
 	Arp
+	Ndp
 )
 
 type Protocol int
@@ -122,6 +125,7 @@ var (
 	pingIcmpTimestampRequestAsyncCallback   func(s *Scanner, ip string)
 	pingIcmpAddressMaskRequestAsyncCallback func(s *Scanner, ip string)
 	arpRequestAsyncCallback                 func(s *Scanner, ip string)
+	pingNdpRequestAsyncCallback             func(s *Scanner, ip string)
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -265,6 +269,8 @@ func (s *Scanner) ICMPWriteWorker() {
 			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
 		case pkg.flag == IcmpAddressMaskRequest && pingIcmpAddressMaskRequestAsyncCallback != nil:
 			pingIcmpAddressMaskRequestAsyncCallback(s, pkg.ip)
+		case pkg.flag == Ndp && pingNdpRequestAsyncCallback != nil:
+			pingNdpRequestAsyncCallback(s, pkg.ip)
 		}
 	}
 }
@@ -315,7 +321,7 @@ func (s *Scanner) ICMPReadWorker4() {
 }
 
 func (s *Scanner) ICMPReadWorker6() {
-	defer s.icmpPacketListener4.Close()
+	defer s.icmpPacketListener6.Close()
 
 	data := make([]byte, 1500)
 	for {
@@ -331,14 +337,21 @@ func (s *Scanner) ICMPReadWorker6() {
 			continue
 		}
 
-		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
+		rm, err := icmp.ParseMessage(ProtocolIPv6ICMP, data[:n])
 		if err != nil {
 			continue
 		}
 
 		switch rm.Type {
-		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestamp:
-			s.icmpChan <- &PkgResult{ip: addr.String()}
+		case ipv6.ICMPTypeEchoReply:
+			ip := addr.String()
+			// check if it has [host]:port
+			if ipSplit, _, err := net.SplitHostPort(ip); err == nil {
+				ip = ipSplit
+			}
+			// drop zone
+			ip = stringsutil.Before(ip, "%")
+			s.icmpChan <- &PkgResult{ip: ip}
 		}
 	}
 }

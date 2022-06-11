@@ -62,7 +62,7 @@ func NewScannerUnix(scanner *Scanner) error {
 	}
 	scanner.icmpPacketListener4 = icmpConn4
 
-	icmpConn6, err := icmp.ListenPacket("ip6:icmp", "::")
+	icmpConn6, err := icmp.ListenPacket("udp6", "::")
 	if err != nil {
 		return err
 	}
