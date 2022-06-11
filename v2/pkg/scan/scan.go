@@ -737,7 +737,7 @@ func (s *Scanner) SetupHandlers() error {
 
 // SetupHandler to listen on the specified interface
 func (s *Scanner) SetupHandler(interfaceName string) error {
-	bpfFilter := fmt.Sprintf("tcp and dst port %d", s.listenPort)
+	bpfFilter := fmt.Sprintf("tcp and dst port %d", s.SourcePort)
 	if setupHandlerCallback != nil {
 		err := setupHandlerCallback(s, interfaceName, bpfFilter, TCP)
 		if err != nil {

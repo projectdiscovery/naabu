@@ -40,6 +40,7 @@ type Options struct {
 	ExcludeIpsFile              string                        // File containing Ips or cidr to exclude from the scan
 	TopPorts                    string                        // Tops ports to scan
 	SourceIP                    string                        // SourceIP to use in TCP packets
+	SourcePort                  string                        // Source Port to use in packets
 	Interface                   string                        // Interface to use for TCP packets
 	ConfigFile                  string                        // Config file contains a scan configuration
 	NmapCLI                     string                        // Nmap command (has priority over config file)
