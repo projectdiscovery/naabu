@@ -96,7 +96,6 @@ type Scanner struct {
 	serializeOptions   gopacket.SerializeOptions
 	debug              bool
 	handlers           interface{}
-	ethernetHandler    interface{}
 	stream             bool
 }
 
@@ -119,9 +118,9 @@ var (
 	setupHandlerCallback                    func(s *Scanner, interfaceName, bpfFilter string, protocol Protocol) error
 	tcpReadWorkerPCAPCallback               func(s *Scanner)
 	cleanupHandlersCallback                 func(s *Scanner)
-	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool
+	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool //nolint
 	pingIcmpEchoRequestAsyncCallback        func(s *Scanner, ip string)
-	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool
+	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool //nolint
 	pingIcmpTimestampRequestAsyncCallback   func(s *Scanner, ip string)
 	pingIcmpAddressMaskRequestAsyncCallback func(s *Scanner, ip string)
 	arpRequestAsyncCallback                 func(s *Scanner, ip string)
