@@ -84,7 +84,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200"),
 		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100)"),
 		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
-		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to exclude from scan (file)"),
+		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to scan (file)"),
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
 		flagSet.BoolVarP(&options.OutputCDN, "cdn", "display-cdn", false, "display cdn in use"),
 	)
