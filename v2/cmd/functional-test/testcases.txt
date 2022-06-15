@@ -6,5 +6,5 @@
 127.0.0.1 {{binary}} -nmap-cli 'nmap -Pn -sT' -p 8000
 127.0.0.1 {{binary}} -json
 127.0.0.1 {{binary}} -nmap-cli 'nmap -sT'
-scanme.nmap.org {{binary}} -stream -passive
-scanme.nmap.org {{binary}} -stream -passive -verify
+scanme.sh {{binary}} -stream -passive
+scanme.sh {{binary}} -stream -passive -verify
