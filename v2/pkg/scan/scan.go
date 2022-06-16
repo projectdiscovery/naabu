@@ -151,8 +151,15 @@ func NewScanner(options *Options) (*Scanner, error) {
 		}
 	}
 
+	var auth *proxy.Auth = nil
+
+	if (options.ProxyAuth != "") && (strings.Contains(options.ProxyAuth, ":")) {
+		credentials := strings.Split(options.ProxyAuth, ":")
+		auth = &proxy.Auth{User: credentials[0], Password: credentials[1]}
+	}
+
 	if options.Proxy != "" {
-		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, nil, &net.Dialer{Timeout: options.Timeout})
+		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, auth, &net.Dialer{Timeout: options.Timeout})
 		if err != nil {
 			return nil, err
 		}

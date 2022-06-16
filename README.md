@@ -84,7 +84,8 @@ CONFIGURATION:
    -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
    -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
    -r string              list of custom resolver dns resolution (comma separated or from file)
-   -proxy string          socks5 proxy
+   -proxy string          socks5 proxy (ip[:port] / fqdn[:port]
+   -proxy-auth string     socks5 proxy authentication (username:password)
    -resume                resume scan using resume.cfg
    -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
    -passive               display passive open ports using shodan internetdb api
