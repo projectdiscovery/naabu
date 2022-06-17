@@ -45,11 +45,11 @@ func TestIPHasPort(t *testing.T) {
 	assert.False(t, res.IPHasPort(targetIP, 1111))
 }
 
-func TestSetIP(t *testing.T) {
+func TestAddIP(t *testing.T) {
 	targetIP := "127.0.0.1"
 
 	res := NewResult()
-	res.SetIP(targetIP)
+	res.AddIp(targetIP)
 	expectedIPS := map[string]struct{}{targetIP: {}}
 	assert.Equal(t, res.IPS, expectedIPS)
 }
@@ -58,7 +58,7 @@ func TestHasIP(t *testing.T) {
 	targetIP := "127.0.0.1"
 
 	res := NewResult()
-	res.SetIP(targetIP)
+	res.AddIp(targetIP)
 	assert.True(t, res.HasIP(targetIP))
 	assert.False(t, res.HasIP("1.2.3.4"))
 }
