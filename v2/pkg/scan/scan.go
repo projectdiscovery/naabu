@@ -153,9 +153,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 	var auth *proxy.Auth = nil
 
-	if (options.ProxyAuth != "") && (strings.Contains(options.ProxyAuth, ":")) {
-		credentials := strings.Split(options.ProxyAuth, ":")
-		auth = &proxy.Auth{User: credentials[0], Password: credentials[1]}
+	if options.ProxyAuth != "" && strings.Contains(options.ProxyAuth, ":") {
+		credentials := strings.SplitN(options.ProxyAuth, ":", 2)
+		var user, password string
+		user = credentials[0]
+		if len(credentials) == 2 {
+			password = credentials[1]
+		}
+		auth = &proxy.Auth{User: user, Password: password}
 	}
 
 	if options.Proxy != "" {
