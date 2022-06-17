@@ -127,3 +127,22 @@ func (options *Options) configureOutput() {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
 	}
 }
+
+// configureHostDiscovery enables default probes if none is specified
+// but host discovery option was requested
+func (options *Options) configureHostDiscovery() {
+	hasProbes := options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
+		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
+		len(options.TcpAckPingProbes) > 0
+	if options.HostDiscovery && !hasProbes {
+		// if no options were defined enable
+		// - ICMP Echo Request
+		// - ICMP timestamp
+		// - TCP SYN on port 80
+		// - TCP ACK on port 443
+		options.IcmpEchoRequestProbe = true
+		options.IcmpTimestampRequestProbe = true
+		options.TcpSynPingProbes = append(options.TcpSynPingProbes, "80")
+		options.TcpAckPingProbes = append(options.TcpAckPingProbes, "443")
+	}
+}
