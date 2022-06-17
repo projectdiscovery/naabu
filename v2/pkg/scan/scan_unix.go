@@ -74,7 +74,7 @@ func NewScannerUnix(scanner *Scanner) error {
 	}
 	scanner.icmpPacketListener6 = icmpConn6
 
-	scanner.icmpChan = make(chan *PkgResult, chanSize)
+	scanner.hostDiscoveryChan = make(chan *PkgResult, chanSize)
 	scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
 	scanner.ethernetPacketSend = make(chan *PkgSend, packetSendSize)
 
@@ -269,7 +269,7 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 								continue
 							}
 
-							gologger.Silent().Msgf("%s\n", ip)
+							s.hostDiscoveryChan <- &PkgResult{ip: ip}
 						}
 					}
 				}

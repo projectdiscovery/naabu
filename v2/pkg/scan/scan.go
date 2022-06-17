@@ -83,20 +83,21 @@ type Scanner struct {
 	Ports    []int
 	IPRanger *ipranger.IPRanger
 
-	tcpPacketSend      chan *PkgSend
-	icmpPacketSend     chan *PkgSend
-	ethernetPacketSend chan *PkgSend
-	tcpChan            chan *PkgResult
-	icmpChan           chan *PkgResult
-	State              State
-	ScanResults        *result.Result
-	NetworkInterface   *net.Interface
-	cdn                *cdncheck.Client
-	tcpsequencer       *TCPSequencer
-	serializeOptions   gopacket.SerializeOptions
-	debug              bool
-	handlers           interface{}
-	stream             bool
+	tcpPacketSend        chan *PkgSend
+	icmpPacketSend       chan *PkgSend
+	ethernetPacketSend   chan *PkgSend
+	tcpChan              chan *PkgResult
+	hostDiscoveryChan    chan *PkgResult
+	State                State
+	HostDiscoveryResults *result.Result
+	ScanResults          *result.Result
+	NetworkInterface     *net.Interface
+	cdn                  *cdncheck.Client
+	tcpsequencer         *TCPSequencer
+	serializeOptions     gopacket.SerializeOptions
+	debug                bool
+	handlers             interface{}
+	stream               bool
 }
 
 // PkgSend is a TCP package
@@ -163,6 +164,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		}
 	}
 
+	scanner.HostDiscoveryResults = result.NewResult()
 	scanner.ScanResults = result.NewResult()
 	if options.ExcludeCdn || options.OutputCdn {
 		var err error
@@ -314,7 +316,7 @@ func (s *Scanner) ICMPReadWorker4() {
 
 		switch rm.Type {
 		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestampReply:
-			s.icmpChan <- &PkgResult{ip: addr.String()}
+			s.hostDiscoveryChan <- &PkgResult{ip: addr.String()}
 		}
 	}
 }
@@ -350,18 +352,17 @@ func (s *Scanner) ICMPReadWorker6() {
 			}
 			// drop zone
 			ip = stringsutil.Before(ip, "%")
-			s.icmpChan <- &PkgResult{ip: ip}
+			s.hostDiscoveryChan <- &PkgResult{ip: ip}
 		}
 	}
 }
 
 // ICMPResultWorker handles ICMP responses (used only during probes)
 func (s *Scanner) ICMPResultWorker() {
-	for ip := range s.icmpChan {
-		// Todo: move this into a proper output structure
+	for ip := range s.hostDiscoveryChan {
 		if s.State == HostDiscovery {
 			gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ip)
-			gologger.Silent().Msgf("%s\n", ip.ip)
+			s.HostDiscoveryResults.AddIp(ip.ip)
 		}
 	}
 }
@@ -371,7 +372,7 @@ func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		if s.State == HostDiscovery {
 			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
-			gologger.Silent().Msgf("%s\n", ip.ip)
+			s.HostDiscoveryResults.AddIp(ip.ip)
 		} else if s.State == Scan || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
