@@ -50,6 +50,7 @@ type Options struct {
 	IncludeIPv6       bool                          // Include resolved IP6 for dns records
 	ScanType          string                        // Scan Type
 	Proxy             string                        // Socks5 proxy
+	ProxyAuth         string                        // Socks5 proxy authentication (username:password)
 	Resolvers         string                        // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
@@ -110,7 +111,8 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
-		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
+		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy (ip[:port] / fqdn[:port]"),
+		flagSet.StringVar(&options.ProxyAuth, "proxy-auth", "", "socks5 proxy authentication (username:password)"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
