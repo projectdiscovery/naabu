@@ -14,5 +14,6 @@ type Options struct {
 	OutputCdn   bool
 	ExcludedIps []string
 	Proxy       string
+	ProxyAuth   string
 	Stream      bool
 }
