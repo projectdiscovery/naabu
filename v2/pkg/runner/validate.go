@@ -111,6 +111,11 @@ func (options *Options) validateOptions() error {
 		options.SourcePort = port
 	}
 
+	// Host Discovery mode needs provileged access
+	if options.HostDiscovery && !privileges.IsPrivileged {
+		return errors.New("Host Discovery needs privileged access to manipulate raw packets")
+	}
+
 	return nil
 }
 
