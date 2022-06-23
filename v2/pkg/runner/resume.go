@@ -14,12 +14,16 @@ import (
 // Default resume file
 const defaultResumeFileName = "resume.cfg"
 
-func DefaultResumeFilePath() string {
+func DefaultResumeFolderPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return defaultResumeFileName
 	}
 	return filepath.Join(home, ".config", "naabu", defaultResumeFileName)
+}
+
+func DefaultResumeFilePath() string {
+	return filepath.Join(DefaultResumeFolderPath(), defaultResumeFileName)
 }
 
 // ResumeCfg contains the scan progression
@@ -38,6 +42,10 @@ func NewResumeCfg() *ResumeCfg {
 // SaveResumeConfig to file
 func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
 	data, _ := json.MarshalIndent(resumeCfg, "", "\t")
+ 	err := os.MkdirAll(DefaultResumeFolderPath(), os.ModePerm)
+ 	if err != nil{
+ 	 	return err
+	}
 	return os.WriteFile(DefaultResumeFilePath(), data, os.ModePerm)
 }
 
