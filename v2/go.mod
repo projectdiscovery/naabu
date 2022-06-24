@@ -2,6 +2,8 @@ module github.com/projectdiscovery/naabu/v2
 
 go 1.17
 
+replace github.com/projectdiscovery/iputil => /Users/marcornvh/go/src/github.com/projectdiscovery/iputil
+
 require (
 	github.com/google/gopacket v1.1.19
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
@@ -25,6 +27,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.49
 	github.com/pkg/errors v0.9.1
+	github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220617101104-3edc1ac3579e
 	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
@@ -49,6 +52,7 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
+	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.6-0.20210726203631-07bc1bf47fb2 // indirect

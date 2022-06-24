@@ -17,6 +17,7 @@ import (
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/stringsutil"
 	"golang.org/x/net/icmp"
@@ -67,7 +68,7 @@ const (
 )
 
 type Scanner struct {
-	Router              Router
+	Router              routing.Router
 	SourceIP4           net.IP
 	SourceIP6           net.IP
 	tcpPacketlistener4  net.PacketConn
@@ -411,27 +412,6 @@ func (s *Scanner) ScanSyn(ip string) {
 	for _, port := range s.Ports {
 		s.EnqueueTCP(ip, Syn, port)
 	}
-}
-
-// GetSourceIP gets the local ip based on our destination ip
-func GetSourceIP(target string) (net.IP, error) {
-	hostPort := net.JoinHostPort(target, "12345")
-	serverAddr, err := net.ResolveUDPAddr("udp", hostPort)
-	if err != nil {
-		return nil, err
-	}
-
-	con, dialUpErr := net.DialUDP("udp", nil, serverAddr)
-	if dialUpErr != nil {
-		return nil, dialUpErr
-	}
-
-	defer con.Close()
-	if udpaddr, ok := con.LocalAddr().(*net.UDPAddr); ok {
-		return udpaddr.IP, nil
-	}
-
-	return nil, nil
 }
 
 // GetInterfaceFromIP gets the name of the network interface from local ip address
