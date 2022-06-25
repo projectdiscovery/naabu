@@ -70,6 +70,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		OutputCdn:   options.OutputCDN,
 		ExcludedIps: excludedIps,
 		Proxy:       options.Proxy,
+		ProxyAuth:   options.ProxyAuth,
 		Stream:      options.Stream,
 	})
 	if err != nil {

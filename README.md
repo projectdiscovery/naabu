@@ -63,7 +63,7 @@ PORT:
    -port, -p string            ports to scan (80,443, 100-200
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
-   -ports-file, -pf string     list of ports to exclude from scan (file)
+   -ports-file, -pf string     list of ports to scan (file)
    -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
 
 RATE-LIMIT:
@@ -84,7 +84,8 @@ CONFIGURATION:
    -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
    -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
    -r string              list of custom resolver dns resolution (comma separated or from file)
-   -proxy string          socks5 proxy
+   -proxy string          socks5 proxy (ip[:port] / fqdn[:port]
+   -proxy-auth string     socks5 proxy authentication (username:password)
    -resume                resume scan using resume.cfg
    -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
    -passive               display passive open ports using shodan internetdb api

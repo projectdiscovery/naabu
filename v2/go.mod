@@ -23,7 +23,7 @@ require (
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/miekg/dns v1.1.49
+	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220625072544-7bb47e7c1809
@@ -32,7 +32,7 @@ require (
 	github.com/projectdiscovery/sliceutil v0.0.0-20220611084746-f38f8821a68a
 	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833
 	github.com/projectdiscovery/uncover v0.0.5
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.7.5
 )
 
 require (
