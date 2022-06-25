@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"net"
+	"strings"
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/iputil"
@@ -15,6 +16,10 @@ const (
 	IPv4 RouteType = "IPv4"
 	IPv6 RouteType = "IPv6"
 )
+
+func (routeType RouteType) String() string {
+	return strings.ToLower(fmt.Sprint(routeType))
+}
 
 type Route struct {
 	Type             RouteType
