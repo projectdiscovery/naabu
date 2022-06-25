@@ -15,7 +15,7 @@ import (
 	"github.com/projectdiscovery/stringsutil"
 )
 
-// New creates a routing engine for Darwin
+// New creates a routing engine for windows
 func New() (Router, error) {
 	return nil, errors.New("not implemented")
 }

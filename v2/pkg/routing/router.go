@@ -85,9 +85,8 @@ func FindSourceIpForIp(route *Route, ip net.IP) (net.IP, error) {
 		return nil, err
 	}
 	for _, address := range addresses {
-		var ipNet *net.IPNet
-		ipNet = address.(*net.IPNet)
-		if ipNet == nil {
+		ipNet, ok := address.(*net.IPNet)
+		if !ok || ipNet == nil {
 			continue
 		}
 		ipAddress := ipNet.IP
@@ -99,7 +98,7 @@ func FindSourceIpForIp(route *Route, ip net.IP) (net.IP, error) {
 		}
 	}
 
-	return nil, fmt.Errorf("could not find source ip for target \"%s\" with interface %s", ip, route.NetworkInterface)
+	return nil, fmt.Errorf("could not find source ip for target \"%s\" with interface %s", ip, route.NetworkInterface.Name)
 }
 
 func GetOutboundIPs() (net.IP, net.IP, error) {
