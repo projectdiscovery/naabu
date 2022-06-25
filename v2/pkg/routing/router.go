@@ -18,7 +18,7 @@ const (
 )
 
 func (routeType RouteType) String() string {
-	return strings.ToLower(fmt.Sprint(routeType))
+	return strings.ToLower(string(routeType))
 }
 
 type Route struct {
