@@ -27,10 +27,9 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.49
 	github.com/pkg/errors v0.9.1
-	github.com/projectdiscovery/folderutil v0.0.0-20220212074351-38f1c1d2fdd4
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/uncover v0.0.5
-	github.com/stretchr/testify v1.7.2
+	github.com/stretchr/testify v1.7.5
 )
 
 require (
