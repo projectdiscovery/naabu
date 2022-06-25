@@ -25,7 +25,7 @@ require (
 
 require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
-	github.com/miekg/dns v1.1.49
+	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/uncover v0.0.5
