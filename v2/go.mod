@@ -2,8 +2,6 @@ module github.com/projectdiscovery/naabu/v2
 
 go 1.17
 
-replace github.com/projectdiscovery/iputil => /Users/marcornvh/go/src/github.com/projectdiscovery/iputil
-
 require (
 	github.com/google/gopacket v1.1.19
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
@@ -15,7 +13,7 @@ require (
 	github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e
 	github.com/projectdiscovery/goflags v0.0.8-0.20220610065908-6a16a6bc848c
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/iputil v0.0.0-20220613112553-9b6873b2c619
+	github.com/projectdiscovery/iputil v0.0.0-20220625072148-037479960416
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
@@ -28,7 +26,7 @@ require (
 	github.com/miekg/dns v1.1.49
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54
-	github.com/projectdiscovery/ipranger v0.0.3-0.20220617101104-3edc1ac3579e
+	github.com/projectdiscovery/ipranger v0.0.3-0.20220625072544-7bb47e7c1809
 	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220611084746-f38f8821a68a

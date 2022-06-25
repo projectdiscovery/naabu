@@ -10,7 +10,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/executil"
 	"github.com/projectdiscovery/iputil"
-	"github.com/projectdiscovery/naabu/v2/pkg/util"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/stringsutil"
 )
