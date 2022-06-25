@@ -62,6 +62,18 @@ type Options struct {
 	Passive           bool
 	OutputCDN         bool // display cdn in use
 	HealthCheck       bool
+	HostDiscovery     bool // Enable Host Discovery
+	TcpSynPingProbes  goflags.StringSlice
+	TcpAckPingProbes  goflags.StringSlice
+	// UdpPingProbes               goflags.StringSlice - planned
+	// STcpInitPingProbes          goflags.StringSlice - planned
+	IcmpEchoRequestProbe        bool
+	IcmpTimestampRequestProbe   bool
+	IcmpAddressMaskRequestProbe bool
+	// IpProtocolPingProbes        goflags.StringSlice - planned
+	ArpPing                   bool
+	IPv6NeighborDiscoveryPing bool
+	// HostDiscoveryIgnoreRST      bool - planned
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -116,6 +128,18 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
+		flagSet.BoolVarP(&options.HostDiscovery, "host-discvoery", "sn", false, "Host Discovery"),
+		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", nil, "TCP SYN Ping"),
+		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping"),
+		// flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
+		// flagSet.StringSliceVarP(&options.STcpInitPingProbes, "probe-stcp-init", "py", []string{}, "SCTP INIT Ping"),
+		// flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping"),
+		flagSet.BoolVarP(&options.IcmpTimestampRequestProbe, "probe-icmp-timestamp", "pp", false, "ICMP timestamp request Ping"),
+		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping"),
+		// flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),
+		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping"),
+		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery"),
+		// flagSet.BoolVarP(&options.HostDiscoveryIgnoreRST, "discovery-ignore-rst", "irst", false, "Ignore RST packets during host discovery"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -146,6 +170,9 @@ func ParseOptions() *Options {
 
 	// Check if stdin pipe was given
 	options.Stdin = fileutil.HasStdin()
+
+	// configure host discovery if necessary
+	options.configureHostDiscovery()
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
@@ -178,8 +205,6 @@ func ParseOptions() *Options {
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
-
-	showNetworkCapabilities(options)
 
 	return options
 }
