@@ -22,6 +22,7 @@ require (
 )
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
@@ -37,7 +38,6 @@ require (
 
 require (
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/cnf/structhash v0.0.0-20201127153200-e1b16c1ebc08 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
