@@ -3,6 +3,8 @@
 package routing
 
 import (
+	"net"
+
 	"github.com/google/gopacket/routing"
 )
 
@@ -16,13 +18,13 @@ func New() (Router, error) {
 }
 
 type RouterLinux struct {
-	router *routing.Router
+	router routing.Router
 }
 
-func (r *RouterLinux) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	return r.Route(dst)
+func (r RouterLinux) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	return r.router.Route(dst)
 }
 
-func (r *RouterLinux) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	return r.RouteWithSrc(input, src, dst)
+func (r RouterLinux) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	return r.router.RouteWithSrc(input, src, dst)
 }
