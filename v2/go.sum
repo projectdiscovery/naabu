@@ -98,6 +98,8 @@ github.com/projectdiscovery/fileutil v0.0.0-20220214145203-ee3ead95c0b9/go.mod h
 github.com/projectdiscovery/fileutil v0.0.0-20220506114156-c4ab20801483/go.mod h1:wjS/oBWbzlayJ/aTK0KW0oOHGO03G8oEYzuN6stI8Ho=
 github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e h1:Xe/e4sQv08fCh+CuKCbPsAVlG0Mf1bZ9ZGR4BEHic18=
 github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e/go.mod h1:qcx3tdBzVDlUvr5nMKrgzNkCNQpCV7kGbYlXBAtXz0o=
+github.com/projectdiscovery/fileutil v0.0.0-20220626180823-b24f0847f8e6 h1:5C3sxeSsGsrj2eDY+3SgYl/W1jUvciP71XzTGTQ511E=
+github.com/projectdiscovery/fileutil v0.0.0-20220626180823-b24f0847f8e6/go.mod h1:DaY7wmLPMleyHDCD/14YApPCDtrARY4J8Eny2ZGsG/g=
 github.com/projectdiscovery/folderutil v0.0.0-20220212074351-38f1c1d2fdd4/go.mod h1:BMqXH4jNGByVdE2iLtKvc/6XStaiZRuCIaKv1vw9PnI=
 github.com/projectdiscovery/goconfig v0.0.0-20210804090219-f893ccd0c69c/go.mod h1:mBv7GRD5n3WNbFE9blG8ynzXTM5eh9MmwaK6EOyn6Pk=
 github.com/projectdiscovery/goflags v0.0.8-0.20220411122653-4f7127a41268/go.mod h1:uN+pHMLsWQoiZHUg/l0tqf/VdbX3+ecKfYz/H7b/+NA=
@@ -152,6 +154,7 @@ github.com/stretchr/testify v1.6.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.1/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.7.2/go.mod h1:R6va5+xMeoiuVRoj+gSkQ7d3FALtqAAGI1FQKckRals=
+github.com/stretchr/testify v1.7.3/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/stretchr/testify v1.7.5 h1:s5PTfem8p8EbKQOctVV53k6jCJt3UX4IEJzwh+C324Q=
 github.com/stretchr/testify v1.7.5/go.mod h1:yNjHg4UonilssWZ8iaSj1OCr/vHnekPRkoO+kdMU+MU=
 github.com/syndtr/goleveldb v1.0.0 h1:fBdIW9lB4Iz0n9khmH8w27SJ3QEJ7+IgjPEwGSZiFdE=
