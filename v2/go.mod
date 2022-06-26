@@ -26,7 +26,6 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
-	github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220625072544-7bb47e7c1809
 	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2

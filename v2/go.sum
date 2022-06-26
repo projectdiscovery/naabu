@@ -90,8 +90,6 @@ github.com/projectdiscovery/clistats v0.0.8 h1:tjmWb15mqsPf/yrQXVHLe2ThZX/5+mgKS
 github.com/projectdiscovery/clistats v0.0.8/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
 github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698 h1:LSE8Fu47mp1VcuQ2tb7K2H3UpWdSt/OvxpPiQ7+yC/k=
 github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698/go.mod h1:KNG4N3G6/QPtv381vQU7lHCJpxz8AvCq7h4pIFDuWwQ=
-github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54 h1:TZueXFrhKVLS+sGrSIGVU+6zk7pnLfs/ESDY8b+oYEo=
-github.com/projectdiscovery/executil v0.0.0-20220606181058-ed6aac072e54/go.mod h1:124/FKhihb7SX7YF6b7JM3MWgFa4F+nwUxSYZR1UZVQ=
 github.com/projectdiscovery/fdmax v0.0.3 h1:FM6lv9expZ/rEEBI9tkRh6tx3DV0gtpwzdc0h7bGPqg=
 github.com/projectdiscovery/fdmax v0.0.3/go.mod h1:NWRcaR7JTO7fC27H4jCl9n7Z+KIredwpgw1fV+4KrKI=
 github.com/projectdiscovery/fileutil v0.0.0-20210926202739-6050d0acf73c/go.mod h1:U+QCpQnX8o2N2w0VUGyAzjM3yBAe4BKedVElxiImsx0=

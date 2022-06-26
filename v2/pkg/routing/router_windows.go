@@ -4,6 +4,7 @@ package routing
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"net"
 	"strconv"
@@ -11,7 +12,6 @@ import (
 
 	"github.com/asaskevich/govalidator"
 	"github.com/pkg/errors"
-	"github.com/projectdiscovery/executil"
 	"github.com/projectdiscovery/stringsutil"
 )
 
@@ -20,12 +20,13 @@ func New() (Router, error) {
 	var routes []*Route
 
 	for _, iptype := range []RouteType{IPv4, IPv6} {
-		netshOutput, err := executil.Run(fmt.Sprintf("netsh interface %s show route", iptype))
+		netshCmd := exec.Command("netsh", "interface", iptype.String(), "show", "route")
+		netstatOutput, err := netshCmd.Output()
 		if err != nil {
 			return nil, err
 		}
 
-		scanner := bufio.NewScanner(strings.NewReader(netshOutput))
+		scanner := bufio.NewScanner(bytes.NewReader(netshOutput))
 		for scanner.Scan() {
 			outputLine := strings.TrimSpace(scanner.Text())
 			if outputLine == "" {

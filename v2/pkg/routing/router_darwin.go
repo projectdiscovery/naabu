@@ -4,11 +4,12 @@ package routing
 
 import (
 	"bufio"
+	"bytes"
 	"net"
+	"os/exec"
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/projectdiscovery/executil"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/stringsutil"
 )
@@ -17,12 +18,13 @@ import (
 func New() (Router, error) {
 	var routes []*Route
 
-	netstatOutput, err := executil.Run("netstat -nr")
+	netstatCmd := exec.Command("netstat", "-nr")
+	netstatOutput, err := netstatCmd.Output()
 	if err != nil {
 		return nil, err
 	}
 
-	scanner := bufio.NewScanner(strings.NewReader(netstatOutput))
+	scanner := bufio.NewScanner(bytes.NewReader(netstatOutput))
 	for scanner.Scan() {
 		outputLine := strings.TrimSpace(scanner.Text())
 		if outputLine == "" {
