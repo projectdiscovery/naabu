@@ -21,6 +21,7 @@ func New() (Router, error) {
 	netstatCmd := exec.Command("netstat", "-nr")
 	netstatOutput, err := netstatCmd.Output()
 	if err != nil {
+		var route4, route6 *Route
 		// create default routes with outgoing ips
 		ip4, ip6, errOutboundIps := GetOutboundIPs()
 		if ip4 != nil {
@@ -28,7 +29,7 @@ func New() (Router, error) {
 			if err != nil {
 				return nil, err
 			}
-			route4 := &Route{
+			route4 = &Route{
 				Type:             IPv4,
 				Default:          true,
 				DefaultSourceIP:  ip4,
@@ -36,13 +37,23 @@ func New() (Router, error) {
 			}
 			routes = append(routes, route4)
 		}
+
+		// try to find outbound route for ipv6
 		if ip6 != nil {
 			interface6, _ := FindInterfaceByIp(ip6)
-			route6 := &Route{
+			route6 = &Route{
 				Type:             IPv6,
 				Default:          true,
 				DefaultSourceIP:  ip6,
 				NetworkInterface: interface6,
+			}
+			routes = append(routes, route6)
+		} else {
+			// if we fail, use the same network interface for ipv4
+			route6 = &Route{
+				Type:             IPv6,
+				Default:          true,
+				NetworkInterface: route4.NetworkInterface,
 			}
 			routes = append(routes, route6)
 		}
