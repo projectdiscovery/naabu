@@ -364,7 +364,9 @@ func (s *Scanner) ICMPReadWorker6() {
 				ip = ipSplit
 			}
 			// drop zone
-			ip = stringsutil.Before(ip, "%")
+			if stringsutil.ContainsAny(ip, "%") {
+				ip = stringsutil.Before(ip, "%")
+			}
 			s.hostDiscoveryChan <- &PkgResult{ip: ip}
 		}
 	}
