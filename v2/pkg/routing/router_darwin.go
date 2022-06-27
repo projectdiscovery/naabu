@@ -25,18 +25,22 @@ func New() (Router, error) {
 		// create default routes with outgoing ips
 		ip4, ip6, errOutboundIps := GetOutboundIPs()
 		if ip4 != nil {
+			interface4, _ := FindInterfaceByIp(ip4)
 			route4 := &Route{
-				Type:            IPv4,
-				Default:         true,
-				DefaultSourceIP: ip4,
+				Type:             IPv4,
+				Default:          true,
+				DefaultSourceIP:  ip4,
+				NetworkInterface: interface4,
 			}
 			routes = append(routes, route4)
 		}
 		if ip6 != nil {
+			interface6, _ := FindInterfaceByIp(ip6)
 			route6 := &Route{
-				Type:            IPv6,
-				Default:         true,
-				DefaultSourceIP: ip6,
+				Type:             IPv6,
+				Default:          true,
+				DefaultSourceIP:  ip6,
+				NetworkInterface: interface6,
 			}
 			routes = append(routes, route6)
 		}
