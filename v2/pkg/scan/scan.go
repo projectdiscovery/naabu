@@ -651,7 +651,7 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	ip6 := layers.IPv6{
 		DstIP:      net.ParseIP(ip),
 		Version:    6,
-		HopLimit:   128,
+		HopLimit:   255,
 		NextHeader: layers.IPProtocolTCP,
 	}
 
