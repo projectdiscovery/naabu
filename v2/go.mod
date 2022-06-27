@@ -33,6 +33,7 @@ require (
 	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833
 	github.com/projectdiscovery/uncover v0.0.5
 	github.com/stretchr/testify v1.7.5
+	go.uber.org/multierr v1.8.0
 )
 
 require (
@@ -49,7 +50,6 @@ require (
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
-	go.uber.org/multierr v1.8.0 // indirect
 	golang.org/x/mod v0.4.2 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.6-0.20210726203631-07bc1bf47fb2 // indirect

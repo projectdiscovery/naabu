@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/stringsutil"
+	"go.uber.org/multierr"
 )
 
 // New creates a routing engine for Darwin
@@ -21,7 +22,28 @@ func New() (Router, error) {
 	netstatCmd := exec.Command("netstat", "-nr")
 	netstatOutput, err := netstatCmd.Output()
 	if err != nil {
-		return nil, err
+		// create default routes with outgoing ips
+		ip4, ip6, errOutboundIps := GetOutboundIPs()
+		if ip4 != nil {
+			route4 := &Route{
+				Type:            IPv4,
+				Default:         true,
+				DefaultSourceIP: ip4,
+			}
+			routes = append(routes, route4)
+		}
+		if ip6 != nil {
+			route6 := &Route{
+				Type:            IPv6,
+				Default:         true,
+				DefaultSourceIP: ip6,
+			}
+			routes = append(routes, route6)
+		}
+		if len(routes) > 0 {
+			return &RouterDarwin{Routes: routes}, nil
+		}
+		return nil, multierr.Combine(err, errOutboundIps)
 	}
 
 	scanner := bufio.NewScanner(bytes.NewReader(netstatOutput))
@@ -75,6 +97,10 @@ func (r *RouterDarwin) Route(dst net.IP) (iface *net.Interface, gateway, preferr
 	route, err := FindRouteForIp(dst, r.Routes)
 	if err != nil {
 		return nil, nil, nil, errors.Wrap(err, "could not find route")
+	}
+
+	if route.DefaultSourceIP != nil {
+		return nil, nil, route.DefaultSourceIP, nil
 	}
 
 	if route.NetworkInterface == nil {

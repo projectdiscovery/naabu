@@ -29,6 +29,7 @@ type Route struct {
 	Gateway          string
 	Flags            string
 	Expire           string
+	DefaultSourceIP  net.IP
 }
 
 // Router shares the same interface described in https://github.com/google/gopacket
@@ -144,4 +145,32 @@ func FindRouteWithHwAndIp(hardwareAddr net.HardwareAddr, src net.IP, routes []*R
 	}
 
 	return nil, errors.New("route not found")
+}
+
+func FindInterfaceByIp(ip net.IP) (*net.Interface, error) {
+	interfaces, err := net.Interfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, itf := range interfaces {
+		addresses, err := itf.Addrs()
+		if err != nil {
+			return nil, err
+		}
+		for _, address := range addresses {
+			ipNet, ok := address.(*net.IPNet)
+			if !ok || ipNet == nil {
+				continue
+			}
+			ipAddress := ipNet.IP
+			switch {
+			case iputil.IsIPv4(ip, ipAddress):
+				return &itf, nil
+			case iputil.IsIPv6(ip, ipAddress):
+				return &itf, nil
+			}
+		}
+	}
+
+	return nil, errors.New("interface not found")
 }
