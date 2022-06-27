@@ -10,6 +10,7 @@ import (
 	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
+	"github.com/projectdiscovery/sliceutil"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
@@ -109,6 +110,10 @@ func (options *Options) validateOptions() error {
 		}
 		options.SourceIP = ip
 		options.SourcePort = port
+	}
+
+	if len(options.IPVersion) > 0 && !sliceutil.ContainsItems([]string{"4", "6"}, options.IPVersion) {
+		return errors.New("IP Version must be 4 and/or 6")
 	}
 
 	return nil

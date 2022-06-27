@@ -28,6 +28,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/retryablehttp-go"
+	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	"github.com/remeh/sizedwaitgroup"
 	"go.uber.org/ratelimit"
@@ -84,7 +85,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
 	dnsOptions.Hostsfile = true
-	if options.IncludeIPv6 {
+	if sliceutil.Contains(options.IPVersion, "6") {
 		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
 	}
 	if len(runner.options.baseResolvers) > 0 {

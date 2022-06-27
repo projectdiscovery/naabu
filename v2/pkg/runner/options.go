@@ -47,7 +47,7 @@ type Options struct {
 	Threads           int                           // Internal worker threads
 	EnableProgressBar bool                          // Enable progress bar
 	ScanAllIPS        bool                          // Scan all the ips
-	IncludeIPv6       bool                          // Include resolved IP6 for dns records
+	IPVersion         goflags.NormalizedStringSlice // IP Version to use while resolving hostnames
 	ScanType          string                        // Scan Type
 	Proxy             string                        // Socks5 proxy
 	ProxyAuth         string                        // Socks5 proxy authentication (username:password)
@@ -103,7 +103,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved to IPv6"),
+		flagSet.NormalizedStringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{}, "Set IP version to be used while resolving hostnames"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
