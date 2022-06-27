@@ -18,14 +18,16 @@ import (
 // New creates a routing engine for Darwin
 func New() (Router, error) {
 	var routes []*Route
-
 	netstatCmd := exec.Command("netstat", "-nr")
 	netstatOutput, err := netstatCmd.Output()
 	if err != nil {
 		// create default routes with outgoing ips
 		ip4, ip6, errOutboundIps := GetOutboundIPs()
 		if ip4 != nil {
-			interface4, _ := FindInterfaceByIp(ip4)
+			interface4, err := FindInterfaceByIp(ip4)
+			if err != nil {
+				return nil, err
+			}
 			route4 := &Route{
 				Type:             IPv4,
 				Default:          true,

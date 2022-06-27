@@ -56,11 +56,14 @@ type Router interface {
 }
 
 func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
-	var defaultRoute *Route
+	var defaultRoute4, defaultRoute6 *Route
 	// first we need to find the interface associated to the destination
 	for _, route := range routes {
-		if defaultRoute == nil && route.Default {
-			defaultRoute = route
+		if defaultRoute4 == nil && route.Default && route.Type == IPv4 {
+			defaultRoute4 = route
+		}
+		if defaultRoute6 == nil && route.Default && route.Type == IPv6 {
+			defaultRoute6 = route
 		}
 		// the destination can be an ip or cidr
 		if itfDestIP := net.ParseIP(route.Destination); itfDestIP != nil {
@@ -69,7 +72,6 @@ func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
 				return route, nil
 			}
 		}
-
 		// if it's a cidr, verify that the destination ip is contained
 		if _, itfDrstCidr, err := net.ParseCIDR(route.Destination); err == nil {
 			if itfDrstCidr.Contains(ip) {
@@ -78,8 +80,11 @@ func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
 		}
 	}
 
-	if defaultRoute != nil {
-		return defaultRoute, nil
+	switch {
+	case iputil.IsIPv4(ip) && defaultRoute4 != nil:
+		return defaultRoute4, nil
+	case iputil.IsIPv6(ip) && defaultRoute6 != nil:
+		return defaultRoute6, nil
 	}
 
 	return nil, fmt.Errorf("route not found for %s", ip)
@@ -163,6 +168,12 @@ func FindInterfaceByIp(ip net.IP) (*net.Interface, error) {
 				continue
 			}
 			ipAddress := ipNet.IP
+			// check if they are equal
+			areEqual := ipAddress.Equal(ip)
+			if !areEqual {
+				continue
+			}
+			// double check if they belongs to the same family as go standard library is faulty
 			switch {
 			case iputil.IsIPv4(ip, ipAddress):
 				return &itf, nil
