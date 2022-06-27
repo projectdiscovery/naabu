@@ -104,7 +104,7 @@ func FindSourceIpForIp(route *Route, ip net.IP) (net.IP, error) {
 		switch {
 		case iputil.IsIPv4(ip, ipAddress):
 			return ipAddress, nil
-		case iputil.IsIPv6(ip, ipAddress):
+		case iputil.IsIPv6(ip, ipAddress) && !ipAddress.IsLinkLocalUnicast(): // link local unicast are not routeable
 			return ipAddress, nil
 		}
 	}
