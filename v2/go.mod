@@ -5,7 +5,7 @@ go 1.17
 require (
 	github.com/google/gopacket v1.1.19
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
-	github.com/projectdiscovery/blackrock v0.0.0-20210415162320-b38689ae3a2e
+	github.com/projectdiscovery/blackrock v0.0.0-20210903102120-5a9d2412d21d
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/dnsx v1.0.7-0.20210927160546-05f957862698
@@ -13,9 +13,7 @@ require (
 	github.com/projectdiscovery/fileutil v0.0.0-20220609085820-4e9293717b1e
 	github.com/projectdiscovery/goflags v0.0.8-0.20220610065908-6a16a6bc848c
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/ipranger v0.0.3-0.20220527173555-3bd361b7ad93
-	github.com/projectdiscovery/iputil v0.0.0-20220523155204-a04b03c5a533
-	github.com/projectdiscovery/mapcidr v0.0.9-0.20220522183402-dd5c57284d9e
+	github.com/projectdiscovery/iputil v0.0.0-20220613112553-9b6873b2c619
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
@@ -27,8 +25,11 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
+	github.com/projectdiscovery/ipranger v0.0.3-0.20220617101104-3edc1ac3579e
+	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
+	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833
 	github.com/projectdiscovery/uncover v0.0.5
 	github.com/stretchr/testify v1.7.5
 )
@@ -45,7 +46,6 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/hmap v0.0.1 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.13-0.20210927160332-db15799e2e4d // indirect
-	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833 // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.uber.org/atomic v1.9.0 // indirect

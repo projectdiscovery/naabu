@@ -12,8 +12,9 @@ import (
 
 // Some constants
 const (
-	DeadlineSec  = 10
-	ProtocolICMP = 1
+	DeadlineSec      = 10
+	ProtocolICMP     = 1
+	ProtocolIPv6ICMP = 58
 )
 
 // PingResult contains the results for the Ping request

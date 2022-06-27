@@ -3,6 +3,7 @@
 package scan
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"net"
@@ -14,6 +15,7 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
+	"golang.org/x/net/icmp"
 )
 
 func init() {
@@ -24,8 +26,10 @@ func init() {
 }
 
 type Handlers struct {
-	Active   []*pcap.Handle
-	Inactive []*pcap.InactiveHandle
+	TcpActive        []*pcap.Handle
+	TcpInactive      []*pcap.InactiveHandle
+	EthernetActive   []*pcap.Handle
+	EthernetInactive []*pcap.InactiveHandle
 }
 
 func getFreePort() (int, error) {
@@ -55,15 +59,31 @@ func NewScannerUnix(scanner *Scanner) error {
 
 	var handlers Handlers
 	scanner.handlers = handlers
-
 	scanner.tcpChan = make(chan *PkgResult, chanSize)
 	scanner.tcpPacketSend = make(chan *PkgSend, packetSendSize)
+
+	icmpConn4, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		return err
+	}
+	scanner.icmpPacketListener4 = icmpConn4
+
+	icmpConn6, err := icmp.ListenPacket("udp6", "::")
+	if err != nil {
+		return err
+	}
+	scanner.icmpPacketListener6 = icmpConn6
+
+	scanner.hostDiscoveryChan = make(chan *PkgResult, chanSize)
+	scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
+	scanner.ethernetPacketSend = make(chan *PkgSend, packetSendSize)
+
 	scanner.Router, err = newRouter()
 
 	return err
 }
 
-func SetupHandlerUnix(s *Scanner, interfaceName string) error {
+func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Protocol) error {
 	inactive, err := pcap.NewInactiveHandle(interfaceName)
 	if err != nil {
 		return err
@@ -85,7 +105,13 @@ func SetupHandlerUnix(s *Scanner, interfaceName string) error {
 	}
 
 	handlers := s.handlers.(Handlers)
-	handlers.Inactive = append(handlers.Inactive, inactive)
+
+	switch protocol {
+	case TCP:
+		handlers.TcpInactive = append(handlers.TcpInactive, inactive)
+	case ARP:
+		handlers.EthernetInactive = append(handlers.EthernetInactive, inactive)
+	}
 
 	handle, err := inactive.Activate()
 	if err != nil {
@@ -93,14 +119,18 @@ func SetupHandlerUnix(s *Scanner, interfaceName string) error {
 		return err
 	}
 
-	handlers.Active = append(handlers.Active, handle)
-
 	// Strict BPF filter
 	// + Destination port equals to sender socket source port
-	err = handle.SetBPFFilter(fmt.Sprintf("tcp and dst port %d", s.SourcePort))
+	err = handle.SetBPFFilter(bpfFilter)
 	if err != nil {
-		s.CleanupHandlers()
 		return err
+	}
+
+	switch protocol {
+	case TCP:
+		handlers.TcpActive = append(handlers.TcpActive, handle)
+	case ARP:
+		handlers.EthernetActive = append(handlers.EthernetActive, handle)
 	}
 	s.handlers = handlers
 
@@ -114,7 +144,8 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 
 	handlers := s.handlers.(Handlers)
 
-	for _, handler := range handlers.Active {
+	// Tcp Readers
+	for _, handler := range handlers.TcpActive {
 		wgread.Add(1)
 		go func(handler *pcap.Handle) {
 			defer wgread.Done()
@@ -170,9 +201,75 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 							// We consider only incoming packets
 							if tcp.DstPort != layers.TCPPort(s.SourcePort) {
 								continue
+							} else if s.State == HostDiscovery {
+								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
 							} else if tcp.SYN && tcp.ACK {
 								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
 							}
+						}
+					}
+				}
+			}
+		}(handler)
+	}
+
+	// Ethernet Readers
+	for _, handler := range handlers.EthernetActive {
+		wgread.Add(1)
+		go func(handler *pcap.Handle) {
+			defer wgread.Done()
+
+			var (
+				eth layers.Ethernet
+				arp layers.ARP
+			)
+
+			parser4 := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &arp)
+			parser4.IgnoreUnsupported = true
+			var parsers []*gopacket.DecodingLayerParser
+			parsers = append(parsers, parser4)
+
+			decoded := []gopacket.LayerType{}
+
+			for {
+				data, _, err := handler.ReadPacketData()
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					continue
+				}
+
+				for _, parser := range parsers {
+					err := parser.DecodeLayers(data, &decoded)
+					if err != nil {
+						continue
+					}
+					for _, layerType := range decoded {
+						if layerType == layers.LayerTypeARP {
+							// check if the packet was sent out
+							isReply := arp.Operation == layers.ARPReply
+							var sourceMacIsInterfaceMac bool
+							if s.NetworkInterface != nil {
+								sourceMacIsInterfaceMac = bytes.Equal([]byte(s.NetworkInterface.HardwareAddr), arp.SourceHwAddress)
+							}
+							isOutgoingPacket := !isReply || sourceMacIsInterfaceMac
+							if isOutgoingPacket {
+								continue
+							}
+							srcIP4 := net.IP(arp.SourceProtAddress)
+							srcMac := net.HardwareAddr(arp.SourceHwAddress)
+
+							isIP4InRange := s.IPRanger.Contains(srcIP4.String())
+
+							var ip string
+							if isIP4InRange {
+								ip = srcIP4.String()
+							} else {
+								gologger.Debug().Msgf("Discarding ARP packet from non target ip: ip4=%s mac=%s\n", srcIP4, srcMac)
+								continue
+							}
+
+							s.hostDiscoveryChan <- &PkgResult{ip: ip}
 						}
 					}
 				}
@@ -185,11 +282,11 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 
 // CleanupHandlers for all interfaces
 func CleanupHandlersUnix(s *Scanner) {
-	handler := s.handlers.(Handlers)
-	for _, handler := range handler.Active {
+	handlers := s.handlers.(Handlers)
+	for _, handler := range append(handlers.TcpActive, handlers.EthernetActive...) {
 		handler.Close()
 	}
-	for _, inactiveHandler := range handler.Inactive {
+	for _, inactiveHandler := range append(handlers.TcpInactive, handlers.EthernetInactive...) {
 		inactiveHandler.CleanUp()
 	}
 }

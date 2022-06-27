@@ -47,7 +47,16 @@ func showNetworkCapabilities(options *Options) {
 		scanType = "CONNECT"
 	}
 
-	gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
+	switch {
+	case options.HostDiscovery:
+		scanType = "Host Discovery"
+		gologger.Info().Msgf("Running %s\n", scanType)
+	case options.Passive:
+		scanType = "PASSIVE"
+		gologger.Info().Msgf("Running %s scan\n", scanType)
+	default:
+		gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
+	}
 }
 
 func showNetworkInterfaces() error {

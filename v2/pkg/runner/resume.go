@@ -14,12 +14,18 @@ import (
 // Default resume file
 const defaultResumeFileName = "resume.cfg"
 
-func DefaultResumeFilePath() string {
+// DefaultResumeFolderPath returns the default resume folder path
+func DefaultResumeFolderPath() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return defaultResumeFileName
 	}
-	return filepath.Join(home, ".config", "naabu", defaultResumeFileName)
+	return filepath.Join(home, ".config", "naabu")
+}
+
+// DefaultResumeFilePath returns the default resume file full path
+func DefaultResumeFilePath() string {
+	return filepath.Join(DefaultResumeFolderPath(), defaultResumeFileName)
 }
 
 // ResumeCfg contains the scan progression
@@ -37,8 +43,16 @@ func NewResumeCfg() *ResumeCfg {
 
 // SaveResumeConfig to file
 func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
-	data, _ := json.MarshalIndent(resumeCfg, "", "\t")
-	return os.WriteFile(DefaultResumeFilePath(), data, os.ModePerm)
+	data, err := json.MarshalIndent(resumeCfg, "", "\t")
+	if err != nil {
+		return err
+	}
+	resumeFolderPath := DefaultResumeFolderPath()
+	if !fileutil.FolderExists(resumeFolderPath) {
+		_ = os.MkdirAll(DefaultResumeFolderPath(), 0644)
+	}
+
+	return os.WriteFile(DefaultResumeFilePath(), data, 0644)
 }
 
 // ConfigureResume read the resume config file
