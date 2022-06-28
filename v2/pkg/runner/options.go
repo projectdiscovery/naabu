@@ -115,7 +115,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.NormalizedStringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{}, "Set IP version to be used while resolving hostnames"),
+		flagSet.NormalizedStringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{}, "ip version to scan of hostname (4,6) - (default 4)"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
