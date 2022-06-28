@@ -143,16 +143,17 @@ func (r *Runner) AddTarget(target string) error {
 }
 
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
-	ips, err := r.host2ips(target)
+	ipsV4, ipsV6, err := r.host2ips(target)
 	if err != nil {
 		return []string{}, err
 	}
 
 	var (
-		initialHosts []string
-		hostIPS      []string
+		initialHosts   []string
+		initialHostsV6 []string
+		hostIPS        []string
 	)
-	for _, ip := range ips {
+	for _, ip := range ipsV4 {
 		if !r.scanner.IPRanger.Np.ValidateAddress(ip) {
 			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
@@ -160,8 +161,15 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 
 		initialHosts = append(initialHosts, ip)
 	}
+	for _, ip := range ipsV6 {
+		if !r.scanner.IPRanger.Np.ValidateAddress(ip) {
+			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
+			continue
+		}
 
-	if len(initialHosts) == 0 {
+		initialHostsV6 = append(initialHostsV6, ip)
+	}
+	if len(initialHosts) == 0 && len(initialHostsV6) == 0 {
 		return []string{}, nil
 	}
 
@@ -190,9 +198,14 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 		gologger.Info().Msgf("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
 		hostIPS = append(hostIPS, fastestHost.Host)
 	} else if r.options.ScanAllIPS {
-		hostIPS = initialHosts
+		hostIPS = append(initialHosts, initialHostsV6...)
 	} else {
-		hostIPS = append(hostIPS, initialHosts[0])
+		if len(initialHosts) > 0 {
+			hostIPS = append(hostIPS, initialHosts[0])
+		}
+		if len(initialHostsV6) > 0 {
+			hostIPS = append(hostIPS, initialHostsV6[0])
+		}
 	}
 
 	for _, hostIP := range hostIPS {
@@ -202,6 +215,5 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
-
 	return hostIPS, nil
 }

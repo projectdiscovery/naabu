@@ -29,7 +29,7 @@ require (
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220625072544-7bb47e7c1809
 	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
-	github.com/projectdiscovery/sliceutil v0.0.0-20220611084746-f38f8821a68a
+	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833
 	github.com/projectdiscovery/uncover v0.0.5
 	github.com/stretchr/testify v1.7.5
