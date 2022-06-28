@@ -9,8 +9,11 @@ import (
 	"os"
 	"time"
 
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/iputil"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
+	"golang.org/x/net/ipv6"
 )
 
 const (
@@ -76,14 +79,35 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 
 // PingIcmpEchoRequestAsync asynchronous to the target ip address
 func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
-	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
+	destinationIP := net.ParseIP(ip)
+	var destAddr net.Addr
 	m := icmp.Message{
-		Type: ipv4.ICMPTypeEcho,
 		Code: 0,
 		Body: &icmp.Echo{
 			ID:   os.Getpid() & 0xffff,
+			Seq:  1,
 			Data: []byte(""),
 		},
+	}
+
+	var packetListener net.PacketConn
+	switch {
+	case iputil.IsIPv4(ip):
+		m.Type = ipv4.ICMPTypeEcho
+		packetListener = s.icmpPacketListener4
+		destAddr = &net.IPAddr{IP: destinationIP}
+	case iputil.IsIPv6(ip):
+		m.Type = ipv6.ICMPTypeEchoRequest
+		packetListener = s.icmpPacketListener6
+		networkInterface, _, _, err := s.Router.Route(destinationIP)
+		if networkInterface == nil {
+			err = fmt.Errorf("Could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
+		}
+		if err != nil {
+			gologger.Debug().Msgf("%s\n", err)
+			return
+		}
+		destAddr = &net.UDPAddr{IP: destinationIP, Zone: networkInterface.Name}
 	}
 
 	data, err := m.Marshal(nil)
@@ -95,7 +119,7 @@ send:
 	if retries >= maxRetries {
 		return
 	}
-	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	_, err = packetListener.WriteTo(data, destAddr)
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
@@ -152,8 +176,11 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	return false
 }
 
-// PingIcmpTimestampRequestAsync synchronous to the target ip address
+// PingIcmpTimestampRequestAsync synchronous to the target ip address - ipv4 only
 func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
+	if !iputil.IsIPv4(ip) {
+		return
+	}
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeTimestamp,
@@ -236,8 +263,11 @@ func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 	return p, nil
 }
 
-// PingIcmpAddressMaskRequestAsync asynchronous to the target ip address
+// PingIcmpAddressMaskRequestAsync asynchronous to the target ip address - ipv4 only
 func PingIcmpAddressMaskRequestAsync(s *Scanner, ip string) {
+	if !iputil.IsIPv4(ip) {
+		return
+	}
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
 		Type: ipv4.ICMPType(17),

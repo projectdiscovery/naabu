@@ -3,7 +3,6 @@
 package scan
 
 import (
-	"log"
 	"net"
 	"os"
 	"time"
@@ -39,7 +38,6 @@ send:
 		return
 	}
 	_, err = s.icmpPacketListener6.WriteTo(data, destAddr)
-	log.Println(err)
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
