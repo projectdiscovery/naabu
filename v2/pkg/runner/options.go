@@ -48,7 +48,7 @@ type Options struct {
 	Threads           int                           // Internal worker threads
 	EnableProgressBar bool                          // Enable progress bar
 	ScanAllIPS        bool                          // Scan all the ips
-	IncludeIPv6       bool                          // Include resolved IP6 for dns records
+	IPVersion         goflags.NormalizedStringSlice // IP Version to use while resolving hostnames
 	ScanType          string                        // Scan Type
 	Proxy             string                        // Socks5 proxy
 	ProxyAuth         string                        // Socks5 proxy authentication (username:password)
@@ -118,7 +118,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.BoolVarP(&options.IncludeIPv6, "ipv6", "resolve-ipv6", false, "DNS names are also resolved to IPv6"),
+		flagSet.NormalizedStringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{}, "ip version to scan of hostname (4,6) - (default 4)"),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
@@ -136,7 +136,7 @@ func ParseOptions() *Options {
 		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping"),
 		// flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
 		// flagSet.StringSliceVarP(&options.STcpInitPingProbes, "probe-stcp-init", "py", []string{}, "SCTP INIT Ping"),
-		// flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping"),
+		flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping"),
 		flagSet.BoolVarP(&options.IcmpTimestampRequestProbe, "probe-icmp-timestamp", "pp", false, "ICMP timestamp request Ping"),
 		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping"),
 		// flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),

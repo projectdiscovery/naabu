@@ -13,7 +13,7 @@ require (
 	github.com/projectdiscovery/fileutil v0.0.0-20220626180823-b24f0847f8e6
 	github.com/projectdiscovery/goflags v0.0.8-0.20220610065908-6a16a6bc848c
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/iputil v0.0.0-20220613112553-9b6873b2c619
+	github.com/projectdiscovery/iputil v0.0.0-20220625072148-037479960416
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
@@ -22,21 +22,22 @@ require (
 )
 
 require (
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
-	github.com/projectdiscovery/ipranger v0.0.3-0.20220617101104-3edc1ac3579e
+	github.com/projectdiscovery/ipranger v0.0.3-0.20220625072544-7bb47e7c1809
 	github.com/projectdiscovery/mapcidr v1.0.0
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
-	github.com/projectdiscovery/sliceutil v0.0.0-20220611084746-f38f8821a68a
+	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.0-20220422150559-b54fb5dc6833
 	github.com/projectdiscovery/uncover v0.0.5
-	github.com/stretchr/testify v1.7.5
+	github.com/stretchr/testify v1.8.0
+	go.uber.org/multierr v1.8.0
 )
 
 require (
 	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d // indirect
 	github.com/cnf/structhash v0.0.0-20201127153200-e1b16c1ebc08 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/golang/snappy v0.0.4 // indirect

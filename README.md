@@ -77,6 +77,7 @@ OUTPUT:
 
 CONFIGURATION:
    -scan-all-ips, -sa     scan all the IP's associated with DNS record
+   -ip-version, -iv string[]      ip version to scan of hostname (4,6) - (default 4)
    -scan-type, -s string  type of port scan (SYN/CONNECT) (default "s")
    -source-ip string      source ip
    -interface-list, -il   list available interfaces and public ip
@@ -203,8 +204,50 @@ The speed can be controlled by changing the value of `rate` flag that represent 
 
 # IPv4 and IPv6
 
-Naabu supports both ipv4 and ipv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
-The option `-ipv6` makes the tool use IPv6 addresses while resolving domain names.
+Naabu supports both IPv4 and IPv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
+
+```console
+echo hackerone.com | dnsx -resp-only -a -aaaa -silent | naabu -p 80 -silent
+
+104.16.99.52:80
+104.16.100.52:80
+2606:4700::6810:6434:80
+2606:4700::6810:6334:80
+```
+
+The option `-ip-version 6` makes the tool use IPv6 addresses while resolving domain names.
+
+```console
+echo hackerone.com | ./naabu -p 80 -ip-version 6
+
+                  __
+  ___  ___  ___ _/ /  __ __
+ / _ \/ _ \/ _ \/ _ \/ // /
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.8
+
+      projectdiscovery.io
+
+Use with caution. You are responsible for your actions
+Developers assume no liability and are not responsible for any misuse or damage.
+[INF] Running CONNECT scan with non root privileges
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+```
+
+To scan all the IPs of both version, `ip-version 4,6` can be used along with `-scan-all-ips` flag.
+
+```console
+echo hackerone.com | ./naabu -iv 4,6 -sa -p 80 -silent
+
+[INF] Found 1 ports on host hackerone.com (104.16.100.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (104.16.99.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6434)
+hackerone.com:80
+```
 
 # Configuration file
 
