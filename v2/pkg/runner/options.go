@@ -2,6 +2,7 @@ package runner
 
 import (
 	"os"
+	"time"
 
 	"github.com/projectdiscovery/fileutil"
 
@@ -74,6 +75,8 @@ type Options struct {
 	ArpPing                   bool
 	IPv6NeighborDiscoveryPing bool
 	// HostDiscoveryIgnoreRST      bool - planned
+	InputReadTimeout time.Duration
+	DisableStdin     bool
 }
 
 // OnResultCallback (hostname, ip, ports)
@@ -140,6 +143,8 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping"),
 		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery"),
 		// flagSet.BoolVarP(&options.HostDiscoveryIgnoreRST, "discovery-ignore-rst", "irst", false, "Ignore RST packets during host discovery"),
+		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", time.Duration(3*time.Minute), "timeout on input read"),
+		flagSet.BoolVar(&options.DisableStdin, "no-stdin", false, "Disable Stdin processing"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -169,7 +174,7 @@ func ParseOptions() *Options {
 	}
 
 	// Check if stdin pipe was given
-	options.Stdin = fileutil.HasStdin()
+	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
 	// configure host discovery if necessary
 	options.configureHostDiscovery()
