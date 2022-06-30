@@ -10,6 +10,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -65,7 +66,8 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// targets from STDIN
 	if r.options.Stdin {
-		if _, err := io.Copy(tempInput, os.Stdin); err != nil {
+		timeoutReader := fileutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
+		if _, err := io.Copy(tempInput, timeoutReader); err != nil {
 			return "", err
 		}
 	}
