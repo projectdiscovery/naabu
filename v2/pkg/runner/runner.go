@@ -204,16 +204,12 @@ func (r *Runner) RunEnumeration() error {
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
 					r.limiter.Take()
-					if !shouldUseRawPackets {
+					if shouldUseRawPackets {
+						r.RawSocketEnumeration(ip, port)
+					} else {
 						r.wgscan.Add()
+						go r.handleHostPort(ip, port)
 					}
-					go func(ip string, port int) {
-						if shouldUseRawPackets {
-							r.RawSocketEnumeration(ip, port)
-						} else {
-							go r.handleHostPort(ip, port)
-						}
-					}(ip, port)
 				}
 			}
 		}
@@ -350,21 +346,16 @@ func (r *Runner) RunEnumeration() error {
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
-				if !shouldUseRawPackets {
-					r.wgscan.Add()
-				}
 				// connect scan
-				go func(port int) {
-					if shouldUseRawPackets {
-						r.RawSocketEnumeration(ip, port)
-					} else {
-
-						go r.handleHostPort(ip, port)
-					}
-					if r.options.EnableProgressBar {
-						r.stats.IncrementCounter("packets", 1)
-					}
-				}(port)
+				if shouldUseRawPackets {
+					r.RawSocketEnumeration(ip, port)
+				} else {
+					r.wgscan.Add()
+					go r.handleHostPort(ip, port)
+				}
+				if r.options.EnableProgressBar {
+					r.stats.IncrementCounter("packets", 1)
+				}
 			}
 
 			r.wgscan.Wait()
