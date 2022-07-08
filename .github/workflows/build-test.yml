@@ -33,9 +33,9 @@ jobs:
       - name: Test
         run: go test ./...
         working-directory: v2/
-        
+
       - name: Race Condition Tests
         run: |
-        go build -race .
-        go run -race . -host scanme.sh
-        working-directory: v2/cmd/naabu/
+          go build -race .
+          go run -race . -host scanme.sh
+          working-directory: v2/cmd/naabu/
