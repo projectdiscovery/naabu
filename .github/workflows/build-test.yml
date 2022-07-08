@@ -36,5 +36,6 @@ jobs:
 
       - name: Race Condition Tests
         run: |
-          go run -race . -host scanme.sh
+          go mod init
+          sudo go run -race . -host scanme.sh
           working-directory: v2/cmd/naabu/
