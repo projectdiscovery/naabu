@@ -17,7 +17,11 @@ func init() {
 
 // PingNdpRequestAsync asynchronous to the target ip address
 func PingNdpRequestAsync(s *Scanner, ip string) {
-	destAddr := &net.UDPAddr{IP: net.ParseIP(ip), Zone: s.NetworkInterface.Name}
+	var zoneName string
+	if s.NetworkInterface != nil {
+		zoneName = s.NetworkInterface.Name
+	}
+	destAddr := &net.UDPAddr{IP: net.ParseIP(ip), Zone: zoneName}
 	m := icmp.Message{
 		Type: ipv6.ICMPTypeEchoRequest,
 		Code: 0,

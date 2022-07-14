@@ -16,9 +16,14 @@ func init() {
 
 // ArpRequestAsync asynchronous to the target ip address
 func ArpRequestAsync(s *Scanner, ip string) {
+	srcAddr := net.HardwareAddr{}
+	if s.NetworkInterface != nil {
+		srcAddr = s.NetworkInterface.HardwareAddr
+	}
+	
 	// network layers
 	eth := layers.Ethernet{
-		SrcMAC:       s.NetworkInterface.HardwareAddr,
+		SrcMAC:       srcAddr,
 		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		EthernetType: layers.EthernetTypeARP,
 	}
@@ -28,7 +33,7 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		HwAddressSize:     6,
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
-		SourceHwAddress:   []byte(s.NetworkInterface.HardwareAddr),
+		SourceHwAddress:   []byte(srcAddr),
 		SourceProtAddress: s.SourceIP4.To4(),
 		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
 		DstProtAddress:    net.ParseIP(ip).To4(),
