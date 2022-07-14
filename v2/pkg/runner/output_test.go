@@ -13,7 +13,7 @@ func TestWriteHostOutput(t *testing.T) {
 	ports := map[int]struct{}{80: {}, 8080: {}}
 	var s string
 	buf := bytes.NewBufferString(s)
-	assert.Nil(t, WriteHostOutput(host, ports, buf))
+	assert.Nil(t, WriteHostOutput(host, ports,"", buf))
 	assert.Contains(t, buf.String(), "127.0.0.1:80")
 	assert.Contains(t, buf.String(), "127.0.0.1:8080")
 }
@@ -24,6 +24,6 @@ func TestWriteJSONOutput(t *testing.T) {
 	ports := map[int]struct{}{80: {}, 8080: {}}
 	var s string
 	buf := bytes.NewBufferString(s)
-	assert.Nil(t, WriteJSONOutput(host, ip, ports, buf))
+	assert.Nil(t, WriteJSONOutput(host, ip, ports,false, "", buf))
 	assert.Equal(t, 3, len(strings.Split(buf.String(), "\n")))
 }

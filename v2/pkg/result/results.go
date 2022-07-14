@@ -52,8 +52,8 @@ func (r *Result) IPHasPort(k string, v int) bool {
 	return hasport
 }
 
-// SetIP as seen
-func (r *Result) SetIP(ip string) {
+// AddIp adds an ip to the results
+func (r *Result) AddIp(ip string) {
 	r.Lock()
 	defer r.Unlock()
 
@@ -67,4 +67,15 @@ func (r *Result) HasIP(ip string) bool {
 
 	_, ok := r.IPS[ip]
 	return ok
+}
+
+func (r *Result) IsEmpty() bool {
+	return r.Len() == 0
+}
+
+func (r *Result) Len() int {
+	r.RLock()
+	defer r.RUnlock()
+
+	return len(r.IPS)
 }

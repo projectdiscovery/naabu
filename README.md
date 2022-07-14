@@ -34,9 +34,11 @@ all ports that return a reply.
 </h1>
 
  - Fast And Simple **SYN/CONNECT** probe based scanning
- - Passive Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
  - Optimized for ease of use and **lightweight** on resources
- - **Automatic IP deduplication for port scan**
+ - **Passive** Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
+ - **IPv6** Port scan (**experimental**)
+ - **Host Discovery** scan (**experimental**)
+ - **Automatic IP Deduplication** for DNS port scan
  - **NMAP** integration for service discovery
  - Multiple input support - **STDIN/HOST/IP/CIDR**
  - Multiple output format support - **JSON/TXT/STDOUT**
@@ -63,8 +65,9 @@ PORT:
    -port, -p string            ports to scan (80,443, 100-200
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
-   -ports-file, -pf string     list of ports to exclude from scan (file)
+   -ports-file, -pf string     list of ports to scan (file)
    -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
+   -display-cdn, -cdn          display cdn in use
 
 RATE-LIMIT:
    -c int     general internal worker threads (default 25)
@@ -76,18 +79,32 @@ OUTPUT:
    -csv                write output in csv format
 
 CONFIGURATION:
-   -scan-all-ips, -sa     scan all the IP's associated with DNS record
-   -scan-type, -s string  type of port scan (SYN/CONNECT) (default "s")
-   -source-ip string      source ip
-   -interface-list, -il   list available interfaces and public ip
-   -interface, -i string  network Interface to use for port scan
-   -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
-   -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
-   -r string              list of custom resolver dns resolution (comma separated or from file)
-   -proxy string          socks5 proxy
-   -resume                resume scan using resume.cfg
-   -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
-   -passive               display passive open ports using shodan internetdb api
+   -scan-all-ips, -sa                  scan all the IP's associated with DNS record
+   -ip-version, -iv string[]           ip version to scan of hostname (4,6) - (default 4)
+   -scan-type, -s string               type of port scan (SYN/CONNECT) (default "s")
+   -source-ip string                   source ip and port (x.x.x.x:yyy)
+   -interface-list, -il                list available interfaces and public ip
+   -interface, -i string               network Interface to use for port scan
+   -nmap                               invoke nmap scan on targets (nmap must be installed) - Deprecated
+   -nmap-cli string                    nmap command to run on found results (example: -nmap-cli 'nmap -sV')
+   -r string                           list of custom resolver dns resolution (comma separated or from file)
+   -proxy string                       socks5 proxy (ip[:port] / fqdn[:port]
+   -proxy-auth string                  socks5 proxy authentication (username:password)
+   -resume                             resume scan using resume.cfg
+   -stream                             stream mode (disables resume, nmap, verify, retries, shuffling, etc)
+   -passive                            display passive open ports using shodan internetdb api
+   -irt, -input-read-timeout duration  timeout on input read (default 3m0s)
+   -no-stdin                           Disable Stdin processing
+
+HOST-DISCOVERY:
+   -sn, -host-discvoery           Run Host Discovery scan
+   -ps, -probe-tcp-syn string[]   TCP SYN Ping
+   -pa, -probe-tcp-ack string[]   TCP ACK Ping
+   -pe, -probe-icmp-echo          ICMP echo request Ping
+   -pp, -probe-icmp-timestamp     ICMP timestamp request Ping
+   -pm, -probe-icmp-address-mask  ICMP address mask request Ping
+   -arp, -arp-ping                ARP ping
+   -nd, -nd-ping                  IPv6 Neighbor Discovery
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -97,6 +114,7 @@ OPTIMIZATION:
    -verify            validate the ports again with TCP verification
 
 DEBUG:
+   -health-check, -hc        run diagnostic check up
    -debug                    display debugging information
    -verbose, -v              display verbose output
    -no-color, -nc            disable colors in CLI output
@@ -199,6 +217,53 @@ http://hackerone.com:80
 ```
 
 The speed can be controlled by changing the value of `rate` flag that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
+
+# IPv4 and IPv6
+
+Naabu supports both IPv4 and IPv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
+
+```console
+echo hackerone.com | dnsx -resp-only -a -aaaa -silent | naabu -p 80 -silent
+
+104.16.99.52:80
+104.16.100.52:80
+2606:4700::6810:6434:80
+2606:4700::6810:6334:80
+```
+
+The option `-ip-version 6` makes the tool use IPv6 addresses while resolving domain names.
+
+```console
+echo hackerone.com | ./naabu -p 80 -ip-version 6
+
+                  __
+  ___  ___  ___ _/ /  __ __
+ / _ \/ _ \/ _ \/ _ \/ // /
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.8
+
+      projectdiscovery.io
+
+Use with caution. You are responsible for your actions
+Developers assume no liability and are not responsible for any misuse or damage.
+[INF] Running CONNECT scan with non root privileges
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+```
+
+To scan all the IPs of both version, `ip-version 4,6` can be used along with `-scan-all-ips` flag.
+
+```console
+echo hackerone.com | ./naabu -iv 4,6 -sa -p 80 -silent
+
+[INF] Found 1 ports on host hackerone.com (104.16.100.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (104.16.99.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6434)
+hackerone.com:80
+```
 
 # Configuration file
 

@@ -20,7 +20,7 @@ jobs:
       - name: Install Dependences
         run: brew install libpcap
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
           args: release -f .goreleaser/mac.yml --rm-dist
@@ -43,7 +43,7 @@ jobs:
         run: sudo apt install libpcap-dev
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
           args: release -f .goreleaser/linux.yml --rm-dist
@@ -63,7 +63,7 @@ jobs:
         with:
           go-version: 1.18
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v2
+        uses: goreleaser/goreleaser-action@v3
         with:
           version: latest
           args: release -f .goreleaser/windows.yml --rm-dist
