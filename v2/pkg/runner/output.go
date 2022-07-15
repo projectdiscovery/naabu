@@ -55,11 +55,11 @@ func (r *Result) CSVFields() ([]string, error) {
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, ports map[int]struct{}, cdnName string, writer io.Writer) error {
+func WriteHostOutput(host string, ports []int, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
 
-	for port := range ports {
+	for _, port := range ports {
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(port))
@@ -79,7 +79,7 @@ func WriteHostOutput(host string, ports map[int]struct{}, cdnName string, writer
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnName string, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports []int, isCdn bool, cdnName string, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 	data := Result{TimeStamp: time.Now().UTC()}
 	if host != ip {
@@ -88,7 +88,7 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnNam
 	data.IP = ip
 	data.IsCDNIP = isCdn
 	data.CDNName = cdnName
-	for port := range ports {
+	for _, port := range ports {
 		data.Port = port
 		err := encoder.Encode(&data)
 		if err != nil {
@@ -99,7 +99,7 @@ func WriteJSONOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnNam
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []int, isCdn bool, cdnName string, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{TimeStamp: time.Now().UTC()}
 	if header {
@@ -111,7 +111,7 @@ func WriteCsvOutput(host, ip string, ports map[int]struct{}, isCdn bool, cdnName
 	data.IP = ip
 	data.IsCDNIP = isCdn
 	data.CDNName = cdnName
-	for port := range ports {
+	for _, port := range ports {
 		data.Port = port
 		writeCSVRow(data, encoder)
 	}
