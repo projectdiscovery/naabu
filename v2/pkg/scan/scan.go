@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/gopacket"
@@ -45,6 +46,25 @@ const (
 	Done
 	Guard
 )
+
+type Phase struct {
+	sync.RWMutex
+	State
+}
+
+func (phase *Phase) Is(state State) bool {
+	phase.RLock()
+	defer phase.RUnlock()
+
+	return phase.State == state
+}
+
+func (phase *Phase) Set(state State) {
+	phase.Lock()
+	defer phase.Unlock()
+
+	phase.State = state
+}
 
 // PkgFlag represent the TCP packet flag
 type PkgFlag int
@@ -89,7 +109,7 @@ type Scanner struct {
 	ethernetPacketSend   chan *PkgSend
 	tcpChan              chan *PkgResult
 	hostDiscoveryChan    chan *PkgResult
-	State                State
+	Phase                Phase
 	HostDiscoveryResults *result.Result
 	ScanResults          *result.Result
 	NetworkInterface     *net.Interface
@@ -231,7 +251,7 @@ func (s *Scanner) TCPReadWorker() {
 	defer s.tcpPacketlistener4.Close()
 	data := make([]byte, 4096)
 	for {
-		if s.State == Done {
+		if s.Phase.Is(Done) {
 			break
 		}
 		// nolint:errcheck // just empty the buffer
@@ -310,7 +330,7 @@ func (s *Scanner) ICMPReadWorker4() {
 
 	data := make([]byte, 1500)
 	for {
-		if s.State == Done {
+		if s.Phase.Is(Done) {
 			break
 		}
 		n, addr, err := s.icmpPacketListener4.ReadFrom(data)
@@ -318,7 +338,7 @@ func (s *Scanner) ICMPReadWorker4() {
 			continue
 		}
 
-		if s.State == Guard {
+		if s.Phase.Is(Guard) {
 			continue
 		}
 
@@ -339,7 +359,7 @@ func (s *Scanner) ICMPReadWorker6() {
 
 	data := make([]byte, 1500)
 	for {
-		if s.State == Done {
+		if s.Phase.Is(Done) {
 			break
 		}
 		n, addr, err := s.icmpPacketListener6.ReadFrom(data)
@@ -347,7 +367,7 @@ func (s *Scanner) ICMPReadWorker6() {
 			continue
 		}
 
-		if s.State == Guard {
+		if s.Phase.Is(Guard) {
 			continue
 		}
 
@@ -375,7 +395,7 @@ func (s *Scanner) ICMPReadWorker6() {
 // ICMPResultWorker handles ICMP responses (used only during probes)
 func (s *Scanner) ICMPResultWorker() {
 	for ip := range s.hostDiscoveryChan {
-		if s.State == HostDiscovery {
+		if s.Phase.Is(HostDiscovery) {
 			gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ip)
 			s.HostDiscoveryResults.AddIp(ip.ip)
 		}
@@ -385,10 +405,10 @@ func (s *Scanner) ICMPResultWorker() {
 // TCPResultWorker handles probes and scan results
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
-		if s.State == HostDiscovery {
+		if s.Phase.Is(HostDiscovery) {
 			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
 			s.HostDiscoveryResults.AddIp(ip.ip)
-		} else if s.State == Scan || s.stream {
+		} else if s.Phase.Is(Scan) || s.stream {
 			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}

@@ -164,7 +164,7 @@ func (r *Runner) RunEnumeration() error {
 	case r.options.HostDiscovery:
 		// perform host discovery
 		showNetworkCapabilities(r.options)
-		r.scanner.State = scan.HostDiscovery
+		r.scanner.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
 		_, targetsV4, targetsv6, err := r.GetTargetIps()
 		if err != nil {
@@ -195,7 +195,7 @@ func (r *Runner) RunEnumeration() error {
 
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
@@ -220,7 +220,7 @@ func (r *Runner) RunEnumeration() error {
 		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
@@ -289,7 +289,7 @@ func (r *Runner) RunEnumeration() error {
 		}
 		portsCount = uint64(len(r.scanner.Ports))
 
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		Range := targetsCount * portsCount
 		if r.options.EnableProgressBar {
 			r.stats.AddStatic("ports", portsCount)
@@ -375,7 +375,7 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		r.scanner.State = scan.Done
+		r.scanner.Phase.Set(scan.Done)
 
 		// Validate the hosts if the user has asked for second step validation
 		if r.options.Verify {
@@ -446,7 +446,7 @@ func (r *Runner) PickPort(index int) int {
 }
 
 func (r *Runner) ConnectVerification() {
-	r.scanner.State = scan.Scan
+	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(r.options.Rate)
 
