@@ -203,7 +203,6 @@ func (r *Runner) RunEnumeration() error {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
-					r.limiter.Take()
 					if shouldUseRawPackets {
 						r.RawSocketEnumeration(ip, port)
 					} else {
