@@ -64,3 +64,27 @@ jobs:
         run: |
           sudo go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: 1.18
+
+      - name: Check out code
+        uses: actions/checkout@v3
+
+      - name: Build
+        run: go build .
+        working-directory: v2/cmd/naabu/
+
+      - name: Test
+        run: go test ./...
+        working-directory: v2/
+
+      - name: Race Condition Tests
+        run: |
+          sudo go run -race . -host scanme.sh
+        working-directory: v2/cmd/naabu/
