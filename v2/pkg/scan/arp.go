@@ -3,6 +3,7 @@
 package scan
 
 import (
+	"errors"
 	"net"
 
 	"github.com/google/gopacket"
@@ -16,14 +17,17 @@ func init() {
 
 // ArpRequestAsync asynchronous to the target ip address
 func ArpRequestAsync(s *Scanner, ip string) {
-	srcAddr := net.HardwareAddr{}
-	if s.NetworkInterface != nil {
-		srcAddr = s.NetworkInterface.HardwareAddr
+	networkInterface, _, _, err := s.Router.Route(net.ParseIP(ip))
+	if networkInterface == nil {
+		err = errors.New("Could not send ARP Request packet to " + ip + ": no interface with outbound source found")
 	}
-	
+	if err != nil {
+		gologger.Debug().Msgf("%s\n", err)
+		return
+	}
 	// network layers
 	eth := layers.Ethernet{
-		SrcMAC:       srcAddr,
+		SrcMAC:       networkInterface.HardwareAddr,
 		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		EthernetType: layers.EthernetTypeARP,
 	}
@@ -33,7 +37,7 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		HwAddressSize:     6,
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
-		SourceHwAddress:   []byte(srcAddr),
+		SourceHwAddress:   []byte(networkInterface.HardwareAddr),
 		SourceProtAddress: s.SourceIP4.To4(),
 		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
 		DstProtAddress:    net.ParseIP(ip).To4(),
@@ -46,7 +50,7 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		ComputeChecksums: true,
 	}
 
-	err := gopacket.SerializeLayers(buf, opts, &eth, &arp)
+	err = gopacket.SerializeLayers(buf, opts, &eth, &arp)
 	if err != nil {
 		gologger.Warning().Msgf("%s\n", err)
 		return
