@@ -17,7 +17,7 @@ func init() {
 
 // ArpRequestAsync asynchronous to the target ip address
 func ArpRequestAsync(s *Scanner, ip string) {
-	networkInterface, _, _, err := s.Router.Route(net.ParseIP(ip))
+	networkInterface, _, sourceIP, err := s.Router.Route(net.ParseIP(ip))
 	if networkInterface == nil {
 		err = errors.New("Could not send ARP Request packet to " + ip + ": no interface with outbound source found")
 	}
@@ -38,7 +38,7 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		ProtAddressSize:   4,
 		Operation:         layers.ARPRequest,
 		SourceHwAddress:   []byte(networkInterface.HardwareAddr),
-		SourceProtAddress: s.SourceIP4.To4(),
+		SourceProtAddress: sourceIP.To4(),
 		DstHwAddress:      []byte{0, 0, 0, 0, 0, 0},
 		DstProtAddress:    net.ParseIP(ip).To4(),
 	}
