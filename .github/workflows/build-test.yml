@@ -87,5 +87,5 @@ jobs:
       - name: Race Condition Tests
         # Known issue: https://github.com/golang/go/issues/46099
         run: |
-          go run -race . -host scanme.sh
+          # go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
