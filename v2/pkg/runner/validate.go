@@ -115,6 +115,18 @@ func (options *Options) validateOptions() error {
 	if len(options.IPVersion) > 0 && !sliceutil.ContainsItems([]string{"4", "6"}, options.IPVersion) {
 		return errors.New("IP Version must be 4 and/or 6")
 	}
+	// Return error if any host disocvery releated options are provided but host discovery is not enabled
+	if (!options.HostDiscovery) &&
+		(len(options.TcpSynPingProbes) > 0 ||
+			len(options.TcpAckPingProbes) > 0 ||
+			options.IcmpEchoRequestProbe ||
+			options.IcmpTimestampRequestProbe ||
+			options.IcmpAddressMaskRequestProbe ||
+			options.ArpPing ||
+			options.IPv6NeighborDiscoveryPing) {
+		return errors.New("host discovery should be enabled (using -sn) for host discovery related options to work")
+	}
+
 	// Host Discovery mode needs provileged access
 	if options.HostDiscovery && !privileges.IsPrivileged {
 		return errors.New("Host Discovery needs privileged access to manipulate raw packets")
