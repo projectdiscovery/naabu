@@ -1,4 +1,4 @@
-FROM golang:1.18.3-alpine AS builder
+FROM golang:1.18.4-alpine AS builder
 RUN apk add build-base libpcap-dev
 RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 
