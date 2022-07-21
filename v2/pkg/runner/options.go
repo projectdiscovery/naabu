@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -79,8 +80,8 @@ type Options struct {
 	DisableStdin     bool
 }
 
-// OnResultCallback (hostname, ip, ports)
-type OnResultCallback func(string, string, []int)
+// OnResultCallback (hostResult)
+type OnResultCallback func(*result.HostResult)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {

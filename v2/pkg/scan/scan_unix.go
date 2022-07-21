@@ -202,7 +202,7 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 							// We consider only incoming packets
 							if tcp.DstPort != layers.TCPPort(s.SourcePort) {
 								continue
-							} else if s.State == HostDiscovery {
+							} else if s.Phase.Is(HostDiscovery) {
 								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
 							} else if tcp.SYN && tcp.ACK {
 								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}

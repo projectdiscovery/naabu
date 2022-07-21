@@ -5,8 +5,8 @@ package routing
 import (
 	"bufio"
 	"bytes"
-	"fmt"
 	"net"
+	"os/exec"
 	"strconv"
 	"strings"
 
@@ -21,7 +21,7 @@ func New() (Router, error) {
 
 	for _, iptype := range []RouteType{IPv4, IPv6} {
 		netshCmd := exec.Command("netsh", "interface", iptype.String(), "show", "route")
-		netstatOutput, err := netshCmd.Output()
+		netshOutput, err := netshCmd.Output()
 		if err != nil {
 			return nil, err
 		}
