@@ -62,7 +62,7 @@ INPUT:
    -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            ports to scan (80,443, 100-200
+   -port, -p string            ports to scan (80,443, 100-200)
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
    -ports-file, -pf string     list of ports to scan (file)
