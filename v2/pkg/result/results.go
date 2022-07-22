@@ -1,19 +1,79 @@
 package result
 
-import "sync"
+import (
+	"sync"
+
+	"github.com/projectdiscovery/naabu/v2/pkg/utils"
+)
+
+type HostResult struct {
+	Host  string
+	IP    string
+	Ports []int
+}
 
 // Result of the scan
 type Result struct {
 	sync.RWMutex
-	IPPorts map[string]map[int]struct{}
-	IPS     map[string]struct{}
+	ipPorts map[string]map[int]struct{}
+	ips     map[string]struct{}
 }
 
 // NewResult structure
 func NewResult() *Result {
 	ipPorts := make(map[string]map[int]struct{})
 	ips := make(map[string]struct{})
-	return &Result{IPPorts: ipPorts, IPS: ips}
+	return &Result{ipPorts: ipPorts, ips: ips}
+}
+
+// AddPort to a specific ip
+func (r *Result) GetIPs() chan string {
+	r.Lock()
+
+	out := make(chan string)
+
+	go func() {
+		defer close(out)
+		defer r.Unlock()
+
+		for ip := range r.ips {
+			out <- ip
+		}
+	}()
+
+	return out
+}
+
+func (r *Result) HasIPS() bool {
+	r.RLock()
+	defer r.RUnlock()
+
+	return len(r.ips) > 0
+}
+
+// AddPort to a specific ip
+func (r *Result) GetIPsPorts() chan *HostResult {
+	r.RLock()
+
+	out := make(chan *HostResult)
+
+	go func() {
+		defer close(out)
+		defer r.RUnlock()
+
+		for ip, ports := range r.ipPorts {
+			out <- &HostResult{IP: ip, Ports: utils.MapKeysToSliceInt(ports)}
+		}
+	}()
+
+	return out
+}
+
+func (r *Result) HasIPsPorts() bool {
+	r.RLock()
+	defer r.RUnlock()
+
+	return len(r.ipPorts) > 0
 }
 
 // AddPort to a specific ip
@@ -21,21 +81,27 @@ func (r *Result) AddPort(k string, v int) {
 	r.Lock()
 	defer r.Unlock()
 
-	if _, ok := r.IPPorts[k]; !ok {
-		r.IPPorts[k] = make(map[int]struct{})
+	if _, ok := r.ipPorts[k]; !ok {
+		r.ipPorts[k] = make(map[int]struct{})
 	}
 
-	r.IPPorts[k][v] = struct{}{}
-	r.IPS[k] = struct{}{}
+	r.ipPorts[k][v] = struct{}{}
+	r.ips[k] = struct{}{}
 }
 
 // SetPorts for a specific ip
-func (r *Result) SetPorts(k string, v map[int]struct{}) {
+func (r *Result) SetPorts(ip string, ports []int) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.IPPorts[k] = v
-	r.IPS[k] = struct{}{}
+	if _, ok := r.ipPorts[ip]; !ok {
+		r.ipPorts[ip] = make(map[int]struct{})
+	}
+
+	for _, port := range ports {
+		r.ipPorts[ip][port] = struct{}{}
+	}
+	r.ips[ip] = struct{}{}
 }
 
 // IPHasPort checks if an ip has a specific port
@@ -43,7 +109,7 @@ func (r *Result) IPHasPort(k string, v int) bool {
 	r.RLock()
 	defer r.RUnlock()
 
-	vv, hasports := r.IPPorts[k]
+	vv, hasports := r.ipPorts[k]
 	if !hasports {
 		return false
 	}
@@ -52,12 +118,12 @@ func (r *Result) IPHasPort(k string, v int) bool {
 	return hasport
 }
 
-// SetIP as seen
-func (r *Result) SetIP(ip string) {
+// AddIp adds an ip to the results
+func (r *Result) AddIp(ip string) {
 	r.Lock()
 	defer r.Unlock()
 
-	r.IPS[ip] = struct{}{}
+	r.ips[ip] = struct{}{}
 }
 
 // HasIP checks if an ip has been seen
@@ -65,6 +131,17 @@ func (r *Result) HasIP(ip string) bool {
 	r.RLock()
 	defer r.RUnlock()
 
-	_, ok := r.IPS[ip]
+	_, ok := r.ips[ip]
 	return ok
+}
+
+func (r *Result) IsEmpty() bool {
+	return r.Len() == 0
+}
+
+func (r *Result) Len() int {
+	r.RLock()
+	defer r.RUnlock()
+
+	return len(r.ips)
 }

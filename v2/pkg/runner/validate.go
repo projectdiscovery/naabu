@@ -8,7 +8,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
+	"github.com/projectdiscovery/sliceutil"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
@@ -98,6 +100,38 @@ func (options *Options) validateOptions() error {
 		return errors.New("verify not supported in stream active mode")
 	}
 
+	// Parse and validate source ip and source port
+	// checks if source ip is ip only
+	isOnlyIP := iputil.IsIP(options.SourceIP)
+	if options.SourceIP != "" && !isOnlyIP {
+		ip, port, err := net.SplitHostPort(options.SourceIP)
+		if err != nil {
+			return err
+		}
+		options.SourceIP = ip
+		options.SourcePort = port
+	}
+
+	if len(options.IPVersion) > 0 && !sliceutil.ContainsItems([]string{"4", "6"}, options.IPVersion) {
+		return errors.New("IP Version must be 4 and/or 6")
+	}
+	// Return error if any host disocvery releated options are provided but host discovery is not enabled
+	if (!options.HostDiscovery) &&
+		(len(options.TcpSynPingProbes) > 0 ||
+			len(options.TcpAckPingProbes) > 0 ||
+			options.IcmpEchoRequestProbe ||
+			options.IcmpTimestampRequestProbe ||
+			options.IcmpAddressMaskRequestProbe ||
+			options.ArpPing ||
+			options.IPv6NeighborDiscoveryPing) {
+		return errors.New("missing host discovery option (-sn)")
+	}
+
+	// Host Discovery mode needs provileged access
+	if options.HostDiscovery && !privileges.IsPrivileged {
+		return errors.New("sudo access required to perform host discovery")
+	}
+
 	return nil
 }
 
@@ -112,5 +146,24 @@ func (options *Options) configureOutput() {
 	}
 	if options.Silent {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
+	}
+}
+
+// configureHostDiscovery enables default probes if none is specified
+// but host discovery option was requested
+func (options *Options) configureHostDiscovery() {
+	hasProbes := options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
+		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
+		len(options.TcpAckPingProbes) > 0
+	if options.HostDiscovery && !hasProbes {
+		// if no options were defined enable
+		// - ICMP Echo Request
+		// - ICMP timestamp
+		// - TCP SYN on port 80
+		// - TCP ACK on port 443
+		options.IcmpEchoRequestProbe = true
+		options.IcmpTimestampRequestProbe = true
+		options.TcpSynPingProbes = append(options.TcpSynPingProbes, "80")
+		options.TcpAckPingProbes = append(options.TcpAckPingProbes, "443")
 	}
 }

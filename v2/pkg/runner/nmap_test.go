@@ -17,9 +17,8 @@ func TestHandleNmap(t *testing.T) {
 	r.scanner = &scan.Scanner{}
 	r.scanner.ScanResults = res
 	assert.Nil(t, r.handleNmap())
-	r.scanner.ScanResults.IPPorts = make(map[string]map[int]struct{})
 	// nmap syntax error (this test might fail if nmap is not installed on the box)
 	assert.Nil(t, r.handleNmap())
-	r.scanner.ScanResults.IPPorts = map[string]map[int]struct{}{"127.0.0.1": {8080: struct{}{}}}
+	r.scanner.ScanResults.SetPorts("127.0.0.1", []int{8080})
 	assert.Nil(t, r.handleNmap())
 }

@@ -6,11 +6,12 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"net"
 	"os"
 	"strings"
 
+	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -18,7 +19,7 @@ import (
 )
 
 func (r *Runner) Load() error {
-	r.scanner.State = scan.Init
+	r.scanner.Phase.Set(scan.Init)
 
 	// merge all target sources into a file
 	targetfile, err := r.mergeToFile()
@@ -65,7 +66,8 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// targets from STDIN
 	if r.options.Stdin {
-		if _, err := io.Copy(tempInput, os.Stdin); err != nil {
+		timeoutReader := fileutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
+		if _, err := io.Copy(tempInput, timeoutReader); err != nil {
 			return "", err
 		}
 	}
@@ -108,13 +110,18 @@ func (r *Runner) AddTarget(target string) error {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
-	} else if ipranger.IsCidr(target) {
+	} else if iputil.IsCIDR(target) {
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
-	} else if ipranger.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+	} else if iputil.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+		ip := net.ParseIP(target)
+		// convert ip4 expressed as ip6 back to ip4
+		if ip.To4() != nil {
+			target = ip.To4().String()
+		}
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
@@ -138,16 +145,17 @@ func (r *Runner) AddTarget(target string) error {
 }
 
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
-	ips, err := r.host2ips(target)
+	ipsV4, ipsV6, err := r.host2ips(target)
 	if err != nil {
 		return []string{}, err
 	}
 
 	var (
-		initialHosts []string
-		hostIPS      []string
+		initialHosts   []string
+		initialHostsV6 []string
+		hostIPS        []string
 	)
-	for _, ip := range ips {
+	for _, ip := range ipsV4 {
 		if !r.scanner.IPRanger.Np.ValidateAddress(ip) {
 			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
 			continue
@@ -155,8 +163,15 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 
 		initialHosts = append(initialHosts, ip)
 	}
+	for _, ip := range ipsV6 {
+		if !r.scanner.IPRanger.Np.ValidateAddress(ip) {
+			gologger.Warning().Msgf("Skipping host %s as ip %s was excluded\n", target, ip)
+			continue
+		}
 
-	if len(initialHosts) == 0 {
+		initialHostsV6 = append(initialHostsV6, ip)
+	}
+	if len(initialHosts) == 0 && len(initialHostsV6) == 0 {
 		return []string{}, nil
 	}
 
@@ -185,9 +200,14 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 		gologger.Info().Msgf("Fastest host found for target: %s (%s)\n", fastestHost.Host, fastestHost.Latency)
 		hostIPS = append(hostIPS, fastestHost.Host)
 	} else if r.options.ScanAllIPS {
-		hostIPS = initialHosts
+		hostIPS = append(initialHosts, initialHostsV6...)
 	} else {
-		hostIPS = append(hostIPS, initialHosts[0])
+		if len(initialHosts) > 0 {
+			hostIPS = append(hostIPS, initialHosts[0])
+		}
+		if len(initialHostsV6) > 0 {
+			hostIPS = append(hostIPS, initialHostsV6[0])
+		}
 	}
 
 	for _, hostIP := range hostIPS {
@@ -197,6 +217,5 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
-
 	return hostIPS, nil
 }

@@ -26,7 +26,7 @@ func TestConnectVerify(t *testing.T) {
 
 	s, err := NewScanner(&Options{})
 	assert.Nil(t, err)
-	wanted := map[int]struct{}{17895: {}}
-	got := s.ConnectVerify("localhost", map[int]struct{}{17895: {}, 17896: {}})
+	wanted := []int{17895}
+	got := s.ConnectVerify("localhost", []int{17895, 17896})
 	assert.EqualValues(t, wanted, got)
 }
