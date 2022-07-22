@@ -124,12 +124,12 @@ func (options *Options) validateOptions() error {
 			options.IcmpAddressMaskRequestProbe ||
 			options.ArpPing ||
 			options.IPv6NeighborDiscoveryPing) {
-		return errors.New("host discovery should be enabled (using -sn) for host discovery related options to work")
+		return errors.New("missing host discovery option (-sn)")
 	}
 
 	// Host Discovery mode needs provileged access
 	if options.HostDiscovery && !privileges.IsPrivileged {
-		return errors.New("Host Discovery needs privileged access to manipulate raw packets")
+		return errors.New("sudo access required to perform host discovery")
 	}
 
 	return nil
