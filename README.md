@@ -29,16 +29,17 @@ all ports that return a reply.
 # Features
 
 <h1 align="center">
-  <img src="static/naabu-run.png" alt="naabu" width="700px">
+  <img src="https://user-images.githubusercontent.com/8293321/180417395-25b1b990-c032-4b5c-9b66-03b58db0789a.png" alt="naabu" width="700px">
   <br>
 </h1>
 
  - Fast And Simple **SYN/CONNECT** probe based scanning
  - Optimized for ease of use and **lightweight** on resources
- - **Passive** Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
- - **IPv6** Port scan (**experimental**)
- - **Host Discovery** scan (**experimental**)
+ - **DNS** Port scan
  - **Automatic IP Deduplication** for DNS port scan
+ - **IPv4/IPv6** Port scan (**experimental**)
+ - **Passive** Port enumeration using Shodan [Internetdb](https://internetdb.shodan.io)
+ - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
  - Multiple input support - **STDIN/HOST/IP/CIDR**
  - Multiple output format support - **JSON/TXT/STDOUT**
@@ -97,14 +98,14 @@ CONFIGURATION:
    -no-stdin                           Disable Stdin processing
 
 HOST-DISCOVERY:
-   -sn, -host-discvoery           Run Host Discovery scan
-   -ps, -probe-tcp-syn string[]   TCP SYN Ping
-   -pa, -probe-tcp-ack string[]   TCP ACK Ping
-   -pe, -probe-icmp-echo          ICMP echo request Ping
-   -pp, -probe-icmp-timestamp     ICMP timestamp request Ping
-   -pm, -probe-icmp-address-mask  ICMP address mask request Ping
-   -arp, -arp-ping                ARP ping
-   -nd, -nd-ping                  IPv6 Neighbor Discovery
+   -sn, -host-discovery           Run Host Discovery scan
+   -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
+   -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
+   -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)
+   -pp, -probe-icmp-timestamp     ICMP timestamp request Ping (host discovery needs to be enabled)
+   -pm, -probe-icmp-address-mask  ICMP address mask request Ping (host discovery needs to be enabled)
+   -arp, -arp-ping                ARP ping (host discovery needs to be enabled)
+   -nd, -nd-ping                  IPv6 Neighbor Discovery (host discovery needs to be enabled)
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -128,13 +129,14 @@ DEBUG:
 
 Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
-Before installing naabu, make sure to install `libpcap` library:
+## Prerequisite
 
-```sh
-sudo apt install -y libpcap-dev
-```
+> **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-Installing Naabu:
+To install libcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `sudo brew install libpcap`
+
+
+## Installing Naabu
 
 ```sh
 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
@@ -265,6 +267,20 @@ hackerone.com:80
 hackerone.com:80
 ```
 
+# Host Discovery
+
+Naabu optionally supports multiple options to perform host discovery, as outlined below. `-sn` flag is required to perform host discovery; when used, host discovery is performed using multiple methods selected internally; one can also specify the desired method to perform host discovery by specifying available options.
+
+Available options to perform host discovery:
+
+- **ARP** ping (`-arp`)
+- TCP **SYN** ping (`-ps 80`)
+- TCP **ACK** ping (`-ps 443`)
+- ICMP **echo** ping (`-pe`)
+- ICMP **timestamp** ping (`-pp`)
+- ICMP **address mask** ping (`-pm`)
+- IPv6 **neighbor discovery** (`-nd`)
+
 # Configuration file
 
 Naabu supports config file as default located at `$HOME/.config/naabu/config.yaml`, It allows you to define any flag in the config file and set default values to include for all scans.
@@ -313,10 +329,15 @@ Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
-# 📋 Notes
+# Notes
+
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
 - We suggest tuning the flags / rate if running naabu from local system.
 - For best results, run naabu as **root** user.
 
-`naabu` is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
+-----
+
+Naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. 
+
+See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
