@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 )
 
 func (r *Runner) handleNmap() error {
@@ -17,18 +18,10 @@ func (r *Runner) handleNmap() error {
 	command := r.options.NmapCLI
 	hasCLI := r.options.NmapCLI != ""
 	if hasCLI {
-		type IpPorts struct {
-			IP    string
-			Ports []int
-		}
-		var ipsPorts []*IpPorts
+		var ipsPorts []*result.HostResult
 		// build a list of all targets
-		for ip, ports := range r.scanner.ScanResults.IPPorts {
-			var portsList []int
-			for port := range ports {
-				portsList = append(portsList, port)
-			}
-			ipsPorts = append(ipsPorts, &IpPorts{IP: ip, Ports: portsList})
+		for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+			ipsPorts = append(ipsPorts, hostResult)
 		}
 
 		// sort by number of ports
@@ -41,7 +34,7 @@ func (r *Runner) handleNmap() error {
 		// 100 - 1000 ports
 		// 1000 - 10000 ports
 		// 10000 - 60000 ports
-		ranges := make(map[int][]*IpPorts) // for better readability
+		ranges := make(map[int][]*result.HostResult) // for better readability
 		// collect the indexes corresponding to ranges changes
 		for _, ipPorts := range ipsPorts {
 			length := len(ipPorts.Ports)

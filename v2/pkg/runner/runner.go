@@ -164,7 +164,7 @@ func (r *Runner) RunEnumeration() error {
 	case r.options.HostDiscovery:
 		// perform host discovery
 		showNetworkCapabilities(r.options)
-		r.scanner.State = scan.HostDiscovery
+		r.scanner.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
 		_, targetsV4, targetsv6, err := r.GetTargetIps()
 		if err != nil {
@@ -195,7 +195,7 @@ func (r *Runner) RunEnumeration() error {
 
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
@@ -219,7 +219,7 @@ func (r *Runner) RunEnumeration() error {
 		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
@@ -288,7 +288,7 @@ func (r *Runner) RunEnumeration() error {
 		}
 		portsCount = uint64(len(r.scanner.Ports))
 
-		r.scanner.State = scan.Scan
+		r.scanner.Phase.Set(scan.Scan)
 		Range := targetsCount * portsCount
 		if r.options.EnableProgressBar {
 			r.stats.AddStatic("ports", portsCount)
@@ -374,7 +374,7 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		r.scanner.State = scan.Done
+		r.scanner.Phase.Set(scan.Done)
 
 		// Validate the hosts if the user has asked for second step validation
 		if r.options.Verify {
@@ -445,19 +445,23 @@ func (r *Runner) PickPort(index int) int {
 }
 
 func (r *Runner) ConnectVerification() {
-	r.scanner.State = scan.Scan
+	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(r.options.Rate)
 
-	for host, ports := range r.scanner.ScanResults.IPPorts {
+	verifiedResult := result.NewResult()
+
+	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
 		limiter.Take()
 		swg.Add(1)
-		go func(host string, ports map[int]struct{}) {
+		go func(hostResult *result.HostResult) {
 			defer swg.Done()
-			results := r.scanner.ConnectVerify(host, ports)
-			r.scanner.ScanResults.SetPorts(host, results)
-		}(host, ports)
+			results := r.scanner.ConnectVerify(hostResult.IP, hostResult.Ports)
+			verifiedResult.SetPorts(hostResult.IP, results)
+		}(hostResult)
 	}
+
+	r.scanner.ScanResults = verifiedResult
 
 	swg.Wait()
 }
@@ -633,10 +637,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	csvFileHeaderEnabled := true
 
 	switch {
-	case len(scanResults.IPPorts) > 0:
-		for hostIP, ports := range scanResults.IPPorts {
+	case scanResults.HasIPsPorts():
+		for hostResult := range scanResults.GetIPsPorts() {
 			csvHeaderEnabled := true
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
+			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
 			if err != nil {
 				continue
 			}
@@ -645,17 +649,17 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			for _, host := range dt {
 				buffer.Reset()
 				if host == "ip" {
-					host = hostIP
+					host = hostResult.IP
 				}
-				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostIP)
-				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(ports), host, hostIP)
+				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
+				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
 				// console output
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), IsCDNIP: isCDNIP, CDNName: cdnName}
-					if host != hostIP {
+					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), IsCDNIP: isCDNIP, CDNName: cdnName}
+					if host != hostResult.IP {
 						data.Host = host
 					}
-					for port := range ports {
+					for _, port := range hostResult.Ports {
 						data.Port = port
 						if r.options.JSON {
 							b, marshallErr := data.JSON()
@@ -678,7 +682,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					writer.Flush()
 					gologger.Silent().Msgf("%s", buffer.String())
 				} else {
-					for port := range ports {
+					for _, port := range hostResult.Ports {
 						if r.options.OutputCDN && isCDNIP {
 							gologger.Silent().Msgf("%s:%d [%s]\n", host, port, cdnName)
 						} else {
@@ -689,11 +693,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, ports, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, ports, isCDNIP, cdnName, csvFileHeaderEnabled, file)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, isCDNIP, cdnName, csvFileHeaderEnabled, file)
 					} else {
-						err = WriteHostOutput(host, ports, cdnName, file)
+						err = WriteHostOutput(host, hostResult.Ports, cdnName, file)
 					}
 					if err != nil {
 						gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
@@ -701,13 +705,13 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 
 				if r.options.OnResult != nil {
-					r.options.OnResult(host, hostIP, mapKeysToSliceInt(ports))
+					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports})
 				}
 			}
 			csvFileHeaderEnabled = false
 		}
-	case len(scanResults.IPS) > 0:
-		for hostIP := range scanResults.IPS {
+	case scanResults.HasIPS():
+		for hostIP := range scanResults.GetIPs() {
 			dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
 			if err != nil {
 				continue
@@ -755,7 +759,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 
 				if r.options.OnResult != nil {
-					r.options.OnResult(host, hostIP, nil)
+					r.options.OnResult(&result.HostResult{Host: host, IP: hostIP})
 				}
 			}
 			csvFileHeaderEnabled = false
