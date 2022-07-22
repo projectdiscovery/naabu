@@ -2,8 +2,10 @@ package runner
 
 import (
 	"os"
+	"time"
 
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -26,29 +28,32 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries           int                           // Retries is the number of retries for the port
-	Rate              int                           // Rate is the rate of port scan requests
-	Timeout           int                           // Timeout is the seconds to wait for ports to respond
-	WarmUpTime        int                           // WarmUpTime between scan phases
-	Host              goflags.NormalizedStringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile         string                        // HostsFile is the file containing list of hosts to find port for
-	Output            string                        // Output is the file to write found ports to.
-	Ports             string                        // Ports is the ports to use for enumeration
-	PortsFile         string                        // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts      string                        // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps        string                        // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile    string                        // File containing Ips or cidr to exclude from the scan
-	TopPorts          string                        // Tops ports to scan
-	SourceIP          string                        // SourceIP to use in TCP packets
-	Interface         string                        // Interface to use for TCP packets
-	ConfigFile        string                        // Config file contains a scan configuration
-	NmapCLI           string                        // Nmap command (has priority over config file)
-	Threads           int                           // Internal worker threads
-	EnableProgressBar bool                          // Enable progress bar
-	ScanAllIPS        bool                          // Scan all the ips
-	ScanType          string                        // Scan Type
-	Proxy             string                        // Socks5 proxy
-	Resolvers         string                        // Resolvers (comma separated or file)
+	Retries           int                 // Retries is the number of retries for the port
+	Rate              int                 // Rate is the rate of port scan requests
+	Timeout           int                 // Timeout is the seconds to wait for ports to respond
+	WarmUpTime        int                 // WarmUpTime between scan phases
+	Host              goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
+	HostsFile         string              // HostsFile is the file containing list of hosts to find port for
+	Output            string              // Output is the file to write found ports to.
+	Ports             string              // Ports is the ports to use for enumeration
+	PortsFile         string              // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts      string              // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps        string              // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile    string              // File containing Ips or cidr to exclude from the scan
+	TopPorts          string              // Tops ports to scan
+	SourceIP          string              // SourceIP to use in TCP packets
+	SourcePort        string              // Source Port to use in packets
+	Interface         string              // Interface to use for TCP packets
+	ConfigFile        string              // Config file contains a scan configuration
+	NmapCLI           string              // Nmap command (has priority over config file)
+	Threads           int                 // Internal worker threads
+	EnableProgressBar bool                // Enable progress bar
+	ScanAllIPS        bool                // Scan all the ips
+	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
+	ScanType          string              // Scan Type
+	Proxy             string              // Socks5 proxy
+	ProxyAuth         string              // Socks5 proxy authentication (username:password)
+	Resolvers         string              // Resolvers (comma separated or file)
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
 	CSV               bool
@@ -57,10 +62,26 @@ type Options struct {
 	ResumeCfg         *ResumeCfg
 	Stream            bool
 	Passive           bool
+	OutputCDN         bool // display cdn in use
+	HealthCheck       bool
+	HostDiscovery     bool // Enable Host Discovery
+	TcpSynPingProbes  goflags.StringSlice
+	TcpAckPingProbes  goflags.StringSlice
+	// UdpPingProbes               goflags.StringSlice - planned
+	// STcpInitPingProbes          goflags.StringSlice - planned
+	IcmpEchoRequestProbe        bool
+	IcmpTimestampRequestProbe   bool
+	IcmpAddressMaskRequestProbe bool
+	// IpProtocolPingProbes        goflags.StringSlice - planned
+	ArpPing                   bool
+	IPv6NeighborDiscoveryPing bool
+	// HostDiscoveryIgnoreRST      bool - planned
+	InputReadTimeout time.Duration
+	DisableStdin     bool
 }
 
-// OnResultCallback (hostname, ip, ports)
-type OnResultCallback func(string, string, []int)
+// OnResultCallback (hostResult)
+type OnResultCallback func(*result.HostResult)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
@@ -70,18 +91,19 @@ func ParseOptions() *Options {
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
 
 	flagSet.CreateGroup("input", "Input",
-		flagSet.NormalizedStringSliceVarP(&options.Host, "host", "", []string{}, "hosts to scan ports for (comma-separated)"),
+		flagSet.StringSliceVarP(&options.Host, "host", "", nil, "hosts to scan ports for (comma-separated)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.HostsFile, "l", "list", "", "list of hosts to scan ports (file)"),
 		flagSet.StringVarP(&options.ExcludeIps, "eh", "exclude-hosts", "", "hosts to exclude from the scan (comma-separated)"),
 		flagSet.StringVarP(&options.ExcludeIpsFile, "ef", "exclude-file", "", "list of hosts to exclude from scan (file)"),
 	)
 
 	flagSet.CreateGroup("port", "Port",
-		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200"),
+		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200)"),
 		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100)"),
 		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
-		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to exclude from scan (file)"),
+		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to scan (file)"),
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
+		flagSet.BoolVarP(&options.OutputCDN, "cdn", "display-cdn", false, "display cdn in use"),
 	)
 
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
@@ -97,17 +119,37 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
+		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", nil, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),
 		flagSet.StringVar(&options.NmapCLI, "nmap-cli", "", "nmap command to run on found results (example: -nmap-cli 'nmap -sV')"),
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
-		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy"),
+		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy (ip[:port] / fqdn[:port]"),
+		flagSet.StringVar(&options.ProxyAuth, "proxy-auth", "", "socks5 proxy authentication (username:password)"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
+		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", time.Duration(3*time.Minute), "timeout on input read"),
+		flagSet.BoolVar(&options.DisableStdin, "no-stdin", false, "Disable Stdin processing"),
+	)
+
+	flagSet.CreateGroup("host-discovery", "Host-Discovery",
+		flagSet.BoolVarP(&options.HostDiscovery, "host-discovery", "sn", false, "Run Host Discovery scan"),
+		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", nil, "TCP SYN Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
+		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
+		flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping (host discovery needs to be enabled)"),
+		flagSet.BoolVarP(&options.IcmpTimestampRequestProbe, "probe-icmp-timestamp", "pp", false, "ICMP timestamp request Ping (host discovery needs to be enabled)"),
+		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping (host discovery needs to be enabled)"),
+		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping (host discovery needs to be enabled)"),
+		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery (host discovery needs to be enabled)"),
+		// The following flags are left as placeholder
+		// flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),
+		// flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
+		// flagSet.StringSliceVarP(&options.STcpInitPingProbes, "probe-stcp-init", "py", []string{}, "SCTP INIT Ping"),
+		// flagSet.BoolVarP(&options.HostDiscoveryIgnoreRST, "discovery-ignore-rst", "irst", false, "Ignore RST packets during host discovery"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -119,6 +161,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
+		flagSet.BoolVarP(&options.HealthCheck, "hc", "health-check", false, "run diagnostic check up"),
 		flagSet.BoolVar(&options.Debug, "debug", false, "display debugging information"),
 		flagSet.BoolVarP(&options.Verbose, "v", "verbose", false, "display verbose output"),
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
@@ -130,8 +173,16 @@ func ParseOptions() *Options {
 
 	_ = flagSet.Parse()
 
+	if options.HealthCheck {
+		gologger.Print().Msgf("%s\n", DoHealthCheck(options))
+		os.Exit(0)
+	}
+
 	// Check if stdin pipe was given
-	options.Stdin = fileutil.HasStdin()
+	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
+
+	// configure host discovery if necessary
+	options.configureHostDiscovery()
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
@@ -164,8 +215,6 @@ func ParseOptions() *Options {
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
-
-	showNetworkCapabilities(options)
 
 	return options
 }

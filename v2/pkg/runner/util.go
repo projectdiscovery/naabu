@@ -6,30 +6,34 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
+	"github.com/projectdiscovery/sliceutil"
 )
 
-func (r *Runner) host2ips(target string) (targetIPs []string, err error) {
+func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []string, err error) {
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
 	if !iputil.IsIP(target) {
-		var ips []string
-		ips, err = r.dnsclient.Lookup(target)
-		if err != nil {
+		dnsData, err := r.dnsclient.QueryMultiple(target)
+		if err != nil || dnsData == nil {
 			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-			return
+			return nil, nil, err
 		}
-		for _, ip := range ips {
-			if iputil.IsIPv4(ip) {
-				targetIPs = append(targetIPs, ip)
+		if len(r.options.IPVersion) > 0 {
+			if sliceutil.Contains(r.options.IPVersion, "4") {
+				targetIPsV4 = append(targetIPsV4, dnsData.A...)
 			}
+			if sliceutil.Contains(r.options.IPVersion, "6") {
+				targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
+			}
+		} else {
+			targetIPsV4 = append(targetIPsV4, dnsData.A...)
 		}
-
-		if len(targetIPs) == 0 {
-			return targetIPs, fmt.Errorf("no IP addresses found for host: %s", target)
+		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
+			return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
-		targetIPs = append(targetIPs, target)
-		gologger.Debug().Msgf("Found %d addresses for %s\n", len(targetIPs), target)
+		targetIPsV4 = append(targetIPsV6, target)
+		gologger.Debug().Msgf("Found %d addresses for %s\n", len(targetIPsV4), target)
 	}
 
 	return
@@ -47,9 +51,6 @@ func isLinux() bool {
 	return runtime.GOOS == "linux"
 }
 
-func mapKeysToSliceInt(m map[int]struct{}) (s []int) {
-	for k := range m {
-		s = append(s, k)
-	}
-	return
+func isWindows() bool {
+	return runtime.GOOS == "windows"
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/pkg/errors"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 )
 
 func (r *Runner) handleNmap() error {
@@ -17,18 +18,10 @@ func (r *Runner) handleNmap() error {
 	command := r.options.NmapCLI
 	hasCLI := r.options.NmapCLI != ""
 	if hasCLI {
-		type IpPorts struct {
-			IP    string
-			Ports []int
-		}
-		var ipsPorts []*IpPorts
+		var ipsPorts []*result.HostResult
 		// build a list of all targets
-		for ip, ports := range r.scanner.ScanResults.IPPorts {
-			var portsList []int
-			for port := range ports {
-				portsList = append(portsList, port)
-			}
-			ipsPorts = append(ipsPorts, &IpPorts{IP: ip, Ports: portsList})
+		for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+			ipsPorts = append(ipsPorts, hostResult)
 		}
 
 		// sort by number of ports
@@ -41,7 +34,7 @@ func (r *Runner) handleNmap() error {
 		// 100 - 1000 ports
 		// 1000 - 10000 ports
 		// 10000 - 60000 ports
-		ranges := make(map[int][]*IpPorts) // for better readability
+		ranges := make(map[int][]*result.HostResult) // for better readability
 		// collect the indexes corresponding to ranges changes
 		for _, ipPorts := range ipsPorts {
 			length := len(ipPorts.Ports)
@@ -87,8 +80,11 @@ func (r *Runner) handleNmap() error {
 			args = append(args, "-p", portsStr)
 			args = append(args, ips...)
 
+			// if the command is not executable, we just suggest it
+			commandCanBeExecuted := isCommandExecutable(args)
+
 			// if requested via config file or via cli
-			if r.options.Nmap || hasCLI {
+			if (r.options.Nmap || hasCLI) && commandCanBeExecuted {
 				gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
 				cmd := exec.Command(args[0], args[1:]...)
 				cmd.Stdout = os.Stdout
@@ -105,4 +101,25 @@ func (r *Runner) handleNmap() error {
 	}
 
 	return nil
+}
+
+func isCommandExecutable(args []string) bool {
+	commandLength := calculateCmdLength(args)
+	if isWindows() {
+		// windows has a hard limit of
+		// - 2048 characters in XP
+		// - 32768 characters in Win7
+		return commandLength < 2048
+	}
+	// linux and darwin
+	return true
+}
+
+func calculateCmdLength(args []string) int {
+	var commandLength int
+	for _, arg := range args {
+		commandLength += len(arg)
+		commandLength += 1 // space character
+	}
+	return commandLength
 }

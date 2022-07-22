@@ -15,10 +15,10 @@ func TestAddPort(t *testing.T) {
 	res.AddPort(targetIP, targetPort)
 
 	expectedIPS := map[string]struct{}{targetIP: {}}
-	assert.Equal(t, res.IPS, expectedIPS)
+	assert.Equal(t, res.ips, expectedIPS)
 
 	expectedIPSPorts := map[string]map[int]struct{}{targetIP: targetPorts}
-	assert.Equal(t, res.IPPorts, expectedIPSPorts)
+	assert.Equal(t, res.ipPorts, expectedIPSPorts)
 }
 
 func TestSetPorts(t *testing.T) {
@@ -26,13 +26,13 @@ func TestSetPorts(t *testing.T) {
 	targetPorts := map[int]struct{}{80: {}, 8080: {}}
 
 	res := NewResult()
-	res.SetPorts(targetIP, targetPorts)
+	res.SetPorts(targetIP, []int{80, 8080})
 
 	expectedIPS := map[string]struct{}{targetIP: {}}
-	assert.Equal(t, res.IPS, expectedIPS)
+	assert.Equal(t, res.ips, expectedIPS)
 
 	expectedIPSPorts := map[string]map[int]struct{}{targetIP: targetPorts}
-	assert.Equal(t, res.IPPorts, expectedIPSPorts)
+	assert.Equal(t, res.ipPorts, expectedIPSPorts)
 }
 
 func TestIPHasPort(t *testing.T) {
@@ -45,20 +45,20 @@ func TestIPHasPort(t *testing.T) {
 	assert.False(t, res.IPHasPort(targetIP, 1111))
 }
 
-func TestSetIP(t *testing.T) {
+func TestAddIP(t *testing.T) {
 	targetIP := "127.0.0.1"
 
 	res := NewResult()
-	res.SetIP(targetIP)
+	res.AddIp(targetIP)
 	expectedIPS := map[string]struct{}{targetIP: {}}
-	assert.Equal(t, res.IPS, expectedIPS)
+	assert.Equal(t, res.ips, expectedIPS)
 }
 
 func TestHasIP(t *testing.T) {
 	targetIP := "127.0.0.1"
 
 	res := NewResult()
-	res.SetIP(targetIP)
+	res.AddIp(targetIP)
 	assert.True(t, res.HasIP(targetIP))
 	assert.False(t, res.HasIP("1.2.3.4"))
 }

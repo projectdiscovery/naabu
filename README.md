@@ -29,14 +29,17 @@ all ports that return a reply.
 # Features
 
 <h1 align="center">
-  <img src="static/naabu-run.png" alt="naabu" width="700px">
+  <img src="https://user-images.githubusercontent.com/8293321/180417395-25b1b990-c032-4b5c-9b66-03b58db0789a.png" alt="naabu" width="700px">
   <br>
 </h1>
 
  - Fast And Simple **SYN/CONNECT** probe based scanning
- - Passive Port Enumeration using Shodan [Internetdb API](https://internetdb.shodan.io)
  - Optimized for ease of use and **lightweight** on resources
- - **Automatic IP deduplication for port scan**
+ - **DNS** Port scan
+ - **Automatic IP Deduplication** for DNS port scan
+ - **IPv4/IPv6** Port scan (**experimental**)
+ - **Passive** Port enumeration using Shodan [Internetdb](https://internetdb.shodan.io)
+ - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
  - Multiple input support - **STDIN/HOST/IP/CIDR**
  - Multiple output format support - **JSON/TXT/STDOUT**
@@ -60,11 +63,12 @@ INPUT:
    -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            ports to scan (80,443, 100-200
+   -port, -p string            ports to scan (80,443, 100-200)
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
-   -ports-file, -pf string     list of ports to exclude from scan (file)
+   -ports-file, -pf string     list of ports to scan (file)
    -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
+   -display-cdn, -cdn          display cdn in use
 
 RATE-LIMIT:
    -c int     general internal worker threads (default 25)
@@ -76,18 +80,32 @@ OUTPUT:
    -csv                write output in csv format
 
 CONFIGURATION:
-   -scan-all-ips, -sa     scan all the IP's associated with DNS record
-   -scan-type, -s string  type of port scan (SYN/CONNECT) (default "s")
-   -source-ip string      source ip
-   -interface-list, -il   list available interfaces and public ip
-   -interface, -i string  network Interface to use for port scan
-   -nmap                  invoke nmap scan on targets (nmap must be installed) - Deprecated
-   -nmap-cli string       nmap command to run on found results (-nmap-cli 'nmap -sV')
-   -r string              list of custom resolver dns resolution (comma separated or from file)
-   -proxy string          socks5 proxy
-   -resume                resume scan using resume.cfg
-   -stream                stream mode (disables resume, nmap, verify, retries, shuffling, etc)
-   -passive               display passive open ports using shodan internetdb api
+   -scan-all-ips, -sa                  scan all the IP's associated with DNS record
+   -ip-version, -iv string[]           ip version to scan of hostname (4,6) - (default 4)
+   -scan-type, -s string               type of port scan (SYN/CONNECT) (default "s")
+   -source-ip string                   source ip and port (x.x.x.x:yyy)
+   -interface-list, -il                list available interfaces and public ip
+   -interface, -i string               network Interface to use for port scan
+   -nmap                               invoke nmap scan on targets (nmap must be installed) - Deprecated
+   -nmap-cli string                    nmap command to run on found results (example: -nmap-cli 'nmap -sV')
+   -r string                           list of custom resolver dns resolution (comma separated or from file)
+   -proxy string                       socks5 proxy (ip[:port] / fqdn[:port]
+   -proxy-auth string                  socks5 proxy authentication (username:password)
+   -resume                             resume scan using resume.cfg
+   -stream                             stream mode (disables resume, nmap, verify, retries, shuffling, etc)
+   -passive                            display passive open ports using shodan internetdb api
+   -irt, -input-read-timeout duration  timeout on input read (default 3m0s)
+   -no-stdin                           Disable Stdin processing
+
+HOST-DISCOVERY:
+   -sn, -host-discovery           Run Host Discovery scan
+   -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
+   -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
+   -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)
+   -pp, -probe-icmp-timestamp     ICMP timestamp request Ping (host discovery needs to be enabled)
+   -pm, -probe-icmp-address-mask  ICMP address mask request Ping (host discovery needs to be enabled)
+   -arp, -arp-ping                ARP ping (host discovery needs to be enabled)
+   -nd, -nd-ping                  IPv6 Neighbor Discovery (host discovery needs to be enabled)
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -97,6 +115,7 @@ OPTIMIZATION:
    -verify            validate the ports again with TCP verification
 
 DEBUG:
+   -health-check, -hc        run diagnostic check up
    -debug                    display debugging information
    -verbose, -v              display verbose output
    -no-color, -nc            disable colors in CLI output
@@ -110,13 +129,14 @@ DEBUG:
 
 Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
-Before installing naabu, make sure to install `libpcap` library:
+## Prerequisite
 
-```sh
-sudo apt install -y libpcap-dev
-```
+> **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-Installing Naabu:
+To install libcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `sudo brew install libpcap`
+
+
+## Installing Naabu
 
 ```sh
 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
@@ -200,6 +220,67 @@ http://hackerone.com:80
 
 The speed can be controlled by changing the value of `rate` flag that represent the number of packets per second. Increasing it while processing hosts may lead to increased false-positive rates. So it is recommended to keep it to a reasonable amount.
 
+# IPv4 and IPv6
+
+Naabu supports both IPv4 and IPv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
+
+```console
+echo hackerone.com | dnsx -resp-only -a -aaaa -silent | naabu -p 80 -silent
+
+104.16.99.52:80
+104.16.100.52:80
+2606:4700::6810:6434:80
+2606:4700::6810:6334:80
+```
+
+The option `-ip-version 6` makes the tool use IPv6 addresses while resolving domain names.
+
+```console
+echo hackerone.com | ./naabu -p 80 -ip-version 6
+
+                  __
+  ___  ___  ___ _/ /  __ __
+ / _ \/ _ \/ _ \/ _ \/ // /
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.0.8
+
+      projectdiscovery.io
+
+Use with caution. You are responsible for your actions
+Developers assume no liability and are not responsible for any misuse or damage.
+[INF] Running CONNECT scan with non root privileges
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+```
+
+To scan all the IPs of both version, `ip-version 4,6` can be used along with `-scan-all-ips` flag.
+
+```console
+echo hackerone.com | ./naabu -iv 4,6 -sa -p 80 -silent
+
+[INF] Found 1 ports on host hackerone.com (104.16.100.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (104.16.99.52)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6334)
+hackerone.com:80
+[INF] Found 1 ports on host hackerone.com (2606:4700::6810:6434)
+hackerone.com:80
+```
+
+# Host Discovery
+
+Naabu optionally supports multiple options to perform host discovery, as outlined below. `-sn` flag is required to perform host discovery; when used, host discovery is performed using multiple methods selected internally; one can also specify the desired method to perform host discovery by specifying available options.
+
+Available options to perform host discovery:
+
+- **ARP** ping (`-arp`)
+- TCP **SYN** ping (`-ps 80`)
+- TCP **ACK** ping (`-ps 443`)
+- ICMP **echo** ping (`-pe`)
+- ICMP **timestamp** ping (`-pp`)
+- ICMP **address mask** ping (`-pm`)
+- IPv6 **neighbor discovery** (`-nd`)
+
 # Configuration file
 
 Naabu supports config file as default located at `$HOME/.config/naabu/config.yaml`, It allows you to define any flag in the config file and set default values to include for all scans.
@@ -248,10 +329,15 @@ Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
-# 📋 Notes
+# Notes
+
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
 - We suggest tuning the flags / rate if running naabu from local system.
 - For best results, run naabu as **root** user.
 
-`naabu` is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
+-----
+
+Naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. 
+
+See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.
