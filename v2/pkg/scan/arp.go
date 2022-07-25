@@ -56,11 +56,12 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		return
 	}
 	// send the packet out on every interface
-	handlers := s.handlers.(Handlers)
-	for _, handler := range handlers.EthernetActive {
-		err := handler.WritePacketData(buf.Bytes())
-		if err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+	if handlers, ok := s.handlers.(Handlers); ok {
+		for _, handler := range handlers.EthernetActive {
+			err := handler.WritePacketData(buf.Bytes())
+			if err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
 		}
 	}
 }
