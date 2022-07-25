@@ -11,7 +11,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220717105926-3bc1597b15c1
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.0-20220705195237-01becc2a8963
-	github.com/projectdiscovery/goflags v0.0.8
+	github.com/projectdiscovery/goflags v0.0.9
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220625072148-037479960416
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
