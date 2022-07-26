@@ -4,6 +4,7 @@ package scan
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -69,7 +70,7 @@ func NewScannerUnix(scanner *Scanner) error {
 	}
 	scanner.icmpPacketListener4 = icmpConn4
 
-	icmpConn6, err := icmp.ListenPacket("udp6", "::")
+	icmpConn6, err := icmp.ListenPacket("ip6:icmp", "::")
 	if err != nil {
 		return err
 	}
@@ -105,7 +106,10 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Prot
 		return err
 	}
 
-	handlers := s.handlers.(Handlers)
+	handlers, ok := s.handlers.(Handlers)
+	if !ok {
+		return errors.New("couldn't create handlers")
+	}
 
 	switch protocol {
 	case TCP:
@@ -143,7 +147,10 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 
 	var wgread sync.WaitGroup
 
-	handlers := s.handlers.(Handlers)
+	handlers, ok := s.handlers.(Handlers)
+	if !ok {
+		return
+	}
 
 	// Tcp Readers
 	for _, handler := range handlers.TcpActive {
@@ -283,11 +290,12 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 
 // CleanupHandlers for all interfaces
 func CleanupHandlersUnix(s *Scanner) {
-	handlers := s.handlers.(Handlers)
-	for _, handler := range append(handlers.TcpActive, handlers.EthernetActive...) {
-		handler.Close()
-	}
-	for _, inactiveHandler := range append(handlers.TcpInactive, handlers.EthernetInactive...) {
-		inactiveHandler.CleanUp()
+	if handlers, ok := s.handlers.(Handlers); ok {
+		for _, handler := range append(handlers.TcpActive, handlers.EthernetActive...) {
+			handler.Close()
+		}
+		for _, inactiveHandler := range append(handlers.TcpInactive, handlers.EthernetInactive...) {
+			inactiveHandler.CleanUp()
+		}
 	}
 }
