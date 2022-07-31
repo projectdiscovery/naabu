@@ -40,7 +40,7 @@ func Test_host2ips(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, got)
 			// As some distributions don't handle correctly ipv6 we compare results only if necessary
-			if len(gotV6) > 0 && len(gotV6) > 0 {
+			if len(gotV6) > 0 && len(tt.wantV6) > 0 {
 				assert.Equal(t, tt.wantV6, gotV6)
 			}
 		})
