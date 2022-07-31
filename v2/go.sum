@@ -244,8 +244,8 @@ github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb h1:Q7t
 github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb/go.mod h1:EevMeCG1ogBoUJYaa0Mv9R1VUboDm/DiynId7DboKy0=
 github.com/projectdiscovery/clistats v0.0.8 h1:tjmWb15mqsPf/yrQXVHLe2ThZX/5+mgKSfZBKWWLh20=
 github.com/projectdiscovery/clistats v0.0.8/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
-github.com/projectdiscovery/dnsx v1.1.1-0.20220717105926-3bc1597b15c1 h1:8XiVC4hJ17TXCZJ8erzVVzqwJo+vfvMlEbLfbGy/Ru8=
-github.com/projectdiscovery/dnsx v1.1.1-0.20220717105926-3bc1597b15c1/go.mod h1:zM2GaMs2sQYZIcFOQgXorqRC1blImu8TZeAswaQHSrU=
+github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a h1:x+/wTC4IEaSBtujl8JbdwWjprfAfLntSr8HTh7pPbbM=
+github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a/go.mod h1:jk2CjjLoxm5wZ14URcbi/OdvVy4MTtdpNAjDK3VWYF4=
 github.com/projectdiscovery/fdmax v0.0.3 h1:FM6lv9expZ/rEEBI9tkRh6tx3DV0gtpwzdc0h7bGPqg=
 github.com/projectdiscovery/fdmax v0.0.3/go.mod h1:NWRcaR7JTO7fC27H4jCl9n7Z+KIredwpgw1fV+4KrKI=
 github.com/projectdiscovery/fileutil v0.0.0-20210926202739-6050d0acf73c/go.mod h1:U+QCpQnX8o2N2w0VUGyAzjM3yBAe4BKedVElxiImsx0=
@@ -285,8 +285,8 @@ github.com/projectdiscovery/mapcidr v1.0.1/go.mod h1:/qxlpxXZQFFjHynSc9u5O0kUPzH
 github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d h1:QXaK3yzoEWI8n+hLAqEgTJEWhkp1WZM8ThbKwrlXFks=
 github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d/go.mod h1:asvdg5wMy3LPVMGALatebKeOYH5n5fV5RCTv6DbxpIs=
 github.com/projectdiscovery/reflectutil v0.0.0-20210804085554-4d90952bf92f/go.mod h1:3L0WfNIcVWXIDur8k+gKDLZLWY2F+rs0SQXtcn/3AYU=
-github.com/projectdiscovery/retryabledns v1.0.14-0.20220717105827-2d0b0e81dd89 h1:nxPe4Bze+LeAHWPPcObcDpp6Wv8hi26xAmVSmyOISVc=
-github.com/projectdiscovery/retryabledns v1.0.14-0.20220717105827-2d0b0e81dd89/go.mod h1:g+NlPMyYzoFuHZpJHNCYMpqHKQu/ov4aG/YTdd8oht8=
+github.com/projectdiscovery/retryabledns v1.0.14 h1:RX7thJK9q7sVQZOpc7Qv5Ts13AyZhJK5G6xFqTtRhWU=
+github.com/projectdiscovery/retryabledns v1.0.14/go.mod h1:g+NlPMyYzoFuHZpJHNCYMpqHKQu/ov4aG/YTdd8oht8=
 github.com/projectdiscovery/retryablehttp-go v1.0.2 h1:LV1/KAQU+yeWhNVlvveaYFsjBYRwXlNEq0PvrezMV0U=
 github.com/projectdiscovery/retryablehttp-go v1.0.2/go.mod h1:dx//aY9V247qHdsRf0vdWHTBZuBQ2vm6Dq5dagxrDYI=
 github.com/projectdiscovery/sliceutil v0.0.0-20220225084130-8392ac12fa6d/go.mod h1:QHXvznfPfA5f0AZUIBkbLapoUJJlsIDgUlkKva6dOr4=

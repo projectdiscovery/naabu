@@ -8,7 +8,6 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.0-20210903102120-5a9d2412d21d
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.8
-	github.com/projectdiscovery/dnsx v1.1.1-0.20220717105926-3bc1597b15c1
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.0-20220705195237-01becc2a8963
 	github.com/projectdiscovery/goflags v0.0.9
@@ -26,6 +25,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
+	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3-0.20220715104731-7638578d1725
 	github.com/projectdiscovery/mapcidr v1.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
@@ -67,7 +67,7 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.14-0.20220717105827-2d0b0e81dd89 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.14 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
