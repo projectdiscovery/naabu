@@ -15,7 +15,7 @@ func Test_host2ips(t *testing.T) {
 		wantErr bool
 	}{
 		{"10.10.10.10", []string{"10.10.10.10"}, nil, false},
-		{"localhost", []string{"127.0.0.1"}, []string{"::1"}, false},
+		{"localhost", []string{"127.0.0.1"}, nil, false}, // ubuntu doesn't hardcode ::1
 		{"aaaa", nil, nil, true},
 		{"10.10.10.0/24", nil, nil, true},
 	}
@@ -40,7 +40,6 @@ func Test_host2ips(t *testing.T) {
 			}
 			assert.Equal(t, tt.want, got)
 			assert.Equal(t, tt.wantV6, gotV6)
-
 		})
 	}
 }
