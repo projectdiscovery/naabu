@@ -62,16 +62,17 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	scanner, err := scan.NewScanner(&scan.Options{
-		Timeout:     time.Duration(options.Timeout) * time.Millisecond,
-		Retries:     options.Retries,
-		Rate:        options.Rate,
-		Debug:       options.Debug,
-		ExcludeCdn:  options.ExcludeCDN,
-		OutputCdn:   options.OutputCDN,
-		ExcludedIps: excludedIps,
-		Proxy:       options.Proxy,
-		ProxyAuth:   options.ProxyAuth,
-		Stream:      options.Stream,
+		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
+		Retries:       options.Retries,
+		Rate:          options.Rate,
+		PortThreshold: options.PortThreshold,
+		Debug:         options.Debug,
+		ExcludeCdn:    options.ExcludeCDN,
+		OutputCdn:     options.OutputCDN,
+		ExcludedIps:   excludedIps,
+		Proxy:         options.Proxy,
+		ProxyAuth:     options.ProxyAuth,
+		Stream:        options.Stream,
 	})
 	if err != nil {
 		return nil, err
@@ -349,6 +350,15 @@ func (r *Runner) RunEnumeration() error {
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ip, port)
 				} else {
+					if r.scanner.ScanResults.HasSkipped(ip) {
+						continue
+					}
+					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+						gologger.Debug().Msgf("Skipping %s, Threshold reached \n", ip)
+						r.scanner.ScanResults.AddSkipped(ip)
+						continue
+					}
+
 					r.wgscan.Add()
 					go r.handleHostPort(ip, port)
 				}

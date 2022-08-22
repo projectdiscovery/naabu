@@ -97,6 +97,7 @@ type Scanner struct {
 	icmpPacketListener6 net.PacketConn
 	retries             int
 	rate                int
+	portThreshold       int
 	SourcePort          int
 	timeout             time.Duration
 	proxyDialer         proxy.Dialer
@@ -171,12 +172,13 @@ func NewScanner(options *Options) (*Scanner, error) {
 			FixLengths:       true,
 			ComputeChecksums: true,
 		},
-		timeout:      options.Timeout,
-		retries:      options.Retries,
-		rate:         options.Rate,
-		debug:        options.Debug,
-		tcpsequencer: NewTCPSequencer(),
-		IPRanger:     iprang,
+		timeout:       options.Timeout,
+		retries:       options.Retries,
+		rate:          options.Rate,
+		portThreshold: options.PortThreshold,
+		debug:         options.Debug,
+		tcpsequencer:  NewTCPSequencer(),
+		IPRanger:      iprang,
 	}
 
 	if privileges.IsPrivileged && newScannerCallback != nil {
