@@ -204,6 +204,15 @@ func (r *Runner) RunEnumeration() error {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
+					if r.scanner.ScanResults.HasSkipped(ip) {
+						continue
+					}
+					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+						r.scanner.ScanResults.AddSkipped(ip)
+						continue
+					}
 					if shouldUseRawPackets {
 						r.RawSocketEnumeration(ip, port)
 					} else {
@@ -346,19 +355,21 @@ func (r *Runner) RunEnumeration() error {
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
+
+				if r.scanner.ScanResults.HasSkipped(ip) {
+					continue
+				}
+				if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+					hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+					gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+					r.scanner.ScanResults.AddSkipped(ip)
+					continue
+				}
+
 				// connect scan
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ip, port)
 				} else {
-					if r.scanner.ScanResults.HasSkipped(ip) {
-						continue
-					}
-					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
-						gologger.Debug().Msgf("Skipping %s, Threshold reached \n", ip)
-						r.scanner.ScanResults.AddSkipped(ip)
-						continue
-					}
-
 					r.wgscan.Add()
 					go r.handleHostPort(ip, port)
 				}
