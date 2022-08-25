@@ -41,6 +41,7 @@ type Options struct {
 	ExcludeIps        string              // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile    string              // File containing Ips or cidr to exclude from the scan
 	TopPorts          string              // Tops ports to scan
+	PortThreshold     int                 // PortThreshold is the number of ports to find before skipping the host
 	SourceIP          string              // SourceIP to use in TCP packets
 	SourcePort        string              // Source Port to use in packets
 	Interface         string              // Interface to use for TCP packets
@@ -102,6 +103,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100)"),
 		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
 		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to scan (file)"),
+		flagSet.IntVarP(&options.PortThreshold, "pts", "port-threshold", 0, "port threshold to skip port scan for the host"),
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN's (only checks for 80,443)"),
 		flagSet.BoolVarP(&options.OutputCDN, "cdn", "display-cdn", false, "display cdn in use"),
 	)
