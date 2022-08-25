@@ -67,6 +67,7 @@ PORT:
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
    -ports-file, -pf string     list of ports to scan (file)
+   -port-threshold, -pts int   port threshold to skip port scan for the host
    -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
    -display-cdn, -cdn          display cdn in use
 

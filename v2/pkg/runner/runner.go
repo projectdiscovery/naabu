@@ -62,16 +62,17 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	scanner, err := scan.NewScanner(&scan.Options{
-		Timeout:     time.Duration(options.Timeout) * time.Millisecond,
-		Retries:     options.Retries,
-		Rate:        options.Rate,
-		Debug:       options.Debug,
-		ExcludeCdn:  options.ExcludeCDN,
-		OutputCdn:   options.OutputCDN,
-		ExcludedIps: excludedIps,
-		Proxy:       options.Proxy,
-		ProxyAuth:   options.ProxyAuth,
-		Stream:      options.Stream,
+		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
+		Retries:       options.Retries,
+		Rate:          options.Rate,
+		PortThreshold: options.PortThreshold,
+		Debug:         options.Debug,
+		ExcludeCdn:    options.ExcludeCDN,
+		OutputCdn:     options.OutputCDN,
+		ExcludedIps:   excludedIps,
+		Proxy:         options.Proxy,
+		ProxyAuth:     options.ProxyAuth,
+		Stream:        options.Stream,
 	})
 	if err != nil {
 		return nil, err
@@ -203,6 +204,15 @@ func (r *Runner) RunEnumeration() error {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
+					if r.scanner.ScanResults.HasSkipped(ip) {
+						continue
+					}
+					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+						r.scanner.ScanResults.AddSkipped(ip)
+						continue
+					}
 					if shouldUseRawPackets {
 						r.RawSocketEnumeration(ip, port)
 					} else {
@@ -345,6 +355,17 @@ func (r *Runner) RunEnumeration() error {
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
+
+				if r.scanner.ScanResults.HasSkipped(ip) {
+					continue
+				}
+				if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+					hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+					gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+					r.scanner.ScanResults.AddSkipped(ip)
+					continue
+				}
+
 				// connect scan
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ip, port)
