@@ -5,6 +5,7 @@ package routing
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"os/exec"
 	"strings"
@@ -97,7 +98,7 @@ func New() (Router, error) {
 			case hasSemicolon:
 				route.Type = IPv6
 			default:
-				return nil, errors.New("unknown route type")
+				return nil, fmt.Errorf("unknown route type: '%s'", outputLine)
 			}
 			routes = append(routes, route)
 		}
