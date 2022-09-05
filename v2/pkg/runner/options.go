@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/projectdiscovery/fileutil"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 
 	"github.com/projectdiscovery/goflags"
@@ -65,7 +66,8 @@ type Options struct {
 	Passive           bool
 	OutputCDN         bool // display cdn in use
 	HealthCheck       bool
-	HostDiscovery     bool // Enable Host Discovery
+	OnlyHostDiscovery bool // Perform only host discovery
+	SkipHostDiscovery bool // Skip host discovery
 	TcpSynPingProbes  goflags.StringSlice
 	TcpAckPingProbes  goflags.StringSlice
 	// UdpPingProbes               goflags.StringSlice - planned
@@ -139,7 +141,8 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("host-discovery", "Host-Discovery",
-		flagSet.BoolVarP(&options.HostDiscovery, "host-discovery", "sn", false, "Run Host Discovery scan"),
+		flagSet.BoolVarP(&options.OnlyHostDiscovery, "host-discovery", "sn", false, "Perform Only Host Discovery"),
+		flagSet.BoolVarP(&options.SkipHostDiscovery, "skip-host-discovery", "Pn", false, "Skip Host discovery"),
 		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", nil, "TCP SYN Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
 		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
 		flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping (host discovery needs to be enabled)"),
@@ -224,4 +227,18 @@ func ParseOptions() *Options {
 // ShouldLoadResume resume file
 func (options *Options) ShouldLoadResume() bool {
 	return options.Resume && fileutil.FileExists(DefaultResumeFilePath())
+}
+
+func (options *Options) shouldDiscoverHosts() bool {
+	return options.OnlyHostDiscovery || !options.SkipHostDiscovery
+}
+
+func (options *Options) hasProbes() bool {
+	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
+		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
+		len(options.TcpAckPingProbes) > 0
+}
+
+func (options *Options) shouldUseRawPackets() bool {
+	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan
 }

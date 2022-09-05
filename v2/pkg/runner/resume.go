@@ -2,7 +2,6 @@ package runner
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sync"
@@ -58,7 +57,7 @@ func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
 // ConfigureResume read the resume config file
 func (resumeCfg *ResumeCfg) ConfigureResume() error {
 	gologger.Info().Msg("Resuming from save checkpoint")
-	file, err := ioutil.ReadFile(DefaultResumeFilePath())
+	file, err := os.ReadFile(DefaultResumeFilePath())
 	if err != nil {
 		return err
 	}

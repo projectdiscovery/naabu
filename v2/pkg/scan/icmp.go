@@ -101,7 +101,7 @@ func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
 		packetListener = s.icmpPacketListener6
 		networkInterface, _, _, err := s.Router.Route(destinationIP)
 		if networkInterface == nil {
-			err = fmt.Errorf("Could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
+			err = fmt.Errorf("could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
 		}
 		if err != nil {
 			gologger.Debug().Msgf("%s\n", err)
