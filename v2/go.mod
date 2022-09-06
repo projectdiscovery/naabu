@@ -31,7 +31,7 @@ require (
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.0-20220712170325-48c50c332cb4
-	github.com/projectdiscovery/uncover v0.0.6
+	github.com/projectdiscovery/uncover v0.0.8
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/multierr v1.8.0
 )
