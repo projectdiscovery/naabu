@@ -5,11 +5,13 @@ package routing
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"net"
 	"os/exec"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/stringsutil"
 	"go.uber.org/multierr"
@@ -63,6 +65,8 @@ func New() (Router, error) {
 		return nil, multierr.Combine(err, errOutboundIps)
 	}
 
+	var lastType RouteType
+
 	scanner := bufio.NewScanner(bytes.NewReader(netstatOutput))
 	for scanner.Scan() {
 		outputLine := strings.TrimSpace(scanner.Text())
@@ -97,8 +101,16 @@ func New() (Router, error) {
 			case hasSemicolon:
 				route.Type = IPv6
 			default:
-				return nil, errors.New("unknown route type")
+				// use last route type and print a warning
+				if lastType != "" {
+					gologger.Debug().Msgf("using '%s' for unknown route type: '%s'\n", lastType, outputLine)
+					route.Type = lastType
+				} else {
+					// we can't determine the route type
+					return nil, fmt.Errorf("could not determine route type for: '%s'", outputLine)
+				}
 			}
+			lastType = route.Type
 			routes = append(routes, route)
 		}
 	}

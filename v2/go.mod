@@ -26,11 +26,12 @@ require (
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
+	github.com/projectdiscovery/ipranger v0.0.3
 	github.com/projectdiscovery/mapcidr v1.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.0-20220712170325-48c50c332cb4
-	github.com/projectdiscovery/uncover v0.0.6
+	github.com/projectdiscovery/uncover v0.0.8
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/multierr v1.8.0
 )
@@ -66,7 +67,6 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
-	github.com/projectdiscovery/ipranger v0.0.3 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.14 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
