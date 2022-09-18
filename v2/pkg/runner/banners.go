@@ -59,6 +59,10 @@ func showNetworkCapabilities(options *Options) {
 	}
 }
 
+func showHostDiscoveryInfo() {
+	gologger.Info().Msgf("Running host discovery scan\n")
+}
+
 func showNetworkInterfaces() error {
 	// Interfaces List
 	interfaces, err := net.Interfaces()

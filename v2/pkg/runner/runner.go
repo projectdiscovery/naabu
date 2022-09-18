@@ -164,7 +164,7 @@ func (r *Runner) RunEnumeration() error {
 
 	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
-		showNetworkCapabilities(r.options)
+		showHostDiscoveryInfo()
 		r.scanner.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
 		_, targetsV4, targetsv6, err := r.GetTargetIps(r.getPreprocessedIps)
@@ -190,10 +190,9 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		r.handleOutput(r.scanner.HostDiscoveryResults)
-
 		// check if we should stop here or continue with full scan
 		if r.options.OnlyHostDiscovery {
+			r.handleOutput(r.scanner.HostDiscoveryResults)
 			return nil
 		}
 	}
