@@ -5,18 +5,18 @@ go 1.17
 require (
 	github.com/google/gopacket v1.1.19
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
-	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
+	github.com/projectdiscovery/blackrock v0.0.0-20210903102120-5a9d2412d21d
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.0-20220705195237-01becc2a8963
-	github.com/projectdiscovery/goflags v0.0.10-0.20220912115102-d9ea875a0a6a
+	github.com/projectdiscovery/goflags v0.0.9
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220625072148-037479960416
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	go.uber.org/ratelimit v0.2.0
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
+	golang.org/x/net v0.0.0-20220826154423-83b083e8dc8b
 	golang.org/x/sys v0.0.0-20220728004956-3c1f35247d10
 )
 
@@ -27,10 +27,10 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3
-	github.com/projectdiscovery/mapcidr v1.0.2
+	github.com/projectdiscovery/mapcidr v1.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
-	github.com/projectdiscovery/stringsutil v0.0.1
+	github.com/projectdiscovery/stringsutil v0.0.0-20220712170325-48c50c332cb4
 	github.com/projectdiscovery/uncover v0.0.8
 	github.com/stretchr/testify v1.8.0
 	go.uber.org/multierr v1.8.0
