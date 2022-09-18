@@ -20,7 +20,6 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/networkpolicy"
-	"github.com/projectdiscovery/stringsutil"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -386,8 +385,8 @@ func (s *Scanner) ICMPReadWorker6() {
 				ip = ipSplit
 			}
 			// drop zone
-			if stringsutil.ContainsAny(ip, "%") {
-				ip = stringsutil.Before(ip, "%")
+			if idx := strings.Index(ip, "%"); idx > 0 {
+				ip = ip[:idx]
 			}
 			s.hostDiscoveryChan <- &PkgResult{ip: ip}
 		}
