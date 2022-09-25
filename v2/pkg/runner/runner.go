@@ -159,15 +159,15 @@ func (r *Runner) RunEnumeration() error {
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(r.options.Rate)
 
-	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
+	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
+	shouldUseRawPackets := r.options.shouldUseRawPackets()
 
-	switch {
-	case r.options.HostDiscovery:
+	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
-		showNetworkCapabilities(r.options)
+		showHostDiscoveryInfo()
 		r.scanner.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
-		_, targetsV4, targetsv6, err := r.GetTargetIps()
+		_, targetsV4, targetsv6, err := r.GetTargetIps(r.getPreprocessedIps)
 		if err != nil {
 			return err
 		}
@@ -190,10 +190,14 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		// continue with other options
-		r.handleOutput(r.scanner.HostDiscoveryResults)
-		return nil
+		// check if we should stop here or continue with full scan
+		if r.options.OnlyHostDiscovery {
+			r.handleOutput(r.scanner.HostDiscoveryResults)
+			return nil
+		}
+	}
 
+	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
 		r.scanner.Phase.Set(scan.Scan)
@@ -284,8 +288,14 @@ func (r *Runner) RunEnumeration() error {
 		return r.handleNmap()
 	default:
 		showNetworkCapabilities(r.options)
+
+		ipsCallback := r.getPreprocessedIps
+		if shouldDiscoverHosts && shouldUseRawPackets {
+			ipsCallback = r.getHostDiscoveryIps
+		}
+
 		// shrinks the ips to the minimum amount of cidr
-		targets, targetsV4, targetsv6, err := r.GetTargetIps()
+		targets, targetsV4, targetsv6, err := r.GetTargetIps(ipsCallback)
 		if err != nil {
 			return err
 		}
@@ -409,13 +419,25 @@ func (r *Runner) RunEnumeration() error {
 	}
 }
 
-func (r *Runner) GetTargetIps() (targets, targetsV4, targetsv6 []*net.IPNet, err error) {
-	// shrinks the ips to the minimum amount of cidr
-	r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-		targets = append(targets, iputil.ToCidr(string(k)))
+func (r *Runner) getHostDiscoveryIps() (ips []*net.IPNet) {
+	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
+		ips = append(ips, iputil.ToCidr(string(ip)))
+	}
+	return
+}
+
+func (r *Runner) getPreprocessedIps() (ips []*net.IPNet) {
+	r.scanner.IPRanger.Hosts.Scan(func(ip, _ []byte) error {
+		ips = append(ips, iputil.ToCidr(string(ip)))
 		return nil
 	})
+	return
+}
 
+func (r *Runner) GetTargetIps(ipsCallback func() []*net.IPNet) (targets, targetsV4, targetsv6 []*net.IPNet, err error) {
+	targets = ipsCallback()
+
+	// shrinks the ips to the minimum amount of cidr
 	targetsV4, targetsv6 = mapcidr.CoalesceCIDRs(targets)
 	if len(targetsV4) == 0 && len(targetsv6) == 0 {
 		return nil, nil, nil, errors.New("no valid ipv4 or ipv6 targets were found")

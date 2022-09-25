@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -39,7 +38,7 @@ func (r *Runner) Load() error {
 
 func (r *Runner) mergeToFile() (string, error) {
 	// merge all targets in a unique file
-	tempInput, err := ioutil.TempFile("", "stdin-input-*")
+	tempInput, err := os.CreateTemp("", "stdin-input-*")
 	if err != nil {
 		return "", err
 	}
