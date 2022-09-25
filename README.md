@@ -99,7 +99,8 @@ CONFIGURATION:
    -no-stdin                           Disable Stdin processing
 
 HOST-DISCOVERY:
-   -sn, -host-discovery           Run Host Discovery scan
+   -sn, -host-discovery           Perform Only Host Discovery
+   -Pn, -skip-host-discovery      Skip Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
    -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
    -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)
@@ -270,7 +271,7 @@ hackerone.com:80
 
 # Host Discovery
 
-Naabu optionally supports multiple options to perform host discovery, as outlined below. `-sn` flag is required to perform host discovery; when used, host discovery is performed using multiple methods selected internally; one can also specify the desired method to perform host discovery by specifying available options.
+Naabu optionally supports multiple options to perform host discovery, as outlined below. Host discovery is completed automatically before beginning a connect/syn scan if the process has enough privileges. `-sn` flag instructs the toll to perform host discovery only. `-Pn` flag skips the host discovery phase. Host discovery is completed using multiple internal methods; one can specify the desired approach to perform host discovery by setting available options.
 
 Available options to perform host discovery:
 

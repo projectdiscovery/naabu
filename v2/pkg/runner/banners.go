@@ -48,7 +48,7 @@ func showNetworkCapabilities(options *Options) {
 	}
 
 	switch {
-	case options.HostDiscovery:
+	case options.OnlyHostDiscovery:
 		scanType = "Host Discovery"
 		gologger.Info().Msgf("Running %s\n", scanType)
 	case options.Passive:
@@ -57,6 +57,10 @@ func showNetworkCapabilities(options *Options) {
 	default:
 		gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
 	}
+}
+
+func showHostDiscoveryInfo() {
+	gologger.Info().Msgf("Running host discovery scan\n")
 }
 
 func showNetworkInterfaces() error {

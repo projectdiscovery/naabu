@@ -2,7 +2,7 @@ package runner
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -28,7 +28,7 @@ func ParsePorts(options *Options) ([]int, error) {
 
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
-		data, err := ioutil.ReadFile(options.PortsFile)
+		data, err := os.ReadFile(options.PortsFile)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
