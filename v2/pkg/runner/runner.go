@@ -791,6 +791,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						gologger.Silent().Msgf("%s\n", host)
 					}
 				}
+				if nil != r.OutCbk {
+					r.OutCbk(host, hostIP, nil, isCDNIP, cdnName)
+				}
 				// file output
 				if file != nil {
 					if r.options.JSON {
