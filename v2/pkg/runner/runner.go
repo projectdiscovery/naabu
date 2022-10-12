@@ -46,6 +46,7 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan *net.IPNet
+	OutCbk        func(out ...interface{})
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -732,6 +733,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							gologger.Silent().Msgf("%s:%d\n", host, port)
 						}
 					}
+				}
+				if nil != r.OutCbk {
+					r.OutCbk(host, hostResult.IP, hostResult.Ports, isCDNIP, cdnName)
 				}
 				// file output
 				if file != nil {
