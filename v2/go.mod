@@ -15,7 +15,7 @@ require (
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
-	go.uber.org/ratelimit v0.2.0
+	//go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
 	golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
 )
@@ -28,6 +28,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3
 	github.com/projectdiscovery/mapcidr v1.0.2
+	github.com/projectdiscovery/ratelimit v0.0.0-20221004232058-7b82379157fa
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.1
@@ -73,6 +74,7 @@ require (
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
+	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
