@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -28,11 +29,11 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	"github.com/remeh/sizedwaitgroup"
-	"go.uber.org/ratelimit"
 )
 
 // Runner is an instance of the port enumeration
@@ -41,7 +42,7 @@ type Runner struct {
 	options       *Options
 	targetsFile   string
 	scanner       *scan.Scanner
-	limiter       ratelimit.Limiter
+	limiter       *ratelimit.Limiter
 	wgscan        sizedwaitgroup.SizedWaitGroup
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
@@ -157,7 +158,7 @@ func (r *Runner) RunEnumeration() error {
 
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
-	r.limiter = ratelimit.New(r.options.Rate)
+	r.limiter = ratelimit.New(context.Background(), r.options.Rate, time.Second)
 
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
@@ -490,7 +491,7 @@ func (r *Runner) PickPort(index int) int {
 func (r *Runner) ConnectVerification() {
 	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
-	limiter := ratelimit.New(r.options.Rate)
+	limiter := ratelimit.New(context.Background(),r.options.Rate, time.Second)
 
 	verifiedResult := result.NewResult()
 
