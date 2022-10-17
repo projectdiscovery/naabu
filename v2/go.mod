@@ -27,7 +27,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3
-	github.com/projectdiscovery/mapcidr v1.0.2
+	github.com/projectdiscovery/mapcidr v1.0.3
 	github.com/projectdiscovery/ratelimit v0.0.0-20221004232058-7b82379157fa
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
@@ -67,6 +67,7 @@ require (
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
+	github.com/projectdiscovery/asnmap v0.0.1 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.15 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
@@ -75,7 +76,7 @@ require (
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/exp v0.0.0-20200513190911-00229845015e // indirect
+	golang.org/x/exp v0.0.0-20220907003533-145caa8ea1d0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/tools v0.1.12 // indirect
