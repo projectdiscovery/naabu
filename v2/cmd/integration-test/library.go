@@ -8,7 +8,7 @@ import (
 )
 
 var libraryTestcases = map[string]testutils.TestCase{
-	"Httpx as library": &httpxLibrary{},
+	"naabu as library": &httpxLibrary{},
 }
 
 type httpxLibrary struct {
@@ -35,6 +35,5 @@ func (h *httpxLibrary) Execute() error {
 	}
 	defer naabuRunner.Close()
 
-	naabuRunner.RunEnumeration()
-	return nil
+	return naabuRunner.RunEnumeration()
 }
