@@ -11,7 +11,7 @@ echo "::group::Build naabu integration-test"
 cd ../integration-test
 go build
 mv integration-test ../../../integration_tests/integration-test 
-cd ../../integration_tests
+cd ../../../integration_tests
 echo "::endgroup::"
 
 ./integration-test
