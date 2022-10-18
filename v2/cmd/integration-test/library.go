@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/projectdiscovery/naabu/v2/internal/testutils"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/runner"
 )
 
@@ -27,6 +28,8 @@ func (h *httpxLibrary) Execute() error {
 		ResumeCfg: &runner.ResumeCfg{},
 		Retries:   1,
 		Ports:     "80",
+		Passive:   true,
+		OnResult:  func(hr *result.HostResult) {},
 	}
 
 	naabuRunner, err := runner.NewRunner(&options)

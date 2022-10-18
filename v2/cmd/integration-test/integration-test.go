@@ -10,7 +10,7 @@ import (
 )
 
 var (
-	debug      = os.Getenv("DEBUG") == "true"
+	// debug      = os.Getenv("DEBUG") == "true" // currently not used
 	customTest = os.Getenv("TEST")
 	protocol   = os.Getenv("PROTO")
 
@@ -47,10 +47,11 @@ func main() {
 	}
 }
 
-func errIncorrectResultsCount(results []string) error {
-	return fmt.Errorf("incorrect number of results %s", strings.Join(results, "\n\t"))
-}
+// Currently not used
+// func errIncorrectResultsCount(results []string) error {
+// 	return fmt.Errorf("incorrect number of results %s", strings.Join(results, "\n\t"))
+// }
 
-func errIncorrectResult(expected, got string) error {
-	return fmt.Errorf("incorrect result: expected \"%s\" got \"%s\"", expected, got)
-}
+// func errIncorrectResult(expected, got string) error {
+// 	return fmt.Errorf("incorrect result: expected \"%s\" got \"%s\"", expected, got)
+// }

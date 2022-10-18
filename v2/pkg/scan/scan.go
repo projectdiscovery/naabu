@@ -32,10 +32,10 @@ type State int
 const (
 	maxRetries     = 10
 	sendDelayMsec  = 10
-	chanSize       = 1000
-	packetSendSize = 2500
-	snaplen        = 65536
-	readtimeout    = 1500
+	chanSize       = 1000  //nolint
+	packetSendSize = 2500  //nolint
+	snaplen        = 65536 //nolint
+	readtimeout    = 1500  //nolint
 )
 
 const (
@@ -117,7 +117,7 @@ type Scanner struct {
 	tcpsequencer         *TCPSequencer
 	serializeOptions     gopacket.SerializeOptions
 	debug                bool
-	handlers             interface{}
+	handlers             interface{} //nolint
 	stream               bool
 }
 
