@@ -2,7 +2,7 @@
 
 echo "::group::Build naabu"
 rm integration-test naabu 2>/dev/null
-cd ../cmd/naabu
+cd ../v2/cmd/naabu
 go build
 mv naabu ../../../integration_tests/naabu
 echo "::endgroup::"
