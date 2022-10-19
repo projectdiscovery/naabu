@@ -57,7 +57,7 @@ func RunNaabuBinaryAndGetResults(target string, naabuBinary string, debug bool, 
 			parts = append(parts, i)
 		}
 	}
-	return parts,nil
+	return parts, nil
 }
 
 // TestCase is a single integration test case
