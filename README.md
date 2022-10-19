@@ -41,7 +41,7 @@ all ports that return a reply.
  - **Passive** Port enumeration using Shodan [Internetdb](https://internetdb.shodan.io)
  - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
- - Multiple input support - **STDIN/HOST/IP/CIDR**
+ - Multiple input support - **STDIN/HOST/IP/CIDR/ASN**
  - Multiple output format support - **JSON/TXT/STDOUT**
 
 # Usage
@@ -199,7 +199,20 @@ To run the naabu on a list of hosts, `-list` option can be used.
 ```sh
 naabu -list hosts.txt
 ```
+To run the naabu on a ASN, AS input can be used. It takes the IP address available for given ASN and runs the enumeration on them.
 
+```console
+echo AS14421 | naabu -p 80,443
+
+216.101.17.249:80
+216.101.17.249:443
+216.101.17.248:443
+216.101.17.252:443
+216.101.17.251:80
+216.101.17.251:443
+216.101.17.250:443
+216.101.17.250:80
+```
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
 ```console
