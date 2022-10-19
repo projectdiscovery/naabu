@@ -26,6 +26,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -47,13 +48,15 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan *net.IPNet
+	asnClient     asn.ASNClient
 }
 
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
-		options: options,
+		options:   options,
+		asnClient: asn.New(),
 	}
 	runner.streamChannel = make(chan *net.IPNet)
 
@@ -491,7 +494,7 @@ func (r *Runner) PickPort(index int) int {
 func (r *Runner) ConnectVerification() {
 	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
-	limiter := ratelimit.New(context.Background(),r.options.Rate, time.Second)
+	limiter := ratelimit.New(context.Background(), r.options.Rate, time.Second)
 
 	verifiedResult := result.NewResult()
 
