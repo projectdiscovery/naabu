@@ -344,6 +344,41 @@ Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
+# Using naabu as library
+The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:
+
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/projectdiscovery/goflags"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/runner"
+)
+
+func main() {
+	options := runner.Options{
+		ResumeCfg: &runner.ResumeCfg{},
+		Retries:   1,
+		Host:      goflags.StringSlice{"scanme.sh"},
+		OnResult: func(hr *result.HostResult) {
+			log.Println(hr.Host, hr.Ports)
+		},
+		Ports: "80",
+	}
+
+	naabuRunner, err := runner.NewRunner(&options)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer naabuRunner.Close()
+
+	naabuRunner.RunEnumeration()
+}
+```
+
 # Notes
 
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
