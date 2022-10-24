@@ -9,7 +9,7 @@ require (
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/fdmax v0.0.3
-	github.com/projectdiscovery/fileutil v0.0.1
+	github.com/projectdiscovery/fileutil v0.0.2
 	github.com/projectdiscovery/goflags v0.1.1
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8
