@@ -16,7 +16,7 @@ require (
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	//go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/net v0.0.0-20220909164309-bea034e7d591
+	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 	golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
 )
 
@@ -31,7 +31,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.0-20221004232058-7b82379157fa
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
-	github.com/projectdiscovery/stringsutil v0.0.1
+	github.com/projectdiscovery/stringsutil v0.0.2
 	github.com/projectdiscovery/uncover v0.0.8
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.8.0
@@ -63,7 +63,7 @@ require (
 	github.com/klauspost/compress v1.11.7 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
-	github.com/microcosm-cc/bluemonday v1.0.20 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
