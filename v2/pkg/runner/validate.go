@@ -115,21 +115,18 @@ func (options *Options) validateOptions() error {
 	if len(options.IPVersion) > 0 && !sliceutil.ContainsItems([]string{"4", "6"}, options.IPVersion) {
 		return errors.New("IP Version must be 4 and/or 6")
 	}
-	// Return error if any host disocvery releated options are provided but host discovery is not enabled
-	if (!options.HostDiscovery) &&
-		(len(options.TcpSynPingProbes) > 0 ||
-			len(options.TcpAckPingProbes) > 0 ||
-			options.IcmpEchoRequestProbe ||
-			options.IcmpTimestampRequestProbe ||
-			options.IcmpAddressMaskRequestProbe ||
-			options.ArpPing ||
-			options.IPv6NeighborDiscoveryPing) {
-		return errors.New("missing host discovery option (-sn)")
+	// Return error if any host discovery releated option is provided but host discovery is disabled
+	if options.SkipHostDiscovery && options.hasProbes() {
+		return errors.New("discovery probes were provided but host discovery is disabled")
 	}
 
 	// Host Discovery mode needs provileged access
-	if options.HostDiscovery && !privileges.IsPrivileged {
+	if options.OnlyHostDiscovery && !privileges.IsPrivileged {
 		return errors.New("sudo access required to perform host discovery")
+	}
+
+	if options.PortThreshold < 0 || options.PortThreshold > 65535 {
+		return errors.New("port threshold must be between 0 and 65535")
 	}
 
 	return nil
@@ -152,10 +149,7 @@ func (options *Options) configureOutput() {
 // configureHostDiscovery enables default probes if none is specified
 // but host discovery option was requested
 func (options *Options) configureHostDiscovery() {
-	hasProbes := options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
-		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
-		len(options.TcpAckPingProbes) > 0
-	if options.HostDiscovery && !hasProbes {
+	if options.shouldDiscoverHosts() && !options.hasProbes() {
 		// if no options were defined enable
 		// - ICMP Echo Request
 		// - ICMP timestamp

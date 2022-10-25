@@ -13,11 +13,11 @@ const banner = `
                   __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.1.0
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.1.1
 `
 
 // Version is the current version of naabu
-const Version = `2.1.0`
+const Version = `2.1.1`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -48,7 +48,7 @@ func showNetworkCapabilities(options *Options) {
 	}
 
 	switch {
-	case options.HostDiscovery:
+	case options.OnlyHostDiscovery:
 		scanType = "Host Discovery"
 		gologger.Info().Msgf("Running %s\n", scanType)
 	case options.Passive:
@@ -57,6 +57,10 @@ func showNetworkCapabilities(options *Options) {
 	default:
 		gologger.Info().Msgf("Running %s scan with %s privileges\n", scanType, accessLevel)
 	}
+}
+
+func showHostDiscoveryInfo() {
+	gologger.Info().Msgf("Running host discovery scan\n")
 }
 
 func showNetworkInterfaces() error {

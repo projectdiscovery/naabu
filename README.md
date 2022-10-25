@@ -41,7 +41,7 @@ all ports that return a reply.
  - **Passive** Port enumeration using Shodan [Internetdb](https://internetdb.shodan.io)
  - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
- - Multiple input support - **STDIN/HOST/IP/CIDR**
+ - Multiple input support - **STDIN/HOST/IP/CIDR/ASN**
  - Multiple output format support - **JSON/TXT/STDOUT**
 
 # Usage
@@ -67,6 +67,7 @@ PORT:
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
    -ports-file, -pf string     list of ports to scan (file)
+   -port-threshold, -pts int   port threshold to skip port scan for the host
    -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
    -display-cdn, -cdn          display cdn in use
 
@@ -98,7 +99,8 @@ CONFIGURATION:
    -no-stdin                           Disable Stdin processing
 
 HOST-DISCOVERY:
-   -sn, -host-discovery           Run Host Discovery scan
+   -sn, -host-discovery           Perform Only Host Discovery
+   -Pn, -skip-host-discovery      Skip Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
    -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
    -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)
@@ -197,7 +199,20 @@ To run the naabu on a list of hosts, `-list` option can be used.
 ```sh
 naabu -list hosts.txt
 ```
+To run the naabu on a ASN, AS input can be used. It takes the IP address available for given ASN and runs the enumeration on them.
 
+```console
+echo AS14421 | naabu -p 80,443
+
+216.101.17.249:80
+216.101.17.249:443
+216.101.17.248:443
+216.101.17.252:443
+216.101.17.251:80
+216.101.17.251:443
+216.101.17.250:443
+216.101.17.250:80
+```
 You can also get output in json format using `-json` switch. This switch saves the output in the JSON lines format.
 
 ```console
@@ -269,7 +284,7 @@ hackerone.com:80
 
 # Host Discovery
 
-Naabu optionally supports multiple options to perform host discovery, as outlined below. `-sn` flag is required to perform host discovery; when used, host discovery is performed using multiple methods selected internally; one can also specify the desired method to perform host discovery by specifying available options.
+Naabu optionally supports multiple options to perform host discovery, as outlined below. Host discovery is completed automatically before beginning a connect/syn scan if the process has enough privileges. `-sn` flag instructs the toll to perform host discovery only. `-Pn` flag skips the host discovery phase. Host discovery is completed using multiple internal methods; one can specify the desired approach to perform host discovery by setting available options.
 
 Available options to perform host discovery:
 
@@ -328,6 +343,41 @@ PORT     STATE SERVICE       VERSION
 Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
+
+# Using naabu as library
+The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:
+
+```go
+package main
+
+import (
+	"log"
+
+	"github.com/projectdiscovery/goflags"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/runner"
+)
+
+func main() {
+	options := runner.Options{
+		ResumeCfg: &runner.ResumeCfg{},
+		Retries:   1,
+		Host:      goflags.StringSlice{"scanme.sh"},
+		OnResult: func(hr *result.HostResult) {
+			log.Println(hr.Host, hr.Ports)
+		},
+		Ports: "80",
+	}
+
+	naabuRunner, err := runner.NewRunner(&options)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer naabuRunner.Close()
+
+	naabuRunner.RunEnumeration()
+}
+```
 
 # Notes
 

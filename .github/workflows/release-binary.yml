@@ -1,6 +1,7 @@
 name: 🎉 Release Binary
+
 on:
-  create:
+  push:
     tags:
       - v*
   workflow_dispatch:
@@ -48,8 +49,9 @@ jobs:
           version: latest
           args: release -f .goreleaser/linux.yml --rm-dist
           workdir: v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        env: 
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          SLACK_WEBHOOK: "${{ secrets.RELEASE_SLACK_WEBHOOK }}"
 
   build-windows:
     runs-on: windows-latest

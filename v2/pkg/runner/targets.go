@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"strings"
@@ -13,6 +12,7 @@ import (
 	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
+	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/remeh/sizedwaitgroup"
@@ -39,7 +39,7 @@ func (r *Runner) Load() error {
 
 func (r *Runner) mergeToFile() (string, error) {
 	// merge all targets in a unique file
-	tempInput, err := ioutil.TempFile("", "stdin-input-*")
+	tempInput, err := os.CreateTemp("", "stdin-input-*")
 	if err != nil {
 		return "", err
 	}
@@ -110,13 +110,31 @@ func (r *Runner) AddTarget(target string) error {
 	target = strings.TrimSpace(target)
 	if target == "" {
 		return nil
-	} else if iputil.IsCIDR(target) {
+	}
+	if asn.IsASN(target) {
+		// Get CIDRs for ASN
+		cidrs, err := r.asnClient.GetCIDRsForASNNum(target)
+		if err != nil {
+			return err
+		}
+		for _, cidr := range cidrs {
+			if r.options.Stream {
+				r.streamChannel <- cidr
+			} else if err := r.scanner.IPRanger.AddHostWithMetadata(cidr.String(), "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
+				gologger.Warning().Msgf("%s\n", err)
+			}
+		}
+		return nil
+	}
+	if iputil.IsCIDR(target) {
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
-	} else if iputil.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
+		return nil
+	}
+	if iputil.IsIP(target) && !r.scanner.IPRanger.Contains(target) {
 		ip := net.ParseIP(target)
 		// convert ip4 expressed as ip6 back to ip4
 		if ip.To4() != nil {
@@ -127,17 +145,17 @@ func (r *Runner) AddTarget(target string) error {
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
-	} else {
-		ips, err := r.resolveFQDN(target)
-		if err != nil {
-			return err
-		}
-		for _, ip := range ips {
-			if r.options.Stream {
-				r.streamChannel <- iputil.ToCidr(ip)
-			} else if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
-				gologger.Warning().Msgf("%s\n", err)
-			}
+		return nil
+	}
+	ips, err := r.resolveFQDN(target)
+	if err != nil {
+		return err
+	}
+	for _, ip := range ips {
+		if r.options.Stream {
+			r.streamChannel <- iputil.ToCidr(ip)
+		} else if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
 
