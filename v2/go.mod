@@ -28,7 +28,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3
 	github.com/projectdiscovery/mapcidr v1.0.3
-	github.com/projectdiscovery/ratelimit v0.0.0-20221004232058-7b82379157fa
+	github.com/projectdiscovery/ratelimit v0.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.2
