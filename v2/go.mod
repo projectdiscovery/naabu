@@ -28,11 +28,11 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
 	github.com/projectdiscovery/ipranger v0.0.3
 	github.com/projectdiscovery/mapcidr v1.0.3
-	github.com/projectdiscovery/ratelimit v0.0.0-20221004232058-7b82379157fa
+	github.com/projectdiscovery/ratelimit v0.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.2
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4
 	github.com/projectdiscovery/stringsutil v0.0.2
-	github.com/projectdiscovery/uncover v0.0.8
+	github.com/projectdiscovery/uncover v0.0.9
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.8.0
 )
@@ -41,7 +41,6 @@ require (
 	github.com/AndreasBriese/bbloom v0.0.0-20190825152654-46b345b51c96 // indirect
 	github.com/DataDog/zstd v1.4.5 // indirect
 	github.com/akrylysov/pogreb v0.10.1 // indirect
-	github.com/andres-erbsen/clock v0.0.0-20160526145045-9e14626cd129 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
 	github.com/cespare/xxhash v1.1.0 // indirect
 	github.com/cespare/xxhash/v2 v2.1.1 // indirect
@@ -75,7 +74,6 @@ require (
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20220907003533-145caa8ea1d0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.3.7 // indirect
