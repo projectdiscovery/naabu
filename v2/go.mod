@@ -9,15 +9,15 @@ require (
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.8
 	github.com/projectdiscovery/fdmax v0.0.3
-	github.com/projectdiscovery/fileutil v0.0.2
+	github.com/projectdiscovery/fileutil v0.0.3
 	github.com/projectdiscovery/goflags v0.1.1
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	//go.uber.org/ratelimit v0.2.0 // indirect
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
-	golang.org/x/sys v0.0.0-20220915200043-7b5979e65e41
+	golang.org/x/net v0.1.0
+	golang.org/x/sys v0.1.0
 )
 
 require (
@@ -78,7 +78,7 @@ require (
 	go.uber.org/ratelimit v0.2.0 // indirect
 	golang.org/x/exp v0.0.0-20220907003533-145caa8ea1d0 // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
-	golang.org/x/text v0.3.7 // indirect
+	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
