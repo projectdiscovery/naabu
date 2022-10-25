@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
@@ -25,14 +26,15 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	"github.com/remeh/sizedwaitgroup"
-	"go.uber.org/ratelimit"
 )
 
 // Runner is an instance of the port enumeration
@@ -41,18 +43,20 @@ type Runner struct {
 	options       *Options
 	targetsFile   string
 	scanner       *scan.Scanner
-	limiter       ratelimit.Limiter
+	limiter       *ratelimit.Limiter
 	wgscan        sizedwaitgroup.SizedWaitGroup
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan *net.IPNet
+	asnClient     asn.ASNClient
 }
 
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
-		options: options,
+		options:   options,
+		asnClient: asn.New(),
 	}
 	runner.streamChannel = make(chan *net.IPNet)
 
@@ -62,16 +66,17 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	scanner, err := scan.NewScanner(&scan.Options{
-		Timeout:     time.Duration(options.Timeout) * time.Millisecond,
-		Retries:     options.Retries,
-		Rate:        options.Rate,
-		Debug:       options.Debug,
-		ExcludeCdn:  options.ExcludeCDN,
-		OutputCdn:   options.OutputCDN,
-		ExcludedIps: excludedIps,
-		Proxy:       options.Proxy,
-		ProxyAuth:   options.ProxyAuth,
-		Stream:      options.Stream,
+		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
+		Retries:       options.Retries,
+		Rate:          options.Rate,
+		PortThreshold: options.PortThreshold,
+		Debug:         options.Debug,
+		ExcludeCdn:    options.ExcludeCDN,
+		OutputCdn:     options.OutputCDN,
+		ExcludedIps:   excludedIps,
+		Proxy:         options.Proxy,
+		ProxyAuth:     options.ProxyAuth,
+		Stream:        options.Stream,
 	})
 	if err != nil {
 		return nil, err
@@ -156,17 +161,17 @@ func (r *Runner) RunEnumeration() error {
 
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
-	r.limiter = ratelimit.New(r.options.Rate)
+	r.limiter = ratelimit.New(context.Background(), int64(r.options.Rate), time.Second)
 
-	shouldUseRawPackets := isOSSupported() && privileges.IsPrivileged && r.options.ScanType == SynScan
+	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
+	shouldUseRawPackets := r.options.shouldUseRawPackets()
 
-	switch {
-	case r.options.HostDiscovery:
+	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
-		showNetworkCapabilities(r.options)
+		showHostDiscoveryInfo()
 		r.scanner.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
-		_, targetsV4, targetsv6, err := r.GetTargetIps()
+		_, targetsV4, targetsv6, err := r.GetTargetIps(r.getPreprocessedIps)
 		if err != nil {
 			return err
 		}
@@ -189,10 +194,14 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		// continue with other options
-		r.handleOutput(r.scanner.HostDiscoveryResults)
-		return nil
+		// check if we should stop here or continue with full scan
+		if r.options.OnlyHostDiscovery {
+			r.handleOutput(r.scanner.HostDiscoveryResults)
+			return nil
+		}
+	}
 
+	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
 		r.scanner.Phase.Set(scan.Scan)
@@ -203,6 +212,15 @@ func (r *Runner) RunEnumeration() error {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				for _, port := range r.scanner.Ports {
+					if r.scanner.ScanResults.HasSkipped(ip) {
+						continue
+					}
+					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+						r.scanner.ScanResults.AddSkipped(ip)
+						continue
+					}
 					if shouldUseRawPackets {
 						r.RawSocketEnumeration(ip, port)
 					} else {
@@ -274,8 +292,14 @@ func (r *Runner) RunEnumeration() error {
 		return r.handleNmap()
 	default:
 		showNetworkCapabilities(r.options)
+
+		ipsCallback := r.getPreprocessedIps
+		if shouldDiscoverHosts && shouldUseRawPackets {
+			ipsCallback = r.getHostDiscoveryIps
+		}
+
 		// shrinks the ips to the minimum amount of cidr
-		targets, targetsV4, targetsv6, err := r.GetTargetIps()
+		targets, targetsV4, targetsv6, err := r.GetTargetIps(ipsCallback)
 		if err != nil {
 			return err
 		}
@@ -345,6 +369,17 @@ func (r *Runner) RunEnumeration() error {
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
+
+				if r.scanner.ScanResults.HasSkipped(ip) {
+					continue
+				}
+				if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+					hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+					gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+					r.scanner.ScanResults.AddSkipped(ip)
+					continue
+				}
+
 				// connect scan
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ip, port)
@@ -388,13 +423,25 @@ func (r *Runner) RunEnumeration() error {
 	}
 }
 
-func (r *Runner) GetTargetIps() (targets, targetsV4, targetsv6 []*net.IPNet, err error) {
-	// shrinks the ips to the minimum amount of cidr
-	r.scanner.IPRanger.Hosts.Scan(func(k, v []byte) error {
-		targets = append(targets, iputil.ToCidr(string(k)))
+func (r *Runner) getHostDiscoveryIps() (ips []*net.IPNet) {
+	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
+		ips = append(ips, iputil.ToCidr(string(ip)))
+	}
+	return
+}
+
+func (r *Runner) getPreprocessedIps() (ips []*net.IPNet) {
+	r.scanner.IPRanger.Hosts.Scan(func(ip, _ []byte) error {
+		ips = append(ips, iputil.ToCidr(string(ip)))
 		return nil
 	})
+	return
+}
 
+func (r *Runner) GetTargetIps(ipsCallback func() []*net.IPNet) (targets, targetsV4, targetsv6 []*net.IPNet, err error) {
+	targets = ipsCallback()
+
+	// shrinks the ips to the minimum amount of cidr
 	targetsV4, targetsv6 = mapcidr.CoalesceCIDRs(targets)
 	if len(targetsV4) == 0 && len(targetsv6) == 0 {
 		return nil, nil, nil, errors.New("no valid ipv4 or ipv6 targets were found")
@@ -447,7 +494,7 @@ func (r *Runner) PickPort(index int) int {
 func (r *Runner) ConnectVerification() {
 	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
-	limiter := ratelimit.New(r.options.Rate)
+	limiter := ratelimit.New(context.Background(), int64(r.options.Rate), time.Second)
 
 	verifiedResult := result.NewResult()
 

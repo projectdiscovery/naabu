@@ -20,7 +20,6 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/networkpolicy"
-	"github.com/projectdiscovery/stringsutil"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -33,10 +32,10 @@ type State int
 const (
 	maxRetries     = 10
 	sendDelayMsec  = 10
-	chanSize       = 1000
-	packetSendSize = 2500
-	snaplen        = 65536
-	readtimeout    = 1500
+	chanSize       = 1000  //nolint
+	packetSendSize = 2500  //nolint
+	snaplen        = 65536 //nolint
+	readtimeout    = 1500  //nolint
 )
 
 const (
@@ -97,6 +96,7 @@ type Scanner struct {
 	icmpPacketListener6 net.PacketConn
 	retries             int
 	rate                int
+	portThreshold       int
 	SourcePort          int
 	timeout             time.Duration
 	proxyDialer         proxy.Dialer
@@ -117,7 +117,7 @@ type Scanner struct {
 	tcpsequencer         *TCPSequencer
 	serializeOptions     gopacket.SerializeOptions
 	debug                bool
-	handlers             interface{}
+	handlers             interface{} //nolint
 	stream               bool
 }
 
@@ -171,12 +171,13 @@ func NewScanner(options *Options) (*Scanner, error) {
 			FixLengths:       true,
 			ComputeChecksums: true,
 		},
-		timeout:      options.Timeout,
-		retries:      options.Retries,
-		rate:         options.Rate,
-		debug:        options.Debug,
-		tcpsequencer: NewTCPSequencer(),
-		IPRanger:     iprang,
+		timeout:       options.Timeout,
+		retries:       options.Retries,
+		rate:          options.Rate,
+		portThreshold: options.PortThreshold,
+		debug:         options.Debug,
+		tcpsequencer:  NewTCPSequencer(),
+		IPRanger:      iprang,
 	}
 
 	if privileges.IsPrivileged && newScannerCallback != nil {
@@ -384,8 +385,8 @@ func (s *Scanner) ICMPReadWorker6() {
 				ip = ipSplit
 			}
 			// drop zone
-			if stringsutil.ContainsAny(ip, "%") {
-				ip = stringsutil.Before(ip, "%")
+			if idx := strings.Index(ip, "%"); idx > 0 {
+				ip = ip[:idx]
 			}
 			s.hostDiscoveryChan <- &PkgResult{ip: ip}
 		}
