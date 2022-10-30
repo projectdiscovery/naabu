@@ -3,6 +3,7 @@ package scan
 import (
 	"errors"
 	"fmt"
+	"io"
 	"math/rand"
 	"net"
 	"strings"
@@ -16,7 +17,9 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/iputil"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/networkpolicy"
@@ -78,20 +81,14 @@ const (
 	Ndp
 )
 
-type Protocol int
-
-const (
-	TCP Protocol = iota
-	UDP
-	ARP
-)
-
 type Scanner struct {
 	Router              routing.Router
 	SourceIP4           net.IP
 	SourceIP6           net.IP
-	tcpPacketlistener4  net.PacketConn
-	tcpPacketlistener6  net.PacketConn
+	tcpPacketListener4  net.PacketConn
+	udpPacketListener4  net.PacketConn
+	tcpPacketListener6  net.PacketConn
+	udpPacketListener6  net.PacketConn
 	icmpPacketListener4 net.PacketConn
 	icmpPacketListener6 net.PacketConn
 	retries             int
@@ -101,13 +98,15 @@ type Scanner struct {
 	timeout             time.Duration
 	proxyDialer         proxy.Dialer
 
-	Ports    []int
+	Ports    []*port.Port
 	IPRanger *ipranger.IPRanger
 
 	tcpPacketSend        chan *PkgSend
+	udpPacketSend        chan *PkgSend
 	icmpPacketSend       chan *PkgSend
 	ethernetPacketSend   chan *PkgSend
 	tcpChan              chan *PkgResult
+	udpChan              chan *PkgResult
 	hostDiscoveryChan    chan *PkgResult
 	Phase                Phase
 	HostDiscoveryResults *result.Result
@@ -124,7 +123,7 @@ type Scanner struct {
 // PkgSend is a TCP package
 type PkgSend struct {
 	ip       string
-	port     int
+	port     *port.Port
 	flag     PkgFlag
 	SourceIP string
 }
@@ -132,12 +131,12 @@ type PkgSend struct {
 // PkgResult contains the results of sending TCP packages
 type PkgResult struct {
 	ip   string
-	port int
+	port *port.Port
 }
 
 var (
 	newScannerCallback                      func(s *Scanner) error
-	setupHandlerCallback                    func(s *Scanner, interfaceName, bpfFilter string, protocol Protocol) error
+	setupHandlerCallback                    func(s *Scanner, interfaceName, bpfFilter string, protocol protocol.Protocol) error
 	tcpReadWorkerPCAPCallback               func(s *Scanner)
 	cleanupHandlersCallback                 func(s *Scanner)
 	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool //nolint
@@ -224,8 +223,8 @@ func NewScanner(options *Options) (*Scanner, error) {
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
 	s.CleanupHandlers()
-	s.tcpPacketlistener4.Close()
-	s.tcpPacketlistener6.Close()
+	s.tcpPacketListener4.Close()
+	s.tcpPacketListener6.Close()
 }
 
 // StartWorkers of the scanner
@@ -249,14 +248,14 @@ func (s *Scanner) TCPWriteWorker() {
 
 // TCPReadWorker reads and parse incoming TCP packets
 func (s *Scanner) TCPReadWorker() {
-	defer s.tcpPacketlistener4.Close()
+	defer s.tcpPacketListener4.Close()
 	data := make([]byte, 4096)
 	for {
 		if s.Phase.Is(Done) {
 			break
 		}
 		// nolint:errcheck // just empty the buffer
-		s.tcpPacketlistener4.ReadFrom(data)
+		s.tcpPacketListener4.ReadFrom(data)
 	}
 }
 
@@ -284,9 +283,20 @@ func (s *Scanner) EnqueueEthernet(ip string, pkgtype PkgFlag) {
 }
 
 // EnqueueTCP outgoing TCP packets
-func (s *Scanner) EnqueueTCP(ip string, pkgtype PkgFlag, ports ...int) {
+func (s *Scanner) EnqueueTCP(ip string, pkgtype PkgFlag, ports ...*port.Port) {
 	for _, port := range ports {
 		s.tcpPacketSend <- &PkgSend{
+			ip:   ip,
+			port: port,
+			flag: pkgtype,
+		}
+	}
+}
+
+// EnqueueTCP outgoing TCP packets
+func (s *Scanner) EnqueueUDP(ip string, pkgtype PkgFlag, ports ...*port.Port) {
+	for _, port := range ports {
+		s.udpPacketSend <- &PkgSend{
 			ip:   ip,
 			port: port,
 			flag: pkgtype,
@@ -407,10 +417,10 @@ func (s *Scanner) ICMPResultWorker() {
 func (s *Scanner) TCPResultWorker() {
 	for ip := range s.tcpChan {
 		if s.Phase.Is(HostDiscovery) {
-			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port)
+			gologger.Debug().Msgf("Received TCP probe response from %s:%d\n", ip.ip, ip.port.Port)
 			s.HostDiscoveryResults.AddIp(ip.ip)
 		} else if s.Phase.Is(Scan) || s.stream {
-			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port)
+			gologger.Debug().Msgf("Received TCP scan response from %s:%d\n", ip.ip, ip.port.Port)
 			s.ScanResults.AddPort(ip.ip, ip.port)
 		}
 	}
@@ -482,24 +492,42 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 }
 
 // ConnectPort a single host and port
-func (s *Scanner) ConnectPort(host string, port int, timeout time.Duration) (bool, error) {
-	hostport := net.JoinHostPort(host, fmt.Sprint(port))
+func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) (bool, error) {
+	hostport := net.JoinHostPort(host, fmt.Sprint(p.Port))
 	var (
 		err  error
 		conn net.Conn
 	)
 	if s.proxyDialer != nil {
-		conn, err = s.proxyDialer.Dial("tcp", hostport)
+		conn, err = s.proxyDialer.Dial(p.Protocol.String(), hostport)
 		if err != nil {
 			return false, err
 		}
 	} else {
-		conn, err = net.DialTimeout("tcp", hostport, timeout)
+		conn, err = net.DialTimeout(p.Protocol.String(), hostport, timeout)
 	}
 	if err != nil {
 		return false, err
 	}
-	conn.Close()
+	defer conn.Close()
+
+	// udp needs data probe
+	switch p.Protocol {
+	case protocol.UDP:
+		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+			return false, err
+		}
+		if _, err := conn.Write(nil); err != nil {
+			return false, err
+		}
+		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+			return false, err
+		}
+		if _, err := io.Copy(io.Discard, conn); err != nil {
+			return false, err
+		}
+	}
+
 	return true, err
 }
 
@@ -601,16 +629,16 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 }
 
 // SendAsyncPkg sends a single packet to a port
-func (s *Scanner) SendAsyncPkg(ip string, port int, pkgFlag PkgFlag) {
+func (s *Scanner) SendAsyncPkg(ip string, p *port.Port, pkgFlag PkgFlag) {
 	switch {
 	case iputil.IsIPv4(ip):
-		s.sendAsync4(ip, port, pkgFlag)
+		s.sendAsync4(ip, p, pkgFlag)
 	case iputil.IsIPv6(ip):
-		s.sendAsync6(ip, port, pkgFlag)
+		s.sendAsync6(ip, p, pkgFlag)
 	}
 }
 
-func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
+func (s *Scanner) sendAsync4(ip string, p *port.Port, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip4 := layers.IPv4{
 		DstIP:    net.ParseIP(ip),
@@ -623,10 +651,10 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 	} else {
 		_, _, sourceIP, err := s.Router.Route(ip4.DstIP)
 		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
 		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, port)
+			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
 			return
 		}
 		ip4.SrcIP = sourceIP
@@ -640,7 +668,7 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.SourcePort),
-		DstPort: layers.TCPPort(port),
+		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
@@ -655,19 +683,19 @@ func (s *Scanner) sendAsync4(ip string, port int, pkgFlag PkgFlag) {
 	err := tcp.SetNetworkLayerForChecksum(&ip4)
 	if err != nil {
 		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 		}
 	} else {
-		err = s.send(ip, s.tcpPacketlistener4, &tcp)
+		err = s.send(ip, s.tcpPacketListener4, &tcp)
 		if err != nil {
 			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, port, err)
+				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			}
 		}
 	}
 }
 
-func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
+func (s *Scanner) sendAsync6(ip string, p *port.Port, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
 	ip6 := layers.IPv6{
 		DstIP:      net.ParseIP(ip),
@@ -681,10 +709,10 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	} else {
 		_, _, sourceIP, err := s.Router.Route(ip6.DstIP)
 		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, port, err)
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
 		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, port)
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
 			return
 		}
 		ip6.SrcIP = sourceIP
@@ -698,7 +726,7 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(s.SourcePort),
-		DstPort: layers.TCPPort(port),
+		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
 		Seq:     s.tcpsequencer.Next(),
 		Options: []layers.TCPOption{tcpOption},
@@ -713,13 +741,13 @@ func (s *Scanner) sendAsync6(ip string, port int, pkgFlag PkgFlag) {
 	err := tcp.SetNetworkLayerForChecksum(&ip6)
 	if err != nil {
 		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, port, err)
+			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 		}
 	} else {
-		err = s.send(ip, s.tcpPacketlistener6, &tcp)
+		err = s.send(ip, s.tcpPacketListener6, &tcp)
 		if err != nil {
 			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, port, err)
+				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			}
 		}
 	}
@@ -754,7 +782,7 @@ func (s *Scanner) SetupHandlers() error {
 func (s *Scanner) SetupHandler(interfaceName string) error {
 	bpfFilter := fmt.Sprintf("tcp and dst port %d", s.SourcePort)
 	if setupHandlerCallback != nil {
-		err := setupHandlerCallback(s, interfaceName, bpfFilter, TCP)
+		err := setupHandlerCallback(s, interfaceName, bpfFilter, protocol.TCP)
 		if err != nil {
 			return err
 		}
@@ -764,7 +792,7 @@ func (s *Scanner) SetupHandler(interfaceName string) error {
 	// (arp[6:2] = 2) and dst host host and ether dst mac
 	bpfFilter = "arp"
 	if setupHandlerCallback != nil {
-		err := setupHandlerCallback(s, interfaceName, bpfFilter, ARP)
+		err := setupHandlerCallback(s, interfaceName, bpfFilter, protocol.ARP)
 		if err != nil {
 			return err
 		}

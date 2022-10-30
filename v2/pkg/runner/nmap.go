@@ -62,11 +62,11 @@ func (r *Runner) handleNmap() error {
 			for _, ipPorts := range rang {
 				ips = append(ips, ipPorts.IP)
 				for _, pp := range ipPorts.Ports {
-					allports[pp] = struct{}{}
+					allports[pp.Port] = struct{}{}
 				}
 			}
 			for p := range allports {
-				ports = append(ports, fmt.Sprintf("%d", p))
+				ports = append(ports, fmt.Sprint(p))
 			}
 
 			// if we have no open ports we avoid running nmap

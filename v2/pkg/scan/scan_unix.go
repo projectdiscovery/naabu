@@ -16,6 +16,8 @@ import (
 	"github.com/google/gopacket/pcap"
 	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
 )
@@ -51,13 +53,25 @@ func NewScannerUnix(scanner *Scanner) error {
 	if err != nil {
 		return err
 	}
-	scanner.tcpPacketlistener4 = tcpConn4
+	scanner.tcpPacketListener4 = tcpConn4
+
+	udpConn4, err := net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", scanner.SourcePort))})
+	if err != nil {
+		return err
+	}
+	scanner.udpPacketListener4 = udpConn4
 
 	tcpConn6, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", scanner.SourcePort))})
 	if err != nil {
 		return err
 	}
-	scanner.tcpPacketlistener6 = tcpConn6
+	scanner.tcpPacketListener6 = tcpConn6
+
+	udpConn6, err := net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", scanner.SourcePort))})
+	if err != nil {
+		return err
+	}
+	scanner.udpPacketListener6 = udpConn6
 
 	var handlers Handlers
 	scanner.handlers = handlers
@@ -85,7 +99,7 @@ func NewScannerUnix(scanner *Scanner) error {
 	return err
 }
 
-func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Protocol) error {
+func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, proto protocol.Protocol) error {
 	inactive, err := pcap.NewInactiveHandle(interfaceName)
 	if err != nil {
 		return err
@@ -111,11 +125,13 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Prot
 		return errors.New("couldn't create handlers")
 	}
 
-	switch protocol {
-	case TCP:
+	switch proto {
+	case protocol.TCP:
 		handlers.TcpInactive = append(handlers.TcpInactive, inactive)
-	case ARP:
+	case protocol.ARP:
 		handlers.EthernetInactive = append(handlers.EthernetInactive, inactive)
+	default:
+		panic("protocol not supported")
 	}
 
 	handle, err := inactive.Activate()
@@ -131,11 +147,13 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocol Prot
 		return err
 	}
 
-	switch protocol {
-	case TCP:
+	switch proto {
+	case protocol.TCP:
 		handlers.TcpActive = append(handlers.TcpActive, handle)
-	case ARP:
+	case protocol.ARP:
 		handlers.EthernetActive = append(handlers.EthernetActive, handle)
+	default:
+		panic("protocol not supported")
 	}
 	s.handlers = handlers
 
@@ -210,9 +228,9 @@ func TCPReadWorkerPCAPUnix(s *Scanner) {
 							if tcp.DstPort != layers.TCPPort(s.SourcePort) {
 								continue
 							} else if s.Phase.Is(HostDiscovery) {
-								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
+								s.hostDiscoveryChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
 							} else if tcp.SYN && tcp.ACK {
-								s.tcpChan <- &PkgResult{ip: ip, port: int(tcp.SrcPort)}
+								s.tcpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
 							}
 						}
 					}

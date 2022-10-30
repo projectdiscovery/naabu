@@ -3,26 +3,27 @@ package result
 import (
 	"sync"
 
-	"github.com/projectdiscovery/naabu/v2/pkg/utils"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"golang.org/x/exp/maps"
 )
 
 type HostResult struct {
 	Host  string
 	IP    string
-	Ports []int
+	Ports []*port.Port
 }
 
 // Result of the scan
 type Result struct {
 	sync.RWMutex
-	ipPorts map[string]map[int]struct{}
+	ipPorts map[string]map[string]*port.Port
 	ips     map[string]struct{}
 	skipped map[string]struct{}
 }
 
 // NewResult structure
 func NewResult() *Result {
-	ipPorts := make(map[string]map[int]struct{})
+	ipPorts := make(map[string]map[string]*port.Port)
 	ips := make(map[string]struct{})
 	skipped := make(map[string]struct{})
 	return &Result{ipPorts: ipPorts, ips: ips, skipped: skipped}
@@ -67,7 +68,7 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 			if r.HasSkipped(ip) {
 				continue
 			}
-			out <- &HostResult{IP: ip, Ports: utils.MapKeysToSliceInt(ports)}
+			out <- &HostResult{IP: ip, Ports: maps.Values(ports)}
 		}
 	}()
 
@@ -82,43 +83,43 @@ func (r *Result) HasIPsPorts() bool {
 }
 
 // AddPort to a specific ip
-func (r *Result) AddPort(k string, v int) {
-	r.Lock()
-	defer r.Unlock()
-
-	if _, ok := r.ipPorts[k]; !ok {
-		r.ipPorts[k] = make(map[int]struct{})
-	}
-
-	r.ipPorts[k][v] = struct{}{}
-	r.ips[k] = struct{}{}
-}
-
-// SetPorts for a specific ip
-func (r *Result) SetPorts(ip string, ports []int) {
+func (r *Result) AddPort(ip string, p *port.Port) {
 	r.Lock()
 	defer r.Unlock()
 
 	if _, ok := r.ipPorts[ip]; !ok {
-		r.ipPorts[ip] = make(map[int]struct{})
+		r.ipPorts[ip] = make(map[string]*port.Port)
 	}
 
-	for _, port := range ports {
-		r.ipPorts[ip][port] = struct{}{}
+	r.ipPorts[ip][p.String()] = p
+	r.ips[ip] = struct{}{}
+}
+
+// SetPorts for a specific ip
+func (r *Result) SetPorts(ip string, ports []*port.Port) {
+	r.Lock()
+	defer r.Unlock()
+
+	if _, ok := r.ipPorts[ip]; !ok {
+		r.ipPorts[ip] = make(map[string]*port.Port)
+	}
+
+	for _, p := range ports {
+		r.ipPorts[ip][p.String()] = p
 	}
 	r.ips[ip] = struct{}{}
 }
 
 // IPHasPort checks if an ip has a specific port
-func (r *Result) IPHasPort(k string, v int) bool {
+func (r *Result) IPHasPort(ip string, p *port.Port) bool {
 	r.RLock()
 	defer r.RUnlock()
 
-	vv, hasports := r.ipPorts[k]
+	ipPorts, hasports := r.ipPorts[ip]
 	if !hasports {
 		return false
 	}
-	_, hasport := vv[v]
+	_, hasport := ipPorts[p.String()]
 
 	return hasport
 }

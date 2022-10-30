@@ -4,18 +4,20 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestParsePortsList(t *testing.T) {
 	tests := []struct {
 		args    string
-		want    map[int]struct{}
+		want    map[string]struct{}
 		wantErr bool
 	}{
-		{"1,2,3,4", map[int]struct{}{1: {}, 2: {}, 3: {}, 4: {}}, false},
-		{"1-3,10", map[int]struct{}{1: {}, 2: {}, 3: {}, 10: {}}, false},
-		{"17,17,17,18", map[int]struct{}{17: {}, 18: {}}, false},
+		{"1,2,3,4", map[string]struct{}{"1": {}, "2": {}, "3": {}, "4": {}}, false},
+		{"1-3,10", map[string]struct{}{"1": {}, "2": {}, "3": {}, "10": {}}, false},
+		{"17,17,17,18", map[string]struct{}{"17": {}, "18": {}}, false},
 		{"a", nil, true},
 	}
 	for _, tt := range tests {
@@ -34,7 +36,10 @@ func TestParsePortsList(t *testing.T) {
 
 func TestExcludePorts(t *testing.T) {
 	var options Options
-	ports := map[int]struct{}{1: {}, 10: {}}
+	ports := []*port.Port{
+		{Port: 1, Protocol: protocol.TCP},
+		{Port: 10, Protocol: protocol.TCP},
+	}
 
 	// no filtering
 	filteredPorts, err := excludePorts(&options, ports)
@@ -50,7 +55,10 @@ func TestExcludePorts(t *testing.T) {
 	options.ExcludePorts = "1"
 	filteredPorts, err = excludePorts(&options, ports)
 	assert.Nil(t, err)
-	expectedPorts := map[int]struct{}{10: {}}
+	expectedPorts := []*port.Port{
+		{Port: 1, Protocol: protocol.TCP},
+		{Port: 10, Protocol: protocol.TCP},
+	}
 	assert.EqualValues(t, expectedPorts, filteredPorts)
 }
 
