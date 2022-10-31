@@ -29,6 +29,7 @@ func init() {
 	cleanupHandlersCallback = CleanupHandlersUnix
 }
 
+// Handlers contains the list of pcap handlers
 type Handlers struct {
 	TransportActive   []*pcap.Handle
 	TransportInactive []*pcap.InactiveHandle
@@ -40,6 +41,7 @@ func getFreePort() (int, error) {
 	return freeport.GetFreePort()
 }
 
+// NewScannerUnix creates a new instance specific for unix OS
 func NewScannerUnix(scanner *Scanner) error {
 	if scanner.SourcePort <= 0 {
 		rawport, err := getFreePort()
@@ -101,6 +103,7 @@ func NewScannerUnix(scanner *Scanner) error {
 	return err
 }
 
+// SetupHandlerUnix on unix OS
 func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocols ...protocol.Protocol) error {
 	for _, proto := range protocols {
 		inactive, err := pcap.NewInactiveHandle(interfaceName)
@@ -164,6 +167,7 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocols ...
 	return nil
 }
 
+// TransportReadWorkerPCAPUnix for TCP and UDP
 func TransportReadWorkerPCAPUnix(s *Scanner) {
 	defer s.CleanupHandlers()
 

@@ -278,6 +278,7 @@ func (s *Scanner) TCPReadWorker6() {
 	}
 }
 
+// UDPReadWorker4 reads and parse incoming ipv4 UDP packets
 func (s *Scanner) UDPReadWorker4() {
 	defer s.udpPacketListener4.Close()
 	data := make([]byte, 4096)
@@ -290,6 +291,7 @@ func (s *Scanner) UDPReadWorker4() {
 	}
 }
 
+// UDPReadWorker6 reads and parse incoming ipv6 UDP packets
 func (s *Scanner) UDPReadWorker6() {
 	defer s.udpPacketListener6.Close()
 	data := make([]byte, 4096)
@@ -372,12 +374,13 @@ func (s *Scanner) EthernetWriteWorker() {
 	}
 }
 
+// ICMPReadWorker starts the ip4 and ip6 workers
 func (s *Scanner) ICMPReadWorker() {
 	go s.ICMPReadWorker4()
 	go s.ICMPReadWorker6()
 }
 
-// ICMPReadWorker reads packets from the network layer
+// ICMPReadWorker4 reads packets from the network layer
 func (s *Scanner) ICMPReadWorker4() {
 	defer s.icmpPacketListener4.Close()
 
@@ -407,6 +410,7 @@ func (s *Scanner) ICMPReadWorker4() {
 	}
 }
 
+// ICMPReadWorker6 reads packets from the network layer
 func (s *Scanner) ICMPReadWorker6() {
 	defer s.icmpPacketListener6.Close()
 
