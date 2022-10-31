@@ -38,6 +38,7 @@ jobs:
 
       - name: Race Condition Tests
         run: |
+          go run -race . -host scanme.sh
           sudo go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
 
@@ -74,6 +75,7 @@ jobs:
 
       - name: Race Condition Tests
         run: |
+          go run -race . -host scanme.sh
           sudo go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
 
@@ -100,4 +102,5 @@ jobs:
         # Known issue: https://github.com/golang/go/issues/46099
         run: |
           # go run -race . -host scanme.sh
+          # sudo go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
