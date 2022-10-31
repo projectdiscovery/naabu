@@ -238,7 +238,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 							sourcePortMatches := tcpPortMatches || udpPortMatches
 							switch {
 							case !sourcePortMatches:
-								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
+								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
 								continue
 							case s.Phase.Is(HostDiscovery):
 								proto := protocol.TCP
