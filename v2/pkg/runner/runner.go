@@ -524,8 +524,19 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 }
 
 func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
-	// skip invalid combinations
-	r.handleHostPortSyn(ip, p)
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(ip, p) {
+		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+		return
+	}
+
+	r.limiter.Take()
+	switch p.Protocol {
+	case protocol.TCP:
+		r.scanner.EnqueueTCP(ip, scan.Syn, p)
+	case protocol.UDP:
+		r.scanner.EnqueueUDP(ip, p)
+	}
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
@@ -597,17 +608,6 @@ func (r *Runner) handleHostDiscovery(host string) {
 	if r.options.IPv6NeighborDiscoveryPing {
 		r.scanner.EnqueueICMP("ff02::1", scan.Ndp)
 	}
-}
-
-func (r *Runner) handleHostPortSyn(host string, p *port.Port) {
-	// performs cdn scan exclusions checks
-	if !r.canIScanIfCDN(host, p) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
-		return
-	}
-
-	r.limiter.Take()
-	r.scanner.EnqueueTCP(host, scan.Syn, p)
 }
 
 func (r *Runner) SetSourceIP(sourceIP string) error {
