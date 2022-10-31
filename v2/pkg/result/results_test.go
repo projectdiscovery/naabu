@@ -44,12 +44,13 @@ func TestSetPorts(t *testing.T) {
 
 func TestIPHasPort(t *testing.T) {
 	targetIP := "127.0.0.1"
-	targetPort := &port.Port{Port: 8080, Protocol: protocol.TCP}
+	expectedPort := &port.Port{Port: 8080, Protocol: protocol.TCP}
+	unexpectedPort := &port.Port{Port: 8081, Protocol: protocol.TCP}
 
 	res := NewResult()
-	res.AddPort(targetIP, targetPort)
-	assert.True(t, res.IPHasPort(targetIP, targetPort))
-	assert.False(t, res.IPHasPort(targetIP, targetPort))
+	res.AddPort(targetIP, expectedPort)
+	assert.True(t, res.IPHasPort(targetIP, expectedPort))
+	assert.False(t, res.IPHasPort(targetIP, unexpectedPort))
 }
 
 func TestAddIP(t *testing.T) {

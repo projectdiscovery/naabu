@@ -188,7 +188,18 @@ func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 		}
 	}
 
-	return ports, nil
+	// dedupe ports
+	seen := make(map[string]struct{})
+	var dedupedPorts []*port.Port
+	for _, port := range ports {
+		if _, ok := seen[port.String()]; ok {
+			continue
+		}
+		seen[port.String()] = struct{}{}
+		dedupedPorts = append(dedupedPorts, port)
+	}
+
+	return dedupedPorts, nil
 }
 
 func parsePortsList(data string) ([]*port.Port, error) {
