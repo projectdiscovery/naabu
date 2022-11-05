@@ -4,7 +4,7 @@ import (
 	"net"
 
 	"github.com/pkg/errors"
-	"github.com/projectdiscovery/iputil"
+	iputil "github.com/projectdiscovery/utils/ip"
 )
 
 // CdnCheck verifies if the given ip is part of Cdn ranges

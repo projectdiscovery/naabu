@@ -4,9 +4,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	fileutil "github.com/projectdiscovery/utils/file"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
