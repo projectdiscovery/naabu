@@ -69,7 +69,7 @@ require (
 	github.com/projectdiscovery/asnmap v0.0.1 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.15 // indirect
-	github.com/projectdiscovery/utils v0.0.1 // indirect
+	github.com/projectdiscovery/utils v0.0.2 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
