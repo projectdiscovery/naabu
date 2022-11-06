@@ -1,6 +1,8 @@
 cmd/naabu/naabu*
 v2/cmd/naabu/naabu*
 vendor
+integration_tests/naabu
+integration_tests/integration-test
 v2/cmd/functional-test/naabu_dev
 v2/cmd/functional-test/functional-test
 v2/cmd/functional-test/naabu
