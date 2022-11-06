@@ -22,9 +22,7 @@ import (
 	"github.com/projectdiscovery/blackrock"
 	"github.com/projectdiscovery/clistats"
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
-	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -32,8 +30,10 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
-	"github.com/projectdiscovery/sliceutil"
 	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
+	fileutil "github.com/projectdiscovery/utils/file"
+	iputil "github.com/projectdiscovery/utils/ip"
+	sliceutil "github.com/projectdiscovery/utils/slice"
 	"github.com/remeh/sizedwaitgroup"
 )
 
