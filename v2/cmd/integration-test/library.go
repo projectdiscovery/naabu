@@ -25,8 +25,6 @@ func (h *httpxLibrary) Execute() error {
 
 	options := runner.Options{
 		HostsFile: testFile,
-		ResumeCfg: &runner.ResumeCfg{},
-		Retries:   1,
 		Ports:     "80",
 		Passive:   true,
 		OnResult:  func(hr *result.HostResult) {},

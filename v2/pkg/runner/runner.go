@@ -54,6 +54,12 @@ type Runner struct {
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
+	if options.Retries == 0 {
+		options.Retries = DefaultRetriesSynScan
+	}
+	if options.ResumeCfg == nil {
+		options.ResumeCfg = NewResumeCfg()
+	}
 	runner := &Runner{
 		options:   options,
 		asnClient: asn.New(),
