@@ -14,7 +14,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/phayes/freeport"
+	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
@@ -35,7 +35,11 @@ type Handlers struct {
 }
 
 func getFreePort() (int, error) {
-	return freeport.GetFreePort()
+	rawPort, err := freeport.GetFreePort("0.0.0.0", freeport.TCP)
+	if err != nil {
+		return 0, err
+	}
+	return rawPort.Port, nil
 }
 
 func NewScannerUnix(scanner *Scanner) error {
