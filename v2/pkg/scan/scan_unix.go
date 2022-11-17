@@ -35,7 +35,7 @@ type Handlers struct {
 }
 
 func getFreePort() (int, error) {
-	rawPort, err := freeport.GetFreePort("0.0.0.0", freeport.TCP)
+	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {
 		return 0, err
 	}

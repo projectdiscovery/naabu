@@ -511,7 +511,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	}
 	defer conn.Close()
 
-	rawPort, err := freeport.GetFreePort("0.0.0.0", freeport.TCP)
+	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {
 		return false, err
 	}
@@ -585,7 +585,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 			// We consider only incoming packets
 			if tcp.DstPort != layers.TCPPort(rawPort.Port) {
 				if s.debug {
-					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
+					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort.Port)
 				}
 				continue
 			} else if tcp.RST {
