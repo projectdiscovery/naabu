@@ -238,8 +238,8 @@ github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc h1:jqZK
 github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc/go.mod h1:5tNGQP9kOfW+X5+40pZP8aqPYLHs45nJkFaSHLxdeH8=
 github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb h1:Q7tb/p2ts+dT+v4nQpxTR0DSng2C1Hlnrw/NE4tgGZw=
 github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb/go.mod h1:EevMeCG1ogBoUJYaa0Mv9R1VUboDm/DiynId7DboKy0=
-github.com/projectdiscovery/clistats v0.0.8 h1:tjmWb15mqsPf/yrQXVHLe2ThZX/5+mgKSfZBKWWLh20=
-github.com/projectdiscovery/clistats v0.0.8/go.mod h1:lV6jUHAv2bYWqrQstqW8iVIydKJhWlVaLl3Xo9ioVGg=
+github.com/projectdiscovery/clistats v0.0.9 h1:8sA17+2qP+cTnY7LaaGURJW5stSM8UwQiygwHQjxHx4=
+github.com/projectdiscovery/clistats v0.0.9/go.mod h1:7F1RdeGAoLf05rhsZesL0+qoXJpOA/vxuRj2JRIAzU4=
 github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a h1:x+/wTC4IEaSBtujl8JbdwWjprfAfLntSr8HTh7pPbbM=
 github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a/go.mod h1:jk2CjjLoxm5wZ14URcbi/OdvVy4MTtdpNAjDK3VWYF4=
 github.com/projectdiscovery/fdmax v0.0.3 h1:FM6lv9expZ/rEEBI9tkRh6tx3DV0gtpwzdc0h7bGPqg=
@@ -368,7 +368,6 @@ golang.org/x/crypto v0.0.0-20190308221718-c2843e01d9a2/go.mod h1:djNgcEr1/C05ACk
 golang.org/x/crypto v0.0.0-20190701094942-4def268fd1a4/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20191011191535-87dc89f01550/go.mod h1:yigFU9vqHzYiE8UmvKecakEJjdnWj3jj499lnFckfCI=
 golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
-golang.org/x/crypto v0.0.0-20201112155050-0c6587e931a9/go.mod h1:LzIPMQfyMNhhGPhUkYOs5KpL4U8rLKemX1yGLhDgUto=
 golang.org/x/crypto v0.0.0-20210921155107-089bfa567519/go.mod h1:GvvjBRRGRdwPK5ydBHafDWAxML/pGHZbMvKqRZ5+Abc=
 golang.org/x/exp v0.0.0-20190121172915-509febef88a4/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
 golang.org/x/exp v0.0.0-20190306152737-a1d7652674e8/go.mod h1:CJ0aWSM057203Lf6IL+f9T1iT9GByDxfZKAQTCR3kQA=
@@ -444,7 +443,6 @@ golang.org/x/sys v0.0.0-20200202164722-d101bd2416d5/go.mod h1:h1NjWce9XRLGQEsW7w
 golang.org/x/sys v0.0.0-20200323222414-85ca7c5b95cd/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200519105757-fe76b779f299/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20200930185726-fdedc70b468f/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
-golang.org/x/sys v0.0.0-20201113233024-12cec1faf1ba/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20201119102817-f84b799fce68/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20201201145000-ef89a241ccb3/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=
 golang.org/x/sys v0.0.0-20210112080510-489259a85091/go.mod h1:h1NjWce9XRLGQEsW7wpKNCjG9DtNlClVuFLEZdDNbEs=

@@ -7,7 +7,7 @@ require (
 	github.com/phayes/freeport v0.0.0-20180830031419-95f893ade6f2
 	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
-	github.com/projectdiscovery/clistats v0.0.8
+	github.com/projectdiscovery/clistats v0.0.9
 	github.com/projectdiscovery/fdmax v0.0.3
 	github.com/projectdiscovery/fileutil v0.0.3 // indirect
 	github.com/projectdiscovery/goflags v0.1.3
