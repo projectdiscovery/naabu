@@ -4,15 +4,15 @@ go 1.18
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.9
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/fileutil v0.0.3 // indirect
+	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/goflags v0.1.3
 	github.com/projectdiscovery/gologger v1.1.4
-	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
+	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
 	//go.uber.org/ratelimit v0.2.0 // indirect
@@ -34,7 +34,7 @@ require (
 	github.com/projectdiscovery/utils v0.0.3
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.8.0
-	golang.org/x/exp v0.0.0-20220907003533-145caa8ea1d0
+	golang.org/x/exp v0.0.0-20221019170559-20944726eadf
 )
 
 require (
@@ -77,7 +77,6 @@ require (
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
-	golang.org/x/exp v0.0.0-20221019170559-20944726eadf // indirect
 	golang.org/x/mod v0.6.0-dev.0.20220419223038-86c51ed26bb4 // indirect
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
