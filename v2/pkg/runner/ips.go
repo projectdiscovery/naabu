@@ -3,8 +3,8 @@ package runner
 import (
 	"strings"
 
-	"github.com/projectdiscovery/fileutil"
-	"github.com/projectdiscovery/iputil"
+	fileutil "github.com/projectdiscovery/utils/file"
+	iputil "github.com/projectdiscovery/utils/ip"
 )
 
 func parseExcludedIps(options *Options) ([]string, error) {

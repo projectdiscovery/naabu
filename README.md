@@ -360,8 +360,6 @@ import (
 
 func main() {
 	options := runner.Options{
-		ResumeCfg: &runner.ResumeCfg{},
-		Retries:   1,
 		Host:      goflags.StringSlice{"scanme.sh"},
 		OnResult: func(hr *result.HostResult) {
 			log.Println(hr.Host, hr.Ports)

@@ -14,7 +14,7 @@ import (
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
-	"github.com/phayes/freeport"
+	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -38,7 +38,11 @@ type Handlers struct {
 }
 
 func getFreePort() (int, error) {
-	return freeport.GetFreePort()
+	rawPort, err := freeport.GetFreeTCPPort("")
+	if err != nil {
+		return 0, err
+	}
+	return rawPort.Port, nil
 }
 
 // NewScannerUnix creates a new instance specific for unix OS

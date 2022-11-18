@@ -13,8 +13,8 @@ import (
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-	"github.com/phayes/freeport"
 	"github.com/projectdiscovery/cdncheck"
+	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/iputil"
@@ -24,6 +24,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/networkpolicy"
+	iputil "github.com/projectdiscovery/utils/ip"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
 	"golang.org/x/net/ipv6"
@@ -601,7 +602,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	}
 	defer conn.Close()
 
-	rawPort, err := freeport.GetFreePort()
+	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {
 		return false, err
 	}
@@ -633,7 +634,7 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 	}
 
 	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(rawPort),
+		SrcPort: layers.TCPPort(rawPort.Port),
 		DstPort: layers.TCPPort(port),
 		ACK:     true,
 		Window:  1024,
@@ -673,9 +674,9 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 				continue
 			}
 			// We consider only incoming packets
-			if tcp.DstPort != layers.TCPPort(rawPort) {
+			if tcp.DstPort != layers.TCPPort(rawPort.Port) {
 				if s.debug {
-					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort)
+					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort.Port)
 				}
 				continue
 			} else if tcp.RST {
