@@ -17,7 +17,6 @@ require (
 	github.com/projectdiscovery/goflags v0.1.4
 	github.com/projectdiscovery/gologger v1.1.5
 	github.com/projectdiscovery/ipranger v0.0.4
-	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8
 	github.com/projectdiscovery/mapcidr v1.0.3
 	github.com/projectdiscovery/networkpolicy v0.0.2
 	github.com/projectdiscovery/ratelimit v0.0.1
@@ -69,6 +68,7 @@ require (
 	github.com/projectdiscovery/asnmap v0.0.1 // indirect
 	github.com/projectdiscovery/fileutil v0.0.1 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
+	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.15 // indirect
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4 // indirect
 	github.com/projectdiscovery/stringsutil v0.0.1 // indirect

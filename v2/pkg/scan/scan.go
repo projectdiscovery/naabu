@@ -17,7 +17,6 @@ import (
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
-	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
