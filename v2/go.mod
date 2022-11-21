@@ -4,13 +4,13 @@ go 1.18
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.9
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/fileutil v0.0.3 // indirect
-	github.com/projectdiscovery/goflags v0.1.3
+	github.com/projectdiscovery/freeport v0.0.3
+	github.com/projectdiscovery/goflags v0.1.4
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
