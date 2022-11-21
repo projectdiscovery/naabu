@@ -4,14 +4,14 @@ go 1.18
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.9
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/fileutil v0.0.3 // indirect
+	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/goflags v0.1.3
-	github.com/projectdiscovery/gologger v1.1.4
+	github.com/projectdiscovery/gologger v1.1.5
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
 	github.com/projectdiscovery/networkpolicy v0.0.2-0.20220525172507-b844eafc878d
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -53,6 +53,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgraph-io/badger v1.6.2 // indirect
 	github.com/dgraph-io/ristretto v0.0.3 // indirect
+	github.com/dsnet/compress v0.0.1 // indirect
 	github.com/dustin/go-humanize v1.0.0 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
@@ -62,9 +63,12 @@ require (
 	github.com/klauspost/compress v1.11.7 // indirect
 	github.com/kr/pretty v0.2.1 // indirect
 	github.com/kr/text v0.2.0 // indirect
+	github.com/mholt/archiver v3.1.1+incompatible // indirect
 	github.com/microcosm-cc/bluemonday v1.0.21 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/nwaples/rardecode v1.1.0 // indirect
+	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v0.0.1 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
@@ -73,6 +77,8 @@ require (
 	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
+	github.com/ulikunitz/xz v0.5.7 // indirect
+	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
@@ -81,5 +87,6 @@ require (
 	golang.org/x/text v0.4.0 // indirect
 	golang.org/x/tools v0.1.12 // indirect
 	google.golang.org/protobuf v1.26.0 // indirect
+	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
