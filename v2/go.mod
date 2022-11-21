@@ -4,12 +4,12 @@ go 1.18
 
 require (
 	github.com/google/gopacket v1.1.19
-	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/blackrock v0.0.0-20220628111055-35616c71b2dc
 	github.com/projectdiscovery/cdncheck v0.0.4-0.20220322144854-b2d8ce308abb
 	github.com/projectdiscovery/clistats v0.0.9
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/fileutil v0.0.3 // indirect
+	github.com/projectdiscovery/freeport v0.0.3
 	github.com/projectdiscovery/goflags v0.1.3
 	github.com/projectdiscovery/gologger v1.1.4
 	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
@@ -26,7 +26,7 @@ require (
 	github.com/miekg/dns v1.1.50
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/dnsx v1.1.1-0.20220726121728-699bed01313a
-	github.com/projectdiscovery/ipranger v0.0.3
+	github.com/projectdiscovery/ipranger v0.0.4
 	github.com/projectdiscovery/mapcidr v1.0.3
 	github.com/projectdiscovery/ratelimit v0.0.1
 	github.com/projectdiscovery/retryablehttp-go v1.0.3
