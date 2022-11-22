@@ -86,7 +86,8 @@ func (r *Runner) handleNmap() error {
 			// if requested via config file or via cli
 			if (r.options.Nmap || hasCLI) && commandCanBeExecuted {
 				gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
-				cmd := exec.Command(args[0], args[1:]...)
+				cmd := exec.Command("nmap", args[0:]...)
+
 				cmd.Stdout = os.Stdout
 				err := cmd.Run()
 				if err != nil {
