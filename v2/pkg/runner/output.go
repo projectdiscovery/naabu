@@ -12,16 +12,17 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
 )
 
 // Result contains the result for a host
 type Result struct {
-	Host      string    `json:"host,omitempty" csv:"host"`
-	IP        string    `json:"ip,omitempty" csv:"ip"`
-	Port      int       `json:"port" csv:"port"`
-	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
-	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp time.Time `json:"timestamp" csv:"timestamp"`
+	Host      string     `json:"host,omitempty" csv:"host"`
+	IP        string     `json:"ip,omitempty" csv:"ip"`
+	Port      *port.Port `json:"port" csv:"port"`
+	IsCDNIP   bool       `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string     `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp time.Time  `json:"timestamp" csv:"timestamp"`
 }
 
 func (r *Result) JSON() ([]byte, error) {
@@ -55,14 +56,14 @@ func (r *Result) CSVFields() ([]string, error) {
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, ports []int, cdnName string, writer io.Writer) error {
+func WriteHostOutput(host string, ports []*port.Port, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
 
-	for _, port := range ports {
+	for _, p := range ports {
 		sb.WriteString(host)
 		sb.WriteString(":")
-		sb.WriteString(strconv.Itoa(port))
+		sb.WriteString(strconv.Itoa(p.Port))
 		if cdnName != "" {
 			sb.WriteString(" [" + cdnName + "]")
 		}
@@ -79,7 +80,7 @@ func WriteHostOutput(host string, ports []int, cdnName string, writer io.Writer)
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports []int, isCdn bool, cdnName string, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports []*port.Port, isCdn bool, cdnName string, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 	data := Result{TimeStamp: time.Now().UTC()}
 	if host != ip {
@@ -88,10 +89,9 @@ func WriteJSONOutput(host, ip string, ports []int, isCdn bool, cdnName string, w
 	data.IP = ip
 	data.IsCDNIP = isCdn
 	data.CDNName = cdnName
-	for _, port := range ports {
-		data.Port = port
-		err := encoder.Encode(&data)
-		if err != nil {
+	for _, p := range ports {
+		data.Port = p
+		if err := encoder.Encode(&data); err != nil {
 			return err
 		}
 	}
@@ -99,7 +99,7 @@ func WriteJSONOutput(host, ip string, ports []int, isCdn bool, cdnName string, w
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports []int, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []*port.Port, isCdn bool, cdnName string, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{TimeStamp: time.Now().UTC()}
 	if header {
@@ -111,8 +111,8 @@ func WriteCsvOutput(host, ip string, ports []int, isCdn bool, cdnName string, he
 	data.IP = ip
 	data.IsCDNIP = isCdn
 	data.CDNName = cdnName
-	for _, port := range ports {
-		data.Port = port
+	for _, p := range ports {
+		data.Port = p
 		writeCSVRow(data, encoder)
 	}
 	encoder.Flush()

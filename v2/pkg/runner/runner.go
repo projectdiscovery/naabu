@@ -25,7 +25,9 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/mapcidr/asn"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
@@ -279,8 +281,8 @@ func (r *Runner) RunEnumeration() error {
 						return
 					}
 
-					for _, port := range data.Ports {
-						r.scanner.ScanResults.AddPort(ip, port)
+					for _, p := range data.Ports {
+						r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
 					}
 				}(ip)
 			}
@@ -366,7 +368,7 @@ func (r *Runner) RunEnumeration() error {
 				resumeCfgIndex := r.options.ResumeCfg.Index
 				r.options.ResumeCfg.RUnlock()
 				if index < resumeCfgIndex {
-					gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port)
+					gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
 					continue
 				}
 
@@ -493,7 +495,7 @@ func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
 	return ip.String()
 }
 
-func (r *Runner) PickPort(index int) int {
+func (r *Runner) PickPort(index int) *port.Port {
 	return r.scanner.Ports[index]
 }
 
@@ -527,13 +529,24 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 	r.handleHostDiscovery(ip)
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, port int) {
-	// skip invalid combinations
-	r.handleHostPortSyn(ip, port)
+func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
+	// performs cdn scan exclusions checks
+	if !r.canIScanIfCDN(ip, p) {
+		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+		return
+	}
+
+	r.limiter.Take()
+	switch p.Protocol {
+	case protocol.TCP:
+		r.scanner.EnqueueTCP(ip, scan.Syn, p)
+	case protocol.UDP:
+		r.scanner.EnqueueUDP(ip, p)
+	}
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
-func (r *Runner) canIScanIfCDN(host string, port int) bool {
+func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	// if CDN ips are not excluded all scans are allowed
 	if !r.options.ExcludeCDN {
 		return true
@@ -545,26 +558,26 @@ func (r *Runner) canIScanIfCDN(host string, port int) bool {
 	}
 
 	// If the cdn is part of the CDN ips range - only ports 80 and 443 are allowed
-	return port == 80 || port == 443
+	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(host string, port int) {
+func (r *Runner) handleHostPort(host string, p *port.Port) {
 	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
-	if !r.canIScanIfCDN(host, port) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
+	if !r.canIScanIfCDN(host, p) {
+		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
 		return
 	}
 
-	if r.scanner.ScanResults.IPHasPort(host, port) {
+	if r.scanner.ScanResults.IPHasPort(host, p) {
 		return
 	}
 
 	r.limiter.Take()
-	open, err := r.scanner.ConnectPort(host, port, time.Duration(r.options.Timeout)*time.Millisecond)
+	open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
 	if open && err == nil {
-		r.scanner.ScanResults.AddPort(host, port)
+		r.scanner.ScanResults.AddPort(host, p)
 	}
 }
 
@@ -589,29 +602,18 @@ func (r *Runner) handleHostDiscovery(host string) {
 	}
 	// Syn Probes
 	if len(r.options.TcpSynPingProbes) > 0 {
-		ports, _ := sliceutil.ToInt(r.options.TcpSynPingProbes)
+		ports, _ := parsePortsSlice(r.options.TcpSynPingProbes)
 		r.scanner.EnqueueTCP(host, scan.Syn, ports...)
 	}
 	// Ack Probes
 	if len(r.options.TcpAckPingProbes) > 0 {
-		ports, _ := sliceutil.ToInt(r.options.TcpAckPingProbes)
+		ports, _ := parsePortsSlice(r.options.TcpAckPingProbes)
 		r.scanner.EnqueueTCP(host, scan.Ack, ports...)
 	}
 	// IPv6-ND (for now we broadcast ICMPv6 to ff02::1)
 	if r.options.IPv6NeighborDiscoveryPing {
 		r.scanner.EnqueueICMP("ff02::1", scan.Ndp)
 	}
-}
-
-func (r *Runner) handleHostPortSyn(host string, port int) {
-	// performs cdn scan exclusions checks
-	if !r.canIScanIfCDN(host, port) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, port)
-		return
-	}
-
-	r.limiter.Take()
-	r.scanner.EnqueueTCP(host, scan.Syn, port)
 }
 
 func (r *Runner) SetSourceIP(sourceIP string) error {
@@ -712,8 +714,8 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if host != hostResult.IP {
 						data.Host = host
 					}
-					for _, port := range hostResult.Ports {
-						data.Port = port
+					for _, p := range hostResult.Ports {
+						data.Port = p
 						if r.options.JSON {
 							b, marshallErr := data.JSON()
 							if marshallErr != nil {
@@ -735,11 +737,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					writer.Flush()
 					gologger.Silent().Msgf("%s", buffer.String())
 				} else {
-					for _, port := range hostResult.Ports {
+					for _, p := range hostResult.Ports {
 						if r.options.OutputCDN && isCDNIP {
-							gologger.Silent().Msgf("%s:%d [%s]\n", host, port, cdnName)
+							gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
 						} else {
-							gologger.Silent().Msgf("%s:%d\n", host, port)
+							gologger.Silent().Msgf("%s:%d\n", host, p.Port)
 						}
 					}
 				}

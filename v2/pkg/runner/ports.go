@@ -3,11 +3,12 @@ package runner
 import (
 	"fmt"
 	"os"
-	"sort"
 	"strconv"
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 )
 
 const portListStrParts = 2
@@ -20,11 +21,8 @@ const (
 )
 
 // ParsePorts parses the list of ports and creates a port map
-func ParsePorts(options *Options) ([]int, error) {
-	portsFileMap := make(map[int]struct{})
-	portsCLIMap := make(map[int]struct{})
-	topPortsCLIMap := make(map[int]struct{})
-	var portsConfigList []map[int]struct{}
+func ParsePorts(options *Options) ([]*port.Port, error) {
+	var portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList []*port.Port
 
 	// If the user has specfied a ports file, use it
 	if options.PortsFile != "" {
@@ -96,8 +94,7 @@ func ParsePorts(options *Options) ([]int, error) {
 	}
 
 	// merge all the specified ports (meaningless if "all" is used)
-	portsConfigMap := merge(portsConfigList...)
-	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigMap)
+	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList)
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
@@ -109,17 +106,19 @@ func ParsePorts(options *Options) ([]int, error) {
 		if err != nil {
 			return nil, err
 		}
-		return flatten(m), nil
+		return m, nil
 	}
 
-	return flatten(ports), nil
+	return ports, nil
 }
 
 // excludePorts excludes the list of ports from the exclusion list
-func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, error) {
+func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
 	if options.ExcludePorts == "" {
 		return ports, nil
 	}
+
+	var filteredPorts []*port.Port
 
 	// Exclude the ports specified by the user in exclusion list
 	excludedPortsCLI, err := parsePortsList(options.ExcludePorts)
@@ -127,17 +126,34 @@ func excludePorts(options *Options, ports map[int]struct{}) (map[int]struct{}, e
 		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
 	}
 
-	for p := range excludedPortsCLI {
-		delete(ports, p)
+	for _, port := range ports {
+		found := false
+		for _, excludedPort := range excludedPortsCLI {
+			if excludedPort.Port == port.Port && excludedPort.Protocol == port.Protocol {
+				found = true
+				break
+			}
+		}
+		if !found {
+			continue
+		}
+
+		filteredPorts = append(filteredPorts, port)
 	}
-	return ports, nil
+	return filteredPorts, nil
 }
 
-func parsePortsList(data string) (map[int]struct{}, error) {
-	ports := make(map[int]struct{})
-	ranges := strings.Split(data, ",")
+func parsePortsSlice(ranges []string) ([]*port.Port, error) {
+	var ports []*port.Port
 	for _, r := range ranges {
 		r = strings.TrimSpace(r)
+
+		portProtocol := protocol.TCP
+		if strings.HasPrefix(r, "u:") {
+			portProtocol = protocol.UDP
+			r = strings.TrimPrefix(r, "u:")
+		}
+
 		if strings.Contains(r, "-") {
 			parts := strings.Split(r, "-")
 			if len(parts) != portListStrParts {
@@ -159,36 +175,41 @@ func parsePortsList(data string) (map[int]struct{}, error) {
 			}
 
 			for i := p1; i <= p2; i++ {
-				ports[i] = struct{}{}
+				port := &port.Port{Port: i, Protocol: portProtocol}
+				ports = append(ports, port)
 			}
 		} else {
-			port, err := strconv.Atoi(r)
+			portNumber, err := strconv.Atoi(r)
 			if err != nil {
 				return nil, fmt.Errorf("invalid port number: '%s'", r)
 			}
-			ports[port] = struct{}{}
+			port := &port.Port{Port: portNumber, Protocol: portProtocol}
+			ports = append(ports, port)
 		}
 	}
 
-	return ports, nil
-}
-
-// merge maps in a new one
-func merge(maps ...map[int]struct{}) (m map[int]struct{}) {
-	m = make(map[int]struct{})
-	for _, mp := range maps {
-		for p := range mp {
-			m[p] = struct{}{}
+	// dedupe ports
+	seen := make(map[string]struct{})
+	var dedupedPorts []*port.Port
+	for _, port := range ports {
+		if _, ok := seen[port.String()]; ok {
+			continue
 		}
+		seen[port.String()] = struct{}{}
+		dedupedPorts = append(dedupedPorts, port)
 	}
-	return
+
+	return dedupedPorts, nil
 }
 
-func flatten(m map[int]struct{}) (s []int) {
-	for k := range m {
-		s = append(s, k)
-	}
+func parsePortsList(data string) ([]*port.Port, error) {
+	return parsePortsSlice(strings.Split(data, ","))
+}
 
-	sort.Ints(s)
-	return
+func merge(slices ...[]*port.Port) []*port.Port {
+	var result []*port.Port
+	for _, slice := range slices {
+		result = append(result, slice...)
+	}
+	return result
 }
