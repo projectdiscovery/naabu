@@ -86,7 +86,22 @@ func (r *Runner) handleNmap() error {
 			// if requested via config file or via cli
 			if (r.options.Nmap || hasCLI) && commandCanBeExecuted {
 				gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
-				cmd := exec.Command(args[0], args[1:]...)
+				// check when user type '-nmap-cli "nmap -sV"'
+				// automatically remove nmap
+				posArgs := 0
+				// nmapCommand helps to check if user is on a Windows machine
+				nmapCommand := "nmap"
+				if args[0] == "nmap" || args[0] == "nmap.exe" {
+					posArgs = 1
+				}
+
+				// if it's windows search for the executable
+				if isWindows() {
+					nmapCommand = "nmap.exe"
+				}
+
+				cmd := exec.Command(nmapCommand, args[posArgs:]...)
+
 				cmd.Stdout = os.Stdout
 				err := cmd.Run()
 				if err != nil {
