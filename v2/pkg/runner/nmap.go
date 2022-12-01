@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"os/exec"
 	"sort"
@@ -102,8 +101,6 @@ func (r *Runner) handleNmap() error {
 				}
 
 				cmd := exec.Command(nmapCommand, args[posArgs:]...)
-
-				log.Fatal(cmd)
 
 				cmd.Stdout = os.Stdout
 				err := cmd.Run()
