@@ -19,9 +19,9 @@ require (
 	github.com/projectdiscovery/ipranger v0.0.4
 	github.com/projectdiscovery/mapcidr v1.0.3
 	github.com/projectdiscovery/networkpolicy v0.0.3
-	github.com/projectdiscovery/ratelimit v0.0.1
+	github.com/projectdiscovery/ratelimit v0.0.2
 	github.com/projectdiscovery/retryablehttp-go v1.0.7
-	github.com/projectdiscovery/uncover v0.0.9
+	github.com/projectdiscovery/uncover v1.0.1
 	github.com/projectdiscovery/utils v0.0.4-0.20221201124851-f8524345b6d3
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.1
@@ -68,13 +68,13 @@ require (
 	github.com/projectdiscovery/asnmap v0.0.1 // indirect
 	github.com/projectdiscovery/fileutil v0.0.1 // indirect
 	github.com/projectdiscovery/hmap v0.0.2 // indirect
-	github.com/projectdiscovery/iputil v0.0.0-20220712175312-b9406f31cdd8 // indirect
+	github.com/projectdiscovery/iputil v0.0.2 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.15 // indirect
 	github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4 // indirect
-	github.com/projectdiscovery/stringsutil v0.0.1 // indirect
+	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
-	github.com/ulikunitz/xz v0.5.7 // indirect
+	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.5 // indirect
