@@ -169,7 +169,7 @@ func (r *Runner) RunEnumeration() error {
 
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
-	r.limiter = ratelimit.New(context.Background(), int64(r.options.Rate), time.Second)
+	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
@@ -502,7 +502,7 @@ func (r *Runner) PickPort(index int) *port.Port {
 func (r *Runner) ConnectVerification() {
 	r.scanner.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
-	limiter := ratelimit.New(context.Background(), int64(r.options.Rate), time.Second)
+	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 
 	verifiedResult := result.NewResult()
 
