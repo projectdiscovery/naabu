@@ -293,8 +293,8 @@ github.com/projectdiscovery/ratelimit v0.0.1/go.mod h1:zenrIElIcKg0Y9h7pMfTlw5va
 github.com/projectdiscovery/retryabledns v1.0.15 h1:3Nn119UwYsfUPC3g0q57ftz0Wb5Zl5ppvw8R0Xu0DEI=
 github.com/projectdiscovery/retryabledns v1.0.15/go.mod h1:3YbsQVqP7jbQ3CDmarhyVtkJaJ8XcB7S19vMeyMxZxk=
 github.com/projectdiscovery/retryablehttp-go v1.0.2/go.mod h1:dx//aY9V247qHdsRf0vdWHTBZuBQ2vm6Dq5dagxrDYI=
-github.com/projectdiscovery/retryablehttp-go v1.0.4 h1:FtRhBhyOnbCL1aDCTml+DzktAolHIbkozUkrbvzWPpY=
-github.com/projectdiscovery/retryablehttp-go v1.0.4/go.mod h1:t4buiLTB0HtI+62iHfGDqQVTv/i+8OhAKwaX93TGsFE=
+github.com/projectdiscovery/retryablehttp-go v1.0.7 h1:4Nd87QN+3yUMxYwQQgG/v+BLQt1fYqXu9PjEoar8LGs=
+github.com/projectdiscovery/retryablehttp-go v1.0.7/go.mod h1:ODXs70i/PgqfqFvycLfQG6QCqWqZMLoX8X68wu6Bg8M=
 github.com/projectdiscovery/sliceutil v0.0.0-20220617151003-15892688e1d6/go.mod h1:9YZb6LRjLYAvSOm65v787dwauurixSyjlqXyYa4rTTA=
 github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4 h1:C04j5gVVMXqFyBIetAz92SyPRYCpkFgIwZw0L/pps9Q=
 github.com/projectdiscovery/sliceutil v0.0.0-20220625085859-c3a4ecb669f4/go.mod h1:RxDaccMjPzIuF7F8XbdGl1yOcqxN4YPiHr9xHpfCkGI=
@@ -307,8 +307,8 @@ github.com/projectdiscovery/stringsutil v0.0.1 h1:a6TCMT+D1aUsoZxNiYf9O30wiDOoLO
 github.com/projectdiscovery/stringsutil v0.0.1/go.mod h1:TDi2LEqR3OML0BxGoMbbfAHSk5AdfHX762Oc302sgmM=
 github.com/projectdiscovery/uncover v0.0.9 h1:cjdL98jZEx10+I/14o6QFsCX6FOucggtl8G5qD7fa10=
 github.com/projectdiscovery/uncover v0.0.9/go.mod h1:+ZJNjDcznffXM03Ijt3AVjJslCJSvgnR7dRV7ulFdac=
-github.com/projectdiscovery/utils v0.0.3 h1:pAjZTGYpnATRc6uaNACdiHv4joZ0Ml7Wpu0dudpcGfM=
-github.com/projectdiscovery/utils v0.0.3/go.mod h1:ne3eSlZlUKuhjHr8FfsfGcGteCzxcbJvFBx4VDBCxK0=
+github.com/projectdiscovery/utils v0.0.4-0.20221201124851-f8524345b6d3 h1:sOvfN3xHLiBMb6GJ3yDxBmPnN0dh3xllaQXQYo7CFUo=
+github.com/projectdiscovery/utils v0.0.4-0.20221201124851-f8524345b6d3/go.mod h1:PCwA5YuCYWPgHaGiZmr53/SA9iGQmAnw7DSHuhr8VPQ=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
 github.com/remeh/sizedwaitgroup v1.0.0/go.mod h1:3j2R4OIe/SeS6YDhICBy22RWjJC5eNCJ1V+9+NVNYlo=
