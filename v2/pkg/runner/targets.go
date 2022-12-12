@@ -13,8 +13,8 @@ import (
 	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
-	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
+	readerutil "github.com/projectdiscovery/utils/reader"
 	"github.com/remeh/sizedwaitgroup"
 )
 
@@ -66,7 +66,7 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// targets from STDIN
 	if r.options.Stdin {
-		timeoutReader := fileutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
+		timeoutReader := readerutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
 		if _, err := io.Copy(tempInput, timeoutReader); err != nil {
 			return "", err
 		}
