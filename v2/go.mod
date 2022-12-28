@@ -25,7 +25,7 @@ require (
 	github.com/projectdiscovery/utils v0.0.4-0.20221201124851-f8524345b6d3
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.1
-	go.uber.org/multierr v1.8.0
+	go.uber.org/multierr v1.9.0
 	golang.org/x/exp v0.0.0-20221019170559-20944726eadf
 	golang.org/x/net v0.4.0
 	golang.org/x/sys v0.3.0
