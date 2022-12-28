@@ -93,11 +93,9 @@ func (options *Options) validateOptions() error {
 		if options.Nmap {
 			return errors.New("nmap not supported in stream active mode")
 		}
-	}
-
-	// stream passive
-	if options.Verify && !options.Passive {
-		return errors.New("verify not supported in stream active mode")
+		if options.Verify {
+			return errors.New("verify not supported in stream active mode")
+		}
 	}
 
 	// Parse and validate source ip and source port
