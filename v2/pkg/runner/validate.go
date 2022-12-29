@@ -96,8 +96,10 @@ func (options *Options) validateOptions() error {
 	}
 
 	// stream passive
-	if options.Verify && !options.Passive {
-		return errors.New("verify not supported in stream active mode")
+	if options.Verify {
+		if options.Stream && !options.Passive {
+			return errors.New("verify not supported in stream active mode")
+		}
 	}
 
 	// Parse and validate source ip and source port
