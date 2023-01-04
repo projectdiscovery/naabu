@@ -96,7 +96,7 @@ func (options *Options) validateOptions() error {
 	}
 
 	// stream passive
-	if options.Verify && !options.Passive {
+	if options.Verify && options.Stream && !options.Passive {
 		return errors.New("verify not supported in stream active mode")
 	}
 
