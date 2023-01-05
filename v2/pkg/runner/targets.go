@@ -162,6 +162,8 @@ func (r *Runner) AddTarget(target string) error {
 	return nil
 }
 
+const defaultMaxOutputInfoCount = 10000
+
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	ipsV4, ipsV6, err := r.host2ips(target)
 	if err != nil {
@@ -229,7 +231,10 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	for _, hostIP := range hostIPS {
-		gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+		if !r.outputInfoCache.Has(hostIP) {
+			gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+			_ = r.outputInfoCache.Set(hostIP, nil)
+		}
 		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
 		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
