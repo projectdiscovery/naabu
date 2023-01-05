@@ -17,7 +17,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/bluele/gcache"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
@@ -43,16 +42,15 @@ import (
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options         *Options
-	targetsFile     string
-	scanner         *scan.Scanner
-	limiter         *ratelimit.Limiter
-	wgscan          sizedwaitgroup.SizedWaitGroup
-	dnsclient       *dnsx.DNSX
-	stats           *clistats.Statistics
-	streamChannel   chan *net.IPNet
-	asnClient       asn.ASNClient
-	outputInfoCache gcache.Cache
+	options       *Options
+	targetsFile   string
+	scanner       *scan.Scanner
+	limiter       *ratelimit.Limiter
+	wgscan        sizedwaitgroup.SizedWaitGroup
+	dnsclient     *dnsx.DNSX
+	stats         *clistats.Statistics
+	streamChannel chan *net.IPNet
+	asnClient     asn.ASNClient
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -97,8 +95,6 @@ func NewRunner(options *Options) (*Runner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse ports: %s", err)
 	}
-
-	runner.outputInfoCache = gcache.New(defaultMaxOutputInfoCount).ARC().Build()
 
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
@@ -473,9 +469,6 @@ func (r *Runner) ShowScanResultOnExit() {
 func (r *Runner) Close() {
 	_ = os.RemoveAll(r.targetsFile)
 	_ = r.scanner.IPRanger.Hosts.Close()
-	if r.outputInfoCache != nil {
-		r.outputInfoCache.Purge()
-	}
 }
 
 // PickIP randomly

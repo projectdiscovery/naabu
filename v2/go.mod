@@ -4,7 +4,6 @@ go 1.18
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
-	github.com/bluele/gcache v0.0.2
 	github.com/google/gopacket v1.1.19
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.50
