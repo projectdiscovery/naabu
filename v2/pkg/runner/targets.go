@@ -162,8 +162,6 @@ func (r *Runner) AddTarget(target string) error {
 	return nil
 }
 
-const defaultMaxOutputInfoCount = 10000
-
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	ipsV4, ipsV6, err := r.host2ips(target)
 	if err != nil {
