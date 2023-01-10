@@ -467,8 +467,8 @@ func (r *Runner) ShowScanResultOnExit() {
 
 // Close runner instance
 func (r *Runner) Close() {
-	os.RemoveAll(r.targetsFile)
-	r.scanner.IPRanger.Hosts.Close()
+	_ = os.RemoveAll(r.targetsFile)
+	_ = r.scanner.IPRanger.Hosts.Close()
 }
 
 // PickIP randomly

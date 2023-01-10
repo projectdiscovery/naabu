@@ -229,7 +229,9 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	for _, hostIP := range hostIPS {
-		gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+		if !r.scanner.IPRanger.Contains(hostIP) {
+			gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+		}
 		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
 		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
