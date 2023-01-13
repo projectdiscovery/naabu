@@ -142,8 +142,20 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
-		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+		} else {
+			metadata := "ip"
+			if r.options.ReversePTR {
+				names, err := r.ipToHost(target)
+				if err != nil {
+					gologger.Debug().Msgf("reverse ptr failed for %s: %s\n", target, err)
+				} else {
+					metadata = strings.Trim(names[0], ".")
+				}
+			}
+			err := r.scanner.IPRanger.AddHostWithMetadata(target, metadata)
+			if err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
 		}
 		return nil
 	}
