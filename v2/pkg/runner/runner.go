@@ -469,6 +469,9 @@ func (r *Runner) ShowScanResultOnExit() {
 func (r *Runner) Close() {
 	_ = os.RemoveAll(r.targetsFile)
 	_ = r.scanner.IPRanger.Hosts.Close()
+	if r.options.EnableProgressBar {
+		_ = r.stats.Stop()
+	}
 }
 
 // PickIP randomly
