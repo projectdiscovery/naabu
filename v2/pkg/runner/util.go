@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"net"
 	"runtime"
 
 	"github.com/projectdiscovery/gologger"
@@ -38,21 +37,6 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 	}
 
 	return
-}
-
-func (r *Runner) ipToHost(target string) ([]string, error) {
-	if !iputil.IsIP(target) {
-		return []string{target}, nil
-	}
-	names, err := net.LookupAddr(target)
-	if err != nil {
-		return nil, err
-	}
-	if len(names) == 0 {
-		return names, fmt.Errorf("no names found for ip: %s", target)
-	}
-
-	return names, nil
 }
 
 func isOSSupported() bool {

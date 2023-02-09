@@ -145,7 +145,7 @@ func (r *Runner) AddTarget(target string) error {
 		} else {
 			metadata := "ip"
 			if r.options.ReversePTR {
-				names, err := r.ipToHost(target)
+				names, err := iputil.ToFQDN(target)
 				if err != nil {
 					gologger.Debug().Msgf("reverse ptr failed for %s: %s\n", target, err)
 				} else {

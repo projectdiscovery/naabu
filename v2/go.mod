@@ -22,7 +22,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.4
 	github.com/projectdiscovery/retryablehttp-go v1.0.8
 	github.com/projectdiscovery/uncover v1.0.2
-	github.com/projectdiscovery/utils v0.0.4-0.20221214110533-9f95ee986a54
+	github.com/projectdiscovery/utils v0.0.8
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.1
 	go.uber.org/multierr v1.9.0
