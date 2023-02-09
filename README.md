@@ -108,6 +108,7 @@ HOST-DISCOVERY:
    -pm, -probe-icmp-address-mask  ICMP address mask request Ping (host discovery needs to be enabled)
    -arp, -arp-ping                ARP ping (host discovery needs to be enabled)
    -nd, -nd-ping                  IPv6 Neighbor Discovery (host discovery needs to be enabled)
+   -rev-ptr                       Reverse PTR lookup for input ips
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
