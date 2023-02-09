@@ -309,8 +309,8 @@ github.com/projectdiscovery/stringsutil v0.0.2 h1:uzmw3IVLJSMW1kEg8eCStG/cGbYYZA
 github.com/projectdiscovery/stringsutil v0.0.2/go.mod h1:EJ3w6bC5fBYjVou6ryzodQq37D5c6qbAYQpGmAy+DC0=
 github.com/projectdiscovery/uncover v1.0.2 h1:mRFzflYyvwKkHd3XKufMlDRrb6p1mjFZTSHoNAUpFwo=
 github.com/projectdiscovery/uncover v1.0.2/go.mod h1:lz4QYfArSA6jJkXyB71kN2/Pc7IW7nJB8c95n7xtwqY=
-github.com/projectdiscovery/utils v0.0.4-0.20230117135930-7371ae6a739d h1:iB/n2/NL4oh1IaEcqX6pBxj0WHfYN7finzNOKVNVISM=
-github.com/projectdiscovery/utils v0.0.4-0.20230117135930-7371ae6a739d/go.mod h1:PCwA5YuCYWPgHaGiZmr53/SA9iGQmAnw7DSHuhr8VPQ=
+github.com/projectdiscovery/utils v0.0.8 h1:yPl/DwhW0IGnWNjapcw03g97ria8ZM8fH5PbcX4QFUo=
+github.com/projectdiscovery/utils v0.0.8/go.mod h1:dZqlayNwgCGn2HgYfKrI71RjBEyKsEPovrU+UDfpQWw=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
 github.com/remeh/sizedwaitgroup v1.0.0/go.mod h1:3j2R4OIe/SeS6YDhICBy22RWjJC5eNCJ1V+9+NVNYlo=

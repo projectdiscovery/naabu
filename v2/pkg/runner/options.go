@@ -85,6 +85,8 @@ type Options struct {
 	ServiceDiscovery bool
 	// ServiceVersion attempts to discover service running on open ports with active/passive probes
 	ServiceVersion bool
+	// ReversePTR lookup for ips
+	ReversePTR bool
 }
 
 // OnResultCallback (hostResult)
@@ -154,6 +156,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping (host discovery needs to be enabled)"),
 		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping (host discovery needs to be enabled)"),
 		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery (host discovery needs to be enabled)"),
+		flagSet.BoolVar(&options.ReversePTR, "rev-ptr", false, "Reverse PTR lookup for input ips"),
 		// The following flags are left as placeholder
 		// flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),
 		// flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
