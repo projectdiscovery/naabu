@@ -1,6 +1,6 @@
 module github.com/projectdiscovery/naabu/v2
 
-go 1.18
+go 1.19
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
@@ -10,7 +10,7 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.0-20221117191031-9e84f9d7a54c
 	github.com/projectdiscovery/cdncheck v0.0.3
-	github.com/projectdiscovery/clistats v0.0.9
+	github.com/projectdiscovery/clistats v0.0.11
 	github.com/projectdiscovery/dnsx v1.1.1
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.4
@@ -19,8 +19,8 @@ require (
 	github.com/projectdiscovery/ipranger v0.0.4
 	github.com/projectdiscovery/mapcidr v1.0.3
 	github.com/projectdiscovery/networkpolicy v0.0.3
-	github.com/projectdiscovery/ratelimit v0.0.4
-	github.com/projectdiscovery/retryablehttp-go v1.0.8
+	github.com/projectdiscovery/ratelimit v0.0.5
+	github.com/projectdiscovery/retryablehttp-go v1.0.9
 	github.com/projectdiscovery/uncover v1.0.2
 	github.com/projectdiscovery/utils v0.0.8
 	github.com/remeh/sizedwaitgroup v1.0.0
