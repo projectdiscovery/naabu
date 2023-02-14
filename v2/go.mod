@@ -15,7 +15,7 @@ require (
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.4
 	github.com/projectdiscovery/goflags v0.1.6
-	github.com/projectdiscovery/gologger v1.1.7
+	github.com/projectdiscovery/gologger v1.1.8
 	github.com/projectdiscovery/ipranger v0.0.4
 	github.com/projectdiscovery/mapcidr v1.1.0
 	github.com/projectdiscovery/networkpolicy v0.0.3
