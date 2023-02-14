@@ -24,7 +24,6 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -50,7 +49,6 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan *net.IPNet
-	asnClient     asn.ASNClient
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -63,8 +61,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		options.ResumeCfg = NewResumeCfg()
 	}
 	runner := &Runner{
-		options:   options,
-		asnClient: asn.New(),
+		options: options,
 	}
 	runner.streamChannel = make(chan *net.IPNet)
 

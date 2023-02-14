@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	"github.com/projectdiscovery/ipranger"
-	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/stretchr/testify/require"
 )
@@ -14,9 +13,8 @@ func Test_AddTarget(t *testing.T) {
 	defer ipranger.Close()
 
 	r := &Runner{
-		options:   &Options{},
-		scanner:   &scan.Scanner{IPRanger: ipranger},
-		asnClient: asn.New(),
+		options: &Options{},
+		scanner: &scan.Scanner{IPRanger: ipranger},
 	}
 
 	// IPV6 Compressed should generate a warning
