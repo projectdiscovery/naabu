@@ -113,7 +113,7 @@ func (r *Runner) AddTarget(target string) error {
 	}
 	if asn.IsASN(target) {
 		// Get CIDRs for ASN
-		cidrs, err := r.asnClient.GetCIDRsForASNNum(target)
+		cidrs, err := asn.GetCIDRsForASNNum(target)
 		if err != nil {
 			return err
 		}
