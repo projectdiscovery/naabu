@@ -11,7 +11,7 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.0-20221117191031-9e84f9d7a54c
 	github.com/projectdiscovery/cdncheck v0.0.3
 	github.com/projectdiscovery/clistats v0.0.12
-	github.com/projectdiscovery/dnsx v1.1.1
+	github.com/projectdiscovery/dnsx v1.1.2
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.6
@@ -63,9 +63,9 @@ require (
 	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.0 // indirect
-	github.com/projectdiscovery/hmap v0.0.7 // indirect
+	github.com/projectdiscovery/hmap v0.0.8 // indirect
 	github.com/projectdiscovery/iputil v0.0.2 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.20 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.21 // indirect
 	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/prometheus/client_golang v1.14.0 // indirect
 	github.com/prometheus/client_model v0.3.0 // indirect
@@ -85,7 +85,7 @@ require (
 	github.com/ulikunitz/xz v0.5.10 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
-	go.etcd.io/bbolt v1.3.6 // indirect
+	go.etcd.io/bbolt v1.3.7 // indirect
 	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/mod v0.6.0 // indirect
 	golang.org/x/text v0.7.0 // indirect
