@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest] # Todo: windows-latest, macOS-latest
+        os: [ubuntu-latest-16-cores] # Todo: windows-latest, macOS-latest
 
     steps:
       - name: Set up Go
