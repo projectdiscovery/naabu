@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/projectdiscovery/fileutil"
+	fileutil "github.com/projectdiscovery/utils/file"
 	"github.com/stretchr/testify/assert"
 )
 

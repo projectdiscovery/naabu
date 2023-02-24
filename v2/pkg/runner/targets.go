@@ -9,12 +9,12 @@ import (
 	"os"
 	"strings"
 
-	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr/asn"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	iputil "github.com/projectdiscovery/utils/ip"
+	readerutil "github.com/projectdiscovery/utils/reader"
 	"github.com/remeh/sizedwaitgroup"
 )
 
@@ -66,7 +66,7 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// targets from STDIN
 	if r.options.Stdin {
-		timeoutReader := fileutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
+		timeoutReader := readerutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
 		if _, err := io.Copy(tempInput, timeoutReader); err != nil {
 			return "", err
 		}
@@ -113,7 +113,7 @@ func (r *Runner) AddTarget(target string) error {
 	}
 	if asn.IsASN(target) {
 		// Get CIDRs for ASN
-		cidrs, err := r.asnClient.GetCIDRsForASNNum(target)
+		cidrs, err := asn.GetCIDRsForASNNum(target)
 		if err != nil {
 			return err
 		}
@@ -142,8 +142,20 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		if r.options.Stream {
 			r.streamChannel <- iputil.ToCidr(target)
-		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "ip"); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+		} else {
+			metadata := "ip"
+			if r.options.ReversePTR {
+				names, err := iputil.ToFQDN(target)
+				if err != nil {
+					gologger.Debug().Msgf("reverse ptr failed for %s: %s\n", target, err)
+				} else {
+					metadata = strings.Trim(names[0], ".")
+				}
+			}
+			err := r.scanner.IPRanger.AddHostWithMetadata(target, metadata)
+			if err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
 		}
 		return nil
 	}
@@ -229,7 +241,9 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	for _, hostIP := range hostIPS {
-		gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+		if !r.scanner.IPRanger.Contains(hostIP) {
+			gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
+		}
 		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
 		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)

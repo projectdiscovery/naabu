@@ -7,10 +7,10 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/projectdiscovery/fileutil"
-	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
-	"github.com/projectdiscovery/sliceutil"
+	fileutil "github.com/projectdiscovery/utils/file"
+	iputil "github.com/projectdiscovery/utils/ip"
+	sliceutil "github.com/projectdiscovery/utils/slice"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/gologger/formatter"
@@ -96,7 +96,7 @@ func (options *Options) validateOptions() error {
 	}
 
 	// stream passive
-	if options.Verify && !options.Passive {
+	if options.Verify && options.Stream && !options.Passive {
 		return errors.New("verify not supported in stream active mode")
 	}
 
@@ -127,6 +127,11 @@ func (options *Options) validateOptions() error {
 
 	if options.PortThreshold < 0 || options.PortThreshold > 65535 {
 		return errors.New("port threshold must be between 0 and 65535")
+	}
+
+	if options.Proxy != "" && options.ScanType == SynScan {
+		gologger.Warning().Msgf("Syn Scan can't be used with socks proxy: falling back to connect scan")
+		options.ScanType = ConnectScan
 	}
 
 	return nil
