@@ -13,19 +13,16 @@ const banner = `
                   __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.1.1
+/_//_/\_,_/\_,_/_.__/\_,_/ v2.1.2
 `
 
 // Version is the current version of naabu
-const Version = `2.1.1`
+const Version = `2.1.2`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
 	gologger.Print().Msgf("%s\n", banner)
 	gologger.Print().Msgf("\t\tprojectdiscovery.io\n\n")
-
-	gologger.Print().Msgf("Use with caution. You are responsible for your actions\n")
-	gologger.Print().Msgf("Developers assume no liability and are not responsible for any misuse or damage.\n")
 }
 
 // showNetworkCapabilities shows the network capabilities/scan types possible with the running user

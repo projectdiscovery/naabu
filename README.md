@@ -23,7 +23,7 @@
   <a href="https://discord.gg/projectdiscovery">Discord</a>
 </p>
 
-Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN/CONNECT scans on the host/list of hosts and lists
+Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner. It is a really simple tool that does fast SYN/CONNECT/UDP scans on the host/list of hosts and lists
 all ports that return a reply.
 
 # Features
@@ -33,7 +33,7 @@ all ports that return a reply.
   <br>
 </h1>
 
- - Fast And Simple **SYN/CONNECT** probe based scanning
+ - Fast And Simple **SYN/CONNECT/UDP** probe based scanning
  - Optimized for ease of use and **lightweight** on resources
  - **DNS** Port scan
  - **Automatic IP Deduplication** for DNS port scan
@@ -63,7 +63,7 @@ INPUT:
    -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            ports to scan (80,443, 100-200)
+   -port, -p string            ports to scan (80,443,100-200,u:53)
    -top-ports, -tp string      top ports to scan (default 100)
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
    -ports-file, -pf string     list of ports to scan (file)
@@ -108,6 +108,7 @@ HOST-DISCOVERY:
    -pm, -probe-icmp-address-mask  ICMP address mask request Ping (host discovery needs to be enabled)
    -arp, -arp-ping                ARP ping (host discovery needs to be enabled)
    -nd, -nd-ping                  IPv6 Neighbor Discovery (host discovery needs to be enabled)
+   -rev-ptr                       Reverse PTR lookup for input ips
 
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
@@ -174,10 +175,10 @@ hackerone.com:8443
 hackerone.com:8080
 ```
 
-The ports to scan for on the host can be specified via `-p` parameter. It takes nmap format ports and runs enumeration on them.
+The ports to scan for on the host can be specified via `-p` parameter (udp ports must be expressed as `u:port`). It takes nmap format ports and runs enumeration on them.
 
 ```sh
-naabu -p 80,443,21-23 -host hackerone.com
+naabu -p 80,443,21-23,u:53 -host hackerone.com
 ```
 
 By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
@@ -360,8 +361,6 @@ import (
 
 func main() {
 	options := runner.Options{
-		ResumeCfg: &runner.ResumeCfg{},
-		Retries:   1,
 		Host:      goflags.StringSlice{"scanme.sh"},
 		OnResult: func(hr *result.HostResult) {
 			log.Println(hr.Host, hr.Ports)

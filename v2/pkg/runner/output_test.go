@@ -5,12 +5,17 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestWriteHostOutput(t *testing.T) {
 	host := "127.0.0.1"
-	ports := []int{80, 8080}
+	ports := []*port.Port{
+		{Port: 80, Protocol: protocol.TCP},
+		{Port: 8080, Protocol: protocol.TCP},
+	}
 	var s string
 	buf := bytes.NewBufferString(s)
 	assert.Nil(t, WriteHostOutput(host, ports, "", buf))
@@ -21,7 +26,10 @@ func TestWriteHostOutput(t *testing.T) {
 func TestWriteJSONOutput(t *testing.T) {
 	host := "localhost"
 	ip := "127.0.0.1"
-	ports := []int{80, 8080}
+	ports := []*port.Port{
+		{Port: 80, Protocol: protocol.TCP},
+		{Port: 8080, Protocol: protocol.TCP},
+	}
 	var s string
 	buf := bytes.NewBufferString(s)
 	assert.Nil(t, WriteJSONOutput(host, ip, ports, false, "", buf))

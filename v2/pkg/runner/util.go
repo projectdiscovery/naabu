@@ -5,8 +5,8 @@ import (
 	"runtime"
 
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/iputil"
-	"github.com/projectdiscovery/sliceutil"
+	iputil "github.com/projectdiscovery/utils/ip"
+	sliceutil "github.com/projectdiscovery/utils/slice"
 )
 
 func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []string, err error) {

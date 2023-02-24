@@ -4,9 +4,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/projectdiscovery/fileutil"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	fileutil "github.com/projectdiscovery/utils/file"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -81,6 +81,12 @@ type Options struct {
 	// HostDiscoveryIgnoreRST      bool - planned
 	InputReadTimeout time.Duration
 	DisableStdin     bool
+	// ServiceDiscovery enables service discovery on found open ports (matches port number with service)
+	ServiceDiscovery bool
+	// ServiceVersion attempts to discover service running on open ports with active/passive probes
+	ServiceVersion bool
+	// ReversePTR lookup for ips
+	ReversePTR bool
 }
 
 // OnResultCallback (hostResult)
@@ -150,11 +156,17 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.IcmpAddressMaskRequestProbe, "probe-icmp-address-mask", "pm", false, "ICMP address mask request Ping (host discovery needs to be enabled)"),
 		flagSet.BoolVarP(&options.ArpPing, "arp-ping", "arp", false, "ARP ping (host discovery needs to be enabled)"),
 		flagSet.BoolVarP(&options.IPv6NeighborDiscoveryPing, "nd-ping", "nd", false, "IPv6 Neighbor Discovery (host discovery needs to be enabled)"),
+		flagSet.BoolVar(&options.ReversePTR, "rev-ptr", false, "Reverse PTR lookup for input ips"),
 		// The following flags are left as placeholder
 		// flagSet.StringSliceVarP(&options.IpProtocolPingProbes, "probe-ip-protocol", "po", []string{}, "IP Protocol Ping"),
 		// flagSet.StringSliceVarP(&options.UdpPingProbes, "probe-udp", "pu", []string{}, "UDP Ping"),
 		// flagSet.StringSliceVarP(&options.STcpInitPingProbes, "probe-stcp-init", "py", []string{}, "SCTP INIT Ping"),
 		// flagSet.BoolVarP(&options.HostDiscoveryIgnoreRST, "discovery-ignore-rst", "irst", false, "Ignore RST packets during host discovery"),
+	)
+
+	flagSet.CreateGroup("services-discovery", "Services-Discovery",
+		flagSet.BoolVarP(&options.ServiceDiscovery, "service-discovery", "sD", false, "Service Discovery"),
+		flagSet.BoolVarP(&options.ServiceVersion, "service-version", "sV", false, "Service Version"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
