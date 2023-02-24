@@ -380,6 +380,7 @@ func main() {
 
 # Notes
 
+- Naabu allows arbitrary binary execution as a feature to support [nmap integration](https://github.com/projectdiscovery/naabu#nmap-integration).
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
 - We suggest tuning the flags / rate if running naabu from local system.
