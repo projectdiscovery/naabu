@@ -59,7 +59,6 @@ type Options struct {
 	baseResolvers     []string
 	OnResult          OnResultCallback // OnResult callback
 	CSV               bool
-	StatsInterval     int // StatsInterval is the number of seconds to display stats after
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
@@ -185,7 +184,6 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Silent, "silent", false, "display only results in output"),
 		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
 		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan"),
-		flagSet.IntVarP(&options.StatsInterval, "stats-interval", "si", DefautStatsInterval, "number of seconds to wait between showing a statistics update"),
 	)
 
 	_ = flagSet.Parse()
