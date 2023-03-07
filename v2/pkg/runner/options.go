@@ -240,7 +240,7 @@ func (options *Options) ShouldLoadResume() bool {
 }
 
 func (options *Options) shouldDiscoverHosts() bool {
-	return options.OnlyHostDiscovery || !options.SkipHostDiscovery
+	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive
 }
 
 func (options *Options) hasProbes() bool {
