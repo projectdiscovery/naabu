@@ -11,6 +11,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	osutil "github.com/projectdiscovery/utils/os"
 )
 
 func (r *Runner) handleNmap() error {
@@ -96,7 +97,7 @@ func (r *Runner) handleNmap() error {
 				}
 
 				// if it's windows search for the executable
-				if isWindows() {
+				if osutil.IsWindows() {
 					nmapCommand = "nmap.exe"
 				}
 
@@ -120,7 +121,7 @@ func (r *Runner) handleNmap() error {
 
 func isCommandExecutable(args []string) bool {
 	commandLength := calculateCmdLength(args)
-	if isWindows() {
+	if osutil.IsWindows() {
 		// windows has a hard limit of
 		// - 2048 characters in XP
 		// - 32768 characters in Win7
