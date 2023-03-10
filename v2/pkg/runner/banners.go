@@ -7,6 +7,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	osutil "github.com/projectdiscovery/utils/os"
 )
 
 const banner = `
@@ -32,7 +33,7 @@ func showNetworkCapabilities(options *Options) {
 	switch {
 	case privileges.IsPrivileged && options.ScanType == SynScan:
 		accessLevel = "root"
-		if isLinux() {
+		if osutil.IsLinux() {
 			accessLevel = "CAP_NET_RAW"
 		}
 		scanType = "SYN"
