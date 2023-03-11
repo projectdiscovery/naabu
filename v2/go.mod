@@ -25,7 +25,7 @@ require (
 	github.com/projectdiscovery/utils v0.0.14
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.2
-	go.uber.org/multierr v1.9.0
+	go.uber.org/multierr v1.10.0
 	golang.org/x/exp v0.0.0-20221230185412-738e83a70c30
 	golang.org/x/net v0.8.0
 	golang.org/x/sys v0.6.0
@@ -86,7 +86,6 @@ require (
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
-	go.uber.org/atomic v1.10.0 // indirect
 	golang.org/x/mod v0.8.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
 	golang.org/x/tools v0.6.0 // indirect
