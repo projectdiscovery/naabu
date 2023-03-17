@@ -3,7 +3,7 @@ module github.com/projectdiscovery/naabu/v2
 go 1.19
 
 require (
-	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
+	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
 	github.com/google/gopacket v1.1.19
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.52
@@ -21,12 +21,12 @@ require (
 	github.com/projectdiscovery/networkpolicy v0.0.4
 	github.com/projectdiscovery/ratelimit v0.0.6
 	github.com/projectdiscovery/retryablehttp-go v1.0.13
-	github.com/projectdiscovery/uncover v1.0.2
+	github.com/projectdiscovery/uncover v1.0.3
 	github.com/projectdiscovery/utils v0.0.16
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.10.0
-	golang.org/x/exp v0.0.0-20230224173230-c95f2b4c22f2
+	golang.org/x/exp v0.0.0-20230314191032-db074128a8ec
 	golang.org/x/net v0.8.0
 	golang.org/x/sys v0.6.0
 )
@@ -75,7 +75,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.21 // indirect
 	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
-	github.com/saintfish/chardet v0.0.0-20120816061221-3af4cd4741ca // indirect
+	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tidwall/btree v1.4.3 // indirect
 	github.com/tidwall/buntdb v1.2.10 // indirect
@@ -92,10 +92,10 @@ require (
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/mod v0.8.0 // indirect
+	golang.org/x/mod v0.9.0 // indirect
 	golang.org/x/oauth2 v0.5.0 // indirect
 	golang.org/x/text v0.8.0 // indirect
-	golang.org/x/tools v0.6.0 // indirect
+	golang.org/x/tools v0.7.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
