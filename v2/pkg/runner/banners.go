@@ -8,6 +8,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	osutil "github.com/projectdiscovery/utils/os"
+	updateutils "github.com/projectdiscovery/utils/update"
 )
 
 const banner = `
@@ -18,7 +19,7 @@ const banner = `
 `
 
 // Version is the current version of naabu
-const Version = `2.1.2`
+const version = `2.1.2`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -87,4 +88,12 @@ func showNetworkInterfaces() error {
 	gologger.Info().Msgf("External Ip: %s\n", externalIP)
 
 	return nil
+}
+
+// GetUpdateCallback returns a callback function that updates naabu
+func GetUpdateCallback() func() {
+	return func() {
+		showBanner()
+		updateutils.GetUpdateToolCallback("naabu", version)()
+	}
 }

@@ -10,6 +10,7 @@ import (
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
+	updateutils "github.com/projectdiscovery/utils/update"
 )
 
 // Options contains the configuration options for tuning
@@ -86,6 +87,8 @@ type Options struct {
 	ServiceVersion bool
 	// ReversePTR lookup for ips
 	ReversePTR bool
+	//DisableUpdateCheck disables automatic update check
+	DisableUpdateCheck bool
 }
 
 // OnResultCallback (hostResult)
@@ -118,6 +121,11 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", 25, "general internal worker threads"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
+	)
+
+	flagSet.CreateGroup("update", "Update",
+		flagSet.CallbackVarP(GetUpdateCallback(), "update", "up", "update naabu to latest version"),
+		flagSet.BoolVarP(&options.DisableUpdateCheck, "disable-update-check", "duc", false, "disable automatic naabu update check"),
 	)
 
 	flagSet.CreateGroup("output", "Output",
@@ -211,8 +219,19 @@ func ParseOptions() *Options {
 	showBanner()
 
 	if options.Version {
-		gologger.Info().Msgf("Current Version: %s\n", Version)
+		gologger.Info().Msgf("Current Version: %s\n", version)
 		os.Exit(0)
+	}
+
+	if !options.DisableUpdateCheck {
+		latestVersion, err := updateutils.GetVersionCheckCallback("naabu")()
+		if err != nil {
+			if options.Verbose {
+				gologger.Error().Msgf("naabu version check failed: %v", err.Error())
+			}
+		} else {
+			gologger.Info().Msgf("Current naabu version %v %v", version, updateutils.GetVersionDescription(version, latestVersion))
+		}
 	}
 
 	// Show network configuration and exit if the user requested it
