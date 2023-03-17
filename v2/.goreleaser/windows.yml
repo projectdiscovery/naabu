@@ -15,8 +15,9 @@ builds:
     goos:
       - windows
     goarch:
-      - amd64 # arm+arm64 => incompatible with https://github.com/akrylysov/pogreb, 386 => problems with build GH build toolchain
-
+      - amd64
+      - arm64
+      - 386
 archives:
 - format: zip
 

@@ -1,8 +1,14 @@
-FROM golang:1.20.1-alpine AS builder
+# Build
+FROM golang:1.20.2-alpine AS builder
 RUN apk add build-base libpcap-dev
-RUN go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+WORKDIR /app
+COPY . /app
+WORKDIR /app/v2
+RUN go mod download
+RUN go build ./cmd/naabu
 
+# Release
 FROM alpine:3.17.2
 RUN apk add nmap libpcap-dev bind-tools ca-certificates nmap-scripts
-COPY --from=builder /go/bin/naabu /usr/local/bin/naabu
+COPY --from=builder /app/v2/naabu /usr/local/bin/
 ENTRYPOINT ["naabu"]

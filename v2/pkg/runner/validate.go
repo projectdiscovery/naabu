@@ -10,6 +10,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
+	osutil "github.com/projectdiscovery/utils/os"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 
 	"github.com/projectdiscovery/gologger"
@@ -122,6 +123,9 @@ func (options *Options) validateOptions() error {
 
 	// Host Discovery mode needs provileged access
 	if options.OnlyHostDiscovery && !privileges.IsPrivileged {
+		if osutil.IsWindows() {
+			return errors.New("host discovery not (yet) supported on windows")
+		}
 		return errors.New("sudo access required to perform host discovery")
 	}
 
