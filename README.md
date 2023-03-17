@@ -362,6 +362,7 @@ import (
 func main() {
 	options := runner.Options{
 		Host:      goflags.StringSlice{"scanme.sh"},
+		ScanType: "s",
 		OnResult: func(hr *result.HostResult) {
 			log.Println(hr.Host, hr.Ports)
 		},
