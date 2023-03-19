@@ -561,7 +561,11 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 	if s.proxyDialer != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), timeout)
 		defer cancel()
-		conn, err = s.proxyDialer.(proxy.ContextDialer).DialContext(ctx, p.Protocol.String(), hostport)
+		proxyDialer, ok := s.proxyDialer.(proxy.ContextDialer)
+		if !ok {
+			return false, errors.New("invalid proxy dialer")
+		}
+		conn, err = proxyDialer.DialContext(ctx, p.Protocol.String(), hostport)
 		if err != nil {
 			return false, err
 		}
