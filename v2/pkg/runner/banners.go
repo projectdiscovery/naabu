@@ -7,17 +7,19 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	osutil "github.com/projectdiscovery/utils/os"
+	updateutils "github.com/projectdiscovery/utils/update"
 )
 
 const banner = `
                   __
   ___  ___  ___ _/ /  __ __
  / _ \/ _ \/ _ \/ _ \/ // /
-/_//_/\_,_/\_,_/_.__/\_,_/ v2.1.2
+/_//_/\_,_/\_,_/_.__/\_,_/
 `
 
 // Version is the current version of naabu
-const Version = `2.1.2`
+const version = `2.1.4`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -32,7 +34,7 @@ func showNetworkCapabilities(options *Options) {
 	switch {
 	case privileges.IsPrivileged && options.ScanType == SynScan:
 		accessLevel = "root"
-		if isLinux() {
+		if osutil.IsLinux() {
 			accessLevel = "CAP_NET_RAW"
 		}
 		scanType = "SYN"
@@ -86,4 +88,12 @@ func showNetworkInterfaces() error {
 	gologger.Info().Msgf("External Ip: %s\n", externalIP)
 
 	return nil
+}
+
+// GetUpdateCallback returns a callback function that updates naabu
+func GetUpdateCallback() func() {
+	return func() {
+		showBanner()
+		updateutils.GetUpdateToolCallback("naabu", version)()
+	}
 }
