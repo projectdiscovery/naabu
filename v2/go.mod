@@ -18,7 +18,7 @@ require (
 	github.com/projectdiscovery/gologger v1.1.8
 	github.com/projectdiscovery/ipranger v0.0.5
 	github.com/projectdiscovery/mapcidr v1.1.1
-	github.com/projectdiscovery/networkpolicy v0.0.4
+	github.com/projectdiscovery/networkpolicy v0.0.5
 	github.com/projectdiscovery/ratelimit v0.0.6
 	github.com/projectdiscovery/retryablehttp-go v1.0.13
 	github.com/projectdiscovery/uncover v1.0.3
@@ -70,9 +70,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.2 // indirect
 	github.com/projectdiscovery/hmap v0.0.10 // indirect
-	github.com/projectdiscovery/iputil v0.0.2 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.21 // indirect
-	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
