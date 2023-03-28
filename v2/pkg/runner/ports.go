@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -87,7 +88,9 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
+		log.Println(ports)
 		portsCLIMap, err = excludePorts(options, ports)
+		log.Fatal(portsCLIMap)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
@@ -135,10 +138,8 @@ func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
 			}
 		}
 		if !found {
-			continue
+			filteredPorts = append(filteredPorts, port)
 		}
-
-		filteredPorts = append(filteredPorts, port)
 	}
 	return filteredPorts, nil
 }
