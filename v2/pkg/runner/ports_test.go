@@ -56,7 +56,7 @@ func TestExcludePorts(t *testing.T) {
 	filteredPorts, err = excludePorts(&options, ports)
 	assert.Nil(t, err)
 	expectedPorts := []*port.Port{
-		{Port: 1, Protocol: protocol.TCP},
+		{Port: 10, Protocol: protocol.TCP},
 	}
 	assert.EqualValues(t, expectedPorts, filteredPorts)
 }
