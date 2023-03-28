@@ -2,10 +2,10 @@ package runner
 
 import (
 	"fmt"
-	"runtime"
 
 	"github.com/projectdiscovery/gologger"
 	iputil "github.com/projectdiscovery/utils/ip"
+	osutil "github.com/projectdiscovery/utils/os"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 )
 
@@ -40,17 +40,5 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 }
 
 func isOSSupported() bool {
-	return isLinux() || isOSX()
-}
-
-func isOSX() bool {
-	return runtime.GOOS == "darwin"
-}
-
-func isLinux() bool {
-	return runtime.GOOS == "linux"
-}
-
-func isWindows() bool {
-	return runtime.GOOS == "windows"
+	return osutil.IsLinux() || osutil.IsOSX()
 }

@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -327,7 +326,7 @@ func (r *Runner) RunEnumeration() error {
 			r.stats.AddCounter("packets", uint64(0))
 			r.stats.AddCounter("errors", uint64(0))
 			r.stats.AddCounter("total", Range*uint64(r.options.Retries))
-			if err := r.stats.Start(makePrintCallback(), time.Duration(r.options.StatsInterval)*time.Second); err != nil {
+			if err := r.stats.Start(); err != nil {
 				gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
 			}
 		}
@@ -845,53 +844,5 @@ func writeCSVRow(data *Result, writer *csv.Writer) {
 	if err := writer.Write(rowData); err != nil {
 		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msgf(errMsg.Error())
-	}
-}
-
-const bufferSize = 128
-
-func makePrintCallback() func(stats clistats.StatisticsClient) {
-	builder := &strings.Builder{}
-	builder.Grow(bufferSize)
-
-	return func(stats clistats.StatisticsClient) {
-		builder.WriteRune('[')
-		startedAt, _ := stats.GetStatic("startedAt")
-		duration := time.Since(startedAt.(time.Time))
-		builder.WriteString(clistats.FmtDuration(duration))
-		builder.WriteRune(']')
-
-		hosts, _ := stats.GetStatic("hosts")
-		builder.WriteString(" | Hosts: ")
-		builder.WriteString(clistats.String(hosts))
-
-		ports, _ := stats.GetStatic("ports")
-		builder.WriteString(" | Ports: ")
-		builder.WriteString(clistats.String(ports))
-
-		retries, _ := stats.GetStatic("retries")
-		builder.WriteString(" | Retries: ")
-		builder.WriteString(clistats.String(retries))
-
-		packets, _ := stats.GetCounter("packets")
-		total, _ := stats.GetCounter("total")
-
-		builder.WriteString(" | PPS: ")
-		builder.WriteString(clistats.String(uint64(float64(packets) / duration.Seconds())))
-
-		builder.WriteString(" | Packets: ")
-		builder.WriteString(clistats.String(packets))
-		builder.WriteRune('/')
-		builder.WriteString(clistats.String(total))
-		builder.WriteRune(' ')
-		builder.WriteRune('(')
-		//nolint:gomnd // this is not a magic number
-		builder.WriteString(clistats.String(uint64(float64(packets) / float64(total) * 100.0)))
-		builder.WriteRune('%')
-		builder.WriteRune(')')
-		builder.WriteRune('\n')
-
-		fmt.Fprintf(os.Stderr, "%s", builder.String())
-		builder.Reset()
 	}
 }
