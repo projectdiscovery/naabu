@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -558,7 +559,13 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		conn net.Conn
 	)
 	if s.proxyDialer != nil {
-		conn, err = s.proxyDialer.Dial(p.Protocol.String(), hostport)
+		ctx, cancel := context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+		proxyDialer, ok := s.proxyDialer.(proxy.ContextDialer)
+		if !ok {
+			return false, errors.New("invalid proxy dialer")
+		}
+		conn, err = proxyDialer.DialContext(ctx, p.Protocol.String(), hostport)
 		if err != nil {
 			return false, err
 		}

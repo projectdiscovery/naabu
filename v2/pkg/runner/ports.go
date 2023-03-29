@@ -135,10 +135,8 @@ func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
 			}
 		}
 		if !found {
-			continue
+			filteredPorts = append(filteredPorts, port)
 		}
-
-		filteredPorts = append(filteredPorts, port)
 	}
 	return filteredPorts, nil
 }

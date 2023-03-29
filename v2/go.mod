@@ -10,23 +10,23 @@ require (
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.0-20221117191031-9e84f9d7a54c
 	github.com/projectdiscovery/cdncheck v0.0.3
-	github.com/projectdiscovery/clistats v0.0.14
+	github.com/projectdiscovery/clistats v0.0.15
 	github.com/projectdiscovery/dnsx v1.1.3
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.8
 	github.com/projectdiscovery/gologger v1.1.8
 	github.com/projectdiscovery/ipranger v0.0.5
-	github.com/projectdiscovery/mapcidr v1.1.0
-	github.com/projectdiscovery/networkpolicy v0.0.4
+	github.com/projectdiscovery/mapcidr v1.1.1
+	github.com/projectdiscovery/networkpolicy v0.0.5
 	github.com/projectdiscovery/ratelimit v0.0.6
-	github.com/projectdiscovery/retryablehttp-go v1.0.13
+	github.com/projectdiscovery/retryablehttp-go v1.0.14
 	github.com/projectdiscovery/uncover v1.0.3
-	github.com/projectdiscovery/utils v0.0.16
+	github.com/projectdiscovery/utils v0.0.18
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.10.0
-	golang.org/x/exp v0.0.0-20230314191032-db074128a8ec
+	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
 	golang.org/x/net v0.8.0
 	golang.org/x/sys v0.6.0
 )
@@ -70,9 +70,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.2 // indirect
 	github.com/projectdiscovery/hmap v0.0.10 // indirect
-	github.com/projectdiscovery/iputil v0.0.2 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.21 // indirect
-	github.com/projectdiscovery/stringsutil v0.0.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
