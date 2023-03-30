@@ -78,6 +78,16 @@ func (options *Options) validateOptions() error {
 		}
 	}
 
+	// disable functionalities for ip and port
+	if options.IPAndPort {
+		if options.Stream {
+			return errors.New("stream not supported in IP and Port mode")
+		}
+		if options.Passive {
+			return errors.New("passive not supported in IP and Port mode")
+		}
+	}
+
 	// passive mode enables automatically stream
 	if options.Passive {
 		options.Stream = true

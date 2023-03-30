@@ -111,6 +111,14 @@ func (r *Runner) AddTarget(target string) error {
 	if target == "" {
 		return nil
 	}
+	if r.options.IPAndPort {
+		if _, _, err := net.SplitHostPort(target); err != nil {
+			return err
+		}
+
+		r.scanner.IPAndPorts = append(r.scanner.IPAndPorts, target)
+		return nil
+	}
 	if asn.IsASN(target) {
 		// Get CIDRs for ASN
 		cidrs, err := asn.GetCIDRsForASNNum(target)

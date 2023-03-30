@@ -89,6 +89,8 @@ type Options struct {
 	ReversePTR bool
 	//DisableUpdateCheck disables automatic update check
 	DisableUpdateCheck bool
+	// IPAndPort allows passing ip:port format
+	IPAndPort bool
 }
 
 // OnResultCallback (hostResult)
@@ -151,6 +153,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
 		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", time.Duration(3*time.Minute), "timeout on input read"),
 		flagSet.BoolVar(&options.DisableStdin, "no-stdin", false, "Disable Stdin processing"),
+		flagSet.BoolVar(&options.IPAndPort, "ip-port", false, "allows passing ip:port format (Disables other port functionalities)"),
 	)
 
 	flagSet.CreateGroup("host-discovery", "Host-Discovery",

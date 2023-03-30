@@ -100,8 +100,9 @@ type Scanner struct {
 	timeout             time.Duration
 	proxyDialer         proxy.Dialer
 
-	Ports    []*port.Port
-	IPRanger *ipranger.IPRanger
+	Ports      []*port.Port
+	IPAndPorts []string
+	IPRanger   *ipranger.IPRanger
 
 	transportPacketSend  chan *PkgSend
 	icmpPacketSend       chan *PkgSend

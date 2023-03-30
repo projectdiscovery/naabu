@@ -23,7 +23,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	libPort "github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
@@ -278,7 +278,7 @@ func (r *Runner) RunEnumeration() error {
 					}
 
 					for _, p := range data.Ports {
-						r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
+						r.scanner.ScanResults.AddPort(ip, &libPort.Port{Port: p, Protocol: protocol.TCP})
 					}
 				}(ip)
 			}
@@ -297,27 +297,39 @@ func (r *Runner) RunEnumeration() error {
 	default:
 		showNetworkCapabilities(r.options)
 
-		ipsCallback := r.getPreprocessedIps
-		if shouldDiscoverHosts && shouldUseRawPackets {
-			ipsCallback = r.getHostDiscoveryIps
-		}
+		var (
+			targets                         interface{}
+			targetsCount, portsCount, Range uint64
+		)
 
-		// shrinks the ips to the minimum amount of cidr
-		targets, targetsV4, targetsv6, err := r.GetTargetIps(ipsCallback)
-		if err != nil {
-			return err
-		}
-		var targetsCount, portsCount uint64
-		for _, target := range append(targetsV4, targetsv6...) {
-			if target == nil {
-				continue
+		if r.options.IPAndPort {
+			targets = r.scanner.IPAndPorts
+			targetsCount = uint64(len(r.scanner.IPAndPorts))
+			Range = targetsCount
+		} else {
+			ipsCallback := r.getPreprocessedIps
+			if shouldDiscoverHosts && shouldUseRawPackets {
+				ipsCallback = r.getHostDiscoveryIps
 			}
-			targetsCount += mapcidr.AddressCountIpnet(target)
+
+			// shrinks the ips to the minimum amount of cidr
+			t, tV4, tv6, err := r.GetTargetIps(ipsCallback)
+			if err != nil {
+				return err
+			}
+			targets = t
+
+			for _, target := range append(tV4, tv6...) {
+				if target == nil {
+					continue
+				}
+				targetsCount += mapcidr.AddressCountIpnet(target)
+			}
+			portsCount = uint64(len(r.scanner.Ports))
+			Range = targetsCount * portsCount
 		}
-		portsCount = uint64(len(r.scanner.Ports))
 
 		r.scanner.Phase.Set(scan.Scan)
-		Range := targetsCount * portsCount
 		if r.options.EnableProgressBar {
 			r.stats.AddStatic("ports", portsCount)
 			r.stats.AddStatic("hosts", targetsCount)
@@ -355,10 +367,31 @@ func (r *Runner) RunEnumeration() error {
 			b := blackrock.New(int64(Range), currentSeed)
 			for index := int64(0); index < int64(Range); index++ {
 				xxx := b.Shuffle(index)
-				ipIndex := xxx / int64(portsCount)
-				portIndex := int(xxx % int64(portsCount))
-				ip := r.PickIP(targets, ipIndex)
-				port := r.PickPort(portIndex)
+
+				var (
+					ip   string
+					port *libPort.Port
+				)
+				if r.options.IPAndPort {
+					t := targets.([]string)
+					picked := t[index]
+					host, portSplit, err := net.SplitHostPort(picked)
+					if err != nil {
+						gologger.Error().Msgf("Failed to parse target: %s\n", picked)
+						continue
+					}
+					portInt, _ := strconv.Atoi(portSplit)
+
+					ip = host
+					port = &libPort.Port{Port: portInt, Protocol: protocol.TCP}
+				} else {
+					t := targets.([]*net.IPNet)
+					ipIndex := xxx / int64(portsCount)
+					portIndex := int(xxx % int64(portsCount))
+					ip = r.PickIP(t, ipIndex)
+					port = r.PickPort(portIndex)
+
+				}
 
 				r.options.ResumeCfg.RLock()
 				resumeCfgIndex := r.options.ResumeCfg.Index
@@ -494,7 +527,7 @@ func (r *Runner) PickSubnetIP(network *net.IPNet, index int64) string {
 	return ip.String()
 }
 
-func (r *Runner) PickPort(index int) *port.Port {
+func (r *Runner) PickPort(index int) *libPort.Port {
 	return r.scanner.Ports[index]
 }
 
@@ -528,7 +561,7 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 	r.handleHostDiscovery(ip)
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
+func (r *Runner) RawSocketEnumeration(ip string, p *libPort.Port) {
 	// performs cdn scan exclusions checks
 	if !r.canIScanIfCDN(ip, p) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
@@ -545,7 +578,7 @@ func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
 }
 
 // check if an ip can be scanned in case CDN exclusions are enabled
-func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
+func (r *Runner) canIScanIfCDN(host string, port *libPort.Port) bool {
 	// if CDN ips are not excluded all scans are allowed
 	if !r.options.ExcludeCDN {
 		return true
@@ -560,7 +593,7 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(host string, p *port.Port) {
+func (r *Runner) handleHostPort(host string, p *libPort.Port) {
 	defer r.wgscan.Done()
 
 	// performs cdn scan exclusions checks
