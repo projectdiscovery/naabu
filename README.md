@@ -124,8 +124,9 @@ DEBUG:
    -no-color, -nc            disable colors in CLI output
    -silent                   display only results in output
    -version                  display version of naabu
-   -stats                    display stats of the running scan
-   -si, -stats-interval int  number of seconds to wait between showing a statistics update (default 5)
+   -stats                    display stats of the running scan (deprecated)
+   -si, -stats-interval int  number of seconds to wait between showing a statistics update (default 5) (deprecated)
+   -mp, -metrics-port int    port to expose nuclei metrics on (default 63636)
 ```
 
 # Installation Instructions
@@ -344,6 +345,9 @@ PORT     STATE SERVICE       VERSION
 Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
+
+# Scan Status
+Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636` (the port can be changed via the `-metrics-port` flag)
 
 # Using naabu as library
 The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:
