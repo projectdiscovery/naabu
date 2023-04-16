@@ -111,7 +111,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.dnsclient = dnsclient
 
 	if options.EnableProgressBar {
-		stats, err := clistats.New()
+		defaultOptions := &clistats.DefaultOptions
+		defaultOptions.ListenPort = options.MetricsPort
+		stats, err := clistats.NewWithOptions(context.Background(), defaultOptions)
 		if err != nil {
 			gologger.Warning().Msgf("Couldn't create progress engine: %s\n", err)
 		} else {
@@ -742,7 +744,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
 				// console output
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), IsCDNIP: isCDNIP, CDNName: cdnName}
+					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+					if r.options.OutputCDN {
+						data.IsCDNIP = isCDNIP
+						data.CDNName = cdnName
+					}
 					if host != hostResult.IP {
 						data.Host = host
 					}
@@ -780,11 +786,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, isCDNIP, cdnName, csvFileHeaderEnabled, file)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file)
 					} else {
-						err = WriteHostOutput(host, hostResult.Ports, cdnName, file)
+						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
 					if err != nil {
 						gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
@@ -814,7 +820,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				gologger.Info().Msgf("Found alive host %s (%s)\n", host, hostIP)
 				// console output
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), IsCDNIP: isCDNIP, CDNName: cdnName}
+					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC()}
+					if r.options.OutputCDN {
+						data.IsCDNIP = isCDNIP
+						data.CDNName = cdnName
+					}
 					if host != hostIP {
 						data.Host = host
 					}
@@ -834,11 +844,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, isCDNIP, cdnName, csvFileHeaderEnabled, file)
+						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file)
 					} else {
-						err = WriteHostOutput(host, nil, cdnName, file)
+						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
 					if err != nil {
 						gologger.Error().Msgf("Could not write results to file %s for %s: %s\n", output, host, err)
