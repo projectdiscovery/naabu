@@ -35,10 +35,13 @@ func (r *Result) CSVHeaders() ([]string, error) {
 	ty := reflect.TypeOf(*r)
 	var headers []string
 	for i := 0; i < ty.NumField(); i++ {
-		headers = append(headers, ty.Field(i).Tag.Get("csv"))
-	}
-	if len(headers) != ty.NumField() {
-		return nil, NumberOfCsvFieldsErr
+		field := ty.Field(i)
+		csvTag := field.Tag.Get("csv")
+		fieldValue := reflect.ValueOf(*r).FieldByName(field.Name).Interface()
+		// appends tag value if field value is other than default value
+		if fieldValue != reflect.Zero(field.Type).Interface() {
+			headers = append(headers, csvTag)
+		}
 	}
 	return headers, nil
 }
@@ -47,16 +50,19 @@ func (r *Result) CSVFields() ([]string, error) {
 	var fields []string
 	vl := reflect.ValueOf(*r)
 	for i := 0; i < vl.NumField(); i++ {
-		fields = append(fields, fmt.Sprint(vl.Field(i).Interface()))
-	}
-	if len(fields) != vl.NumField() {
-		return nil, NumberOfCsvFieldsErr
+		field := vl.Field(i)
+		fieldValue := field.Interface()
+		zeroValue := reflect.Zero(field.Type()).Interface()
+		// appends tag value if field value is other than default value
+		if !reflect.DeepEqual(fieldValue, zeroValue) {
+			fields = append(fields, fmt.Sprint(fieldValue))
+		}
 	}
 	return fields, nil
 }
 
 // WriteHostOutput writes the output list of host ports to an io.Writer
-func WriteHostOutput(host string, ports []*port.Port, cdnName string, writer io.Writer) error {
+func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
 
@@ -64,11 +70,10 @@ func WriteHostOutput(host string, ports []*port.Port, cdnName string, writer io.
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(p.Port))
-		if cdnName != "" {
+		if outputCDN && cdnName != "" {
 			sb.WriteString(" [" + cdnName + "]")
 		}
 		sb.WriteString("\n")
-
 		_, err := bufwriter.WriteString(sb.String())
 		if err != nil {
 			bufwriter.Flush()
@@ -80,15 +85,17 @@ func WriteHostOutput(host string, ports []*port.Port, cdnName string, writer io.
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports []*port.Port, isCdn bool, cdnName string, writer io.Writer) error {
+func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
 	data := Result{TimeStamp: time.Now().UTC()}
 	if host != ip {
 		data.Host = host
 	}
 	data.IP = ip
-	data.IsCDNIP = isCdn
-	data.CDNName = cdnName
+	if outputCDN {
+		data.IsCDNIP = isCdn
+		data.CDNName = cdnName
+	}
 	for _, p := range ports {
 		data.Port = p
 		if err := encoder.Encode(&data); err != nil {
@@ -99,18 +106,20 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, isCdn bool, cdnName st
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports []*port.Port, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
-	data := &Result{TimeStamp: time.Now().UTC()}
-	if header {
-		writeCSVHeaders(data, encoder)
-	}
+	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: &port.Port{}}
 	if host != ip {
 		data.Host = host
 	}
-	data.IP = ip
-	data.IsCDNIP = isCdn
-	data.CDNName = cdnName
+	if outputCDN {
+		data.IsCDNIP = isCdn
+		data.CDNName = cdnName
+	}
+	if header {
+		writeCSVHeaders(data, encoder)
+	}
+
 	for _, p := range ports {
 		data.Port = p
 		writeCSVRow(data, encoder)
