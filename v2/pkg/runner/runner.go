@@ -187,9 +187,9 @@ func (r *Runner) RunEnumeration() error {
 		}
 
 		// store exclued ips to a map
-		excludedIPsMap := make(map[string]bool)
+		excludedIPsMap := make(map[string]struct{})
 		for _, ipString := range excludedIPs {
-			excludedIPsMap[ipString] = true
+			excludedIPsMap[ipString] = struct{}{}
 		}
 
 		discoverCidr := func(cidr *net.IPNet) {
