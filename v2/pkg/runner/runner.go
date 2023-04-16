@@ -182,10 +182,25 @@ func (r *Runner) RunEnumeration() error {
 			return err
 		}
 
+		// get excluded ips
+		excludedIPs, err := parseExcludedIps(r.options)
+		if err != nil {
+			return err
+		}
+
+		// store exclued ips to a map
+		excludedIPsMap := make(map[string]struct{})
+		for _, ipString := range excludedIPs {
+			excludedIPsMap[ipString] = struct{}{}
+		}
+
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				r.handleHostDiscovery(ip)
+				// only run host discovery if the ip is not present in the excludedIPsMap
+				if _, exists := excludedIPsMap[ip]; !exists {
+					r.handleHostDiscovery(ip)
+				}
 			}
 		}
 
