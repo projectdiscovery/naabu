@@ -111,7 +111,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.dnsclient = dnsclient
 
 	if options.EnableProgressBar {
-		stats, err := clistats.New()
+		defaultOptions := &clistats.DefaultOptions
+		defaultOptions.ListenPort = options.MetricsPort
+		stats, err := clistats.NewWithOptions(context.Background(), defaultOptions)
 		if err != nil {
 			gologger.Warning().Msgf("Couldn't create progress engine: %s\n", err)
 		} else {
