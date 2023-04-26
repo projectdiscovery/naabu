@@ -129,8 +129,8 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/projectdiscovery/asnmap v1.0.2 h1:2+8tqzJeFVpJS7u27YH7kMK7edDAr7OsmSxs92aWFNc=
 github.com/projectdiscovery/asnmap v1.0.2/go.mod h1:64YfriVxyRQvqc+1iPMHMf+i/of2jr+Qx7geCIm4ZsU=
-github.com/projectdiscovery/blackrock v0.0.0-20230328171319-f24b18d05b64 h1:3oOT3yauepbOp84gz67JQLu/y9uyyIeGakpi+rYw1Cc=
-github.com/projectdiscovery/blackrock v0.0.0-20230328171319-f24b18d05b64/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
+github.com/projectdiscovery/blackrock v0.0.1 h1:lHQqhaaEFjgf5WkuItbpeCZv2DUIE45k0VbGJyft6LQ=
+github.com/projectdiscovery/blackrock v0.0.1/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
 github.com/projectdiscovery/cdncheck v0.0.3 h1:li2/rUJmhVXSqRFyhJMqi6pdBX6ZxMnwzBfE0Kifj/g=
 github.com/projectdiscovery/cdncheck v0.0.3/go.mod h1:EevMeCG1ogBoUJYaa0Mv9R1VUboDm/DiynId7DboKy0=
 github.com/projectdiscovery/clistats v0.0.15 h1:vUumNYZkrT3vMkOoVqP9yaboqDbUac/VSzKRLFtzWB0=
