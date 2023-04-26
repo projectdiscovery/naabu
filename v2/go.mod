@@ -8,7 +8,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.53
 	github.com/pkg/errors v0.9.1
-	github.com/projectdiscovery/blackrock v0.0.0-20230328171319-f24b18d05b64
+	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v0.0.3
 	github.com/projectdiscovery/clistats v0.0.15
 	github.com/projectdiscovery/dnsx v1.1.3
