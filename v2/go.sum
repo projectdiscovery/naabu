@@ -138,6 +138,8 @@ github.com/projectdiscovery/cdncheck v1.0.0 h1:4RrvkHW4AGot7NDFjCNa3vbuN3I/PJ9ZG
 github.com/projectdiscovery/cdncheck v1.0.0/go.mod h1:5l2DFwQNbR3uDYiyUpUQLN0I37+JnE8rSeBpd7WQR/Y=
 github.com/projectdiscovery/clistats v0.0.15 h1:vUumNYZkrT3vMkOoVqP9yaboqDbUac/VSzKRLFtzWB0=
 github.com/projectdiscovery/clistats v0.0.15/go.mod h1:hEjSInJ5MDhNSgithLjcfThui3KBP4FjPHnHqHpUGhw=
+github.com/projectdiscovery/dnsx v1.1.1-0.20230427093721-a4c5978d80d7 h1:oDT/YRM0DRDkapEDQ1ZD/iBR4A27vDa8FLjj59z7scg=
+github.com/projectdiscovery/dnsx v1.1.1-0.20230427093721-a4c5978d80d7/go.mod h1:/dfaVSd3JH4jBplcr4cWTtbASDyX4bRn4TyhkdtL+gI=
 github.com/projectdiscovery/dnsx v1.1.3 h1:GO1VULC0axtaSAxmvhLrc7Ee7RRRd63h35kdnektxQw=
 github.com/projectdiscovery/dnsx v1.1.3/go.mod h1:YNilpJaq+OLIMkSHkv4+H9ksrq+AY5Y9rx5rct6kb7I=
 github.com/projectdiscovery/fdmax v0.0.4 h1:K9tIl5MUZrEMzjvwn/G4drsHms2aufTn1xUdeVcmhmc=

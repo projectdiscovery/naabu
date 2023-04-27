@@ -11,7 +11,7 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v1.0.0
 	github.com/projectdiscovery/clistats v0.0.15
-	github.com/projectdiscovery/dnsx v1.1.3
+	github.com/projectdiscovery/dnsx v1.1.1-0.20230427093721-a4c5978d80d7
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.8
