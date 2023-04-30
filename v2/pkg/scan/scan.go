@@ -189,11 +189,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 	scanner.HostDiscoveryResults = result.NewResult()
 	scanner.ScanResults = result.NewResult()
 	if options.ExcludeCdn || options.OutputCdn {
-		var err error
-		scanner.cdn, err = cdncheck.NewWithCache()
-		if err != nil {
-			return nil, err
-		}
+		scanner.cdn = cdncheck.New()
 	}
 
 	var auth *proxy.Auth = nil
