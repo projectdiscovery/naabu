@@ -15,5 +15,5 @@ func (s *Scanner) CdnCheck(ip string) (bool, string, error) {
 	if !iputil.IsIP(ip) {
 		return false, "", errors.Errorf("%s is not a valid ip", ip)
 	}
-	return s.cdn.Check(net.ParseIP((ip)))
+	return s.cdn.CheckCDN(net.ParseIP((ip)))
 }

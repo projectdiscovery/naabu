@@ -30,27 +30,30 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries           int                 // Retries is the number of retries for the port
-	Rate              int                 // Rate is the rate of port scan requests
-	Timeout           int                 // Timeout is the seconds to wait for ports to respond
-	WarmUpTime        int                 // WarmUpTime between scan phases
-	Host              goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile         string              // HostsFile is the file containing list of hosts to find port for
-	Output            string              // Output is the file to write found ports to.
-	Ports             string              // Ports is the ports to use for enumeration
-	PortsFile         string              // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts      string              // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps        string              // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile    string              // File containing Ips or cidr to exclude from the scan
-	TopPorts          string              // Tops ports to scan
-	PortThreshold     int                 // PortThreshold is the number of ports to find before skipping the host
-	SourceIP          string              // SourceIP to use in TCP packets
-	SourcePort        string              // Source Port to use in packets
-	Interface         string              // Interface to use for TCP packets
-	ConfigFile        string              // Config file contains a scan configuration
-	NmapCLI           string              // Nmap command (has priority over config file)
-	Threads           int                 // Internal worker threads
-	EnableProgressBar bool                // Enable progress bar
+	Retries        int                 // Retries is the number of retries for the port
+	Rate           int                 // Rate is the rate of port scan requests
+	Timeout        int                 // Timeout is the seconds to wait for ports to respond
+	WarmUpTime     int                 // WarmUpTime between scan phases
+	Host           goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
+	HostsFile      string              // HostsFile is the file containing list of hosts to find port for
+	Output         string              // Output is the file to write found ports to.
+	Ports          string              // Ports is the ports to use for enumeration
+	PortsFile      string              // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts   string              // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps     string              // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile string              // File containing Ips or cidr to exclude from the scan
+	TopPorts       string              // Tops ports to scan
+	PortThreshold  int                 // PortThreshold is the number of ports to find before skipping the host
+	SourceIP       string              // SourceIP to use in TCP packets
+	SourcePort     string              // Source Port to use in packets
+	Interface      string              // Interface to use for TCP packets
+	ConfigFile     string              // Config file contains a scan configuration
+	NmapCLI        string              // Nmap command (has priority over config file)
+	Threads        int                 // Internal worker threads
+	// Deprecated: stats are automatically available through local endpoint
+	EnableProgressBar bool // Enable progress bar
+	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
+	StatsInterval     int                 // StatsInterval is the number of seconds to display stats after
 	ScanAllIPS        bool                // Scan all the ips
 	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
 	ScanType          string              // Scan Type
@@ -89,6 +92,8 @@ type Options struct {
 	ReversePTR bool
 	//DisableUpdateCheck disables automatic update check
 	DisableUpdateCheck bool
+	// MetricsPort with statistics
+	MetricsPort int
 }
 
 // OnResultCallback (hostResult)
@@ -191,7 +196,9 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.NoColor, "nc", "no-color", false, "disable colors in CLI output"),
 		flagSet.BoolVar(&options.Silent, "silent", false, "display only results in output"),
 		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
-		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan"),
+		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan (deprecated)"),
+		flagSet.IntVarP(&options.StatsInterval, "stats-interval", "si", DefautStatsInterval, "number of seconds to wait between showing a statistics update (deprecated)"),
+		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose nuclei metrics on"),
 	)
 
 	_ = flagSet.Parse()
@@ -224,7 +231,7 @@ func ParseOptions() *Options {
 	}
 
 	if !options.DisableUpdateCheck {
-		latestVersion, err := updateutils.GetVersionCheckCallback("naabu")()
+		latestVersion, err := updateutils.GetToolVersionCallback("naabu", version)()
 		if err != nil {
 			if options.Verbose {
 				gologger.Error().Msgf("naabu version check failed: %v", err.Error())
