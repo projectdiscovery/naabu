@@ -9,9 +9,9 @@ require (
 	github.com/miekg/dns v1.1.53
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v0.0.3
+	github.com/projectdiscovery/cdncheck v1.0.1
 	github.com/projectdiscovery/clistats v0.0.15
-	github.com/projectdiscovery/dnsx v1.1.3
+	github.com/projectdiscovery/dnsx v1.1.4
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.8
@@ -26,7 +26,7 @@ require (
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.11.0
-	golang.org/x/exp v0.0.0-20230315142452-642cacee5cc0
+	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
 	golang.org/x/net v0.9.0
 	golang.org/x/sys v0.7.0
 )
@@ -64,13 +64,13 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.1 // indirect
-	github.com/nwaples/rardecode v1.1.0 // indirect
+	github.com/nwaples/rardecode v1.1.3 // indirect
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
-	github.com/pierrec/lz4 v2.6.0+incompatible // indirect
+	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/projectdiscovery/asnmap v1.0.2 // indirect
+	github.com/projectdiscovery/asnmap v1.0.3 // indirect
 	github.com/projectdiscovery/hmap v0.0.11 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.21 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.23 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
@@ -82,17 +82,18 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	github.com/tidwall/rtred v0.1.2 // indirect
 	github.com/tidwall/tinyqueue v0.1.1 // indirect
-	github.com/ulikunitz/xz v0.5.10 // indirect
+	github.com/ulikunitz/xz v0.5.11 // indirect
+	github.com/weppos/publicsuffix-go v0.30.0 // indirect
 	github.com/xi2/xz v0.0.0-20171230120015-48954b6210f8 // indirect
 	github.com/yl2chen/cidranger v1.0.2 // indirect
 	github.com/yuin/goldmark v1.5.4 // indirect
 	github.com/yuin/goldmark-emoji v1.0.1 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	golang.org/x/crypto v0.7.0 // indirect
-	golang.org/x/mod v0.9.0 // indirect
+	golang.org/x/mod v0.10.0 // indirect
 	golang.org/x/oauth2 v0.7.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	golang.org/x/tools v0.7.0 // indirect
+	golang.org/x/tools v0.8.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/protobuf v1.29.1 // indirect
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
