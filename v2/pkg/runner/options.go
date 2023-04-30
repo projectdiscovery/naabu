@@ -231,7 +231,7 @@ func ParseOptions() *Options {
 	}
 
 	if !options.DisableUpdateCheck {
-		latestVersion, err := updateutils.GetVersionCheckCallback("naabu")()
+		latestVersion, err := updateutils.GetToolVersionCallback("naabu", version)()
 		if err != nil {
 			if options.Verbose {
 				gologger.Error().Msgf("naabu version check failed: %v", err.Error())
