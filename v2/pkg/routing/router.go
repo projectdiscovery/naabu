@@ -173,7 +173,7 @@ func FindInterfaceByIp(ip net.IP) (*net.Interface, error) {
 			if !areEqual {
 				continue
 			}
-			// double check if they belongs to the same family as go standard library is faulty
+			// double check if they belong to the same family as go standard library is faulty
 			switch {
 			case iputil.IsIPv4(ip, ipAddress):
 				return &itf, nil

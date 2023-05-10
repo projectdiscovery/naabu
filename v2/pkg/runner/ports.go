@@ -96,7 +96,7 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 	// merge all the specified ports (meaningless if "all" is used)
 	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList)
 
-	// By default scan top 100 ports only
+	// default to scan top 100 ports only
 	if len(ports) == 0 {
 		portsList, err := parsePortsList(NmapTop100)
 		if err != nil {
@@ -126,16 +126,16 @@ func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
 		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
 	}
 
-	for _, port := range ports {
+	for _, p := range ports {
 		found := false
 		for _, excludedPort := range excludedPortsCLI {
-			if excludedPort.Port == port.Port && excludedPort.Protocol == port.Protocol {
+			if excludedPort.Port == p.Port && excludedPort.Protocol == p.Protocol {
 				found = true
 				break
 			}
 		}
 		if !found {
-			filteredPorts = append(filteredPorts, port)
+			filteredPorts = append(filteredPorts, p)
 		}
 	}
 	return filteredPorts, nil
@@ -173,28 +173,28 @@ func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 			}
 
 			for i := p1; i <= p2; i++ {
-				port := &port.Port{Port: i, Protocol: portProtocol}
-				ports = append(ports, port)
+				p := &port.Port{Port: i, Protocol: portProtocol}
+				ports = append(ports, p)
 			}
 		} else {
 			portNumber, err := strconv.Atoi(r)
 			if err != nil {
 				return nil, fmt.Errorf("invalid port number: '%s'", r)
 			}
-			port := &port.Port{Port: portNumber, Protocol: portProtocol}
-			ports = append(ports, port)
+			p := &port.Port{Port: portNumber, Protocol: portProtocol}
+			ports = append(ports, p)
 		}
 	}
 
 	// dedupe ports
 	seen := make(map[string]struct{})
 	var dedupedPorts []*port.Port
-	for _, port := range ports {
-		if _, ok := seen[port.String()]; ok {
+	for _, p := range ports {
+		if _, ok := seen[p.String()]; ok {
 			continue
 		}
-		seen[port.String()] = struct{}{}
-		dedupedPorts = append(dedupedPorts, port)
+		seen[p.String()] = struct{}{}
+		dedupedPorts = append(dedupedPorts, p)
 	}
 
 	return dedupedPorts, nil

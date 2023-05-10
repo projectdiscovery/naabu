@@ -61,7 +61,7 @@ func (resumeCfg *ResumeCfg) ConfigureResume() error {
 	if err != nil {
 		return err
 	}
-	err = json.Unmarshal([]byte(file), &resumeCfg)
+	err = json.Unmarshal(file, &resumeCfg)
 	if err != nil {
 		return err
 	}

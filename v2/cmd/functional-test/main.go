@@ -68,11 +68,11 @@ func runIndividualTestCase(testcase string) error {
 		finalArgs = parts[2:]
 		target = parts[0]
 	}
-	mainOutput, err := testutils.RunNaabuBinaryAndGetResults(target, *mainNaabuBinary, debug, finalArgs)
+	mainOutput, err := testutils.RunNaabuAndGetResults(target, *mainNaabuBinary, debug, finalArgs)
 	if err != nil {
 		return errors.Wrap(err, "could not run naabu main test")
 	}
-	devOutput, err := testutils.RunNaabuBinaryAndGetResults(target, *devNaabuBinary, debug, finalArgs)
+	devOutput, err := testutils.RunNaabuAndGetResults(target, *devNaabuBinary, debug, finalArgs)
 	if err != nil {
 		return errors.Wrap(err, "could not run naabu dev test")
 	}

@@ -29,7 +29,7 @@ func NewResult() *Result {
 	return &Result{ipPorts: ipPorts, ips: ips, skipped: skipped}
 }
 
-// AddPort to a specific ip
+// GetIPs stream all the ips
 func (r *Result) GetIPs() chan string {
 	r.Lock()
 
@@ -54,7 +54,7 @@ func (r *Result) HasIPS() bool {
 	return len(r.ips) > 0
 }
 
-// GetIpsPorts returns the ips and ports
+// GetIPsPorts returns the ips and ports
 func (r *Result) GetIPsPorts() chan *HostResult {
 	r.RLock()
 

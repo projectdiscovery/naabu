@@ -185,7 +185,7 @@ func (r *Runner) RunEnumeration() error {
 			return err
 		}
 
-		// store exclued ips to a map
+		// store excluded ips to a map
 		excludedIPsMap := make(map[string]struct{})
 		for _, ipString := range excludedIPs {
 			excludedIPsMap[ipString] = struct{}{}
@@ -443,7 +443,7 @@ func (r *Runner) RunEnumeration() error {
 
 func (r *Runner) getHostDiscoveryIps() (ips []*net.IPNet) {
 	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
-		ips = append(ips, iputil.ToCidr(string(ip)))
+		ips = append(ips, iputil.ToCidr(ip))
 	}
 	return
 }
@@ -664,7 +664,7 @@ func (r *Runner) SetSourcePort(sourcePort string) error {
 }
 
 func (r *Runner) SetInterface(interfaceName string) error {
-	networkInterface, err := net.InterfaceByName(r.options.Interface)
+	networkInterface, err := net.InterfaceByName(interfaceName)
 	if err != nil {
 		return err
 	}

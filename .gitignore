@@ -9,3 +9,4 @@ v2/cmd/functional-test/naabu
 v2/cmd/functional-test/*.cfg
 .vscode
 dist
+.idea

@@ -11,7 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 )
 
@@ -28,8 +27,6 @@ type Result struct {
 func (r *Result) JSON() ([]byte, error) {
 	return json.Marshal(r)
 }
-
-var NumberOfCsvFieldsErr = errors.New("exported fields don't match csv tags")
 
 func (r *Result) CSVHeaders() ([]string, error) {
 	ty := reflect.TypeOf(*r)
@@ -76,7 +73,7 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 		sb.WriteString("\n")
 		_, err := bufwriter.WriteString(sb.String())
 		if err != nil {
-			bufwriter.Flush()
+			_ = bufwriter.Flush()
 			return err
 		}
 		sb.Reset()
