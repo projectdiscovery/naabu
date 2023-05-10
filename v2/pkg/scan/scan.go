@@ -585,7 +585,7 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 			return false, err
 		}
-		n, _ := io.Copy(io.Discard, conn)
+		n, err := io.Copy(io.Discard, conn)
 		// ignore timeout errors
 		if err != nil && !os.IsTimeout(err) {
 			return false, err

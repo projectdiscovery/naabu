@@ -30,7 +30,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
-	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
+	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -100,9 +100,6 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	if len(runner.options.baseResolvers) > 0 {
 		dnsOptions.BaseResolvers = runner.options.baseResolvers
-	}
-	if err != nil {
-		return nil, err
 	}
 	dnsclient, err := dnsx.New(dnsOptions)
 	if err != nil {
