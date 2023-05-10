@@ -434,6 +434,11 @@ func (r *Runner) RunEnumeration() error {
 			r.ConnectVerification()
 		}
 
+		// TODO: placeholder - service discovery after port verification
+		if r.options.ServiceDiscovery {
+			r.ServiceDiscovery()
+		}
+
 		r.handleOutput(r.scanner.ScanResults)
 
 		// handle nmap
@@ -867,4 +872,24 @@ func writeCSVRow(data *Result, writer *csv.Writer) {
 		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msgf(errMsg.Error())
 	}
+}
+
+func (r *Runner) ServiceDiscovery() error {
+	var swg sync.WaitGroup
+	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
+
+	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+		limiter.Take()
+		swg.Add(1)
+
+		go func(hostResult *result.HostResult) {
+			defer swg.Done()
+
+			// TODO: TCP|UDP service discovery placeholder
+		}(hostResult)
+	}
+
+	swg.Wait()
+
+	return nil
 }

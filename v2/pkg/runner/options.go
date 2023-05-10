@@ -177,8 +177,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("services-discovery", "Services-Discovery",
-		flagSet.BoolVarP(&options.ServiceDiscovery, "service-discovery", "sD", false, "Service Discovery"),
-		flagSet.BoolVarP(&options.ServiceVersion, "service-version", "sV", false, "Service Version"),
+		flagSet.BoolVarP(&options.ServiceVersion, "service-version-detection", "sV", false, "Probe open ports to determine service/version info"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -277,4 +276,8 @@ func (options *Options) hasProbes() bool {
 
 func (options *Options) shouldUseRawPackets() bool {
 	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan
+}
+
+func (options *Options) shouldDetectServiceVersion() bool {
+	return options.ScanType == ConnectScan && options.ServiceDiscovery
 }
