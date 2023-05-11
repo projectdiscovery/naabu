@@ -20,6 +20,7 @@ import (
 
 var Probes map[string]Probe
 
+// Probe attempts to trigger a service response for a specific service
 type Probe interface {
 	Do(host string, p *port.Port, timeout time.Duration) ([]byte, error)
 }
@@ -38,6 +39,8 @@ func init() {
 	// SSH
 	// POP3
 	// SMTP
+	// TELNET
+	// MYSQL
 	MustAddProbe("null", nullProbe{})
 	// Protocols (TCP)
 	// HTTP(S)
@@ -49,8 +52,14 @@ func init() {
 	// DNS
 	MustAddProbe("dns", dnsProbe{})
 	// Protocols (TCP|UDP)
-	// Echo
+	// ECHO
 	MustAddProbe("echo", echoProbe{})
+	// Protocols (TCP|UDP)
+	// IMAP
+	MustAddProbe("imap", imapProbe{})
+	// Protocols (UDP)
+	// TFTP
+	MustAddProbe("tftp", tftpProbe{})
 }
 
 type httpProbe struct{}
@@ -145,7 +154,7 @@ type dnsProbe struct{}
 
 func (d dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	if p.Protocol != protocol.UDP {
-		return nil, errors.New("dhcp probes only works on UDP")
+		return nil, errors.New("dns probes only works on UDP")
 	}
 	req := new(dns.Msg)
 	req.SetQuestion(".", dns.TypeNS) // Query for the root domain NS records
@@ -175,6 +184,61 @@ func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 
 	_, err = rand.Read(randomData)
 	if err != nil {
+		return nil, err
+	}
+
+	if _, err := conn.Write(randomData); err != nil {
+		return nil, err
+	}
+
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	return io.ReadAll(conn)
+}
+
+type imapProbe struct{}
+
+func (d imapProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	var URL strings.Builder
+	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
+	conn, err := net.Dial(p.Protocol.String(), URL.String())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	// imap should already trigger a response
+	retriedWithPayload := false
+read:
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	data, err := io.ReadAll(conn)
+	if err != nil {
+		if !retriedWithPayload {
+			retriedWithPayload = true
+			conn.SetWriteDeadline(time.Now().Add(timeout))
+			if _, err := conn.Write([]byte("CAPABILITY\r\n")); err != nil {
+				return nil, err
+			}
+			goto read
+		}
+	}
+
+	return data, err
+}
+
+// tftp servers are very hard to detect without a valid filename as most servers are unresponsive
+type tftpProbe struct{}
+
+func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	var URL strings.Builder
+	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
+	conn, err := net.Dial(p.Protocol.String(), URL.String())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	// use default nmap probe
+	if _, err := conn.Write([]byte("\x00\x01r7tftp.txt\x00octet\x00")); err != nil {
 		return nil, err
 	}
 
