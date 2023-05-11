@@ -9,7 +9,7 @@ require (
 	github.com/miekg/dns v1.1.54
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.0.1
+	github.com/projectdiscovery/cdncheck v1.0.3
 	github.com/projectdiscovery/clistats v0.0.16
 	github.com/projectdiscovery/dnsx v1.1.4
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -22,7 +22,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.6
 	github.com/projectdiscovery/retryablehttp-go v1.0.16
 	github.com/projectdiscovery/uncover v1.0.4
-	github.com/projectdiscovery/utils v0.0.26
+	github.com/projectdiscovery/utils v0.0.29
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.2
 	go.uber.org/multierr v1.11.0
@@ -70,7 +70,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.3 // indirect
 	github.com/projectdiscovery/hmap v0.0.11 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.23 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.24 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
