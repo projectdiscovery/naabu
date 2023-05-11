@@ -1,6 +1,7 @@
 package probe
 
 import (
+	"crypto/rand"
 	"crypto/tls"
 	"errors"
 	"fmt"
@@ -12,6 +13,7 @@ import (
 	"time"
 
 	"github.com/insomniacslk/dhcp/dhcpv4"
+	"github.com/miekg/dns"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 )
@@ -41,6 +43,12 @@ func init() {
 	// Protocols (UDP)
 	// DHCP
 	MustAddProbe("dhcp", dhcpProbe{})
+	// Protocols (UDP)
+	// DNS
+	MustAddProbe("dns", dnsProbe{})
+	// Protocols (TCP|UDP)
+	// Echo
+	MustAddProbe("echo", echoProbe{})
 }
 
 type httpProbe struct{}
@@ -129,4 +137,45 @@ func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 		return nil, errors.New("invalid dhcp response")
 	}
 	return data, nil
+}
+
+type dnsProbe struct{}
+
+func (d dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	if p.Protocol != protocol.UDP {
+		return nil, errors.New("dhcp probes only works on UDP")
+	}
+	req := new(dns.Msg)
+	req.SetQuestion(".", dns.TypeNS) // Query for the root domain NS records
+
+	dnsClient := new(dns.Client)
+	dnsClient.ReadTimeout = timeout
+	resp, _, err := dnsClient.Exchange(req, net.JoinHostPort(host, fmt.Sprint(p.Port)))
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.Pack()
+}
+
+type echoProbe struct{}
+
+func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	var URL strings.Builder
+	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
+	conn, err := net.Dial(p.Protocol.String(), URL.String())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+
+	randomData := make([]byte, 16)
+
+	_, err = rand.Read(randomData)
+	if err != nil {
+		return nil, err
+	}
+
+	conn.SetReadDeadline(time.Now().Add(timeout))
+	return io.ReadAll(conn)
 }
