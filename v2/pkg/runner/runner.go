@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -32,6 +33,7 @@ import (
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
+	"github.com/projectdiscovery/utils/generic"
 	iputil "github.com/projectdiscovery/utils/ip"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 	"github.com/remeh/sizedwaitgroup"
@@ -249,6 +251,12 @@ func (r *Runner) RunEnumeration() error {
 			}
 		}
 		r.wgscan.Wait()
+
+		// TODO: placeholder - service discovery after port verification
+		if r.options.ServiceDiscovery {
+			r.ServiceDiscovery()
+		}
+
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -576,7 +584,7 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	}
 
 	// If the cdn is part of the CDN ips range - only ports 80 and 443 are allowed
-	return port.Port == 80 || port.Port == 443
+	return generic.EqualsAny(port.Port, 80, 443)
 }
 
 func (r *Runner) handleHostPort(host string, p *port.Port) {
@@ -877,16 +885,20 @@ func writeCSVRow(data *Result, writer *csv.Writer) {
 func (r *Runner) ServiceDiscovery() error {
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
-
 	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
-		limiter.Take()
-		swg.Add(1)
+		for _, p := range hostResult.Ports {
+			limiter.Take()
+			swg.Add(1)
 
-		go func(hostResult *result.HostResult) {
-			defer swg.Done()
+			// for each host:port perform service discovery
+			go func(hostResult *result.HostResult, p *port.Port) {
+				defer swg.Done()
 
-			// TODO: TCP|UDP service discovery placeholder
-		}(hostResult)
+				portProbes, err := r.scanner.DiscoverServices(hostResult.IP, p, 1*time.Second)
+				// todo: just print out for now
+				log.Println(len(portProbes), err)
+			}(hostResult, p)
+		}
 	}
 
 	swg.Wait()

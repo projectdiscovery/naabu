@@ -84,10 +84,8 @@ type Options struct {
 	// HostDiscoveryIgnoreRST      bool - planned
 	InputReadTimeout time.Duration
 	DisableStdin     bool
-	// ServiceDiscovery enables service discovery on found open ports (matches port number with service)
+	// ServiceDiscovery enables service discovery on found open ports
 	ServiceDiscovery bool
-	// ServiceVersion attempts to discover service running on open ports with active/passive probes
-	ServiceVersion bool
 	// ReversePTR lookup for ips
 	ReversePTR bool
 	//DisableUpdateCheck disables automatic update check
@@ -177,7 +175,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("services-discovery", "Services-Discovery",
-		flagSet.BoolVarP(&options.ServiceVersion, "service-version-detection", "sV", false, "Probe open ports to determine service/version info"),
+		flagSet.BoolVarP(&options.ServiceDiscovery, "service-version-detection", "sV", false, "Probe open ports to determine service/version info"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -276,8 +274,4 @@ func (options *Options) hasProbes() bool {
 
 func (options *Options) shouldUseRawPackets() bool {
 	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan
-}
-
-func (options *Options) shouldDetectServiceVersion() bool {
-	return options.ScanType == ConnectScan && options.ServiceDiscovery
 }
