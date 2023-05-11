@@ -4,7 +4,9 @@ go 1.19
 
 require (
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
+	github.com/beevik/ntp v1.0.0
 	github.com/google/gopacket v1.1.19
+	github.com/gosnmp/gosnmp v1.35.0
 	github.com/insomniacslk/dhcp v0.0.0-20230407062729-974c6f05fe16
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.54

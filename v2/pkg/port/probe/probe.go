@@ -3,6 +3,7 @@ package probe
 import (
 	"crypto/rand"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -12,6 +13,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/beevik/ntp"
+	"github.com/gosnmp/gosnmp"
 	"github.com/insomniacslk/dhcp/dhcpv4"
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -60,6 +63,14 @@ func init() {
 	// Protocols (UDP)
 	// TFTP
 	MustAddProbe("tftp", tftpProbe{})
+	// Protocols (UDP)
+	// SNMP
+	MustAddProbe("snmp", snmpProbe{})
+	// Protocols (UDP)
+	// SNMP
+	MustAddProbe("ntp", ntpProbe{})
+	// todo: undetectable (one-way protocols)
+	// SYSLOG
 }
 
 type httpProbe struct{}
@@ -137,7 +148,7 @@ func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	conn.Write(dhcpMsg.ToBytes())
 	conn.SetReadDeadline(time.Now().Add(timeout))
 
-	// todo: broadcast response should be intercepted via pcap
+	// TODO: broadcast response to 255.255.255.255:68 lot of times is not delivered to user space socket => intercepted via pcap
 	data := make([]byte, 1024)
 	_, err = conn.Read(data)
 	if err != nil {
@@ -157,7 +168,9 @@ func (d dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, 
 		return nil, errors.New("dns probes only works on UDP")
 	}
 	req := new(dns.Msg)
-	req.SetQuestion(".", dns.TypeNS) // Query for the root domain NS records
+
+	// Query for the root domain NS records
+	req.SetQuestion(".", dns.TypeNS)
 
 	dnsClient := new(dns.Client)
 	dnsClient.ReadTimeout = timeout
@@ -229,6 +242,9 @@ read:
 type tftpProbe struct{}
 
 func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	if p.Protocol != protocol.UDP {
+		return nil, errors.New("tftp probes only works on UDP")
+	}
 	var URL strings.Builder
 	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
 	conn, err := net.Dial(p.Protocol.String(), URL.String())
@@ -237,11 +253,64 @@ func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	}
 	defer conn.Close()
 
-	// use default nmap probe
+	// todo: tftp servers are very hard to detect since mostly they reply only with valid file names (nmap default: r7tftp.txt)
 	if _, err := conn.Write([]byte("\x00\x01r7tftp.txt\x00octet\x00")); err != nil {
 		return nil, err
 	}
 
 	conn.SetReadDeadline(time.Now().Add(timeout))
 	return io.ReadAll(conn)
+}
+
+type snmpProbe struct{}
+
+func (h snmpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	if p.Protocol != protocol.UDP {
+		return nil, errors.New("snmp probes only works on UDP")
+	}
+
+	oid := "1.3.6.1.2.1.1.1.0" // OID for sysDescr
+
+	// Create SNMP GoSNMP instance
+	snmp := &gosnmp.GoSNMP{
+		Target:    host,
+		Port:      uint16(p.Port),
+		Community: "public",
+		Version:   gosnmp.Version2c,
+		Timeout:   timeout,
+	}
+
+	// Send SNMP GetRequest
+	err := snmp.Connect()
+	if err != nil {
+		return nil, err
+	}
+	defer snmp.Conn.Close()
+
+	response, err := snmp.Get([]string{oid})
+	if err != nil {
+		return nil, err
+	}
+
+	return response.MarshalMsg()
+}
+
+// tftp servers are very hard to detect without a valid filename as most servers are unresponsive
+type ntpProbe struct{}
+
+func (h ntpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	if p.Protocol != protocol.UDP {
+		return nil, errors.New("tftp probes only works on UDP")
+	}
+
+	ntpOptions := ntp.QueryOptions{
+		Timeout: timeout,
+		Port:    p.Port,
+	}
+	response, err := ntp.QueryWithOptions(host, ntpOptions)
+	if err != nil {
+		return nil, err
+	}
+	// todo: patch original library to dump raw bytes => for now marshaling to common json
+	return json.Marshal(response)
 }
