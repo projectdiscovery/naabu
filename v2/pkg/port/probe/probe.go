@@ -36,6 +36,8 @@ func init() {
 	// Protocols (TCP|UDP)
 	// FTP
 	// SSH
+	// POP3
+	// SMTP
 	MustAddProbe("null", nullProbe{})
 	// Protocols (TCP)
 	// HTTP(S)
