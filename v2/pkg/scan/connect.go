@@ -37,6 +37,9 @@ func (s *Scanner) DiscoverServices(host string, p *port.Port, timeout time.Durat
 	var portProbes []port.PortProbe
 
 	for _, probe := range probe.Probes {
+		if !probe.ValidFor(p) {
+			continue
+		}
 		data, err := probe.Do(host, p, timeout)
 		if err != nil && !errors.Is(err, io.EOF) {
 			continue

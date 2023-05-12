@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"math/rand"
 	"net"
 	"os"
@@ -19,6 +18,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/port/probe"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
@@ -573,24 +573,14 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 	}
 	defer conn.Close()
 
-	// udp needs data probe
 	switch p.Protocol {
 	case protocol.UDP:
-		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
-			return false, err
-		}
-		if _, err := conn.Write(nil); err != nil {
-			return false, err
-		}
-		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
-			return false, err
-		}
-		n, err := io.Copy(io.Discard, conn)
+		data, err := probe.LookupOneOrNull(p).DoWithConn(conn, timeout)
 		// ignore timeout errors
 		if err != nil && !os.IsTimeout(err) {
 			return false, err
 		}
-		return n > 0, nil
+		return len(data) > 0, nil
 	}
 
 	return true, err

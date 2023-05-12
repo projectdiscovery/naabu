@@ -25,6 +25,8 @@ var Probes map[string]Probe
 
 // Probe attempts to trigger a service response for a specific service
 type Probe interface {
+	ValidFor(p *port.Port) bool
+	DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error)
 	Do(host string, p *port.Port, timeout time.Duration) ([]byte, error)
 }
 
@@ -33,6 +35,15 @@ func MustAddProbe(name string, probe Probe) {
 		panic("probe " + name + " already defined")
 	}
 	Probes[name] = probe
+}
+
+func LookupOneOrNull(p *port.Port) Probe {
+	for _, probe := range Probes {
+		if probe.ValidFor(p) {
+			return probe
+		}
+	}
+	return Probes["null"]
 }
 
 func init() {
@@ -75,11 +86,11 @@ func init() {
 
 type httpProbe struct{}
 
-func (h httpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.TCP {
-		return nil, errors.New("dhcp probes only works on TCP")
-	}
+func (h httpProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.TCP
+}
 
+func (h httpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	httpClient := http.Client{
 		Timeout: timeout,
 		Transport: &http.Transport{
@@ -103,8 +114,16 @@ func (h httpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	return httputil.DumpResponse(resp, true)
 }
 
+func (h httpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
+	return nil, errors.New("not supported")
+}
+
 // genericReadProbe for self-advertising services
 type nullProbe struct{}
+
+func (h nullProbe) ValidFor(p *port.Port) bool {
+	return true
+}
 
 func (h nullProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	var URL strings.Builder
@@ -114,6 +133,10 @@ func (h nullProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 		return nil, err
 	}
 	defer conn.Close()
+	return h.DoWithConn(conn, timeout)
+}
+
+func (h nullProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 		return nil, err
 	}
@@ -124,19 +147,11 @@ type dhcpProbe struct {
 	SourceIP string
 }
 
-func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.UDP {
-		return nil, errors.New("dhcp probes only works on UDP")
-	}
-	dhcpMsg, err := dhcpv4.New(
-		dhcpv4.WithClientIP(net.ParseIP(h.SourceIP)),
-		dhcpv4.WithMessageType(dhcpv4.MessageTypeInform),
-	)
-	if err != nil {
-		return nil, err
-	}
-	dhcpMsg.UpdateOption(dhcpv4.OptServerIdentifier(net.ParseIP(host)))
+func (h dhcpProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.UDP && p.Port == 67
+}
 
+func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	conn, err := net.DialUDP("udp", &net.UDPAddr{Port: 68}, &net.UDPAddr{IP: net.ParseIP(host), Port: p.Port})
 	if err != nil {
 		// in case of error we fallback to arbitrary port
@@ -148,6 +163,19 @@ func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	defer func() {
 		_ = conn.Close()
 	}()
+
+	return h.DoWithConn(conn, timeout)
+}
+
+func (h dhcpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
+	dhcpMsg, err := dhcpv4.New(
+		dhcpv4.WithClientIP(net.ParseIP(h.SourceIP)),
+		dhcpv4.WithMessageType(dhcpv4.MessageTypeInform),
+	)
+	if err != nil {
+		return nil, err
+	}
+	dhcpMsg.UpdateOption(dhcpv4.OptServerIdentifier(net.ParseIP(conn.RemoteAddr().Network())))
 
 	if _, err := conn.Write(dhcpMsg.ToBytes()); err != nil {
 		return nil, err
@@ -171,18 +199,28 @@ func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 
 type dnsProbe struct{}
 
-func (d dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.UDP {
-		return nil, errors.New("dns probes only works on UDP")
+func (h dnsProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.UDP
+}
+
+func (h dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
+	conn, err := net.Dial(p.Protocol.String(), net.JoinHostPort(host, fmt.Sprint(p.Port)))
+	if err != nil {
+		return nil, err
 	}
+	defer conn.Close()
+
+	return h.DoWithConn(conn, timeout)
+}
+
+func (h dnsProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	req := new(dns.Msg)
 
 	// Query for the root domain NS records
 	req.SetQuestion(".", dns.TypeNS)
-
 	dnsClient := new(dns.Client)
 	dnsClient.ReadTimeout = timeout
-	resp, _, err := dnsClient.Exchange(req, net.JoinHostPort(host, fmt.Sprint(p.Port)))
+	resp, _, err := dnsClient.ExchangeWithConn(req, &dns.Conn{Conn: conn})
 	if err != nil {
 		return nil, err
 	}
@@ -191,6 +229,10 @@ func (d dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, 
 }
 
 type echoProbe struct{}
+
+func (h echoProbe) ValidFor(p *port.Port) bool {
+	return true
+}
 
 func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	var URL strings.Builder
@@ -201,9 +243,13 @@ func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	}
 	defer conn.Close()
 
+	return d.DoWithConn(conn, timeout)
+}
+
+func (d echoProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	randomData := make([]byte, 16)
 
-	_, err = rand.Read(randomData)
+	_, err := rand.Read(randomData)
 	if err != nil {
 		return nil, err
 	}
@@ -220,6 +266,10 @@ func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 
 type imapProbe struct{}
 
+func (h imapProbe) ValidFor(p *port.Port) bool {
+	return true
+}
+
 func (d imapProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	var URL strings.Builder
 	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
@@ -229,6 +279,10 @@ func (d imapProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	}
 	defer conn.Close()
 
+	return d.DoWithConn(conn, timeout)
+}
+
+func (d imapProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	// imap should already trigger a response
 	retriedWithPayload := false
 read:
@@ -255,10 +309,11 @@ read:
 // tftp servers are very hard to detect without a valid filename as most servers are unresponsive
 type tftpProbe struct{}
 
+func (h tftpProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.UDP
+}
+
 func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.UDP {
-		return nil, errors.New("tftp probes only works on UDP")
-	}
 	var URL strings.Builder
 	URL.WriteString(fmt.Sprintf("%s:%d", host, p.Port))
 	conn, err := net.Dial(p.Protocol.String(), URL.String())
@@ -267,6 +322,10 @@ func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	}
 	defer conn.Close()
 
+	return h.DoWithConn(conn, timeout)
+}
+
+func (h tftpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
 	// todo: tftp servers are very hard to detect since mostly they reply only with valid file names (nmap default: r7tftp.txt)
 	if _, err := conn.Write([]byte("\x00\x01r7tftp.txt\x00octet\x00")); err != nil {
 		return nil, err
@@ -280,11 +339,11 @@ func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 
 type snmpProbe struct{}
 
-func (h snmpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.UDP {
-		return nil, errors.New("snmp probes only works on UDP")
-	}
+func (h snmpProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.UDP
+}
 
+func (h snmpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	oid := "1.3.6.1.2.1.1.1.0" // OID for sysDescr
 
 	// Create SNMP GoSNMP instance
@@ -311,14 +370,17 @@ func (h snmpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	return response.MarshalMsg()
 }
 
-// tftp servers are very hard to detect without a valid filename as most servers are unresponsive
+func (h snmpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
+	return nil, errors.New("not supported")
+}
+
 type ntpProbe struct{}
 
-func (h ntpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
-	if p.Protocol != protocol.UDP {
-		return nil, errors.New("tftp probes only works on UDP")
-	}
+func (h ntpProbe) ValidFor(p *port.Port) bool {
+	return p.Protocol == protocol.UDP
+}
 
+func (h ntpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
 	ntpOptions := ntp.QueryOptions{
 		Timeout: timeout,
 		Port:    p.Port,
@@ -329,4 +391,8 @@ func (h ntpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, 
 	}
 	// todo: patch original library to dump raw bytes => for now marshaling to common json
 	return json.Marshal(response)
+}
+
+func (h ntpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error) {
+	return nil, errors.New("not supported")
 }
