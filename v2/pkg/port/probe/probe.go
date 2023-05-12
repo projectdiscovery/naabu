@@ -114,7 +114,9 @@ func (h nullProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 		return nil, err
 	}
 	defer conn.Close()
-	conn.SetReadDeadline(time.Now().Add(timeout))
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	return io.ReadAll(conn)
 }
 
@@ -143,10 +145,16 @@ func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 			return nil, err
 		}
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
-	conn.Write(dhcpMsg.ToBytes())
-	conn.SetReadDeadline(time.Now().Add(timeout))
+	if _, err := conn.Write(dhcpMsg.ToBytes()); err != nil {
+		return nil, err
+	}
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 
 	// TODO: broadcast response to 255.255.255.255:68 lot of times is not delivered to user space socket => intercepted via pcap
 	data := make([]byte, 1024)
@@ -204,7 +212,9 @@ func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 		return nil, err
 	}
 
-	conn.SetReadDeadline(time.Now().Add(timeout))
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	return io.ReadAll(conn)
 }
 
@@ -222,12 +232,16 @@ func (d imapProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 	// imap should already trigger a response
 	retriedWithPayload := false
 read:
-	conn.SetReadDeadline(time.Now().Add(timeout))
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	data, err := io.ReadAll(conn)
 	if err != nil {
 		if !retriedWithPayload {
 			retriedWithPayload = true
-			conn.SetWriteDeadline(time.Now().Add(timeout))
+			if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
+				return nil, err
+			}
 			if _, err := conn.Write([]byte("CAPABILITY\r\n")); err != nil {
 				return nil, err
 			}
@@ -258,7 +272,9 @@ func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte,
 		return nil, err
 	}
 
-	conn.SetReadDeadline(time.Now().Add(timeout))
+	if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
+		return nil, err
+	}
 	return io.ReadAll(conn)
 }
 

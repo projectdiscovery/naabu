@@ -253,7 +253,9 @@ func (r *Runner) RunEnumeration() error {
 
 		// TODO: placeholder - service discovery after port verification
 		if r.options.ServiceDiscovery {
-			r.ServiceDiscovery()
+			if err := r.ServiceDiscovery(); err != nil {
+				return err
+			}
 		}
 
 		r.handleOutput(r.scanner.ScanResults)
@@ -443,7 +445,9 @@ func (r *Runner) RunEnumeration() error {
 
 		// TODO: placeholder - service discovery after port verification
 		if r.options.ServiceDiscovery {
-			r.ServiceDiscovery()
+			if err := r.ServiceDiscovery(); err != nil {
+				return err
+			}
 		}
 
 		r.handleOutput(r.scanner.ScanResults)
