@@ -19,18 +19,21 @@ import (
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/utils/generic"
 )
 
 var Probes map[string]Probe
 
 // Probe attempts to trigger a service response for a specific service
 type Probe interface {
+	Id() string
 	ValidFor(p *port.Port) bool
 	DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, error)
 	Do(host string, p *port.Port, timeout time.Duration) ([]byte, error)
 }
 
-func MustAddProbe(name string, probe Probe) {
+func MustAddProbe(probe Probe) {
+	name := probe.Id()
 	if _, ok := Probes[name]; ok {
 		panic("probe " + name + " already defined")
 	}
@@ -55,39 +58,44 @@ func init() {
 	// SMTP
 	// TELNET
 	// MYSQL
-	MustAddProbe("null", nullProbe{})
+	MustAddProbe(nullProbe{})
 	// Protocols (TCP)
 	// HTTP(S)
-	MustAddProbe("http(s)", httpProbe{})
+	MustAddProbe(httpProbe{})
 	// Protocols (UDP)
 	// DHCP
-	MustAddProbe("dhcp", dhcpProbe{})
+	MustAddProbe(dhcpProbe{})
 	// Protocols (UDP)
 	// DNS
-	MustAddProbe("dns", dnsProbe{})
+	MustAddProbe(dnsProbe{})
 	// Protocols (TCP|UDP)
 	// ECHO
-	MustAddProbe("echo", echoProbe{})
+	MustAddProbe(echoProbe{})
 	// Protocols (TCP|UDP)
 	// IMAP
-	MustAddProbe("imap", imapProbe{})
+	MustAddProbe(imapProbe{})
 	// Protocols (UDP)
 	// TFTP
-	MustAddProbe("tftp", tftpProbe{})
+	MustAddProbe(tftpProbe{})
 	// Protocols (UDP)
 	// SNMP
-	MustAddProbe("snmp", snmpProbe{})
+	MustAddProbe(snmpProbe{})
 	// Protocols (UDP)
 	// SNMP
-	MustAddProbe("ntp", ntpProbe{})
+	MustAddProbe(ntpProbe{})
 	// todo: undetectable (one-way protocols)
 	// SYSLOG
 }
 
 type httpProbe struct{}
 
+func (h httpProbe) Id() string {
+	return "http"
+}
+
 func (h httpProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.TCP
+	return p.Protocol == protocol.TCP &&
+		generic.EqualsAny(p.Port, 80, 443, 8080)
 }
 
 func (h httpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -121,6 +129,10 @@ func (h httpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, err
 // genericReadProbe for self-advertising services
 type nullProbe struct{}
 
+func (h nullProbe) Id() string {
+	return "null"
+}
+
 func (h nullProbe) ValidFor(p *port.Port) bool {
 	return true
 }
@@ -147,8 +159,13 @@ type dhcpProbe struct {
 	SourceIP string
 }
 
+func (h dhcpProbe) Id() string {
+	return "dhcp"
+}
+
 func (h dhcpProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.UDP && p.Port == 67
+	return p.Protocol == protocol.UDP &&
+		generic.EqualsAny(p.Port, 67)
 }
 
 func (h dhcpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -199,8 +216,13 @@ func (h dhcpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, err
 
 type dnsProbe struct{}
 
+func (h dnsProbe) Id() string {
+	return "dns"
+}
+
 func (h dnsProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.UDP
+	return p.Protocol == protocol.UDP &&
+		generic.EqualsAny(p.Port, 53)
 }
 
 func (h dnsProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -230,8 +252,12 @@ func (h dnsProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, erro
 
 type echoProbe struct{}
 
+func (h echoProbe) Id() string {
+	return "echo"
+}
+
 func (h echoProbe) ValidFor(p *port.Port) bool {
-	return true
+	return generic.EqualsAny(p.Port, 7)
 }
 
 func (d echoProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -266,8 +292,12 @@ func (d echoProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, err
 
 type imapProbe struct{}
 
+func (h imapProbe) Id() string {
+	return "imap"
+}
+
 func (h imapProbe) ValidFor(p *port.Port) bool {
-	return true
+	return generic.EqualsAny(p.Port, 143, 993)
 }
 
 func (d imapProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -309,8 +339,13 @@ read:
 // tftp servers are very hard to detect without a valid filename as most servers are unresponsive
 type tftpProbe struct{}
 
+func (h tftpProbe) Id() string {
+	return "tftp"
+}
+
 func (h tftpProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.UDP
+	return p.Protocol == protocol.UDP &&
+		generic.EqualsAny(p.Port, 69)
 }
 
 func (h tftpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -339,8 +374,13 @@ func (h tftpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, err
 
 type snmpProbe struct{}
 
+func (h snmpProbe) Id() string {
+	return "snmp"
+}
+
 func (h snmpProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.UDP
+	return p.Protocol == protocol.UDP &&
+		generic.EqualsAny(p.Port, 161, 162)
 }
 
 func (h snmpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
@@ -376,8 +416,13 @@ func (h snmpProbe) DoWithConn(conn net.Conn, timeout time.Duration) ([]byte, err
 
 type ntpProbe struct{}
 
+func (h ntpProbe) Id() string {
+	return "ntp"
+}
+
 func (h ntpProbe) ValidFor(p *port.Port) bool {
-	return p.Protocol == protocol.UDP
+	return p.Protocol == protocol.UDP &&
+		generic.EqualsAny(p.Port, 161, 162)
 }
 
 func (h ntpProbe) Do(host string, p *port.Port, timeout time.Duration) ([]byte, error) {
