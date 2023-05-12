@@ -15,3 +15,10 @@ type Port struct {
 func (p *Port) String() string {
 	return fmt.Sprintf("%d-%d-%v", p.Port, p.Protocol, p.TLS)
 }
+
+type PortProbe struct {
+	Port    *Port
+	ProbeId string
+	Data    []byte
+	Meta    map[string]interface{}
+}

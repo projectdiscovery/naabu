@@ -16,12 +16,13 @@ import (
 
 // Result contains the result for a host
 type Result struct {
-	Host      string     `json:"host,omitempty" csv:"host"`
-	IP        string     `json:"ip,omitempty" csv:"ip"`
-	Port      *port.Port `json:"port" csv:"port"`
-	IsCDNIP   bool       `json:"cdn,omitempty" csv:"cdn"`
-	CDNName   string     `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp time.Time  `json:"timestamp" csv:"timestamp"`
+	Host      string           `json:"host,omitempty" csv:"host"`
+	IP        string           `json:"ip,omitempty" csv:"ip"`
+	Port      *port.Port       `json:"port" csv:"port"`
+	IsCDNIP   bool             `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string           `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp time.Time        `json:"timestamp" csv:"timestamp"`
+	Probes    []port.PortProbe `json:"probes,omitempty" csv:"probes,omitempty"`
 }
 
 func (r *Result) JSON() ([]byte, error) {

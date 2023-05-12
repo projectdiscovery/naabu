@@ -6,7 +6,6 @@ import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
-	"log"
 	"math/big"
 	"net"
 	"net/http"
@@ -746,6 +745,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					}
 					for _, p := range hostResult.Ports {
 						data.Port = p
+						for _, probe := range hostResult.PortResults {
+							if *p == *probe.Port {
+								data.Probes = append(data.Probes, probe)
+							}
+						}
 						if r.options.JSON {
 							b, marshallErr := data.JSON()
 							if marshallErr != nil {
@@ -790,7 +794,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 
 				if r.options.OnResult != nil {
-					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports})
+					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports, PortResults: hostResult.PortResults})
 				}
 			}
 			csvFileHeaderEnabled = false
@@ -895,8 +899,10 @@ func (r *Runner) ServiceDiscovery() error {
 				defer swg.Done()
 
 				portProbes, err := r.scanner.DiscoverServices(hostResult.IP, p, 1*time.Second)
-				// todo: just print out for now
-				log.Println(len(portProbes), err)
+				if err != nil {
+					return
+				}
+				r.scanner.ScanResults.AddPortProbes(hostResult.IP, portProbes)
 			}(hostResult, p)
 		}
 	}

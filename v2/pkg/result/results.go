@@ -8,16 +8,23 @@ import (
 )
 
 type HostResult struct {
-	Host  string
-	IP    string
-	Ports []*port.Port
+	Host        string
+	IP          string
+	Ports       []*port.Port
+	PortResults []port.PortProbe
 }
 
 // Result of the scan
 type Result struct {
 	sync.RWMutex
+
+	// key: ip => key: port id => value: port struct
 	ipPorts map[string]map[string]*port.Port
-	ips     map[string]struct{}
+	// ip => value: ports results
+	ipPortsResults map[string][]port.PortProbe
+	// key: ip
+	ips map[string]struct{}
+	// key: ip
 	skipped map[string]struct{}
 }
 
@@ -26,7 +33,8 @@ func NewResult() *Result {
 	ipPorts := make(map[string]map[string]*port.Port)
 	ips := make(map[string]struct{})
 	skipped := make(map[string]struct{})
-	return &Result{ipPorts: ipPorts, ips: ips, skipped: skipped}
+	ipPortsResults := make(map[string][]port.PortProbe)
+	return &Result{ipPorts: ipPorts, ips: ips, skipped: skipped, ipPortsResults: ipPortsResults}
 }
 
 // GetIPs stream all the ips
@@ -68,7 +76,7 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 			if r.HasSkipped(ip) {
 				continue
 			}
-			out <- &HostResult{IP: ip, Ports: maps.Values(ports)}
+			out <- &HostResult{IP: ip, Ports: maps.Values(ports), PortResults: r.ipPortsResults[ip]}
 		}
 	}()
 
@@ -175,4 +183,15 @@ func (r *Result) HasSkipped(ip string) bool {
 
 	_, ok := r.skipped[ip]
 	return ok
+}
+
+func (r *Result) AddPortProbes(ip string, portProbes []port.PortProbe) {
+	r.Lock()
+	defer r.Unlock()
+
+	if _, ok := r.ipPortsResults[ip]; ok {
+		r.ipPortsResults[ip] = append(r.ipPortsResults[ip], portProbes...)
+	} else {
+		r.ipPortsResults[ip] = portProbes
+	}
 }

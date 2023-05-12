@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
+	"reflect"
 	"time"
 
 	"github.com/projectdiscovery/gologger"
@@ -28,29 +28,23 @@ func (s *Scanner) ConnectVerify(host string, ports []*port.Port) []*port.Port {
 	return verifiedPorts
 }
 
-type PortProbe struct {
-	Port *port.Port
-	Data []byte
-}
-
 // DiscoverServices is used to verify if ports are accurate using a connect request
-func (s *Scanner) DiscoverServices(host string, p *port.Port, timeout time.Duration) ([]PortProbe, error) {
+func (s *Scanner) DiscoverServices(host string, p *port.Port, timeout time.Duration) ([]port.PortProbe, error) {
 	if timeout == 0 {
 		return nil, errors.New("read timeout not defined")
 	}
 
-	var portProbes []PortProbe
+	var portProbes []port.PortProbe
 
 	for _, probe := range probe.Probes {
 		data, err := probe.Do(host, p, timeout)
-		portProbe := PortProbe{
-			Port: p,
-			Data: data,
-		}
 		if err != nil && !errors.Is(err, io.EOF) {
-			// todo: print failures for debug purposes
-			log.Println(err)
 			continue
+		}
+		portProbe := port.PortProbe{
+			Port:    p,
+			Data:    data,
+			ProbeId: reflect.TypeOf(probe).Name(),
 		}
 		portProbes = append(portProbes, portProbe)
 	}
