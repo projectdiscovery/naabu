@@ -154,8 +154,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.16 h1:xrEK9VVkLf0eN4bYOTc2Pg0q
 github.com/projectdiscovery/retryablehttp-go v1.0.16/go.mod h1:9m76To4lNgBtVfqADzLxZg1wWajv6y/uYMWCOs1Olo8=
 github.com/projectdiscovery/uncover v1.0.4 h1:d0lUNcnqDMfG4gR/WP2+UoQKLVmLE7opBiwnmI7ir/0=
 github.com/projectdiscovery/uncover v1.0.4/go.mod h1:fvSHBhj8zZFEXGOhQIpPe5j5LtDXI7adOns1iFJ5TTY=
-github.com/projectdiscovery/utils v0.0.29 h1:B7SYDIt2OJau+8Q6v/mMf1C0TNJK1mJFprQA/z7Ygdw=
-github.com/projectdiscovery/utils v0.0.29/go.mod h1:RpMyTA/KACEBK+Bo9mk9MgLH0Hfc+BZtSlZ4T9bjLBE=
+github.com/projectdiscovery/utils v0.0.30 h1:G8RAGOxi5uOdlPpfAjKqYadMTSuVuRa+6raJm3TE788=
+github.com/projectdiscovery/utils v0.0.30/go.mod h1:UbZLkuIUQpik6eYCdX84ji31JcXv17KYJepIEM0Wk/Q=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
 github.com/remeh/sizedwaitgroup v1.0.0/go.mod h1:3j2R4OIe/SeS6YDhICBy22RWjJC5eNCJ1V+9+NVNYlo=
 github.com/rivo/uniseg v0.1.0/go.mod h1:J6wj4VEh+S6ZtnVlnTBMWIodfgj8LQOQFoIToxlJtxc=
