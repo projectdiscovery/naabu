@@ -126,8 +126,8 @@ github.com/projectdiscovery/blackrock v0.0.1 h1:lHQqhaaEFjgf5WkuItbpeCZv2DUIE45k
 github.com/projectdiscovery/blackrock v0.0.1/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
 github.com/projectdiscovery/cdncheck v1.0.4 h1:dIL+jniVY5wqEFjY/UUODKXy7UKmG6DwnyPmxQ92FB4=
 github.com/projectdiscovery/cdncheck v1.0.4/go.mod h1:NN0QRfxBzUVZJoS0lN37spElCOXHzFuvq1yg5RhTxCE=
-github.com/projectdiscovery/clistats v0.0.16 h1:rsKvtDlRyGS0OZ5fmIzVFkzZo6vMwI/sClpDOuFCdR8=
-github.com/projectdiscovery/clistats v0.0.16/go.mod h1:hEjSInJ5MDhNSgithLjcfThui3KBP4FjPHnHqHpUGhw=
+github.com/projectdiscovery/clistats v0.0.17 h1:/QeHi990w7250LpIh3AP9LH9TZD4zkkHuzt+KlOsNgA=
+github.com/projectdiscovery/clistats v0.0.17/go.mod h1:4ogkpnCyujFBs+kpLvv9Z8CCrNg9549IBj24zuYOCKk=
 github.com/projectdiscovery/dnsx v1.1.4 h1:hdvIPU8W1rwNAi6sjjN1rCtCVOhS1/cM3OgmOLFvAm8=
 github.com/projectdiscovery/dnsx v1.1.4/go.mod h1:wYz+2E97h0j25FLiqpUJyVY6NW7cEDODyUAsIoXsDsA=
 github.com/projectdiscovery/fdmax v0.0.4 h1:K9tIl5MUZrEMzjvwn/G4drsHms2aufTn1xUdeVcmhmc=
