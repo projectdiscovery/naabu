@@ -548,15 +548,7 @@ func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
 		return
 	}
-	if r.scanner.ScanResults.IPHasPort(ip, p) {
-		return
-	}
 	r.limiter.Take()
-	open, err := r.scanner.ConnectPort(ip, p, time.Duration(r.options.Timeout)*time.Millisecond)
-	if open && err == nil {
-		r.scanner.ScanResults.AddPort(ip, p)
-	}
-
 	switch p.Protocol {
 	case protocol.TCP:
 		r.scanner.EnqueueTCP(ip, scan.Syn, p)
