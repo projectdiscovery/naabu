@@ -205,12 +205,15 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 		}
 	}
 
+	// In case of OSX, when we decode the data from 'loO' interface
+	// always get [Ethernet] layer only.
+	// with the help of data received from packetSource.Packets() we can
+	// extract the high level layers like [IPv4, IPv6, TCP, UDP]
 	macLoopBackScanCaseCallback := func(handler *pcap.Handle) {
-		tcp := &layers.TCP{}
-		udp := &layers.UDP{}
-
 		packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 		for packet := range packetSource.Packets() {
+			tcp := &layers.TCP{}
+			udp := &layers.UDP{}
 			for _, layerType := range packet.Layers() {
 				ipLayer := packet.Layer(layers.LayerTypeIPv4)
 				if ipLayer == nil {
