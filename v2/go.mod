@@ -9,7 +9,7 @@ require (
 	github.com/miekg/dns v1.1.54
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.0.4
+	github.com/projectdiscovery/cdncheck v1.0.5
 	github.com/projectdiscovery/clistats v0.0.16
 	github.com/projectdiscovery/dnsx v1.1.4
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -24,7 +24,7 @@ require (
 	github.com/projectdiscovery/uncover v1.0.4
 	github.com/projectdiscovery/utils v0.0.32
 	github.com/remeh/sizedwaitgroup v1.0.0
-	github.com/stretchr/testify v1.8.2
+	github.com/stretchr/testify v1.8.3
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20230420155640-133eef4313cb
 	golang.org/x/net v0.10.0
