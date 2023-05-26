@@ -209,8 +209,8 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 	// always get [Ethernet] layer only.
 	// with the help of data received from packetSource.Packets() we can
 	// extract the high level layers like [IPv4, IPv6, TCP, UDP]
-	macLoopBackScanCaseCallback := func(handler *pcap.Handle) {
-		defer wgread.Done()
+	macLoopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
+		defer wg.Done()
 		packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 		for packet := range packetSource.Packets() {
 			tcp := &layers.TCP{}
@@ -266,7 +266,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 	for _, handler := range handlers.TransportActive {
 		if runtime.GOOS == "darwin" {
 			wgread.Add(1)
-			go macLoopBackScanCaseCallback(handler)
+			go macLoopBackScanCaseCallback(handler, &wgread)
 		}
 
 		wgread.Add(1)
