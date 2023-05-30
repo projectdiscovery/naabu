@@ -183,7 +183,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 		return
 	}
 
-	transportRaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {
+	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {
 		// We consider only incoming packets
 		tcpPortMatches := tcp.DstPort == layers.TCPPort(s.SourcePort)
 		udpPortMatches := udp.DstPort == layers.UDPPort(s.SourcePort)
@@ -256,7 +256,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 					} else {
 						gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
 					}
-					transportRaderCallback(*tcp, *udp, ip, srcIP4, srcIP6)
+					transportReaderCallback(*tcp, *udp, ip, srcIP4, srcIP6)
 				}
 			}
 		}
@@ -324,7 +324,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
 								continue
 							}
-							transportRaderCallback(tcp, udp, ip, srcIP4, srcIP6)
+							transportReaderCallback(tcp, udp, ip, srcIP4, srcIP6)
 						}
 					}
 				}
