@@ -20,6 +20,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
+	osutil "github.com/projectdiscovery/utils/os"
 	"golang.org/x/net/icmp"
 )
 
@@ -264,7 +265,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 
 	// Transport Readers (TCP|UDP)
 	for _, handler := range handlers.TransportActive {
-		if runtime.GOOS == "darwin" {
+		if osutil.IsOSX() {
 			wgread.Add(1)
 			go macLoopBackScanCaseCallback(handler, &wgread)
 		}
