@@ -22,7 +22,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.8
 	github.com/projectdiscovery/retryablehttp-go v1.0.16
 	github.com/projectdiscovery/uncover v1.0.4
-	github.com/projectdiscovery/utils v0.0.32
+	github.com/projectdiscovery/utils v0.0.35
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.3
 	go.uber.org/multierr v1.11.0
@@ -58,7 +58,7 @@ require (
 	github.com/mattn/go-isatty v0.0.17 // indirect
 	github.com/mattn/go-runewidth v0.0.14 // indirect
 	github.com/mholt/archiver v3.1.1+incompatible // indirect
-	github.com/microcosm-cc/bluemonday v1.0.23 // indirect
+	github.com/microcosm-cc/bluemonday v1.0.24 // indirect
 	github.com/minio/selfupdate v0.6.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
