@@ -19,7 +19,6 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
-	osutil "github.com/projectdiscovery/utils/os"
 	"golang.org/x/net/icmp"
 )
 
@@ -33,6 +32,7 @@ func init() {
 // Handlers contains the list of pcap handlers
 type Handlers struct {
 	TransportActive   []*pcap.Handle
+	LoopbackHandlers  []*pcap.Handle
 	TransportInactive []*pcap.InactiveHandle
 	EthernetActive    []*pcap.Handle
 	EthernetInactive  []*pcap.InactiveHandle
@@ -157,10 +157,17 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocols ...
 		if err != nil {
 			return err
 		}
-
+		iface, err := net.InterfaceByName(interfaceName)
+		if err != nil {
+			return err
+		}
 		switch proto {
 		case protocol.TCP, protocol.UDP:
-			handlers.TransportActive = append(handlers.TransportActive, handle)
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				handlers.LoopbackHandlers = append(handlers.LoopbackHandlers, handle)
+			} else {
+				handlers.TransportActive = append(handlers.TransportActive, handle)
+			}
 		case protocol.ARP:
 			handlers.EthernetActive = append(handlers.EthernetActive, handle)
 		default:
@@ -209,7 +216,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 	// always get [Ethernet] layer only.
 	// with the help of data received from packetSource.Packets() we can
 	// extract the high level layers like [IPv4, IPv6, TCP, UDP]
-	macLoopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
+	loopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
 		defer wg.Done()
 		packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
 		for packet := range packetSource.Packets() {
@@ -262,13 +269,14 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 		}
 	}
 
+	// Loopback Readers
+	for _, handler := range handlers.LoopbackHandlers {
+		wgread.Add(1)
+		go loopBackScanCaseCallback(handler, &wgread)
+	}
+
 	// Transport Readers (TCP|UDP)
 	for _, handler := range handlers.TransportActive {
-		if osutil.IsOSX() {
-			wgread.Add(1)
-			go macLoopBackScanCaseCallback(handler, &wgread)
-		}
-
 		wgread.Add(1)
 		go func(handler *pcap.Handle) {
 			defer wgread.Done()
