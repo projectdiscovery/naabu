@@ -28,7 +28,7 @@ jobs:
         run: |
           sudo apt install libpcap-dev
           sudo apt install nmap
-          go install github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
+          go install -race github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
 
       - name: Run the simplehttpserver on 127.0.0.1:8000
         run: |
