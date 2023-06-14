@@ -42,10 +42,11 @@ jobs:
       - name: Race Condition Tests
         run: |
           go run -race . -host scanme.sh
+          sudo go run -race . -host scanme.sh
         working-directory: v2/cmd/naabu/
 
   build-mac:
-    runs-on: macos-13
+    runs-on: macos-latest
     steps:
       - name: Set up Go
         uses: actions/setup-go@v4
