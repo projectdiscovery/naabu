@@ -548,7 +548,6 @@ func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
 		return
 	}
-
 	r.limiter.Take()
 	switch p.Protocol {
 	case protocol.TCP:
