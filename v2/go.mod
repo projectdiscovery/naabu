@@ -1,4 +1,4 @@
-module github.com/Mzack9999/naabu/v2
+module github.com/projectdiscovery/naabu/v2
 
 go 1.19
 
