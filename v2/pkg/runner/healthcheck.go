@@ -6,8 +6,8 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/Mzack9999/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/goflags"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	fileutil "github.com/projectdiscovery/utils/file"
 )
 

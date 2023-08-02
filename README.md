@@ -5,9 +5,9 @@
 
 <p align="center">
 <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-_red.svg"></a>
-<a href="https://github.com/Mzack9999/naabu/issues"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat"></a>
-<a href="https://goreportcard.com/badge/github.com/Mzack9999/naabu"><img src="https://goreportcard.com/badge/github.com/Mzack9999/naabu"></a>
-<a href="https://github.com/Mzack9999/naabu/releases"><img src="https://img.shields.io/github/release/projectdiscovery/naabu"></a>
+<a href="https://github.com/projectdiscovery/naabu/issues"><img src="https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat"></a>
+<a href="https://goreportcard.com/badge/github.com/projectdiscovery/naabu"><img src="https://goreportcard.com/badge/github.com/projectdiscovery/naabu"></a>
+<a href="https://github.com/projectdiscovery/naabu/releases"><img src="https://img.shields.io/github/release/projectdiscovery/naabu"></a>
 <a href="https://twitter.com/pdiscoveryio"><img src="https://img.shields.io/twitter/follow/pdiscoveryio.svg?logo=twitter"></a>
 <a href="https://discord.gg/projectdiscovery"><img src="https://img.shields.io/discord/695645237418131507.svg?logo=discord"></a>
 </p>
@@ -131,7 +131,7 @@ DEBUG:
 
 # Installation Instructions
 
-Download the ready to run [binary](https://github.com/Mzack9999/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
+Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
 ## Prerequisite
 
@@ -143,7 +143,7 @@ To install libcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `
 ## Installing Naabu
 
 ```sh
-go install -v github.com/Mzack9999/naabu/v2/cmd/naabu@latest
+go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 ```
 
 # Running Naabu
@@ -359,8 +359,8 @@ import (
 	"log"
 
 	"github.com/projectdiscovery/goflags"
-	"github.com/Mzack9999/naabu/v2/pkg/result"
-	"github.com/Mzack9999/naabu/v2/pkg/runner"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/runner"
 )
 
 func main() {
@@ -385,7 +385,7 @@ func main() {
 
 # Notes
 
-- Naabu allows arbitrary binary execution as a feature to support [nmap integration](https://github.com/Mzack9999/naabu#nmap-integration).
+- Naabu allows arbitrary binary execution as a feature to support [nmap integration](https://github.com/projectdiscovery/naabu#nmap-integration).
 - Naabu is designed to scan ports on multiple hosts / mass port scanning. 
 - As default naabu is configured with a assumption that you are running it from VPS.
 - We suggest tuning the flags / rate if running naabu from local system.
@@ -395,4 +395,4 @@ func main() {
 
 Naabu is made with 🖤 by the [projectdiscovery](https://projectdiscovery.io) team. Community contributions have made the project what it is. 
 
-See the **[Thanks.md](https://github.com/Mzack9999/naabu/blob/master/THANKS.md)** file for more details.
+See the **[Thanks.md](https://github.com/projectdiscovery/naabu/blob/master/THANKS.md)** file for more details.

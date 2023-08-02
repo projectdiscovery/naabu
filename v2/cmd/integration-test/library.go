@@ -3,9 +3,9 @@ package main
 import (
 	"os"
 
-	"github.com/Mzack9999/naabu/v2/internal/testutils"
-	"github.com/Mzack9999/naabu/v2/pkg/result"
-	"github.com/Mzack9999/naabu/v2/pkg/runner"
+	"github.com/projectdiscovery/naabu/v2/internal/testutils"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/runner"
 )
 
 var libraryTestcases = map[string]testutils.TestCase{
