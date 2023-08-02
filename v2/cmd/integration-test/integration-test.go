@@ -5,8 +5,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/Mzack9999/naabu/v2/internal/testutils"
 	"github.com/logrusorgru/aurora"
-	"github.com/projectdiscovery/naabu/v2/internal/testutils"
 )
 
 var (

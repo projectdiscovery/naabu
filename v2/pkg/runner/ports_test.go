@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/projectdiscovery/naabu/v2/pkg/port"
-	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/Mzack9999/naabu/v2/pkg/port"
+	"github.com/Mzack9999/naabu/v2/pkg/protocol"
 	"github.com/stretchr/testify/assert"
 )
 

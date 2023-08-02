@@ -13,6 +13,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Mzack9999/naabu/v2/pkg/port"
+	"github.com/Mzack9999/naabu/v2/pkg/privileges"
+	"github.com/Mzack9999/naabu/v2/pkg/protocol"
+	"github.com/Mzack9999/naabu/v2/pkg/result"
+	"github.com/Mzack9999/naabu/v2/pkg/scan"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
@@ -20,13 +25,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
-	"github.com/projectdiscovery/naabu/v2/pkg/port"
-	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
-	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
-	"github.com/projectdiscovery/naabu/v2/pkg/result"
-	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
-	"github.com/projectdiscovery/retryablehttp-go"
 
 	// "github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
@@ -255,7 +254,7 @@ func (r *Runner) RunEnumeration() error {
 	case r.options.Stream && r.options.Passive: // stream passive
 		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
-		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
+		// httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
 		r.scanner.Phase.Set(scan.Scan)
 		for cidr := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {

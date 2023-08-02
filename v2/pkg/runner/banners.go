@@ -4,9 +4,9 @@ import (
 	"net"
 	"strings"
 
+	"github.com/Mzack9999/naabu/v2/pkg/privileges"
+	"github.com/Mzack9999/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
-	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	osutil "github.com/projectdiscovery/utils/os"
 	updateutils "github.com/projectdiscovery/utils/update"
 )

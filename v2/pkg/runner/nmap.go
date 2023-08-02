@@ -9,8 +9,8 @@ import (
 
 	"github.com/pkg/errors"
 
+	"github.com/Mzack9999/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/gologger"
-	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	osutil "github.com/projectdiscovery/utils/os"
 )
 
