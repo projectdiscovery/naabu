@@ -4,12 +4,9 @@ import (
 	"bytes"
 	"context"
 	"encoding/csv"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	"net"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,7 +27,8 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
-	"github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
+
+	// "github.com/projectdiscovery/uncover/uncover/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -269,34 +267,34 @@ func (r *Runner) RunEnumeration() error {
 				go func(ip string) {
 					defer r.wgscan.Done()
 
-					// obtain ports from shodan idb
-					shodanURL := fmt.Sprintf(shodanidb.URL, url.QueryEscape(ip))
-					request, err := retryablehttp.NewRequest(http.MethodGet, shodanURL, nil)
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't create http request for %s: %s\n", ip, err)
-						return
-					}
-					r.limiter.Take()
-					response, err := httpClient.Do(request)
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
-						return
-					}
-					if response.StatusCode != http.StatusOK {
-						gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
-						return
-					}
+					// // obtain ports from shodan idb
+					// shodanURL := fmt.Sprintf(shodanidb.URL, url.QueryEscape(ip))
+					// request, err := retryablehttp.NewRequest(http.MethodGet, shodanURL, nil)
+					// if err != nil {
+					// 	gologger.Warning().Msgf("Couldn't create http request for %s: %s\n", ip, err)
+					// 	return
+					// }
+					// r.limiter.Take()
+					// response, err := httpClient.Do(request)
+					// if err != nil {
+					// 	gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
+					// 	return
+					// }
+					// if response.StatusCode != http.StatusOK {
+					// 	gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
+					// 	return
+					// }
 
-					// unmarshal the response
-					data := &shodanidb.ShodanResponse{}
-					if err := json.NewDecoder(response.Body).Decode(data); err != nil {
-						gologger.Warning().Msgf("Couldn't unmarshal json data for %s: %s\n", ip, err)
-						return
-					}
+					// // unmarshal the response
+					// data := &shodanidb.ShodanResponse{}
+					// if err := json.NewDecoder(response.Body).Decode(data); err != nil {
+					// 	gologger.Warning().Msgf("Couldn't unmarshal json data for %s: %s\n", ip, err)
+					// 	return
+					// }
 
-					for _, p := range data.Ports {
-						r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
-					}
+					// for _, p := range data.Ports {
+					// 	r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
+					// }
 				}(ip)
 			}
 		}
