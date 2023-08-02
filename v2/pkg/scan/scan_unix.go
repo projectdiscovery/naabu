@@ -11,14 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Mzack9999/naabu/v2/pkg/port"
-	"github.com/Mzack9999/naabu/v2/pkg/protocol"
-	"github.com/Mzack9999/naabu/v2/pkg/routing"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/gopacket/pcap"
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
 )
 

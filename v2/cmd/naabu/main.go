@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.com/Mzack9999/naabu/v2/pkg/runner"
 	_ "github.com/projectdiscovery/fdmax/autofdmax"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/runner"
 	"os"
 	"os/signal"
 )

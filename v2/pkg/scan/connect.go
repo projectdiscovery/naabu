@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/Mzack9999/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
 )
 
 // ConnectVerify is used to verify if ports are accurate using a connect request
