@@ -7,7 +7,7 @@ import (
 	iputil "github.com/projectdiscovery/utils/ip"
 )
 
-// CdnCheck verifies if the given ip is part of Cdn ranges
+// CdnCheck verifies if the given ip is part of Cdn/WAF ranges
 func (s *Scanner) CdnCheck(ip string) (bool, string, error) {
 	if s.cdn == nil {
 		return false, "", errors.New("cdn client not initialized")
