@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/mapcidr v1.1.2
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.9
-	github.com/projectdiscovery/retryablehttp-go v1.0.20
+	github.com/projectdiscovery/retryablehttp-go v1.0.21
 	github.com/projectdiscovery/uncover v1.0.5
 	github.com/projectdiscovery/utils v0.0.47
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -73,7 +73,7 @@ require (
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.4 // indirect
-	github.com/projectdiscovery/fastdialer v0.0.35-0.20230712222521-f5386e7cfc12 // indirect
+	github.com/projectdiscovery/fastdialer v0.0.35 // indirect
 	github.com/projectdiscovery/hmap v0.0.13 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.31 // indirect
 	github.com/refraction-networking/utls v1.3.2 // indirect
