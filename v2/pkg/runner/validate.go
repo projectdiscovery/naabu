@@ -129,6 +129,9 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("sudo access required to perform host discovery")
 	}
 
+	// configure host discovery if necessary
+	options.configureHostDiscovery()
+
 	if options.PortThreshold < 0 || options.PortThreshold > 65535 {
 		return errors.New("port threshold must be between 0 and 65535")
 	}
