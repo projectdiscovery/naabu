@@ -252,7 +252,7 @@ func ParseOptions() *Options {
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
-	err := options.validateOptions()
+	err := options.ValidateOptions()
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}

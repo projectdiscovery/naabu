@@ -25,8 +25,8 @@ var (
 	errTwoOutputMode = errors.New("both json and csv mode specified")
 )
 
-// validateOptions validates the configuration options passed
-func (options *Options) validateOptions() error {
+// ValidateOptions validates the configuration options passed
+func (options *Options) ValidateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
 	// If none was provided, then return.
 	if options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
