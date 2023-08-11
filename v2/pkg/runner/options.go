@@ -212,7 +212,7 @@ func ParseOptions() *Options {
 	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
 	// configure host discovery if necessary
-	options.configureHostDiscovery()
+	options.ConfigureHostDiscovery()
 
 	// Read the inputs and configure the logging
 	options.configureOutput()
@@ -252,7 +252,7 @@ func ParseOptions() *Options {
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
-	err := options.validateOptions()
+	err := options.ValidateOptions()
 	if err != nil {
 		gologger.Fatal().Msgf("Program exiting: %s\n", err)
 	}
