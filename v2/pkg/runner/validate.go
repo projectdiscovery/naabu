@@ -129,9 +129,6 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("sudo access required to perform host discovery")
 	}
 
-	// configure host discovery if necessary
-	options.configureHostDiscovery()
-
 	if options.PortThreshold < 0 || options.PortThreshold > 65535 {
 		return errors.New("port threshold must be between 0 and 65535")
 	}
@@ -158,9 +155,9 @@ func (options *Options) configureOutput() {
 	}
 }
 
-// configureHostDiscovery enables default probes if none is specified
+// ConfigureHostDiscovery enables default probes if none is specified
 // but host discovery option was requested
-func (options *Options) configureHostDiscovery() {
+func (options *Options) ConfigureHostDiscovery() {
 	if options.shouldDiscoverHosts() && !options.hasProbes() {
 		// if no options were defined enable
 		// - ICMP Echo Request
