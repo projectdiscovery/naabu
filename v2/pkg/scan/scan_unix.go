@@ -253,8 +253,11 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 				}
 
 				if layerType.LayerType() == layers.LayerTypeTCP || layerType.LayerType() == layers.LayerTypeUDP {
-					isIP4InRange := s.IPRanger.Contains(srcIP4)
-					isIP6InRange := s.IPRanger.Contains(srcIP6)
+					srcPort := fmt.Sprint(int(tcp.SrcPort))
+					srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+					isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
+					srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+					isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
 					var ip string
 					if isIP4InRange {
 						ip = srcIP4
@@ -319,10 +322,13 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 					}
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
+							srcPort := fmt.Sprint(int(tcp.SrcPort))
 							srcIP4 := ip4.SrcIP.String()
-							isIP4InRange := s.IPRanger.Contains(srcIP4)
+							srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+							isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
 							srcIP6 := ip6.SrcIP.String()
-							isIP6InRange := s.IPRanger.Contains(srcIP6)
+							srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+							isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
 							var ip string
 							if isIP4InRange {
 								ip = srcIP4

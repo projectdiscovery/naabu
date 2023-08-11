@@ -14,9 +14,9 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.4
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.12
+	github.com/projectdiscovery/goflags v0.1.8
 	github.com/projectdiscovery/gologger v1.1.11
-	github.com/projectdiscovery/ipranger v0.0.6
+	github.com/projectdiscovery/ipranger v0.0.7-0.20230811220704-392e15f8cb01
 	github.com/projectdiscovery/mapcidr v1.1.2
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.9
