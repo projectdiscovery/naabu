@@ -747,6 +747,22 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			if err != nil {
 				continue
 			}
+
+			// recover hostnames from ip:port combination
+			for _, p := range hostResult.Ports {
+				ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+				if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
+					if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
+						// replace bare ip:port with host
+						for idx, ipCandidate := range dt {
+							if iputil.IsIP(ipCandidate) {
+								dt[idx] = otherName
+							}
+						}
+					}
+				}
+			}
+
 			buffer := bytes.Buffer{}
 			writer := csv.NewWriter(&buffer)
 			for _, host := range dt {
