@@ -16,14 +16,11 @@ func (s *Scanner) CdnCheck(ip string) (bool, string, error) {
 		return false, "", errors.Errorf("%s is not a valid ip", ip)
 	}
 
-	matched, val, err := s.cdn.CheckWAF(net.ParseIP((ip)))
-	if err != nil {
+	// the goal is to check if ip is part of cdn/waf to decide if target should be scanned or not
+	// since 'cloud' itemtype does not fit logic here , we consider target is not part of cdn/waf
+	matched, value, itemType, err := s.cdn.Check(net.ParseIP((ip)))
+	if itemType == "cloud" {
 		return false, "", err
 	}
-
-	if matched {
-		return matched, val, err
-	}
-
-	return s.cdn.CheckCDN(net.ParseIP((ip)))
+	return matched, value, err
 }
