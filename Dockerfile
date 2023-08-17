@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.20.7-alpine AS builder
+FROM golang:1.21.0-alpine AS builder
 RUN apk add build-base libpcap-dev
 WORKDIR /app
 COPY . /app
