@@ -47,7 +47,14 @@ type Runner struct {
 	wgscan        sizedwaitgroup.SizedWaitGroup
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
-	streamChannel chan *net.IPNet
+	streamChannel chan Target
+}
+
+type Target struct {
+	Ip   string
+	Cidr string
+	Fqdn string
+	Port string
 }
 
 // NewRunner creates a new runner struct instance by parsing
@@ -62,7 +69,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
 		options: options,
 	}
-	runner.streamChannel = make(chan *net.IPNet)
+	runner.streamChannel = make(chan Target)
 
 	excludedIps, err := parseExcludedIps(options)
 	if err != nil {
@@ -223,29 +230,41 @@ func (r *Runner) RunEnumeration() error {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
 		r.scanner.Phase.Set(scan.Scan)
-		for cidr := range r.streamChannel {
-			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
-				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
+
+		handleStreamIp := func(target string, port *port.Port) bool {
+			if r.scanner.ScanResults.HasSkipped(target) {
+				return false
 			}
-			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
-			for ip := range ipStream {
-				for _, port := range r.scanner.Ports {
-					if r.scanner.ScanResults.HasSkipped(ip) {
-						continue
-					}
-					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
-						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
-						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
-						r.scanner.ScanResults.AddSkipped(ip)
-						continue
-					}
-					if shouldUseRawPackets {
-						r.RawSocketEnumeration(ip, port)
-					} else {
-						r.wgscan.Add()
-						go r.handleHostPort(ip, port)
+			if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(target) >= r.options.PortThreshold {
+				hosts, _ := r.scanner.IPRanger.GetHostsByIP(target)
+				gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", target, hosts)
+				r.scanner.ScanResults.AddSkipped(target)
+				return false
+			}
+			if shouldUseRawPackets {
+				r.RawSocketEnumeration(target, port)
+			} else {
+				r.wgscan.Add()
+				go r.handleHostPort(target, port)
+			}
+			return true
+		}
+
+		for target := range r.streamChannel {
+			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
+				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
+			}
+			if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
+				for ip := range ipStream {
+					for _, port := range r.scanner.Ports {
+						if !handleStreamIp(ip, port) {
+							break
+						}
 					}
 				}
+			} else if target.Ip != "" && target.Port != "" {
+				pp, _ := strconv.Atoi(target.Port)
+				handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 			}
 		}
 		r.wgscan.Wait()
@@ -256,11 +275,11 @@ func (r *Runner) RunEnumeration() error {
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
 		r.scanner.Phase.Set(scan.Scan)
-		for cidr := range r.streamChannel {
-			if err := r.scanner.IPRanger.Add(cidr.String()); err != nil {
-				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", cidr, err)
+		for target := range r.streamChannel {
+			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
+				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
 			}
-			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
+			ipStream, _ := mapcidr.IPAddressesAsStream(target.Cidr)
 			for ip := range ipStream {
 				r.wgscan.Add()
 				go func(ip string) {

@@ -119,7 +119,7 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		for _, cidr := range cidrs {
 			if r.options.Stream {
-				r.streamChannel <- cidr
+				r.streamChannel <- Target{Cidr: cidr.String()}
 			} else if err := r.scanner.IPRanger.AddHostWithMetadata(cidr.String(), "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 				gologger.Warning().Msgf("%s\n", err)
 			}
@@ -128,7 +128,7 @@ func (r *Runner) AddTarget(target string) error {
 	}
 	if iputil.IsCIDR(target) {
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(target)
+			r.streamChannel <- Target{Cidr: target}
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
@@ -141,7 +141,7 @@ func (r *Runner) AddTarget(target string) error {
 			target = ip.To4().String()
 		}
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(target)
+			r.streamChannel <- Target{Cidr: iputil.ToCidr(target).String()}
 		} else {
 			metadata := "ip"
 			if r.options.ReversePTR {
@@ -173,7 +173,11 @@ func (r *Runner) AddTarget(target string) error {
 
 	for _, ip := range ips {
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(ip)
+			if hasPort {
+				r.streamChannel <- Target{Ip: ip, Port: port}
+			} else {
+				r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+			}
 		} else if hasPort {
 			ipPort := net.JoinHostPort(ip, port)
 			if err := r.scanner.IPRanger.AddHostWithMetadata(ipPort, target); err != nil {
