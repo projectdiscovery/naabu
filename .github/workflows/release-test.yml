@@ -1,0 +1,69 @@
+name: 🔨 Release Test
+
+on:
+  pull_request:
+    paths:
+      - '**.go'
+      - '**.mod'
+  workflow_dispatch:
+
+jobs:
+  release-test-mac:
+    runs-on: macos-latest
+    steps:
+      - name: "Check out code"
+        uses: actions/checkout@v3
+        with: 
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+      
+      - name: release test
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          args: "release --clean --snapshot -f .goreleaser/mac.yml"
+          version: latest
+          workdir: v2
+
+  release-test-linux:
+    runs-on: ubuntu-latest-16-cores
+    steps:
+      - name: "Check out code"
+        uses: actions/checkout@v3
+        with: 
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+      
+      - name: release test
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          args: "release --clean --snapshot -f .goreleaser/linux.yml"
+          version: latest
+          workdir: v2
+
+  release-test-windows:
+    runs-on: windows-latest-8-cores
+    steps:
+      - name: "Check out code"
+        uses: actions/checkout@v3
+        with: 
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: 1.20.x
+      
+      - name: release test
+        uses: goreleaser/goreleaser-action@v4
+        with:
+          args: "release --clean --snapshot -f .goreleaser/windows.yml"
+          version: latest
+          workdir: v2
