@@ -19,7 +19,7 @@
   <a href="#running-naabu">Running naabu</a> •
   <a href="#configuration-file">Config</a> •
   <a href="#nmap-integration">NMAP integration</a> •
-  <a href="#cdn-exclusion">CDN Exclusion</a> •
+  <a href="#cdn-waf-exclusion">CDN/WAF Exclusion</a> •
   <a href="https://discord.gg/projectdiscovery">Discord</a>
 </p>
 
@@ -68,8 +68,8 @@ PORT:
    -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
    -ports-file, -pf string     list of ports to scan (file)
    -port-threshold, -pts int   port threshold to skip port scan for the host
-   -exclude-cdn, -ec           skip full port scans for CDN's (only checks for 80,443)
-   -display-cdn, -cdn          display cdn in use
+   -exclude-cdn, -ec           skip full port scans for CDN/WAF (only checks for 80,443)
+   -display-cdn, -cdn          display cdn/waf in use
 
 RATE-LIMIT:
    -c int     general internal worker threads (default 25)
@@ -340,9 +340,9 @@ PORT     STATE SERVICE       VERSION
 8443/tcp open  ssl/https-alt cloudflare
 ```
 
-# CDN Exclusion
+# CDN/WAF Exclusion
 
-Naabu also supports excluding CDN IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
+Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 

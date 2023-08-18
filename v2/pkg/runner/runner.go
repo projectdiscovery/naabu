@@ -598,7 +598,7 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 }
 
 func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
-	// performs cdn scan exclusions checks
+	// performs cdn/waf scan exclusions checks
 	if !r.canIScanIfCDN(ip, p) {
 		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
 		return
@@ -612,14 +612,14 @@ func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
 	}
 }
 
-// check if an ip can be scanned in case CDN exclusions are enabled
+// check if an ip can be scanned in case CDN/WAF exclusions are enabled
 func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	// if CDN ips are not excluded all scans are allowed
 	if !r.options.ExcludeCDN {
 		return true
 	}
 
-	// if exclusion is enabled, but the ip is not part of the CDN ips range we can scan
+	// if exclusion is enabled, but the ip is not part of the CDN/WAF ips range we can scan
 	if ok, _, err := r.scanner.CdnCheck(host); err == nil && !ok {
 		return true
 	}
