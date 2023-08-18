@@ -119,7 +119,7 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		for _, cidr := range cidrs {
 			if r.options.Stream {
-				r.streamChannel <- cidr
+				r.streamChannel <- Target{Cidr: cidr.String()}
 			} else if err := r.scanner.IPRanger.AddHostWithMetadata(cidr.String(), "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 				gologger.Warning().Msgf("%s\n", err)
 			}
@@ -128,7 +128,7 @@ func (r *Runner) AddTarget(target string) error {
 	}
 	if iputil.IsCIDR(target) {
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(target)
+			r.streamChannel <- Target{Cidr: target}
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(target, "cidr"); err != nil { // Add cidr directly to ranger, as single ips would allocate more resources later
 			gologger.Warning().Msgf("%s\n", err)
 		}
@@ -141,7 +141,7 @@ func (r *Runner) AddTarget(target string) error {
 			target = ip.To4().String()
 		}
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(target)
+			r.streamChannel <- Target{Cidr: iputil.ToCidr(target).String()}
 		} else {
 			metadata := "ip"
 			if r.options.ReversePTR {
@@ -159,13 +159,38 @@ func (r *Runner) AddTarget(target string) error {
 		}
 		return nil
 	}
-	ips, err := r.resolveFQDN(target)
+
+	host, port, hasPort := getPort(target)
+
+	targetToResolve := target
+	if hasPort {
+		targetToResolve = host
+	}
+	ips, err := r.resolveFQDN(targetToResolve)
 	if err != nil {
 		return err
 	}
+
 	for _, ip := range ips {
 		if r.options.Stream {
-			r.streamChannel <- iputil.ToCidr(ip)
+			if hasPort {
+				r.streamChannel <- Target{Ip: ip, Port: port}
+				if len(r.options.Ports) > 0 {
+					r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+				}
+			} else {
+				r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+			}
+		} else if hasPort {
+			ipPort := net.JoinHostPort(ip, port)
+			if err := r.scanner.IPRanger.AddHostWithMetadata(ipPort, target); err != nil {
+				gologger.Warning().Msgf("%s\n", err)
+			}
+			if len(r.options.Ports) > 0 {
+				if err := r.scanner.IPRanger.AddHostWithMetadata(ip, host); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
+			}
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
 		}
@@ -177,7 +202,7 @@ func (r *Runner) AddTarget(target string) error {
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	ipsV4, ipsV6, err := r.host2ips(target)
 	if err != nil {
-		return []string{}, err
+		return nil, err
 	}
 
 	var (
@@ -241,13 +266,10 @@ func (r *Runner) resolveFQDN(target string) ([]string, error) {
 	}
 
 	for _, hostIP := range hostIPS {
-		if !r.scanner.IPRanger.Contains(hostIP) {
-			gologger.Debug().Msgf("Using host %s for enumeration\n", hostIP)
-		}
-		// dedupe all the hosts and also keep track of ip => host for the output - just append new hostname
-		if err := r.scanner.IPRanger.AddHostWithMetadata(hostIP, target); err != nil {
-			gologger.Warning().Msgf("%s\n", err)
+		if r.scanner.IPRanger.Contains(hostIP) {
+			gologger.Debug().Msgf("Using ip %s for host %s enumeration\n", hostIP, target)
 		}
 	}
+
 	return hostIPS, nil
 }
