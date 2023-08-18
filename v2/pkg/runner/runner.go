@@ -497,7 +497,15 @@ func (r *Runner) getHostDiscoveryIps() (ips []*net.IPNet, ipsWithPort []string) 
 	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
 		ips = append(ips, iputil.ToCidr(string(ip)))
 	}
-	// ips with port are ignored during host discovery phase
+
+	r.scanner.IPRanger.Hosts.Scan(func(ip, _ []byte) error {
+		// ips with port are ignored during host discovery phase
+		if cidr := iputil.ToCidr(string(ip)); cidr == nil {
+			ipsWithPort = append(ipsWithPort, string(ip))
+		}
+		return nil
+	})
+
 	return
 }
 
