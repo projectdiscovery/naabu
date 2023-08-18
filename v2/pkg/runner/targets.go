@@ -175,6 +175,9 @@ func (r *Runner) AddTarget(target string) error {
 		if r.options.Stream {
 			if hasPort {
 				r.streamChannel <- Target{Ip: ip, Port: port}
+				if len(r.options.Ports) > 0 {
+					r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+				}
 			} else {
 				r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
 			}
@@ -182,6 +185,11 @@ func (r *Runner) AddTarget(target string) error {
 			ipPort := net.JoinHostPort(ip, port)
 			if err := r.scanner.IPRanger.AddHostWithMetadata(ipPort, target); err != nil {
 				gologger.Warning().Msgf("%s\n", err)
+			}
+			if len(r.options.Ports) > 0 {
+				if err := r.scanner.IPRanger.AddHostWithMetadata(ip, host); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
 			}
 		} else if err := r.scanner.IPRanger.AddHostWithMetadata(ip, target); err != nil {
 			gologger.Warning().Msgf("%s\n", err)
