@@ -359,7 +359,7 @@ func (r *Runner) RunEnumeration() error {
 			r.stats.AddStatic("startedAt", time.Now())
 			r.stats.AddCounter("packets", uint64(0))
 			r.stats.AddCounter("errors", uint64(0))
-			r.stats.AddCounter("total", Range*uint64(r.options.Retries))
+			r.stats.AddCounter("total", Range*uint64(r.options.Retries)+targetsWithPortCount)
 			r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
 			if err := r.stats.Start(); err != nil {
 				gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
@@ -456,6 +456,9 @@ func (r *Runner) RunEnumeration() error {
 				} else {
 					r.wgscan.Add()
 					go r.handleHostPort(ip, &portWithMetadata)
+				}
+				if r.options.EnableProgressBar {
+					r.stats.IncrementCounter("packets", 1)
 				}
 			}
 
