@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net"
 	"os"
 	"strings"
@@ -151,8 +150,6 @@ var (
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
 func NewScanner(options *Options) (*Scanner, error) {
-	rand.Seed(time.Now().UnixNano())
-
 	iprang, err := ipranger.New()
 	if err != nil {
 		return nil, err
@@ -585,7 +582,7 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
 			return false, err
 		}
-		n, _ := io.Copy(io.Discard, conn)
+		n, err := io.Copy(io.Discard, conn)
 		// ignore timeout errors
 		if err != nil && !os.IsTimeout(err) {
 			return false, err

@@ -32,6 +32,7 @@ func init() {
 // Handlers contains the list of pcap handlers
 type Handlers struct {
 	TransportActive   []*pcap.Handle
+	LoopbackHandlers  []*pcap.Handle
 	TransportInactive []*pcap.InactiveHandle
 	EthernetActive    []*pcap.Handle
 	EthernetInactive  []*pcap.InactiveHandle
@@ -156,10 +157,17 @@ func SetupHandlerUnix(s *Scanner, interfaceName, bpfFilter string, protocols ...
 		if err != nil {
 			return err
 		}
-
+		iface, err := net.InterfaceByName(interfaceName)
+		if err != nil {
+			return err
+		}
 		switch proto {
 		case protocol.TCP, protocol.UDP:
-			handlers.TransportActive = append(handlers.TransportActive, handle)
+			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
+				handlers.LoopbackHandlers = append(handlers.LoopbackHandlers, handle)
+			} else {
+				handlers.TransportActive = append(handlers.TransportActive, handle)
+			}
 		case protocol.ARP:
 			handlers.EthernetActive = append(handlers.EthernetActive, handle)
 		default:
@@ -180,6 +188,94 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 	handlers, ok := s.handlers.(Handlers)
 	if !ok {
 		return
+	}
+
+	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {
+		// We consider only incoming packets
+		tcpPortMatches := tcp.DstPort == layers.TCPPort(s.SourcePort)
+		udpPortMatches := udp.DstPort == layers.UDPPort(s.SourcePort)
+		sourcePortMatches := tcpPortMatches || udpPortMatches
+		switch {
+		case !sourcePortMatches:
+			gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
+
+		case s.Phase.Is(HostDiscovery):
+			proto := protocol.TCP
+			if udpPortMatches {
+				proto = protocol.UDP
+			}
+			s.hostDiscoveryChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
+		case tcpPortMatches && tcp.SYN && tcp.ACK:
+			s.tcpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
+		case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
+			s.udpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
+		}
+	}
+
+	// In case of OSX, when we decode the data from 'loO' interface
+	// always get [Ethernet] layer only.
+	// with the help of data received from packetSource.Packets() we can
+	// extract the high level layers like [IPv4, IPv6, TCP, UDP]
+	loopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
+		defer wg.Done()
+		packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+		for packet := range packetSource.Packets() {
+			tcp := &layers.TCP{}
+			udp := &layers.UDP{}
+			for _, layerType := range packet.Layers() {
+				ipLayer := packet.Layer(layers.LayerTypeIPv4)
+				if ipLayer == nil {
+					ipLayer = packet.Layer(layers.LayerTypeIPv6)
+					if ipLayer == nil {
+						continue
+					}
+				}
+				var srcIP4, srcIP6 string
+				if ipv4, ok := ipLayer.(*layers.IPv4); ok {
+					srcIP4 = ipv4.SrcIP.String()
+				} else if ipv6, ok := ipLayer.(*layers.IPv6); ok {
+					srcIP6 = ipv6.SrcIP.String()
+				}
+
+				tcpLayer := packet.Layer(layers.LayerTypeTCP)
+				if tcpLayer != nil {
+					tcp, ok = tcpLayer.(*layers.TCP)
+					if !ok {
+						continue
+					}
+				}
+				udpLayer := packet.Layer(layers.LayerTypeUDP)
+				if udpLayer != nil {
+					udp, ok = udpLayer.(*layers.UDP)
+					if !ok {
+						continue
+					}
+				}
+
+				if layerType.LayerType() == layers.LayerTypeTCP || layerType.LayerType() == layers.LayerTypeUDP {
+					srcPort := fmt.Sprint(int(tcp.SrcPort))
+					srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+					isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
+					srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+					isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
+					var ip string
+					if isIP4InRange {
+						ip = srcIP4
+					} else if isIP6InRange {
+						ip = srcIP6
+					} else {
+						gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
+					}
+					transportReaderCallback(*tcp, *udp, ip, srcIP4, srcIP6)
+				}
+			}
+		}
+	}
+
+	// Loopback Readers
+	for _, handler := range handlers.LoopbackHandlers {
+		wgread.Add(1)
+		go loopBackScanCaseCallback(handler, &wgread)
 	}
 
 	// Transport Readers (TCP|UDP)
@@ -226,10 +322,13 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 					}
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
+							srcPort := fmt.Sprint(int(tcp.SrcPort))
 							srcIP4 := ip4.SrcIP.String()
-							isIP4InRange := s.IPRanger.Contains(srcIP4)
+							srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+							isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
 							srcIP6 := ip6.SrcIP.String()
-							isIP6InRange := s.IPRanger.Contains(srcIP6)
+							srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+							isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
 							var ip string
 							if isIP4InRange {
 								ip = srcIP4
@@ -239,26 +338,7 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
 								continue
 							}
-
-							// We consider only incoming packets
-							tcpPortMatches := tcp.DstPort == layers.TCPPort(s.SourcePort)
-							udpPortMatches := udp.DstPort == layers.UDPPort(s.SourcePort)
-							sourcePortMatches := tcpPortMatches || udpPortMatches
-							switch {
-							case !sourcePortMatches:
-								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
-								continue
-							case s.Phase.Is(HostDiscovery):
-								proto := protocol.TCP
-								if udpPortMatches {
-									proto = protocol.UDP
-								}
-								s.hostDiscoveryChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
-							case tcpPortMatches && tcp.SYN && tcp.ACK:
-								s.tcpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
-							case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
-								s.udpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
-							}
+							transportReaderCallback(tcp, udp, ip, srcIP4, srcIP6)
 						}
 					}
 				}
