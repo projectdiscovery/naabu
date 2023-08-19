@@ -5,7 +5,7 @@ before:
     - go mod tidy
 project_name: naabu
 builds:
-  - id: naabu-linux
+  - id: naabu-linux-generic
     ldflags:
       - -s -w
     binary: naabu
@@ -16,7 +16,20 @@ builds:
       - linux
     goarch:
       - amd64
+
+  - id: naabu-linux-arm
+    ldflags:
+      - -s -w
+    binary: naabu
+    env:
+      - CGO_ENABLED=1
+      - CC=aarch64-linux-gnu-gcc
+    main: ./cmd/naabu/main.go
+    goos:
+      - linux
+    goarch:
       - arm64
+
 archives:
 - format: zip
   name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
