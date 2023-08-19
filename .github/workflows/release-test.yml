@@ -5,7 +5,7 @@ on:
     paths:
       - '**.go'
       - '**.mod'
-      - '**.yaml'
+      - '**.yml'
   workflow_dispatch:
 
 jobs:
