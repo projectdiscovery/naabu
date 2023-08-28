@@ -16,7 +16,7 @@ require (
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.17
 	github.com/projectdiscovery/gologger v1.1.11
-	github.com/projectdiscovery/ipranger v0.0.8
+	github.com/projectdiscovery/ipranger v0.0.9
 	github.com/projectdiscovery/mapcidr v1.1.2
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.9
@@ -74,7 +74,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.4 // indirect
 	github.com/projectdiscovery/fastdialer v0.0.35 // indirect
-	github.com/projectdiscovery/hmap v0.0.14 // indirect
+	github.com/projectdiscovery/hmap v0.0.15 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.31 // indirect
 	github.com/refraction-networking/utls v1.3.2 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
