@@ -7,10 +7,11 @@ project_name: naabu
 builds:
   - id: naabu-linux
     ldflags:
-      - -s -w
+      - -linkmode external -extldflags "-static -s -w"
     binary: naabu
     env:
       - CGO_ENABLED=1
+      - CC=musl-gcc
     main: ./cmd/naabu/main.go
     goos:
       - linux
