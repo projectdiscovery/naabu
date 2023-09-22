@@ -135,7 +135,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
-		flagSet.BoolVar(&options.JSON, "json", false, "write output in JSON lines format"),
+		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
 
