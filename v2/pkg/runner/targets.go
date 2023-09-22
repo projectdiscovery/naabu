@@ -177,17 +177,23 @@ func (r *Runner) AddTarget(target string) error {
 				r.streamChannel <- Target{Ip: ip, Port: port}
 				if len(r.options.Ports) > 0 {
 					r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+					if err := r.scanner.IPRanger.AddHostWithMetadata(joinHostPort(ip, ""), target); err != nil {
+						gologger.Warning().Msgf("%s\n", err)
+					}
 				}
 			} else {
 				r.streamChannel <- Target{Cidr: iputil.ToCidr(ip).String()}
+				if err := r.scanner.IPRanger.AddHostWithMetadata(joinHostPort(ip, port), target); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
 			}
 		} else if hasPort {
-			ipPort := net.JoinHostPort(ip, port)
-			if err := r.scanner.IPRanger.AddHostWithMetadata(ipPort, target); err != nil {
-				gologger.Warning().Msgf("%s\n", err)
-			}
 			if len(r.options.Ports) > 0 {
-				if err := r.scanner.IPRanger.AddHostWithMetadata(ip, host); err != nil {
+				if err := r.scanner.IPRanger.AddHostWithMetadata(joinHostPort(ip, ""), target); err != nil {
+					gologger.Warning().Msgf("%s\n", err)
+				}
+			} else {
+				if err := r.scanner.IPRanger.AddHostWithMetadata(joinHostPort(ip, port), target); err != nil {
 					gologger.Warning().Msgf("%s\n", err)
 				}
 			}
@@ -197,6 +203,14 @@ func (r *Runner) AddTarget(target string) error {
 	}
 
 	return nil
+}
+
+func joinHostPort(host, port string) string {
+	if port == "" {
+		return host
+	}
+
+	return net.JoinHostPort(host, port)
 }
 
 func (r *Runner) resolveFQDN(target string) ([]string, error) {
