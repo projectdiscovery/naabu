@@ -81,7 +81,7 @@ UPDATE:
 
 OUTPUT:
    -o, -output string  file to write output to (optional)
-   -json               write output in JSON lines format
+   -j, -json           write output in JSON lines format
    -csv                write output in csv format
 
 CONFIGURATION:
