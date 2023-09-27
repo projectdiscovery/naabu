@@ -11,15 +11,15 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v1.0.9
 	github.com/projectdiscovery/clistats v0.0.19
-	github.com/projectdiscovery/dnsx v1.1.4
+	github.com/projectdiscovery/dnsx v1.1.5
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.20
+	github.com/projectdiscovery/goflags v0.1.21
 	github.com/projectdiscovery/gologger v1.1.11
-	github.com/projectdiscovery/ipranger v0.0.12
-	github.com/projectdiscovery/mapcidr v1.1.2
+	github.com/projectdiscovery/ipranger v0.0.13
+	github.com/projectdiscovery/mapcidr v1.1.9
 	github.com/projectdiscovery/networkpolicy v0.0.6
-	github.com/projectdiscovery/ratelimit v0.0.9
+	github.com/projectdiscovery/ratelimit v0.0.10
 	github.com/projectdiscovery/retryablehttp-go v1.0.28
 	github.com/projectdiscovery/uncover v1.0.6
 	github.com/projectdiscovery/utils v0.0.55
@@ -73,7 +73,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/projectdiscovery/asnmap v1.0.4 // indirect
+	github.com/projectdiscovery/asnmap v1.0.5 // indirect
 	github.com/projectdiscovery/fastdialer v0.0.37 // indirect
 	github.com/projectdiscovery/hmap v0.0.19 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.35 // indirect
