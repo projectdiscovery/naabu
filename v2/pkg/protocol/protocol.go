@@ -20,3 +20,7 @@ func (p Protocol) String() string {
 		panic("uknown type")
 	}
 }
+
+func (p Protocol) MarshalJSON() ([]byte, error) {
+	return []byte(`"` + p.String() + `"`), nil
+}

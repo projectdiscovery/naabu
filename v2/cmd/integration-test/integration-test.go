@@ -23,6 +23,7 @@ func main() {
 
 	tests := map[string]map[string]testutils.TestCase{
 		"library": libraryTestcases,
+		"cli":     cliTestcases,
 	}
 	for proto, tests := range tests {
 		if protocol == "" || protocol == proto {
@@ -47,11 +48,11 @@ func main() {
 	}
 }
 
-// Currently not used
-// func errIncorrectResultsCount(results []string) error {
-// 	return fmt.Errorf("incorrect number of results %s", strings.Join(results, "\n\t"))
-// }
+func errIncorrectResultsCount(results []string) error {
+	return fmt.Errorf("incorrect number of results %s", strings.Join(results, "\n\t"))
+}
 
+// Currently not used
 // func errIncorrectResult(expected, got string) error {
 // 	return fmt.Errorf("incorrect result: expected \"%s\" got \"%s\"", expected, got)
 // }

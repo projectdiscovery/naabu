@@ -2,6 +2,7 @@ package runner
 
 import (
 	"fmt"
+	"net"
 
 	"github.com/projectdiscovery/gologger"
 	iputil "github.com/projectdiscovery/utils/ip"
@@ -41,4 +42,13 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 
 func isOSSupported() bool {
 	return osutil.IsLinux() || osutil.IsOSX()
+}
+
+func getPort(target string) (string, string, bool) {
+	host, port, err := net.SplitHostPort(target)
+	if err == nil && iputil.IsPort(port) {
+		return host, port, true
+	}
+
+	return target, "", false
 }

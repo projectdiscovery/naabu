@@ -1,76 +1,76 @@
-name: 🎉 Release Binary
+name: 🔨 Release Test
 
 on:
-  push:
-    tags:
-      - v*
+  pull_request:
+    paths:
+      - '**.go'
+      - '**.mod'
+      - '**.yml'
   workflow_dispatch:
 
 jobs:
-  build-mac:
+  release-test-mac:
     runs-on: macos-latest
     steps:
-      - name: Code checkout
+      - name: "Check out code"
         uses: actions/checkout@v3
-        with:
+        with: 
           fetch-depth: 0
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.20.x
+
       - name: Install Dependences
         run: brew install libpcap
-      - name: Run GoReleaser
+
+      - name: release test
         uses: goreleaser/goreleaser-action@v4
         with:
+          args: "release --clean --snapshot -f .goreleaser/mac.yml"
           version: latest
-          args: release -f .goreleaser/mac.yml --rm-dist
           workdir: v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  build-linux:
+  release-test-linux:
     runs-on: ubuntu-latest-16-cores
     steps:
-      - name: Code checkout
+      - name: "Check out code"
         uses: actions/checkout@v3
-        with:
+        with: 
           fetch-depth: 0
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.20.x
+
       - name: Install Dependences
         run: sudo apt install libpcap-dev
 
-      - name: Run GoReleaser
+      - name: release test
         uses: goreleaser/goreleaser-action@v4
         with:
+          args: "release --clean --snapshot -f .goreleaser/linux.yml"
           version: latest
-          args: release -f .goreleaser/linux.yml --rm-dist
           workdir: v2
-        env: 
-          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          SLACK_WEBHOOK: "${{ secrets.RELEASE_SLACK_WEBHOOK }}"
-          DISCORD_WEBHOOK_ID: "${{ secrets.DISCORD_WEBHOOK_ID }}"
-          DISCORD_WEBHOOK_TOKEN: "${{ secrets.DISCORD_WEBHOOK_TOKEN }}"
 
-  build-windows:
+  release-test-windows:
     runs-on: windows-latest-8-cores
     steps:
-      - name: Code checkout
+      - name: "Check out code"
         uses: actions/checkout@v3
-        with:
+        with: 
           fetch-depth: 0
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.20.x
-      - name: Run GoReleaser
+      
+      - name: release test
         uses: goreleaser/goreleaser-action@v4
         with:
+          args: "release --clean --snapshot -f .goreleaser/windows.yml"
           version: latest
-          args: release -f .goreleaser/windows.yml --rm-dist
           workdir: v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

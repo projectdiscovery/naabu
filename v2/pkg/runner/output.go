@@ -25,8 +25,27 @@ type Result struct {
 	Probes    []port.PortProbe `json:"probes,omitempty" csv:"probes,omitempty"`
 }
 
+type jsonResult struct {
+	Result
+	PortNumber int    `json:"port"`
+	Protocol   string `json:"protocol"`
+	TLS        bool   `json:"tls"`
+}
+
 func (r *Result) JSON() ([]byte, error) {
-	return json.Marshal(r)
+	data := jsonResult{}
+	data.TimeStamp = r.TimeStamp
+	if r.Host != r.IP {
+		data.Host = r.Host
+	}
+	data.IP = r.IP
+	data.IsCDNIP = r.IsCDNIP
+	data.CDNName = r.CDNName
+	data.PortNumber = r.Port.Port
+	data.Protocol = r.Port.Protocol.String()
+	data.TLS = r.Port.TLS
+
+	return json.Marshal(data)
 }
 
 func (r *Result) CSVHeaders() ([]string, error) {
@@ -85,7 +104,8 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
 func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, writer io.Writer) error {
 	encoder := json.NewEncoder(writer)
-	data := Result{TimeStamp: time.Now().UTC()}
+	data := jsonResult{}
+	data.TimeStamp = time.Now().UTC()
 	if host != ip {
 		data.Host = host
 	}
@@ -95,7 +115,9 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 		data.CDNName = cdnName
 	}
 	for _, p := range ports {
-		data.Port = p
+		data.PortNumber = p.Port
+		data.Protocol = p.Protocol.String()
+		data.TLS = p.TLS
 		if err := encoder.Encode(&data); err != nil {
 			return err
 		}

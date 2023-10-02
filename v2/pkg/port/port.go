@@ -7,9 +7,9 @@ import (
 )
 
 type Port struct {
-	Port     int
-	Protocol protocol.Protocol
-	TLS      bool
+	Port     int               `json:"port"`
+	Protocol protocol.Protocol `json:"protocol"`
+	TLS      bool              `json:"tls"`
 }
 
 func (p *Port) String() string {
