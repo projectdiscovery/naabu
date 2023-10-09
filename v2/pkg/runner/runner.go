@@ -71,7 +71,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.streamChannel = make(chan Target)
 
-	excludedIps, err := parseExcludedIps(options)
+	excludedIps, err := runner.parseExcludedIps(options)
 	if err != nil {
 		return nil, err
 	}
@@ -187,7 +187,7 @@ func (r *Runner) RunEnumeration() error {
 		}
 
 		// get excluded ips
-		excludedIPs, err := parseExcludedIps(r.options)
+		excludedIPs, err := r.parseExcludedIps(r.options)
 		if err != nil {
 			return err
 		}
