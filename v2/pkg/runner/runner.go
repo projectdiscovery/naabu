@@ -69,12 +69,28 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner := &Runner{
 		options: options,
 	}
-	runner.streamChannel = make(chan Target)
 
-	excludedIps, err := parseExcludedIps(options)
+	dnsOptions := dnsx.DefaultOptions
+	dnsOptions.MaxRetries = runner.options.Retries
+	dnsOptions.Hostsfile = true
+	if sliceutil.Contains(options.IPVersion, "6") {
+		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
+	}
+	if len(runner.options.baseResolvers) > 0 {
+		dnsOptions.BaseResolvers = runner.options.baseResolvers
+	}
+	dnsclient, err := dnsx.New(dnsOptions)
 	if err != nil {
 		return nil, err
 	}
+	runner.dnsclient = dnsclient
+
+	excludedIps, err := runner.parseExcludedIps(options)
+	if err != nil {
+		return nil, err
+	}
+
+	runner.streamChannel = make(chan Target)
 
 	scanner, err := scan.NewScanner(&scan.Options{
 		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
@@ -98,21 +114,6 @@ func NewRunner(options *Options) (*Runner, error) {
 	if err != nil {
 		return nil, fmt.Errorf("could not parse ports: %s", err)
 	}
-
-	dnsOptions := dnsx.DefaultOptions
-	dnsOptions.MaxRetries = runner.options.Retries
-	dnsOptions.Hostsfile = true
-	if sliceutil.Contains(options.IPVersion, "6") {
-		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
-	}
-	if len(runner.options.baseResolvers) > 0 {
-		dnsOptions.BaseResolvers = runner.options.baseResolvers
-	}
-	dnsclient, err := dnsx.New(dnsOptions)
-	if err != nil {
-		return nil, err
-	}
-	runner.dnsclient = dnsclient
 
 	if options.EnableProgressBar {
 		defaultOptions := &clistats.DefaultOptions
@@ -187,7 +188,7 @@ func (r *Runner) RunEnumeration() error {
 		}
 
 		// get excluded ips
-		excludedIPs, err := parseExcludedIps(r.options)
+		excludedIPs, err := r.parseExcludedIps(r.options)
 		if err != nil {
 			return err
 		}
