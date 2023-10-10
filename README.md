@@ -296,7 +296,7 @@ Available options to perform host discovery:
 
 - **ARP** ping (`-arp`)
 - TCP **SYN** ping (`-ps 80`)
-- TCP **ACK** ping (`-ps 443`)
+- TCP **ACK** ping (`-pa 443`)
 - ICMP **echo** ping (`-pe`)
 - ICMP **timestamp** ping (`-pp`)
 - ICMP **address mask** ping (`-pm`)
