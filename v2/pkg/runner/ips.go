@@ -7,10 +7,16 @@ import (
 	iputil "github.com/projectdiscovery/utils/ip"
 )
 
-func parseExcludedIps(options *Options) ([]string, error) {
+func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	var excludedIps []string
 	if options.ExcludeIps != "" {
-		excludedIps = append(excludedIps, strings.Split(options.ExcludeIps, ",")...)
+		for _, host := range strings.Split(options.ExcludeIps, ",") {
+			ips, err := r.getExcludeItems(host)
+			if err != nil {
+				return nil, err
+			}
+			excludedIps = append(excludedIps, ips...)
+		}
 	}
 
 	if options.ExcludeIpsFile != "" {
@@ -18,14 +24,28 @@ func parseExcludedIps(options *Options) ([]string, error) {
 		if err != nil {
 			return excludedIps, err
 		}
-		for ip := range cdata {
-			if isIpOrCidr(ip) {
-				excludedIps = append(excludedIps, ip)
+		for host := range cdata {
+			ips, err := r.getExcludeItems(host)
+			if err != nil {
+				return nil, err
 			}
+			excludedIps = append(excludedIps, ips...)
 		}
 	}
 
 	return excludedIps, nil
+}
+
+func (r *Runner) getExcludeItems(s string) ([]string, error) {
+	if isIpOrCidr(s) {
+		return []string{s}, nil
+	}
+
+	ips4, ips6, err := r.host2ips(s)
+	if err != nil {
+		return nil, err
+	}
+	return append(ips4, ips6...), nil
 }
 
 func isIpOrCidr(s string) bool {
