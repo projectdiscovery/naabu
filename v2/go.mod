@@ -11,24 +11,24 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v1.0.9
 	github.com/projectdiscovery/clistats v0.0.19
-	github.com/projectdiscovery/dnsx v1.1.4
+	github.com/projectdiscovery/dnsx v1.1.5
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.20
+	github.com/projectdiscovery/goflags v0.1.23
 	github.com/projectdiscovery/gologger v1.1.11
-	github.com/projectdiscovery/ipranger v0.0.12
-	github.com/projectdiscovery/mapcidr v1.1.2
+	github.com/projectdiscovery/ipranger v0.0.14
+	github.com/projectdiscovery/mapcidr v1.1.11
 	github.com/projectdiscovery/networkpolicy v0.0.6
-	github.com/projectdiscovery/ratelimit v0.0.9
-	github.com/projectdiscovery/retryablehttp-go v1.0.27
+	github.com/projectdiscovery/ratelimit v0.0.11
+	github.com/projectdiscovery/retryablehttp-go v1.0.30
 	github.com/projectdiscovery/uncover v1.0.6
-	github.com/projectdiscovery/utils v0.0.55
+	github.com/projectdiscovery/utils v0.0.57
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
-	golang.org/x/net v0.15.0
-	golang.org/x/sys v0.12.0
+	golang.org/x/net v0.16.0
+	golang.org/x/sys v0.13.0
 )
 
 require (
@@ -46,6 +46,7 @@ require (
 	github.com/cloudflare/circl v1.3.3 // indirect
 	github.com/cnf/structhash v0.0.0-20201127153200-e1b16c1ebc08 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
+	github.com/denisbrodbeck/machineid v1.0.1 // indirect
 	github.com/dimchansky/utfbom v1.1.1 // indirect
 	github.com/dlclark/regexp2 v1.8.1 // indirect
 	github.com/dsnet/compress v0.0.1 // indirect
@@ -73,12 +74,12 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/projectdiscovery/asnmap v1.0.4 // indirect
-	github.com/projectdiscovery/fastdialer v0.0.37 // indirect
-	github.com/projectdiscovery/hmap v0.0.18 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.35 // indirect
+	github.com/projectdiscovery/asnmap v1.0.5 // indirect
+	github.com/projectdiscovery/fastdialer v0.0.38 // indirect
+	github.com/projectdiscovery/hmap v0.0.21 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.37 // indirect
 	github.com/quic-go/quic-go v0.38.1 // indirect
-	github.com/refraction-networking/utls v1.5.2 // indirect
+	github.com/refraction-networking/utls v1.5.3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
 	github.com/syndtr/goleveldb v1.0.0 // indirect
@@ -100,7 +101,7 @@ require (
 	github.com/zmap/rc2 v0.0.0-20190804163417-abaa70531248 // indirect
 	github.com/zmap/zcrypto v0.0.0-20230814193918-dbe676986518 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
-	golang.org/x/crypto v0.13.0 // indirect
+	golang.org/x/crypto v0.14.0 // indirect
 	golang.org/x/mod v0.12.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
 	golang.org/x/text v0.13.0 // indirect
