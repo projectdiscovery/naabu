@@ -20,14 +20,14 @@ require (
 	github.com/projectdiscovery/mapcidr v1.1.11
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.11
-	github.com/projectdiscovery/retryablehttp-go v1.0.30
+	github.com/projectdiscovery/retryablehttp-go v1.0.31
 	github.com/projectdiscovery/uncover v1.0.6
 	github.com/projectdiscovery/utils v0.0.57
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63
-	golang.org/x/net v0.16.0
+	golang.org/x/net v0.17.0
 	golang.org/x/sys v0.13.0
 )
 
@@ -75,9 +75,9 @@ require (
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.5 // indirect
-	github.com/projectdiscovery/fastdialer v0.0.38 // indirect
-	github.com/projectdiscovery/hmap v0.0.21 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.37 // indirect
+	github.com/projectdiscovery/fastdialer v0.0.39 // indirect
+	github.com/projectdiscovery/hmap v0.0.22 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.38 // indirect
 	github.com/quic-go/quic-go v0.38.1 // indirect
 	github.com/refraction-networking/utls v1.5.3 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
