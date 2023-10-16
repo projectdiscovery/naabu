@@ -172,8 +172,8 @@ github.com/projectdiscovery/gologger v1.1.11 h1:8vsz9oJlDT9euw6xlj7F7dZ6RWItVIqV
 github.com/projectdiscovery/gologger v1.1.11/go.mod h1:UR2bgXl7zraOxYGnUwuO917hifWrwMJ0feKnVqMQkzY=
 github.com/projectdiscovery/hmap v0.0.22 h1:iBddf2s45zTF+fNIw2WdQVJT2nJKI6p8Ie2c/eEOw2I=
 github.com/projectdiscovery/hmap v0.0.22/go.mod h1:0oVrzemluM43mi8ZKCQMfZvlOPrk0Vn2eiiyyZDILk8=
-github.com/projectdiscovery/ipranger v0.0.14 h1:Vn9OJXh6BkN31Ch3aCZ9BjA+HidRl8W9x0z6vFmxNkg=
-github.com/projectdiscovery/ipranger v0.0.14/go.mod h1:0nOKqdtcW76tjpRmHRnaalbM/0s8Xyq5DBkQTgd6yc0=
+github.com/projectdiscovery/ipranger v0.0.16 h1:kTnNXyvIaL/P4kgyOEkzlBOxtqAEBnyMCjxgKqdM+t8=
+github.com/projectdiscovery/ipranger v0.0.16/go.mod h1:f2sob4Z1OXEv0uOy9Q81IyQT55EEOWQjPrEiyChOcXA=
 github.com/projectdiscovery/mapcidr v1.1.11 h1:CVOwq2YoyeKzqEU/a1hv1hPUHDdTCyy7Ej82gD8gKPU=
 github.com/projectdiscovery/mapcidr v1.1.11/go.mod h1:i6vt5jApyht30bEErJkmXAvUDJEyO0XschRY7Il+XAo=
 github.com/projectdiscovery/networkpolicy v0.0.6 h1:yDvm0XCrS9HeemRrBS+J+22surzVczM94W5nHiOy/1o=
