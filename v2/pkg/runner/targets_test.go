@@ -37,6 +37,7 @@ func Test_AddTarget(t *testing.T) {
 	err = r.AddTarget("127.0.0.1/24")
 	require.Nil(t, err, "ipv4 cidr incorrectly parsed")
 
-	err = r.AddTarget("AS14421")
-	require.Nil(t, err, "ASN incorrectly parsed")
+	// todo: excluding due to api instability (https://github.com/projectdiscovery/asnmap/issues/198)
+	// err = r.AddTarget("AS14421")
+	// require.Nil(t, err, "ASN incorrectly parsed")
 }
