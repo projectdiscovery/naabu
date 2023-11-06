@@ -17,7 +17,7 @@ require (
 	github.com/projectdiscovery/goflags v0.1.25
 	github.com/projectdiscovery/gologger v1.1.11
 	github.com/projectdiscovery/ipranger v0.0.18
-	github.com/projectdiscovery/mapcidr v1.1.13
+	github.com/projectdiscovery/mapcidr v1.1.14
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.13
 	github.com/projectdiscovery/retryablehttp-go v1.0.33
