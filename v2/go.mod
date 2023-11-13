@@ -11,13 +11,13 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v1.0.9
 	github.com/projectdiscovery/clistats v0.0.19
-	github.com/projectdiscovery/dnsx v1.1.5
+	github.com/projectdiscovery/dnsx v1.1.6
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.27
 	github.com/projectdiscovery/gologger v1.1.11
 	github.com/projectdiscovery/ipranger v0.0.20
-	github.com/projectdiscovery/mapcidr v1.1.14
+	github.com/projectdiscovery/mapcidr v1.1.15
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.15
 	github.com/projectdiscovery/retryablehttp-go v1.0.34
@@ -74,10 +74,10 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/pierrec/lz4 v2.6.1+incompatible // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/projectdiscovery/asnmap v1.0.5 // indirect
+	github.com/projectdiscovery/asnmap v1.0.6 // indirect
 	github.com/projectdiscovery/fastdialer v0.0.42 // indirect
 	github.com/projectdiscovery/hmap v0.0.24 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.40 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.41 // indirect
 	github.com/quic-go/quic-go v0.38.1 // indirect
 	github.com/refraction-networking/utls v1.5.4 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
