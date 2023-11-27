@@ -16,8 +16,8 @@ require (
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.29
 	github.com/projectdiscovery/gologger v1.1.11
-	github.com/projectdiscovery/ipranger v0.0.20
-	github.com/projectdiscovery/mapcidr v1.1.15
+	github.com/projectdiscovery/ipranger v0.0.21
+	github.com/projectdiscovery/mapcidr v1.1.16
 	github.com/projectdiscovery/networkpolicy v0.0.6
 	github.com/projectdiscovery/ratelimit v0.0.17
 	github.com/projectdiscovery/retryablehttp-go v1.0.37
