@@ -163,10 +163,14 @@ func (options *Options) ConfigureHostDiscovery() {
 		// - ICMP Echo Request
 		// - ICMP timestamp
 		// - TCP SYN on port 80
+		// - TCP SYN on port 443
+		// - TCP ACK on port 80
 		// - TCP ACK on port 443
 		options.IcmpEchoRequestProbe = true
 		options.IcmpTimestampRequestProbe = true
 		options.TcpSynPingProbes = append(options.TcpSynPingProbes, "80")
+		options.TcpSynPingProbes = append(options.TcpSynPingProbes, "443")
+		options.TcpAckPingProbes = append(options.TcpAckPingProbes, "80")
 		options.TcpAckPingProbes = append(options.TcpAckPingProbes, "443")
 	}
 }
