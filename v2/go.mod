@@ -14,7 +14,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.1.6
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.29
+	github.com/projectdiscovery/goflags v0.1.30
 	github.com/projectdiscovery/gologger v1.1.11
 	github.com/projectdiscovery/ipranger v0.0.22
 	github.com/projectdiscovery/mapcidr v1.1.16
@@ -22,7 +22,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.17
 	github.com/projectdiscovery/retryablehttp-go v1.0.37
 	github.com/projectdiscovery/uncover v1.0.7
-	github.com/projectdiscovery/utils v0.0.64
+	github.com/projectdiscovery/utils v0.0.65
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
