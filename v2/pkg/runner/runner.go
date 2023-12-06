@@ -925,28 +925,3 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	}
 
 }
-
-func writeCSVHeaders(data *Result, writer *csv.Writer) {
-	headers, err := data.CSVHeaders()
-	if err != nil {
-		gologger.Error().Msgf(err.Error())
-		return
-	}
-
-	if err := writer.Write(headers); err != nil {
-		errMsg := errors.Wrap(err, "Could not write headers")
-		gologger.Error().Msgf(errMsg.Error())
-	}
-}
-
-func writeCSVRow(data *Result, writer *csv.Writer) {
-	rowData, err := data.CSVFields()
-	if err != nil {
-		gologger.Error().Msgf(err.Error())
-		return
-	}
-	if err := writer.Write(rowData); err != nil {
-		errMsg := errors.Wrap(err, "Could not write row")
-		gologger.Error().Msgf(errMsg.Error())
-	}
-}
