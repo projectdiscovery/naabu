@@ -60,6 +60,8 @@ type Target struct {
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
+	options.configureHostDiscovery()
+
 	if options.Retries == 0 {
 		options.Retries = DefaultRetriesSynScan
 	}
