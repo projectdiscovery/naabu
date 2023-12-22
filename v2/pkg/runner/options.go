@@ -211,9 +211,6 @@ func ParseOptions() *Options {
 	// Check if stdin pipe was given
 	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
-	// configure host discovery if necessary
-	options.ConfigureHostDiscovery()
-
 	// Read the inputs and configure the logging
 	options.configureOutput()
 	options.ResumeCfg = NewResumeCfg()
