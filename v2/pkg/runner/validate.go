@@ -157,7 +157,7 @@ func (options *Options) configureOutput() {
 
 // ConfigureHostDiscovery enables default probes if none is specified
 // but host discovery option was requested
-func (options *Options) ConfigureHostDiscovery() {
+func (options *Options) configureHostDiscovery() {
 	if options.shouldDiscoverHosts() && !options.hasProbes() {
 		// if no options were defined enable
 		// - ICMP Echo Request
