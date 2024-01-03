@@ -816,7 +816,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						data.Host = host
 					}
 					for _, p := range hostResult.Ports {
-						data.Port = p
+						data.Port = p.Port
+						data.Protocol = p.Protocol.String()
+						data.TLS = p.TLS
 						if r.options.JSON {
 							b, marshallErr := data.JSON()
 							if marshallErr != nil {
