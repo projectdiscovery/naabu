@@ -78,7 +78,7 @@ require (
 	github.com/projectdiscovery/fastdialer v0.0.45 // indirect
 	github.com/projectdiscovery/hmap v0.0.26 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.43 // indirect
-	github.com/quic-go/quic-go v0.38.1 // indirect
+	github.com/quic-go/quic-go v0.38.2 // indirect
 	github.com/refraction-networking/utls v1.5.4 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
