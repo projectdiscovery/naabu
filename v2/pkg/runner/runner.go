@@ -60,6 +60,8 @@ type Target struct {
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
+	options.configureHostDiscovery()
+
 	if options.Retries == 0 {
 		options.Retries = DefaultRetriesSynScan
 	}
@@ -814,7 +816,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						data.Host = host
 					}
 					for _, p := range hostResult.Ports {
-						data.Port = p
+						data.Port = p.Port
+						data.Protocol = p.Protocol.String()
+						data.TLS = p.TLS
 						if r.options.JSON {
 							b, marshallErr := data.JSON()
 							if marshallErr != nil {
@@ -924,29 +928,4 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}
 	}
 
-}
-
-func writeCSVHeaders(data *Result, writer *csv.Writer) {
-	headers, err := data.CSVHeaders()
-	if err != nil {
-		gologger.Error().Msgf(err.Error())
-		return
-	}
-
-	if err := writer.Write(headers); err != nil {
-		errMsg := errors.Wrap(err, "Could not write headers")
-		gologger.Error().Msgf(errMsg.Error())
-	}
-}
-
-func writeCSVRow(data *Result, writer *csv.Writer) {
-	rowData, err := data.CSVFields()
-	if err != nil {
-		gologger.Error().Msgf(err.Error())
-		return
-	}
-	if err := writer.Write(rowData); err != nil {
-		errMsg := errors.Wrap(err, "Could not write row")
-		gologger.Error().Msgf(errMsg.Error())
-	}
 }
