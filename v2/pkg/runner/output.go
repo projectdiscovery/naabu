@@ -11,18 +11,24 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/exp/slices"
+
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 )
 
 // Result contains the result for a host
 type Result struct {
-	Host      string     `json:"host,omitempty" csv:"host"`
-	IP        string     `json:"ip,omitempty" csv:"ip"`
-	Port      *port.Port `json:"port" csv:"port"`
-	IsCDNIP   bool       `json:"cdn,omitempty" csv:"cdn"`
-	CDNName   string     `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp time.Time  `json:"timestamp" csv:"timestamp"`
+	Host      string    `json:"host,omitempty" csv:"host"`
+	IP        string    `json:"ip,omitempty" csv:"ip"`
+	Port      int       `json:"port,omitempty" csv:"port"`
+	Protocol  string    `json:"protocol,omitempty" csv:"protocol"`
+	TLS       bool      `json:"tls,omitempty" csv:"tls"`
+	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
 }
 
 type jsonResult struct {
@@ -41,24 +47,24 @@ func (r *Result) JSON() ([]byte, error) {
 	data.IP = r.IP
 	data.IsCDNIP = r.IsCDNIP
 	data.CDNName = r.CDNName
-	data.PortNumber = r.Port.Port
-	data.Protocol = r.Port.Protocol.String()
-	data.TLS = r.Port.TLS
+	data.PortNumber = r.Port
+	data.Protocol = r.Protocol
+	data.TLS = r.TLS
 
 	return json.Marshal(data)
 }
 
-var NumberOfCsvFieldsErr = errors.New("exported fields don't match csv tags")
+var (
+	NumberOfCsvFieldsErr = errors.New("exported fields don't match csv tags")
+	headers              = []string{}
+)
 
 func (r *Result) CSVHeaders() ([]string, error) {
 	ty := reflect.TypeOf(*r)
-	var headers []string
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		fieldValue := reflect.ValueOf(*r).FieldByName(field.Name).Interface()
-		// appends tag value if field value is other than default value
-		if fieldValue != reflect.Zero(field.Type).Interface() {
+		if !slices.Contains(headers, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
@@ -68,12 +74,12 @@ func (r *Result) CSVHeaders() ([]string, error) {
 func (r *Result) CSVFields() ([]string, error) {
 	var fields []string
 	vl := reflect.ValueOf(*r)
+	ty := reflect.TypeOf(*r)
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
+		csvTag := ty.Field(i).Tag.Get("csv")
 		fieldValue := field.Interface()
-		zeroValue := reflect.Zero(field.Type()).Interface()
-		// appends tag value if field value is other than default value
-		if !reflect.DeepEqual(fieldValue, zeroValue) {
+		if slices.Contains(headers, csvTag) {
 			fields = append(fields, fmt.Sprint(fieldValue))
 		}
 	}
@@ -130,7 +136,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
 func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
-	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: &port.Port{}}
+	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
 	if host != ip {
 		data.Host = host
 	}
@@ -143,9 +149,36 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 	}
 
 	for _, p := range ports {
-		data.Port = p
+		data.Port = p.Port
+		data.Protocol = p.Protocol.String()
+		data.TLS = p.TLS
 		writeCSVRow(data, encoder)
 	}
 	encoder.Flush()
 	return nil
+}
+
+func writeCSVHeaders(data *Result, writer *csv.Writer) {
+	headers, err := data.CSVHeaders()
+	if err != nil {
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+
+	if err := writer.Write(headers); err != nil {
+		errMsg := errors.Wrap(err, "Could not write headers")
+		gologger.Error().Msgf(errMsg.Error())
+	}
+}
+
+func writeCSVRow(data *Result, writer *csv.Writer) {
+	rowData, err := data.CSVFields()
+	if err != nil {
+		gologger.Error().Msgf(err.Error())
+		return
+	}
+	if err := writer.Write(rowData); err != nil {
+		errMsg := errors.Wrap(err, "Could not write row")
+		gologger.Error().Msgf(errMsg.Error())
+	}
 }
