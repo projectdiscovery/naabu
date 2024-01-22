@@ -216,7 +216,6 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
-	s.CleanupHandlers()
 	if s.tcpPacketListener4 != nil {
 		s.tcpPacketListener4.Close()
 	}
