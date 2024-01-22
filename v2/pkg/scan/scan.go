@@ -229,6 +229,12 @@ func (s *Scanner) Close() {
 	if s.udpPacketListener6 != nil {
 		s.udpPacketListener6.Close()
 	}
+	if s.icmpPacketListener4 != nil {
+		s.icmpPacketListener4.Close()
+	}
+	if s.icmpPacketListener6 != nil {
+		s.icmpPacketListener6.Close()
+	}
 }
 
 // StartWorkers of the scanner
