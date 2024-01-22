@@ -22,7 +22,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.25
 	github.com/projectdiscovery/retryablehttp-go v1.0.43
 	github.com/projectdiscovery/uncover v1.0.7
-	github.com/projectdiscovery/utils v0.0.73
+	github.com/projectdiscovery/utils v0.0.74
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.8.4
 	go.uber.org/multierr v1.11.0
@@ -76,9 +76,9 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/projectdiscovery/asnmap v1.0.6 // indirect
-	github.com/projectdiscovery/fastdialer v0.0.50 // indirect
-	github.com/projectdiscovery/hmap v0.0.33 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.48 // indirect
+	github.com/projectdiscovery/fastdialer v0.0.53 // indirect
+	github.com/projectdiscovery/hmap v0.0.34 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.51 // indirect
 	github.com/quic-go/quic-go v0.38.1 // indirect
 	github.com/refraction-networking/utls v1.5.4 // indirect
 	github.com/rivo/uniseg v0.4.4 // indirect
