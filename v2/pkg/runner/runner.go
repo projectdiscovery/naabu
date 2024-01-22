@@ -552,6 +552,7 @@ func (r *Runner) Close() {
 		_ = r.stats.Stop()
 	}
 	r.scanner.Close()
+	r.limiter.Stop()
 }
 
 // PickIP randomly
