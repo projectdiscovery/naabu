@@ -216,11 +216,24 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
-	s.CleanupHandlers()
-	s.tcpPacketListener4.Close()
-	s.udpPacketListener4.Close()
-	s.tcpPacketListener6.Close()
-	s.udpPacketListener6.Close()
+	if s.tcpPacketListener4 != nil {
+		s.tcpPacketListener4.Close()
+	}
+	if s.udpPacketListener4 != nil {
+		s.udpPacketListener4.Close()
+	}
+	if s.tcpPacketListener6 != nil {
+		s.tcpPacketListener6.Close()
+	}
+	if s.udpPacketListener6 != nil {
+		s.udpPacketListener6.Close()
+	}
+	if s.icmpPacketListener4 != nil {
+		s.icmpPacketListener4.Close()
+	}
+	if s.icmpPacketListener6 != nil {
+		s.icmpPacketListener6.Close()
+	}
 }
 
 // StartWorkers of the scanner
