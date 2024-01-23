@@ -551,6 +551,8 @@ func (r *Runner) Close() {
 	if r.options.EnableProgressBar {
 		_ = r.stats.Stop()
 	}
+	r.scanner.Close()
+	r.limiter.Stop()
 }
 
 // PickIP randomly

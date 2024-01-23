@@ -416,10 +416,13 @@ func TransportReadWorkerPCAPUnix(s *Scanner) {
 // CleanupHandlers for all interfaces
 func CleanupHandlersUnix(s *Scanner) {
 	if handlers, ok := s.handlers.(Handlers); ok {
-		for _, handler := range append(handlers.TransportActive, handlers.EthernetActive...) {
+		allActive := append(handlers.TransportActive, handlers.EthernetActive...)
+		allActive = append(allActive, handlers.LoopbackHandlers...)
+		for _, handler := range allActive {
 			handler.Close()
 		}
-		for _, inactiveHandler := range append(handlers.TransportInactive, handlers.EthernetInactive...) {
+		allInactive := append(handlers.TransportInactive, handlers.EthernetInactive...)
+		for _, inactiveHandler := range allInactive {
 			inactiveHandler.CleanUp()
 		}
 	}
