@@ -186,7 +186,7 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		default:
 			panic("protocol not supported")
 		}
-		initilizedHandlers.Set(hash, struct{}{})
+		_ = initilizedHandlers.Set(hash, struct{}{})
 	}
 
 	return nil
