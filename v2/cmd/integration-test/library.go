@@ -95,7 +95,6 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 	options := runner.Options{
 		HostsFile: testFile,
 		Ports:     "80",
-		Passive:   true,
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
