@@ -26,6 +26,13 @@ import (
 var (
 	initilizedHandlers = mapsutil.NewSyncLockMap[string, struct{}]()
 	onceReadWorker     = sync.Once{}
+	getFreePort        = sync.OnceValue(func() int {
+		rawPort, err := freeport.GetFreeTCPPort("")
+		if err != nil {
+			panic(err)
+		}
+		return rawPort.Port
+	})
 )
 
 func init() {
@@ -46,21 +53,10 @@ type Handlers struct {
 	EthernetInactive  []*pcap.InactiveHandle
 }
 
-func getFreePort() (int, error) {
-	rawPort, err := freeport.GetFreeTCPPort("")
-	if err != nil {
-		return 0, err
-	}
-	return rawPort.Port, nil
-}
-
 // NewScannerUnix creates a new instance specific for unix OS
 func NewScannerUnix(scanner *Scanner) error {
 	if scanner.SourcePort <= 0 {
-		rawport, err := getFreePort()
-		if err != nil {
-			return err
-		}
+		rawport := getFreePort()
 		scanner.SourcePort = rawport
 	}
 
