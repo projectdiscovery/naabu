@@ -11,13 +11,13 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.21.x
-
-      - name: Check out code
-        uses: actions/checkout@v3
 
       - name: Install libpcap-dev
         run: sudo apt install libpcap-dev
