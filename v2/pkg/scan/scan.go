@@ -82,6 +82,11 @@ const (
 	Ndp
 )
 
+// singleton handlers
+var (
+	handlers interface{}
+)
+
 type Scanner struct {
 	Router              routing.Router
 	SourceIP4           net.IP
@@ -116,7 +121,6 @@ type Scanner struct {
 	tcpsequencer         *TCPSequencer
 	serializeOptions     gopacket.SerializeOptions
 	debug                bool
-	handlers             interface{} //nolint
 	stream               bool
 }
 
@@ -136,9 +140,9 @@ type PkgResult struct {
 
 var (
 	newScannerCallback                      func(s *Scanner) error
-	setupHandlerCallback                    func(s *Scanner, interfaceName, bpfFilter string, protocols ...protocol.Protocol) error
+	setupHandlerCallback                    func(interfaceName, bpfFilter string, protocols ...protocol.Protocol) error
 	tcpReadWorkerPCAPCallback               func(s *Scanner)
-	cleanupHandlersCallback                 func(s *Scanner)
+	cleanupHandlersCallback                 func()
 	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool //nolint
 	pingIcmpEchoRequestAsyncCallback        func(s *Scanner, ip string)
 	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool //nolint
@@ -950,7 +954,7 @@ func (s *Scanner) SetupHandlers() error {
 func (s *Scanner) SetupHandler(interfaceName string) error {
 	bpfFilter := fmt.Sprintf("dst port %d and (tcp or udp)", s.SourcePort)
 	if setupHandlerCallback != nil {
-		err := setupHandlerCallback(s, interfaceName, bpfFilter, protocol.TCP)
+		err := setupHandlerCallback(interfaceName, bpfFilter, protocol.TCP)
 		if err != nil {
 			return err
 		}
@@ -960,7 +964,7 @@ func (s *Scanner) SetupHandler(interfaceName string) error {
 	// (arp[6:2] = 2) and dst host host and ether dst mac
 	bpfFilter = "arp"
 	if setupHandlerCallback != nil {
-		err := setupHandlerCallback(s, interfaceName, bpfFilter, protocol.ARP)
+		err := setupHandlerCallback(interfaceName, bpfFilter, protocol.ARP)
 		if err != nil {
 			return err
 		}
@@ -970,8 +974,8 @@ func (s *Scanner) SetupHandler(interfaceName string) error {
 }
 
 // CleanupHandlers for all interfaces
-func (s *Scanner) CleanupHandlers() {
+func CleanupHandlers() {
 	if cleanupHandlersCallback != nil {
-		cleanupHandlersCallback(s)
+		cleanupHandlersCallback()
 	}
 }
