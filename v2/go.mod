@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/mapcidr v1.1.16
 	github.com/projectdiscovery/networkpolicy v0.0.7
 	github.com/projectdiscovery/ratelimit v0.0.25
-	github.com/projectdiscovery/retryablehttp-go v1.0.44
+	github.com/projectdiscovery/retryablehttp-go v1.0.45
 	github.com/projectdiscovery/uncover v1.0.7
 	github.com/projectdiscovery/utils v0.0.76
 	github.com/remeh/sizedwaitgroup v1.0.0
