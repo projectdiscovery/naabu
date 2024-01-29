@@ -10,8 +10,36 @@ import (
 )
 
 var libraryTestcases = map[string]testutils.TestCase{
-	"sdk - one execution":       &naabuSingleLibrary{},
-	"sdk - multiple executions": &naabuMultipleExecLibrary{},
+	"sdk - one passive execution": &naabuPassiveSingleLibrary{},
+	"sdk - one execution":         &naabuSingleLibrary{},
+	"sdk - multiple executions":   &naabuMultipleExecLibrary{},
+}
+
+type naabuPassiveSingleLibrary struct {
+}
+
+func (h *naabuPassiveSingleLibrary) Execute() error {
+	testFile := "test.txt"
+	err := os.WriteFile(testFile, []byte("scanme.sh"), 0644)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(testFile)
+
+	options := runner.Options{
+		HostsFile: testFile,
+		Ports:     "80",
+		Passive:   true,
+		OnResult:  func(hr *result.HostResult) {},
+	}
+
+	naabuRunner, err := runner.NewRunner(&options)
+	if err != nil {
+		return err
+	}
+	defer naabuRunner.Close()
+
+	return naabuRunner.RunEnumeration()
 }
 
 type naabuSingleLibrary struct {
@@ -28,7 +56,6 @@ func (h *naabuSingleLibrary) Execute() error {
 	options := runner.Options{
 		HostsFile: testFile,
 		Ports:     "80",
-		Passive:   true,
 		OnResult:  func(hr *result.HostResult) {},
 	}
 
