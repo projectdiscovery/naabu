@@ -17,7 +17,7 @@ func init() {
 
 // ArpRequestAsync asynchronous to the target ip address
 func ArpRequestAsync(s *Scanner, ip string) {
-	networkInterface, _, sourceIP, err := s.Router.Route(net.ParseIP(ip))
+	networkInterface, _, sourceIP, err := router.Route(net.ParseIP(ip))
 	if networkInterface == nil {
 		err = errors.New("Could not send ARP Request packet to " + ip + ": no interface with outbound source found")
 	}
@@ -56,12 +56,10 @@ func ArpRequestAsync(s *Scanner, ip string) {
 		return
 	}
 	// send the packet out on every interface
-	if handlers, ok := handlers.(Handlers); ok {
-		for _, handler := range handlers.EthernetActive {
-			err := handler.WritePacketData(buf.Bytes())
-			if err != nil {
-				gologger.Warning().Msgf("%s\n", err)
-			}
+	for _, handler := range handlers.EthernetActive {
+		err := handler.WritePacketData(buf.Bytes())
+		if err != nil {
+			gologger.Warning().Msgf("%s\n", err)
 		}
 	}
 }

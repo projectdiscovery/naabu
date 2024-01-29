@@ -4,7 +4,6 @@ package scan
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -17,32 +16,22 @@ import (
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
-	mapsutil "github.com/projectdiscovery/utils/maps"
 	"golang.org/x/net/icmp"
 )
 
 var (
-	initilizedHandlers = mapsutil.NewSyncLockMap[string, struct{}]()
-	onceReadWorker     = sync.Once{}
-	getFreePort        = sync.OnceValue(func() int {
-		rawPort, err := freeport.GetFreeTCPPort("")
-		if err != nil {
-			panic(err)
-		}
-		return rawPort.Port
-	})
+	NetworkInterface                                        string
+	ListenPort                                              int
+	tcpChan, udpChan, hostDiscoveryChan                     chan *PkgResult
+	tcpConn4, udpConn4, tcpConn6, udpConn6                  *net.IPConn
+	transportPacketSend, icmpPacketSend, ethernetPacketSend chan *PkgSend
+	icmpConn4, icmpConn6                                    *icmp.PacketConn
+	router                                                  routing.Router
+	handlers                                                *Handlers
 )
-
-func init() {
-	newScannerCallback = NewScannerUnix
-	setupHandlerCallback = SetupHandlerUnix
-	tcpReadWorkerPCAPCallback = TransportReadWorkerPCAPUnix
-	cleanupHandlersCallback = CleanupHandlersUnix
-
-	handlers = &Handlers{}
-}
 
 // Handlers contains the list of pcap handlers
 type Handlers struct {
@@ -53,73 +42,71 @@ type Handlers struct {
 	EthernetInactive  []*pcap.InactiveHandle
 }
 
-// NewScannerUnix creates a new instance specific for unix OS
-func NewScannerUnix(scanner *Scanner) error {
-	if scanner.SourcePort <= 0 {
-		rawport := getFreePort()
-		scanner.SourcePort = rawport
+func init() {
+	if port, err := freeport.GetFreeTCPPort(""); err != nil {
+		panic(err)
+	} else {
+		ListenPort = port.Port
 	}
 
-	tcpConn4, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", scanner.SourcePort))})
+	if !privileges.IsPrivileged {
+		return
+	}
+
+	tcpChan = make(chan *PkgResult, chanSize)
+	udpChan = make(chan *PkgResult, chanSize)
+	hostDiscoveryChan = make(chan *PkgResult, chanSize)
+
+	var err error
+	tcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", ListenPort))})
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.tcpPacketListener4 = tcpConn4
-
-	udpConn4, err := net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", scanner.SourcePort))})
+	udpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", ListenPort))})
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.udpPacketListener4 = udpConn4
 
-	tcpConn6, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", scanner.SourcePort))})
+	tcpConn6, err = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", ListenPort))})
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.tcpPacketListener6 = tcpConn6
 
-	udpConn6, err := net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", scanner.SourcePort))})
+	udpConn6, err = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", ListenPort))})
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.udpPacketListener6 = udpConn6
 
-	scanner.tcpChan = make(chan *PkgResult, chanSize)
-	scanner.udpChan = make(chan *PkgResult, chanSize)
-	scanner.transportPacketSend = make(chan *PkgSend, packetSendSize)
+	transportPacketSend = make(chan *PkgSend, packetSendSize)
 
-	icmpConn4, err := icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.icmpPacketListener4 = icmpConn4
 
-	icmpConn6, err := icmp.ListenPacket("ip6:icmp", "::")
+	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
 	if err != nil {
-		return err
+		panic(err)
 	}
-	scanner.icmpPacketListener6 = icmpConn6
 
-	scanner.hostDiscoveryChan = make(chan *PkgResult, chanSize)
-	scanner.icmpPacketSend = make(chan *PkgSend, packetSendSize)
-	scanner.ethernetPacketSend = make(chan *PkgSend, packetSendSize)
+	icmpPacketSend = make(chan *PkgSend, packetSendSize)
+	ethernetPacketSend = make(chan *PkgSend, packetSendSize)
 
-	scanner.Router, err = routing.New()
+	router, err = routing.New()
+	if err != nil {
+		panic(err)
+	}
 
-	return err
-}
+	handlers = &Handlers{}
 
-func InterfaceProtoHash(interfaceName string, proto protocol.Protocol) string {
-	return fmt.Sprintf("%s-%s", interfaceName, proto.String())
+	if err := SetupHandlers(); err != nil {
+		panic(err)
+	}
 }
 
 // SetupHandlerUnix on unix OS
 func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Protocol) error {
 	for _, proto := range protocols {
-		hash := InterfaceProtoHash(interfaceName, proto)
-		if initilizedHandlers.Has(hash) {
-			continue
-		}
 		inactive, err := pcap.NewInactiveHandle(interfaceName)
 		if err != nil {
 			return err
@@ -138,11 +125,6 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		err = inactive.SetImmediateMode(true)
 		if err != nil {
 			return err
-		}
-
-		handlers, ok := handlers.(*Handlers)
-		if !ok {
-			return errors.New("couldn't create handlers")
 		}
 
 		switch proto {
@@ -182,7 +164,6 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		default:
 			panic("protocol not supported")
 		}
-		_ = initilizedHandlers.Set(hash, struct{}{})
 	}
 
 	return nil
@@ -190,249 +171,284 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 
 // TransportReadWorkerPCAPUnix for TCP and UDP
 func TransportReadWorkerPCAPUnix(s *Scanner) {
-	onceReadWorker.Do(func() {
-		var wgread sync.WaitGroup
+	var wgread sync.WaitGroup
 
-		handlers, ok := handlers.(*Handlers)
-		if !ok {
-			return
-		}
+	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {
+		// We consider only incoming packets
+		tcpPortMatches := tcp.DstPort == layers.TCPPort(ListenPort)
+		udpPortMatches := udp.DstPort == layers.UDPPort(ListenPort)
+		sourcePortMatches := tcpPortMatches || udpPortMatches
+		switch {
+		case !sourcePortMatches:
+			gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
 
-		transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {
-			// We consider only incoming packets
-			tcpPortMatches := tcp.DstPort == layers.TCPPort(s.SourcePort)
-			udpPortMatches := udp.DstPort == layers.UDPPort(s.SourcePort)
-			sourcePortMatches := tcpPortMatches || udpPortMatches
-			switch {
-			case !sourcePortMatches:
-				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
-
-			case s.Phase.Is(HostDiscovery):
-				proto := protocol.TCP
-				if udpPortMatches {
-					proto = protocol.UDP
-				}
-				s.hostDiscoveryChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
-			case tcpPortMatches && tcp.SYN && tcp.ACK:
-				s.tcpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
-			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
-				s.udpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
+		case s.Phase.Is(HostDiscovery):
+			proto := protocol.TCP
+			if udpPortMatches {
+				proto = protocol.UDP
 			}
+			hostDiscoveryChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
+		case tcpPortMatches && tcp.SYN && tcp.ACK:
+			tcpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
+		case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
+			udpChan <- &PkgResult{ip: ip, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
 		}
+	}
 
-		// In case of OSX, when we decode the data from 'loO' interface
-		// always get [Ethernet] layer only.
-		// with the help of data received from packetSource.Packets() we can
-		// extract the high level layers like [IPv4, IPv6, TCP, UDP]
-		loopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
-			defer wg.Done()
-			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-			for packet := range packetSource.Packets() {
-				tcp := &layers.TCP{}
-				udp := &layers.UDP{}
-				for _, layerType := range packet.Layers() {
-					ipLayer := packet.Layer(layers.LayerTypeIPv4)
+	// In case of OSX, when we decode the data from 'loO' interface
+	// always get [Ethernet] layer only.
+	// with the help of data received from packetSource.Packets() we can
+	// extract the high level layers like [IPv4, IPv6, TCP, UDP]
+	loopBackScanCaseCallback := func(handler *pcap.Handle, wg *sync.WaitGroup) {
+		defer wg.Done()
+		packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+		for packet := range packetSource.Packets() {
+			tcp := &layers.TCP{}
+			udp := &layers.UDP{}
+			for _, layerType := range packet.Layers() {
+				ipLayer := packet.Layer(layers.LayerTypeIPv4)
+				if ipLayer == nil {
+					ipLayer = packet.Layer(layers.LayerTypeIPv6)
 					if ipLayer == nil {
-						ipLayer = packet.Layer(layers.LayerTypeIPv6)
-						if ipLayer == nil {
-							continue
-						}
+						continue
 					}
-					var srcIP4, srcIP6 string
-					if ipv4, ok := ipLayer.(*layers.IPv4); ok {
-						srcIP4 = ipv4.SrcIP.String()
-					} else if ipv6, ok := ipLayer.(*layers.IPv6); ok {
-						srcIP6 = ipv6.SrcIP.String()
-					}
+				}
+				var srcIP4, srcIP6 string
+				if ipv4, ok := ipLayer.(*layers.IPv4); ok {
+					srcIP4 = ipv4.SrcIP.String()
+				} else if ipv6, ok := ipLayer.(*layers.IPv6); ok {
+					srcIP6 = ipv6.SrcIP.String()
+				}
 
-					tcpLayer := packet.Layer(layers.LayerTypeTCP)
-					if tcpLayer != nil {
-						tcp, ok = tcpLayer.(*layers.TCP)
-						if !ok {
-							continue
-						}
+				var ok bool
+				tcpLayer := packet.Layer(layers.LayerTypeTCP)
+				if tcpLayer != nil {
+					tcp, ok = tcpLayer.(*layers.TCP)
+					if !ok {
+						continue
 					}
-					udpLayer := packet.Layer(layers.LayerTypeUDP)
-					if udpLayer != nil {
-						udp, ok = udpLayer.(*layers.UDP)
-						if !ok {
-							continue
-						}
+				}
+				udpLayer := packet.Layer(layers.LayerTypeUDP)
+				if udpLayer != nil {
+					udp, ok = udpLayer.(*layers.UDP)
+					if !ok {
+						continue
 					}
+				}
 
-					if layerType.LayerType() == layers.LayerTypeTCP || layerType.LayerType() == layers.LayerTypeUDP {
-						srcPort := fmt.Sprint(int(tcp.SrcPort))
-						srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
-						isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
-						srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
-						isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
-						var ip string
-						if isIP4InRange {
-							ip = srcIP4
-						} else if isIP6InRange {
-							ip = srcIP6
-						} else {
-							gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
-						}
-						transportReaderCallback(*tcp, *udp, ip, srcIP4, srcIP6)
+				if layerType.LayerType() == layers.LayerTypeTCP || layerType.LayerType() == layers.LayerTypeUDP {
+					srcPort := fmt.Sprint(int(tcp.SrcPort))
+					srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+					isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
+					srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+					isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
+					var ip string
+					if isIP4InRange {
+						ip = srcIP4
+					} else if isIP6InRange {
+						ip = srcIP6
+					} else {
+						gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
 					}
+					transportReaderCallback(*tcp, *udp, ip, srcIP4, srcIP6)
 				}
 			}
 		}
+	}
 
-		// Loopback Readers
-		for _, handler := range handlers.LoopbackHandlers {
-			wgread.Add(1)
-			go loopBackScanCaseCallback(handler, &wgread)
-		}
+	// Loopback Readers
+	for _, handler := range handlers.LoopbackHandlers {
+		wgread.Add(1)
+		go loopBackScanCaseCallback(handler, &wgread)
+	}
 
-		// Transport Readers (TCP|UDP)
-		for _, handler := range handlers.TransportActive {
-			wgread.Add(1)
-			go func(handler *pcap.Handle) {
-				defer wgread.Done()
+	// Transport Readers (TCP|UDP)
+	for _, handler := range handlers.TransportActive {
+		wgread.Add(1)
+		go func(handler *pcap.Handle) {
+			defer wgread.Done()
 
-				var (
-					eth layers.Ethernet
-					ip4 layers.IPv4
-					ip6 layers.IPv6
-					tcp layers.TCP
-					udp layers.UDP
-				)
+			var (
+				eth layers.Ethernet
+				ip4 layers.IPv4
+				ip6 layers.IPv6
+				tcp layers.TCP
+				udp layers.UDP
+			)
 
-				// Interfaces with MAC (Physical + Virtualized)
-				parser4Mac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp, &udp)
-				parser6Mac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip6, &tcp, &udp)
-				// Interfaces without MAC (TUN/TAP)
-				parser4NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp, &udp)
-				parser6NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv6, &ip6, &tcp, &udp)
+			// Interfaces with MAC (Physical + Virtualized)
+			parser4Mac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip4, &tcp, &udp)
+			parser6Mac := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &ip6, &tcp, &udp)
+			// Interfaces without MAC (TUN/TAP)
+			parser4NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp, &udp)
+			parser6NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv6, &ip6, &tcp, &udp)
 
-				var parsers []*gopacket.DecodingLayerParser
-				parsers = append(parsers,
-					parser4Mac, parser6Mac,
-					parser4NoMac, parser6NoMac,
-				)
+			var parsers []*gopacket.DecodingLayerParser
+			parsers = append(parsers,
+				parser4Mac, parser6Mac,
+				parser4NoMac, parser6NoMac,
+			)
 
-				decoded := []gopacket.LayerType{}
+			decoded := []gopacket.LayerType{}
 
-				for {
-					data, _, err := handler.ReadPacketData()
-					if err == io.EOF {
-						break
-					} else if err != nil {
+			for {
+				data, _, err := handler.ReadPacketData()
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					continue
+				}
+
+				for _, parser := range parsers {
+					err := parser.DecodeLayers(data, &decoded)
+					if err != nil {
 						continue
 					}
-
-					for _, parser := range parsers {
-						err := parser.DecodeLayers(data, &decoded)
-						if err != nil {
-							continue
-						}
-						for _, layerType := range decoded {
-							if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
-								srcPort := fmt.Sprint(int(tcp.SrcPort))
-								srcIP4 := ip4.SrcIP.String()
-								srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
-								isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
-								srcIP6 := ip6.SrcIP.String()
-								srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
-								isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
-								var ip string
-								if isIP4InRange {
-									ip = srcIP4
-								} else if isIP6InRange {
-									ip = srcIP6
-								} else {
-									gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
-									continue
-								}
-								transportReaderCallback(tcp, udp, ip, srcIP4, srcIP6)
+					for _, layerType := range decoded {
+						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
+							srcPort := fmt.Sprint(int(tcp.SrcPort))
+							srcIP4 := ip4.SrcIP.String()
+							srcIP4WithPort := net.JoinHostPort(srcIP4, srcPort)
+							isIP4InRange := s.IPRanger.ContainsAny(srcIP4, srcIP4WithPort)
+							srcIP6 := ip6.SrcIP.String()
+							srcIP6WithPort := net.JoinHostPort(srcIP6, srcPort)
+							isIP6InRange := s.IPRanger.ContainsAny(srcIP6, srcIP6WithPort)
+							var ip string
+							if isIP4InRange {
+								ip = srcIP4
+							} else if isIP6InRange {
+								ip = srcIP6
+							} else {
+								gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", srcIP4, srcIP6)
+								continue
 							}
+							transportReaderCallback(tcp, udp, ip, srcIP4, srcIP6)
 						}
 					}
 				}
-			}(handler)
-		}
+			}
+		}(handler)
+	}
 
-		// Ethernet Readers
-		for _, handler := range handlers.EthernetActive {
-			wgread.Add(1)
-			go func(handler *pcap.Handle) {
-				defer wgread.Done()
+	// Ethernet Readers
+	for _, handler := range handlers.EthernetActive {
+		wgread.Add(1)
+		go func(handler *pcap.Handle) {
+			defer wgread.Done()
 
-				var (
-					eth layers.Ethernet
-					arp layers.ARP
-				)
+			var (
+				eth layers.Ethernet
+				arp layers.ARP
+			)
 
-				parser4 := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &arp)
-				parser4.IgnoreUnsupported = true
-				var parsers []*gopacket.DecodingLayerParser
-				parsers = append(parsers, parser4)
+			parser4 := gopacket.NewDecodingLayerParser(layers.LayerTypeEthernet, &eth, &arp)
+			parser4.IgnoreUnsupported = true
+			var parsers []*gopacket.DecodingLayerParser
+			parsers = append(parsers, parser4)
 
-				decoded := []gopacket.LayerType{}
+			decoded := []gopacket.LayerType{}
 
-				for {
-					data, _, err := handler.ReadPacketData()
-					if err == io.EOF {
-						break
-					} else if err != nil {
+			for {
+				data, _, err := handler.ReadPacketData()
+				if err == io.EOF {
+					break
+				} else if err != nil {
+					continue
+				}
+
+				for _, parser := range parsers {
+					err := parser.DecodeLayers(data, &decoded)
+					if err != nil {
 						continue
 					}
-
-					for _, parser := range parsers {
-						err := parser.DecodeLayers(data, &decoded)
-						if err != nil {
-							continue
-						}
-						for _, layerType := range decoded {
-							if layerType == layers.LayerTypeARP {
-								// check if the packet was sent out
-								isReply := arp.Operation == layers.ARPReply
-								var sourceMacIsInterfaceMac bool
-								if s.NetworkInterface != nil {
-									sourceMacIsInterfaceMac = bytes.Equal([]byte(s.NetworkInterface.HardwareAddr), arp.SourceHwAddress)
-								}
-								isOutgoingPacket := !isReply || sourceMacIsInterfaceMac
-								if isOutgoingPacket {
-									continue
-								}
-								srcIP4 := net.IP(arp.SourceProtAddress)
-								srcMac := net.HardwareAddr(arp.SourceHwAddress)
-
-								isIP4InRange := s.IPRanger.Contains(srcIP4.String())
-
-								var ip string
-								if isIP4InRange {
-									ip = srcIP4.String()
-								} else {
-									gologger.Debug().Msgf("Discarding ARP packet from non target ip: ip4=%s mac=%s\n", srcIP4, srcMac)
-									continue
-								}
-
-								s.hostDiscoveryChan <- &PkgResult{ip: ip}
+					for _, layerType := range decoded {
+						if layerType == layers.LayerTypeARP {
+							// check if the packet was sent out
+							isReply := arp.Operation == layers.ARPReply
+							var sourceMacIsInterfaceMac bool
+							if s.NetworkInterface != nil {
+								sourceMacIsInterfaceMac = bytes.Equal([]byte(s.NetworkInterface.HardwareAddr), arp.SourceHwAddress)
 							}
+							isOutgoingPacket := !isReply || sourceMacIsInterfaceMac
+							if isOutgoingPacket {
+								continue
+							}
+							srcIP4 := net.IP(arp.SourceProtAddress)
+							srcMac := net.HardwareAddr(arp.SourceHwAddress)
+
+							isIP4InRange := s.IPRanger.Contains(srcIP4.String())
+
+							var ip string
+							if isIP4InRange {
+								ip = srcIP4.String()
+							} else {
+								gologger.Debug().Msgf("Discarding ARP packet from non target ip: ip4=%s mac=%s\n", srcIP4, srcMac)
+								continue
+							}
+
+							hostDiscoveryChan <- &PkgResult{ip: ip}
 						}
 					}
 				}
-			}(handler)
-		}
+			}
+		}(handler)
+	}
 
-		wgread.Wait()
-	})
+	wgread.Wait()
 }
 
 // CleanupHandlers for all interfaces
 func CleanupHandlersUnix() {
-	if handlers, ok := handlers.(Handlers); ok {
-		allActive := append(handlers.TransportActive, handlers.EthernetActive...)
-		allActive = append(allActive, handlers.LoopbackHandlers...)
-		for _, handler := range allActive {
-			handler.Close()
+	allActive := append(handlers.TransportActive, handlers.EthernetActive...)
+	allActive = append(allActive, handlers.LoopbackHandlers...)
+	for _, handler := range allActive {
+		handler.Close()
+	}
+	allInactive := append(handlers.TransportInactive, handlers.EthernetInactive...)
+	for _, inactiveHandler := range allInactive {
+		inactiveHandler.CleanUp()
+	}
+}
+
+func SetupHandlers() error {
+	if NetworkInterface != "" {
+		return SetupHandler(NetworkInterface)
+	}
+
+	// listen on all interfaces manually
+	// unfortunately s.SetupHandler("any") causes ip4 to be ignored
+	itfs, err := net.Interfaces()
+	if err != nil {
+		return err
+	}
+	for _, itf := range itfs {
+		isInterfaceDown := itf.Flags&net.FlagUp == 0
+		if isInterfaceDown {
+			continue
 		}
-		allInactive := append(handlers.TransportInactive, handlers.EthernetInactive...)
-		for _, inactiveHandler := range allInactive {
-			inactiveHandler.CleanUp()
+		if err := SetupHandler(itf.Name); err != nil {
+			gologger.Warning().Msgf("Error on interface %s: %s", itf.Name, err)
 		}
 	}
+
+	return nil
+}
+
+func SetupHandler(interfaceName string) error {
+	bpfFilter := fmt.Sprintf("dst port %d and (tcp or udp)", ListenPort)
+
+	err := SetupHandlerUnix(interfaceName, bpfFilter, protocol.TCP)
+	if err != nil {
+		return err
+	}
+	// arp filter should be improved with source mac
+	// https://stackoverflow.com/questions/40196549/bpf-expression-to-capture-only-arp-reply-packets
+	// (arp[6:2] = 2) and dst host host and ether dst mac
+	bpfFilter = "arp"
+	err = SetupHandlerUnix(interfaceName, bpfFilter, protocol.ARP)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

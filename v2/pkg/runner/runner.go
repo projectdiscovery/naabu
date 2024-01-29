@@ -156,10 +156,6 @@ func (r *Runner) RunEnumeration() error {
 			}
 		}
 
-		err := r.scanner.SetupHandlers()
-		if err != nil {
-			return err
-		}
 		r.BackgroundWorkers()
 	}
 
@@ -728,7 +724,7 @@ func (r *Runner) SetSourcePort(sourcePort string) error {
 		return err
 	}
 
-	r.scanner.SourcePort = port
+	scan.ListenPort = port
 
 	return nil
 }

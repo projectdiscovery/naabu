@@ -94,12 +94,12 @@ func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
 	switch {
 	case iputil.IsIPv4(ip):
 		m.Type = ipv4.ICMPTypeEcho
-		packetListener = s.icmpPacketListener4
+		packetListener = icmpConn4
 		destAddr = &net.IPAddr{IP: destinationIP}
 	case iputil.IsIPv6(ip):
 		m.Type = ipv6.ICMPTypeEchoRequest
-		packetListener = s.icmpPacketListener6
-		networkInterface, _, _, err := s.Router.Route(destinationIP)
+		packetListener = icmpConn6
+		networkInterface, _, _, err := router.Route(destinationIP)
 		if networkInterface == nil {
 			err = fmt.Errorf("could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
 		}
@@ -197,7 +197,7 @@ func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
 		return
 	}
 
-	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	_, err = icmpConn4.WriteTo(data, destAddr)
 	if err != nil {
 		return
 	}
@@ -288,7 +288,7 @@ send:
 	if retries >= maxRetries {
 		return
 	}
-	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	_, err = icmpConn4.WriteTo(data, destAddr)
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
