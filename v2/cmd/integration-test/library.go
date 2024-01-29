@@ -53,10 +53,14 @@ func (h *naabuSingleLibrary) Execute() error {
 	}
 	defer os.RemoveAll(testFile)
 
+	var got bool
+
 	options := runner.Options{
 		HostsFile: testFile,
 		Ports:     "80",
-		OnResult:  func(hr *result.HostResult) {},
+		OnResult: func(hr *result.HostResult) {
+			got = true
+		},
 	}
 
 	naabuRunner, err := runner.NewRunner(&options)
@@ -65,7 +69,14 @@ func (h *naabuSingleLibrary) Execute() error {
 	}
 	defer naabuRunner.Close()
 
-	return naabuRunner.RunEnumeration()
+	if err = naabuRunner.RunEnumeration(); err != nil {
+		return err
+	}
+	if !got {
+		return errors.New("no results found")
+	}
+
+	return nil
 }
 
 type naabuMultipleExecLibrary struct {
