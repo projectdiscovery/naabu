@@ -77,4 +77,5 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 			return errors.New("no results found")
 		}
 	}
+	return nil
 }
