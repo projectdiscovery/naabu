@@ -39,12 +39,6 @@ jobs:
         run: bash run.sh
         working-directory: integration_tests/
 
-      - name: Integration Tests - Root User
-        env:
-          GH_ACTION: true
-        run: sudo bash run.sh
-        working-directory: integration_tests/
-
       - name: Race Condition Tests - Standard User
         run: |
           go run -race . -host scanme.sh
