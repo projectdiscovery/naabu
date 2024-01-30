@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
+	"os"
+	"os/signal"
+
 	_ "github.com/projectdiscovery/fdmax/autofdmax"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/runner"
-	"os"
-	"os/signal"
 )
 
 func main() {
@@ -35,7 +37,7 @@ func main() {
 		}
 	}()
 
-	err = naabuRunner.RunEnumeration()
+	err = naabuRunner.RunEnumeration(context.TODO())
 	if err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}

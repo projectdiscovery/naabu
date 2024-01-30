@@ -132,8 +132,11 @@ func NewRunner(options *Options) (*Runner, error) {
 }
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
-func (r *Runner) RunEnumeration() error {
+func (r *Runner) RunEnumeration(pctx context.Context) error {
 	defer r.Close()
+
+	ctx, cancel := context.WithCancel(pctx)
+	defer cancel()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
@@ -156,7 +159,7 @@ func (r *Runner) RunEnumeration() error {
 			}
 		}
 
-		r.BackgroundWorkers()
+		r.BackgroundWorkers(ctx)
 	}
 
 	if r.options.Stream {
@@ -601,8 +604,8 @@ func (r *Runner) ConnectVerification() {
 	swg.Wait()
 }
 
-func (r *Runner) BackgroundWorkers() {
-	r.scanner.StartWorkers()
+func (r *Runner) BackgroundWorkers(ctx context.Context) {
+	r.scanner.StartWorkers(ctx)
 }
 
 func (r *Runner) RawSocketHostDiscovery(ip string) {

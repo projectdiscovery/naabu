@@ -201,7 +201,7 @@ func (s *Scanner) Close() {
 }
 
 // StartWorkers of the scanner
-func (s *Scanner) StartWorkers() {
+func (s *Scanner) StartWorkers(ctx context.Context) {
 	go s.ICMPReadWorker()
 	go s.ICMPWriteWorker()
 	go s.ICMPResultWorker()
@@ -211,7 +211,7 @@ func (s *Scanner) StartWorkers() {
 	go s.UDPReadWorker6()
 	go s.TCPReadWorkerPCAP()
 	go s.TransportWriteWorker()
-	go s.TCPResultWorker()
+	go s.TCPResultWorker(ctx)
 	go s.UDPResultWorker()
 	go s.EthernetWriteWorker()
 }
@@ -421,14 +421,19 @@ func (s *Scanner) ICMPResultWorker() {
 }
 
 // TCPResultWorker handles probes and scan results
-func (s *Scanner) TCPResultWorker() {
-	for ip := range tcpChan {
-		if s.Phase.Is(HostDiscovery) {
-			gologger.Debug().Msgf("Received Transport (TCP|UDP) probe response from %s:%d\n", ip.ip, ip.port.Port)
-			s.HostDiscoveryResults.AddIp(ip.ip)
-		} else if s.Phase.Is(Scan) || s.stream {
-			gologger.Debug().Msgf("Received Transport (TCP) scan response from %s:%d\n", ip.ip, ip.port.Port)
-			s.ScanResults.AddPort(ip.ip, ip.port)
+func (s *Scanner) TCPResultWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ip := <-tcpChan:
+			if s.Phase.Is(HostDiscovery) {
+				gologger.Debug().Msgf("Received Transport (TCP|UDP) probe response from %s:%d\n", ip.ip, ip.port.Port)
+				s.HostDiscoveryResults.AddIp(ip.ip)
+			} else if s.Phase.Is(Scan) || s.stream {
+				gologger.Debug().Msgf("Received Transport (TCP) scan response from %s:%d\n", ip.ip, ip.port.Port)
+				s.ScanResults.AddPort(ip.ip, ip.port)
+			}
 		}
 	}
 }
