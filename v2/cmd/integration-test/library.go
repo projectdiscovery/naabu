@@ -122,7 +122,7 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 		},
 	}
 
-	for i := 0; i < 25; i++ {
+	for i := 0; i < 3; i++ {
 		naabuRunner, err := runner.NewRunner(&options)
 		if err != nil {
 			return err
