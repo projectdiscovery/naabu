@@ -6,14 +6,17 @@ import (
 	"os"
 
 	"github.com/projectdiscovery/naabu/v2/internal/testutils"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/runner"
 )
 
 var libraryTestcases = map[string]testutils.TestCase{
-	"sdk - one passive execution": &naabuPassiveSingleLibrary{},
-	"sdk - one execution":         &naabuSingleLibrary{},
-	"sdk - multiple executions":   &naabuMultipleExecLibrary{},
+	"sdk - one passive execution":         &naabuPassiveSingleLibrary{},
+	"sdk - one execution - connect":       &naabuSingleLibrary{scanType: "c"},
+	"sdk - multiple executions - connect": &naabuMultipleExecLibrary{scanType: "c"},
+	"sdk - one execution - syn":           &naabuSingleLibrary{scanType: "s"},
+	"sdk - multiple executions - syn":     &naabuMultipleExecLibrary{scanType: "s"},
 }
 
 type naabuPassiveSingleLibrary struct {
@@ -28,10 +31,11 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 	defer os.RemoveAll(testFile)
 
 	options := runner.Options{
-		HostsFile: testFile,
-		Ports:     "80",
-		Passive:   true,
-		OnResult:  func(hr *result.HostResult) {},
+		HostsFile:         testFile,
+		Ports:             "80",
+		Passive:           true,
+		SkipHostDiscovery: true,
+		OnResult:          func(hr *result.HostResult) {},
 	}
 
 	naabuRunner, err := runner.NewRunner(&options)
@@ -44,9 +48,15 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 }
 
 type naabuSingleLibrary struct {
+	scanType string
 }
 
 func (h *naabuSingleLibrary) Execute() error {
+	// ignore syn scan without privileges
+	if h.scanType == "s" && !privileges.IsPrivileged {
+		return nil
+	}
+
 	testFile := "test.txt"
 	err := os.WriteFile(testFile, []byte("scanme.sh"), 0644)
 	if err != nil {
@@ -57,8 +67,10 @@ func (h *naabuSingleLibrary) Execute() error {
 	var got bool
 
 	options := runner.Options{
-		HostsFile: testFile,
-		Ports:     "80",
+		HostsFile:         testFile,
+		Ports:             "80",
+		SkipHostDiscovery: true,
+		ScanType:          h.scanType,
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
@@ -81,9 +93,15 @@ func (h *naabuSingleLibrary) Execute() error {
 }
 
 type naabuMultipleExecLibrary struct {
+	scanType string
 }
 
 func (h *naabuMultipleExecLibrary) Execute() error {
+	// ignore syn scan without privileges
+	if h.scanType == "s" && !privileges.IsPrivileged {
+		return nil
+	}
+
 	testFile := "test.txt"
 	err := os.WriteFile(testFile, []byte("scanme.sh"), 0644)
 	if err != nil {
@@ -94,8 +112,10 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 	var got bool
 
 	options := runner.Options{
-		HostsFile: testFile,
-		Ports:     "80",
+		HostsFile:         testFile,
+		Ports:             "80",
+		ScanType:          h.scanType,
+		SkipHostDiscovery: true,
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
