@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"os/user"
 
 	"github.com/projectdiscovery/naabu/v2/internal/testutils"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -52,9 +53,9 @@ type naabuSingleLibrary struct {
 }
 
 func (h *naabuSingleLibrary) Execute() error {
-	// ignore syn scan without privileges
 	if h.scanType == "s" && !privileges.IsPrivileged {
-		return nil
+		usr, _ := user.Current()
+		return errors.New("invalid user" + usr.Name)
 	}
 
 	testFile := "test.txt"
@@ -97,9 +98,9 @@ type naabuMultipleExecLibrary struct {
 }
 
 func (h *naabuMultipleExecLibrary) Execute() error {
-	// ignore syn scan without privileges
 	if h.scanType == "s" && !privileges.IsPrivileged {
-		return nil
+		usr, _ := user.Current()
+		return errors.New("invalid user" + usr.Name)
 	}
 
 	testFile := "test.txt"
