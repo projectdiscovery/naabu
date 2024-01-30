@@ -244,10 +244,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				return false
 			}
 			if shouldUseRawPackets {
-				r.RawSocketEnumeration(target, port)
+				r.RawSocketEnumeration(ctx, target, port)
 			} else {
 				r.wgscan.Add()
-				go r.handleHostPort(target, port)
+				go r.handleHostPort(ctx, target, port)
 			}
 			return true
 		}
@@ -423,10 +423,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 				// connect scan
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port)
+					r.RawSocketEnumeration(ctx, ip, port)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ip, port)
+					go r.handleHostPort(ctx, ip, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -454,10 +454,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 				// connect scan
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, &portWithMetadata)
+					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ip, &portWithMetadata)
+					go r.handleHostPort(ctx, ip, &portWithMetadata)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -612,18 +612,23 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 	r.handleHostDiscovery(ip)
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
-	// performs cdn/waf scan exclusions checks
-	if !r.canIScanIfCDN(ip, p) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
+	select {
+	case <-ctx.Done():
 		return
-	}
-	r.limiter.Take()
-	switch p.Protocol {
-	case protocol.TCP:
-		r.scanner.EnqueueTCP(ip, scan.Syn, p)
-	case protocol.UDP:
-		r.scanner.EnqueueUDP(ip, p)
+	default:
+		// performs cdn/waf scan exclusions checks
+		if !r.canIScanIfCDN(ip, p) {
+			gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+			return
+		}
+		r.limiter.Take()
+		switch p.Protocol {
+		case protocol.TCP:
+			r.scanner.EnqueueTCP(ip, scan.Syn, p)
+		case protocol.UDP:
+			r.scanner.EnqueueUDP(ip, p)
+		}
 	}
 }
 
@@ -643,23 +648,28 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(host string, p *port.Port) {
+func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) {
 	defer r.wgscan.Done()
 
-	// performs cdn scan exclusions checks
-	if !r.canIScanIfCDN(host, p) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
+	select {
+	case <-ctx.Done():
 		return
-	}
+	default:
+		// performs cdn scan exclusions checks
+		if !r.canIScanIfCDN(host, p) {
+			gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
+			return
+		}
 
-	if r.scanner.ScanResults.IPHasPort(host, p) {
-		return
-	}
+		if r.scanner.ScanResults.IPHasPort(host, p) {
+			return
+		}
 
-	r.limiter.Take()
-	open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
-	if open && err == nil {
-		r.scanner.ScanResults.AddPort(host, p)
+		r.limiter.Take()
+		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
+		if open && err == nil {
+			r.scanner.ScanResults.AddPort(host, p)
+		}
 	}
 }
 
