@@ -83,7 +83,7 @@ jobs:
       - name: Integration Tests
         env:
           GH_ACTION: true
-        run: sudo bash run.sh
+        run: bash run.sh
         working-directory: integration_tests/
 
       - name: Race Condition Tests - Standard User
