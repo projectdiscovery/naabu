@@ -75,6 +75,7 @@ func (h *naabuSingleLibrary) Execute() error {
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
+		WarmUpTime: 2,
 	}
 
 	naabuRunner, err := runner.NewRunner(&options)
@@ -120,6 +121,7 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
+		WarmUpTime: 2,
 	}
 
 	for i := 0; i < 3; i++ {
