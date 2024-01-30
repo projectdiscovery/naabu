@@ -18,19 +18,11 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
-	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
 )
 
 var (
-	NetworkInterface                                        string
-	ListenPort                                              int
-	tcpChan, udpChan, hostDiscoveryChan                     chan *PkgResult
-	tcpConn4, udpConn4, tcpConn6, udpConn6                  *net.IPConn
-	transportPacketSend, icmpPacketSend, ethernetPacketSend chan *PkgSend
-	icmpConn4, icmpConn6                                    *icmp.PacketConn
-	router                                                  routing.Router
-	handlers                                                *Handlers
+	handlers *Handlers
 )
 
 // Handlers contains the list of pcap handlers
@@ -43,6 +35,8 @@ type Handlers struct {
 }
 
 func init() {
+	TransportReadWorkerPCAP = transportReadWorkerPCAPUnix
+
 	if port, err := freeport.GetFreeTCPPort(""); err != nil {
 		panic(err)
 	} else {
@@ -91,11 +85,6 @@ func init() {
 
 	icmpPacketSend = make(chan *PkgSend, packetSendSize)
 	ethernetPacketSend = make(chan *PkgSend, packetSendSize)
-
-	router, err = routing.New()
-	if err != nil {
-		panic(err)
-	}
 
 	handlers = &Handlers{}
 
@@ -170,7 +159,7 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 }
 
 // TransportReadWorkerPCAPUnix for TCP and UDP
-func TransportReadWorkerPCAPUnix(s *Scanner) {
+func transportReadWorkerPCAPUnix(s *Scanner) {
 	var wgread sync.WaitGroup
 
 	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, ip, srcIP4, srcIP6 string) {

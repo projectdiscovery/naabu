@@ -273,7 +273,7 @@ func (s *Scanner) UDPReadWorker6() {
 
 // TCPReadWorkerPCAP reads and parse incoming TCP packets with pcap
 func (s *Scanner) TCPReadWorkerPCAP() {
-	TransportReadWorkerPCAPUnix(s)
+	TransportReadWorkerPCAP(s)
 }
 
 // EnqueueICMP outgoing ICMP packets
@@ -588,8 +588,8 @@ func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, 
 
 	if s.SourceIP4 != nil {
 		ip4.SrcIP = s.SourceIP4
-	} else if router != nil {
-		_, _, sourceIP, err := router.Route(ip4.DstIP)
+	} else if pkgRouter != nil {
+		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
 		if err != nil {
 			return false, err
 		}
@@ -691,7 +691,7 @@ func (s *Scanner) sendAsyncTCP4(ip string, p *port.Port, pkgFlag PkgFlag) {
 	if s.SourceIP4 != nil {
 		ip4.SrcIP = s.SourceIP4
 	} else {
-		_, _, sourceIP, err := router.Route(ip4.DstIP)
+		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -748,7 +748,7 @@ func (s *Scanner) sendAsyncUDP4(ip string, p *port.Port, pkgFlag PkgFlag) {
 	if s.SourceIP4 != nil {
 		ip4.SrcIP = s.SourceIP4
 	} else {
-		_, _, sourceIP, err := router.Route(ip4.DstIP)
+		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -791,7 +791,7 @@ func (s *Scanner) sendAsyncTCP6(ip string, p *port.Port, pkgFlag PkgFlag) {
 	if s.SourceIP6 != nil {
 		ip6.SrcIP = s.SourceIP6
 	} else {
-		_, _, sourceIP, err := router.Route(ip6.DstIP)
+		_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -849,7 +849,7 @@ func (s *Scanner) sendAsyncUDP6(ip string, p *port.Port, pkgFlag PkgFlag) {
 	if s.SourceIP6 != nil {
 		ip6.SrcIP = s.SourceIP6
 	} else {
-		_, _, sourceIP, err := router.Route(ip6.DstIP)
+		_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
