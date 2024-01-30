@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"os"
 
@@ -39,7 +40,7 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 	}
 	defer naabuRunner.Close()
 
-	return naabuRunner.RunEnumeration()
+	return naabuRunner.RunEnumeration(context.TODO())
 }
 
 type naabuSingleLibrary struct {
@@ -69,7 +70,7 @@ func (h *naabuSingleLibrary) Execute() error {
 	}
 	defer naabuRunner.Close()
 
-	if err = naabuRunner.RunEnumeration(); err != nil {
+	if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
 		return err
 	}
 	if !got {
@@ -105,14 +106,14 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 		if err != nil {
 			return err
 		}
-		defer naabuRunner.Close()
 
-		if err = naabuRunner.RunEnumeration(); err != nil {
+		if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
 			return err
 		}
 		if !got {
 			return errors.New("no results found")
 		}
+		naabuRunner.Close()
 	}
 	return nil
 }
