@@ -2,12 +2,14 @@ package scan
 
 import (
 	"net"
+	"sync"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
 )
 
 var (
+	Busy                                                    sync.Mutex
 	NetworkInterface                                        string
 	tcpChan, udpChan, hostDiscoveryChan                     chan *PkgResult
 	tcpConn4, udpConn4, tcpConn6, udpConn6                  *net.IPConn

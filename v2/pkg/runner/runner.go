@@ -139,6 +139,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	defer cancel()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
+		if !scan.Busy.TryLock() {
+			return errors.New("existing scan already in progress")
+		}
+		defer scan.Busy.Unlock()
+
 		// Set values if those were specified via cli, errors are fatal
 		if r.options.SourceIP != "" {
 			err := r.SetSourceIP(r.options.SourceIP)
