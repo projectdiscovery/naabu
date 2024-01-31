@@ -212,7 +212,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		err = send(ip, listenHandler.TcpConn4, &tcp)
 		if err != nil {
 			// if s.debug {
-			// 	gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
+			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			// }
 		}
 	}
@@ -250,7 +250,7 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		err = send(ip, listenHandler.UdpConn4, &udp)
 		if err != nil {
 			// if s.debug {
-			// 	gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
+			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			// }
 		}
 	}
@@ -304,7 +304,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		err = send(ip, listenHandler.TcpConn6, &tcp)
 		if err != nil {
 			// if s.debug {
-			// 	gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
+			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			// }
 		}
 	}
@@ -343,7 +343,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		err = send(ip, listenHandler.UdpConn6, &udp)
 		if err != nil {
 			// if s.debug {
-			// 	gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
+			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 			// }
 		}
 	}
@@ -434,27 +434,27 @@ send:
 func (l *ListenHandler) TcpReadWorker4() {
 	data := make([]byte, 4096)
 	for {
-		l.TcpConn4.ReadFrom(data)
+		_, _, _ = l.TcpConn4.ReadFrom(data)
 	}
 }
 
 func (l *ListenHandler) TcpReadWorker6() {
 	data := make([]byte, 4096)
 	for {
-		l.TcpConn6.ReadFrom(data)
+		_, _, _ = l.TcpConn6.ReadFrom(data)
 	}
 }
 
 func (l *ListenHandler) UdpReadWorker4() {
 	data := make([]byte, 4096)
 	for {
-		l.UdpConn4.ReadFrom(data)
+		_, _, _ = l.UdpConn4.ReadFrom(data)
 	}
 }
 func (l *ListenHandler) UdpReadWorker6() {
 	data := make([]byte, 4096)
 	for {
-		l.UdpConn6.ReadFrom(data)
+		_, _, _ = l.UdpConn6.ReadFrom(data)
 	}
 }
 
@@ -869,8 +869,8 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 				continue
 			} else if tcp.RST {
 				// if s.debug {
-				// 	gologger.Debug().Msgf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
-				// 	return true, nil
+				gologger.Debug().Msgf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
+				return true, nil
 				// }
 			}
 		}
