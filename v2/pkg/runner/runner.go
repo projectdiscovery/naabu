@@ -133,17 +133,10 @@ func NewRunner(options *Options) (*Runner, error) {
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
 func (r *Runner) RunEnumeration(pctx context.Context) error {
-	defer r.Close()
-
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
-		if !scan.Busy.TryLock() {
-			return errors.New("existing scan already in progress")
-		}
-		defer scan.Busy.Unlock()
-
 		// Set values if those were specified via cli, errors are fatal
 		if r.options.SourceIP != "" {
 			err := r.SetSourceIP(r.options.SourceIP)
@@ -163,7 +156,6 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				return err
 			}
 		}
-
 		r.BackgroundWorkers(ctx)
 	}
 
@@ -742,7 +734,7 @@ func (r *Runner) SetSourcePort(sourcePort string) error {
 		return err
 	}
 
-	scan.ListenPort = port
+	r.scanner.ListenHandler.Port = port
 
 	return nil
 }

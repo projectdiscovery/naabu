@@ -24,11 +24,7 @@ const (
 
 func init() {
 	pingIcmpEchoRequestCallback = PingIcmpEchoRequest
-	pingIcmpEchoRequestAsyncCallback = PingIcmpEchoRequestAsync
 	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
-	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
-	pingIcmpAddressMaskRequestAsyncCallback = PingIcmpAddressMaskRequestAsync
-	pingNdpRequestAsyncCallback = PingNdpRequestAsync
 }
 
 // PingIcmpEchoRequest synchronous to the target ip address
@@ -78,7 +74,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpEchoRequestAsync asynchronous to the target ip address
-func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
+func PingIcmpEchoRequestAsync(ip string) {
 	destinationIP := net.ParseIP(ip)
 	var destAddr net.Addr
 	m := icmp.Message{
@@ -177,7 +173,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpTimestampRequestAsync synchronous to the target ip address - ipv4 only
-func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
+func PingIcmpTimestampRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
 		return
 	}
@@ -264,7 +260,7 @@ func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 }
 
 // PingIcmpAddressMaskRequestAsync asynchronous to the target ip address - ipv4 only
-func PingIcmpAddressMaskRequestAsync(s *Scanner, ip string) {
+func PingIcmpAddressMaskRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
 		return
 	}

@@ -11,21 +11,13 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
 	"github.com/projectdiscovery/cdncheck"
-	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
-	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/networkpolicy"
-	iputil "github.com/projectdiscovery/utils/ip"
-	"golang.org/x/net/icmp"
-	"golang.org/x/net/ipv4"
-	"golang.org/x/net/ipv6"
 	"golang.org/x/net/proxy"
 )
 
@@ -99,34 +91,30 @@ type Scanner struct {
 	NetworkInterface     *net.Interface
 	cdn                  *cdncheck.Client
 	tcpsequencer         *TCPSequencer
-	serializeOptions     gopacket.SerializeOptions
 	debug                bool
 	stream               bool
+	ListenHandler        *ListenHandler
 }
 
 // PkgSend is a TCP package
 type PkgSend struct {
-	ip       string
-	port     *port.Port
-	flag     PkgFlag
-	SourceIP string
+	ListenHandler *ListenHandler
+	ip            string
+	port          *port.Port
+	flag          PkgFlag
+	SourceIP      string
 }
 
 // PkgResult contains the results of sending TCP packages
 type PkgResult struct {
-	ip   string
+	ipv4 string
+	ipv6 string
 	port *port.Port
 }
 
 var (
-	newScannerCallback                      func(s *Scanner) error
-	pingIcmpEchoRequestCallback             func(ip string, timeout time.Duration) bool //nolint
-	pingIcmpEchoRequestAsyncCallback        func(s *Scanner, ip string)
-	pingIcmpTimestampRequestCallback        func(ip string, timeout time.Duration) bool //nolint
-	pingIcmpTimestampRequestAsyncCallback   func(s *Scanner, ip string)
-	pingIcmpAddressMaskRequestAsyncCallback func(s *Scanner, ip string)
-	arpRequestAsyncCallback                 func(s *Scanner, ip string)
-	pingNdpRequestAsyncCallback             func(s *Scanner, ip string)
+	pingIcmpEchoRequestCallback      func(ip string, timeout time.Duration) bool //nolint
+	pingIcmpTimestampRequestCallback func(ip string, timeout time.Duration) bool //nolint
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -145,10 +133,6 @@ func NewScanner(options *Options) (*Scanner, error) {
 	iprang.Np = nPolicy
 
 	scanner := &Scanner{
-		serializeOptions: gopacket.SerializeOptions{
-			FixLengths:       true,
-			ComputeChecksums: true,
-		},
 		timeout:       options.Timeout,
 		retries:       options.Retries,
 		rate:          options.Rate,
@@ -156,12 +140,6 @@ func NewScanner(options *Options) (*Scanner, error) {
 		debug:         options.Debug,
 		tcpsequencer:  NewTCPSequencer(),
 		IPRanger:      iprang,
-	}
-
-	if privileges.IsPrivileged && newScannerCallback != nil {
-		if err := newScannerCallback(scanner); err != nil {
-			return nil, err
-		}
 	}
 
 	scanner.HostDiscoveryResults = result.NewResult()
@@ -192,103 +170,41 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 	scanner.stream = options.Stream
 
+	if err := InitScanner(scanner); err != nil {
+		return nil, err
+	}
+
 	return scanner, nil
 }
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() {
-
+	s.ListenHandler.Busy = false
+	s.ListenHandler = nil
 }
 
 // StartWorkers of the scanner
 func (s *Scanner) StartWorkers(ctx context.Context) {
-	go s.ICMPReadWorker()
-	go s.ICMPWriteWorker()
-	go s.ICMPResultWorker()
-	go s.TCPReadWorker4()
-	go s.TCPReadWorker6()
-	go s.UDPReadWorker4()
-	go s.UDPReadWorker6()
-	go s.TCPReadWorkerPCAP()
-	go s.TransportWriteWorker()
+	go s.ICMPResultWorker(ctx)
 	go s.TCPResultWorker(ctx)
-	go s.UDPResultWorker()
-	go s.EthernetWriteWorker()
-}
-
-// TCPWriteWorker that sends out TCP|UDP packets
-func (s *Scanner) TransportWriteWorker() {
-	for pkg := range transportPacketSend {
-		s.SendAsyncPkg(pkg.ip, pkg.port, pkg.flag)
-	}
-}
-
-// TCPReadWorker4 reads and parse incoming TCP packets
-func (s *Scanner) TCPReadWorker4() {
-	data := make([]byte, 4096)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		// nolint:errcheck // just empty the buffer
-		tcpConn4.ReadFrom(data)
-	}
-}
-
-// TCPReadWorker4 reads and parse incoming TCP packets
-func (s *Scanner) TCPReadWorker6() {
-	data := make([]byte, 4096)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		// nolint:errcheck // just empty the buffer
-		tcpConn6.ReadFrom(data)
-	}
-}
-
-// UDPReadWorker4 reads and parse incoming ipv4 UDP packets
-func (s *Scanner) UDPReadWorker4() {
-	data := make([]byte, 4096)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		// nolint:errcheck // just empty the buffer
-		udpConn4.ReadFrom(data)
-	}
-}
-
-// UDPReadWorker6 reads and parse incoming ipv6 UDP packets
-func (s *Scanner) UDPReadWorker6() {
-	data := make([]byte, 4096)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		// nolint:errcheck // just empty the buffer
-		udpConn6.ReadFrom(data)
-	}
-}
-
-// TCPReadWorkerPCAP reads and parse incoming TCP packets with pcap
-func (s *Scanner) TCPReadWorkerPCAP() {
-	TransportReadWorkerPCAP(s)
+	go s.UDPResultWorker(ctx)
 }
 
 // EnqueueICMP outgoing ICMP packets
 func (s *Scanner) EnqueueICMP(ip string, pkgtype PkgFlag) {
 	icmpPacketSend <- &PkgSend{
-		ip:   ip,
-		flag: pkgtype,
+		ListenHandler: s.ListenHandler,
+		ip:            ip,
+		flag:          pkgtype,
 	}
 }
 
 // EnqueueEthernet outgoing Ethernet packets
 func (s *Scanner) EnqueueEthernet(ip string, pkgtype PkgFlag) {
 	ethernetPacketSend <- &PkgSend{
-		ip:   ip,
-		flag: pkgtype,
+		ListenHandler: s.ListenHandler,
+		ip:            ip,
+		flag:          pkgtype,
 	}
 }
 
@@ -296,9 +212,10 @@ func (s *Scanner) EnqueueEthernet(ip string, pkgtype PkgFlag) {
 func (s *Scanner) EnqueueTCP(ip string, pkgtype PkgFlag, ports ...*port.Port) {
 	for _, port := range ports {
 		transportPacketSend <- &PkgSend{
-			ip:   ip,
-			port: port,
-			flag: pkgtype,
+			ListenHandler: s.ListenHandler,
+			ip:            ip,
+			port:          port,
+			flag:          pkgtype,
 		}
 	}
 }
@@ -307,115 +224,25 @@ func (s *Scanner) EnqueueTCP(ip string, pkgtype PkgFlag, ports ...*port.Port) {
 func (s *Scanner) EnqueueUDP(ip string, ports ...*port.Port) {
 	for _, port := range ports {
 		transportPacketSend <- &PkgSend{
-			ip:   ip,
-			port: port,
-		}
-	}
-}
-
-// ICMPWriteWorker writes packet to the network layer
-func (s *Scanner) ICMPWriteWorker() {
-	for pkg := range icmpPacketSend {
-		switch {
-		case pkg.flag == IcmpEchoRequest && pingIcmpEchoRequestAsyncCallback != nil:
-			pingIcmpEchoRequestAsyncCallback(s, pkg.ip)
-		case pkg.flag == IcmpTimestampRequest && pingIcmpTimestampRequestAsyncCallback != nil:
-			pingIcmpTimestampRequestAsyncCallback(s, pkg.ip)
-		case pkg.flag == IcmpAddressMaskRequest && pingIcmpAddressMaskRequestAsyncCallback != nil:
-			pingIcmpAddressMaskRequestAsyncCallback(s, pkg.ip)
-		case pkg.flag == Ndp && pingNdpRequestAsyncCallback != nil:
-			pingNdpRequestAsyncCallback(s, pkg.ip)
-		}
-	}
-}
-
-// EthernetWriteWorker writes packet to the network layer
-func (s *Scanner) EthernetWriteWorker() {
-	for pkg := range ethernetPacketSend {
-		switch {
-		case pkg.flag == Arp && arpRequestAsyncCallback != nil:
-			arpRequestAsyncCallback(s, pkg.ip)
-		}
-	}
-}
-
-// ICMPReadWorker starts the ip4 and ip6 workers
-func (s *Scanner) ICMPReadWorker() {
-	go s.ICMPReadWorker4()
-	go s.ICMPReadWorker6()
-}
-
-// ICMPReadWorker4 reads packets from the network layer
-func (s *Scanner) ICMPReadWorker4() {
-	data := make([]byte, 1500)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		n, addr, err := icmpConn4.ReadFrom(data)
-		if err != nil {
-			continue
-		}
-
-		if s.Phase.Is(Guard) {
-			continue
-		}
-
-		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
-		if err != nil {
-			continue
-		}
-
-		switch rm.Type {
-		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestampReply:
-			hostDiscoveryChan <- &PkgResult{ip: addr.String()}
-		}
-	}
-}
-
-// ICMPReadWorker6 reads packets from the network layer
-func (s *Scanner) ICMPReadWorker6() {
-	data := make([]byte, 1500)
-	for {
-		if s.Phase.Is(Done) {
-			break
-		}
-		n, addr, err := icmpConn6.ReadFrom(data)
-		if err != nil {
-			continue
-		}
-
-		if s.Phase.Is(Guard) {
-			continue
-		}
-
-		rm, err := icmp.ParseMessage(ProtocolIPv6ICMP, data[:n])
-		if err != nil {
-			continue
-		}
-
-		switch rm.Type {
-		case ipv6.ICMPTypeEchoReply:
-			ip := addr.String()
-			// check if it has [host]:port
-			if ipSplit, _, err := net.SplitHostPort(ip); err == nil {
-				ip = ipSplit
-			}
-			// drop zone
-			if idx := strings.Index(ip, "%"); idx > 0 {
-				ip = ip[:idx]
-			}
-			hostDiscoveryChan <- &PkgResult{ip: ip}
+			ListenHandler: s.ListenHandler,
+			ip:            ip,
+			port:          port,
 		}
 	}
 }
 
 // ICMPResultWorker handles ICMP responses (used only during probes)
-func (s *Scanner) ICMPResultWorker() {
-	for ip := range hostDiscoveryChan {
-		if s.Phase.Is(HostDiscovery) {
-			gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ip)
-			s.HostDiscoveryResults.AddIp(ip.ip)
+func (s *Scanner) ICMPResultWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ip := <-s.ListenHandler.HostDiscoveryChan:
+			if s.Phase.Is(HostDiscovery) {
+				gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ipv4)
+				s.HostDiscoveryResults.AddIp(ip.ipv4)
+				s.HostDiscoveryResults.AddIp(ip.ipv6)
+			}
 		}
 	}
 }
@@ -426,55 +253,38 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			return
-		case ip := <-tcpChan:
+		case ip := <-s.ListenHandler.TcpChan:
 			if s.Phase.Is(HostDiscovery) {
-				gologger.Debug().Msgf("Received Transport (TCP|UDP) probe response from %s:%d\n", ip.ip, ip.port.Port)
-				s.HostDiscoveryResults.AddIp(ip.ip)
+				gologger.Debug().Msgf("Received Transport (TCP|UDP) probe response from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
+				s.HostDiscoveryResults.AddIp(ip.ipv4)
+				s.HostDiscoveryResults.AddIp(ip.ipv6)
 			} else if s.Phase.Is(Scan) || s.stream {
-				gologger.Debug().Msgf("Received Transport (TCP) scan response from %s:%d\n", ip.ip, ip.port.Port)
-				s.ScanResults.AddPort(ip.ip, ip.port)
+				gologger.Debug().Msgf("Received Transport (TCP) scan response from ipv4:%s ipv6:%s port:%d\n\n", ip.ipv4, ip.ipv6, ip.port.Port)
+				s.ScanResults.AddPort(ip.ipv4, ip.port)
+				s.ScanResults.AddPort(ip.ipv6, ip.port)
 			}
 		}
 	}
 }
 
 // UDPResultWorker handles probes and scan results
-func (s *Scanner) UDPResultWorker() {
-	for ip := range udpChan {
-		if s.Phase.Is(HostDiscovery) {
-			gologger.Debug().Msgf("Received UDP probe response from %s:%d\n", ip.ip, ip.port.Port)
-			s.HostDiscoveryResults.AddIp(ip.ip)
-		} else if s.Phase.Is(Scan) || s.stream {
-			gologger.Debug().Msgf("Received Transport (UDP) scan response from %s:%d\n", ip.ip, ip.port.Port)
-			s.ScanResults.AddPort(ip.ip, ip.port)
+func (s *Scanner) UDPResultWorker(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case ip := <-s.ListenHandler.UdpChan:
+			if s.Phase.Is(HostDiscovery) {
+				gologger.Debug().Msgf("Received UDP probe response from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
+				s.HostDiscoveryResults.AddIp(ip.ipv4)
+				s.HostDiscoveryResults.AddIp(ip.ipv6)
+			} else if s.Phase.Is(Scan) || s.stream {
+				gologger.Debug().Msgf("Received Transport (UDP) scan response from from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
+				s.ScanResults.AddPort(ip.ipv4, ip.port)
+				s.ScanResults.AddPort(ip.ipv6, ip.port)
+			}
 		}
 	}
-}
-
-// send sends the given layers as a single packet on the network.
-func (s *Scanner) send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
-	buf := gopacket.NewSerializeBuffer()
-	if err := gopacket.SerializeLayers(buf, s.serializeOptions, l...); err != nil {
-		return err
-	}
-
-	var (
-		retries int
-		err     error
-	)
-
-send:
-	if retries >= maxRetries {
-		return err
-	}
-	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
-	if err != nil {
-		retries++
-		// introduce a small delay to allow the network interface to flush the queue
-		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
-		goto send
-	}
-	return err
 }
 
 // ScanSyn a target ip
@@ -563,319 +373,4 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 	}
 
 	return true, err
-}
-
-// ACKPort sends an ACK packet to a port
-func (s *Scanner) ACKPort(dstIP string, port int, timeout time.Duration) (bool, error) {
-	conn, err := net.ListenPacket("ip4:tcp", "0.0.0.0")
-	if err != nil {
-		return false, err
-	}
-	defer conn.Close()
-
-	rawPort, err := freeport.GetFreeTCPPort("")
-	if err != nil {
-		return false, err
-	}
-
-	// Construct all the network layers we need.
-	ip4 := layers.IPv4{
-		DstIP:    net.ParseIP(dstIP),
-		Version:  4,
-		TTL:      255,
-		Protocol: layers.IPProtocolTCP,
-	}
-
-	if s.SourceIP4 != nil {
-		ip4.SrcIP = s.SourceIP4
-	} else if pkgRouter != nil {
-		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
-		if err != nil {
-			return false, err
-		}
-		ip4.SrcIP = sourceIP
-	} else {
-		return false, errors.New("could not find routes")
-	}
-
-	tcpOption := layers.TCPOption{
-		OptionType:   layers.TCPOptionKindMSS,
-		OptionLength: 4,
-		OptionData:   []byte{0x12, 0x34},
-	}
-
-	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(rawPort.Port),
-		DstPort: layers.TCPPort(port),
-		ACK:     true,
-		Window:  1024,
-		Seq:     s.tcpsequencer.Next(),
-		Options: []layers.TCPOption{tcpOption},
-	}
-
-	err = tcp.SetNetworkLayerForChecksum(&ip4)
-	if err != nil {
-		return false, err
-	}
-
-	err = s.send(dstIP, conn, &tcp)
-	if err != nil {
-		return false, err
-	}
-
-	data := make([]byte, 4096)
-	for {
-		n, addr, err := conn.ReadFrom(data)
-		if err != nil {
-			break
-		}
-
-		// not matching ip
-		if addr.String() != dstIP {
-			if s.debug {
-				gologger.Debug().Msgf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
-			}
-			continue
-		}
-
-		packet := gopacket.NewPacket(data[:n], layers.LayerTypeTCP, gopacket.Default)
-		if tcpLayer := packet.Layer(layers.LayerTypeTCP); tcpLayer != nil {
-			tcp, ok := tcpLayer.(*layers.TCP)
-			if !ok {
-				continue
-			}
-			// We consider only incoming packets
-			if tcp.DstPort != layers.TCPPort(rawPort.Port) {
-				if s.debug {
-					gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort.Port)
-				}
-				continue
-			} else if tcp.RST {
-				if s.debug {
-					gologger.Debug().Msgf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
-					return true, nil
-				}
-			}
-		}
-	}
-
-	return false, nil
-}
-
-// SendAsyncPkg sends a single packet to a port
-func (s *Scanner) SendAsyncPkg(ip string, p *port.Port, pkgFlag PkgFlag) {
-	isIP4 := iputil.IsIPv4(ip)
-	isIP6 := iputil.IsIPv6(ip)
-	isTCP := p.Protocol == protocol.TCP
-	isUDP := p.Protocol == protocol.UDP
-	switch {
-	case isIP4 && isTCP:
-		s.sendAsyncTCP4(ip, p, pkgFlag)
-	case isIP4 && isUDP:
-		s.sendAsyncUDP4(ip, p, pkgFlag)
-	case isIP6 && isTCP:
-		s.sendAsyncTCP6(ip, p, pkgFlag)
-	case isIP6 && isUDP:
-		s.sendAsyncUDP6(ip, p, pkgFlag)
-	}
-}
-
-func (s *Scanner) sendAsyncTCP4(ip string, p *port.Port, pkgFlag PkgFlag) {
-	// Construct all the network layers we need.
-	ip4 := layers.IPv4{
-		DstIP:    net.ParseIP(ip),
-		Version:  4,
-		TTL:      255,
-		Protocol: layers.IPProtocolTCP,
-	}
-	if s.SourceIP4 != nil {
-		ip4.SrcIP = s.SourceIP4
-	} else {
-		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
-			return
-		}
-		ip4.SrcIP = sourceIP
-	}
-
-	tcpOption := layers.TCPOption{
-		OptionType:   layers.TCPOptionKindMSS,
-		OptionLength: 4,
-		OptionData:   []byte{0x05, 0xB4},
-	}
-
-	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(ListenPort),
-		DstPort: layers.TCPPort(p.Port),
-		Window:  1024,
-		Seq:     s.tcpsequencer.Next(),
-		Options: []layers.TCPOption{tcpOption},
-	}
-
-	if pkgFlag == Syn {
-		tcp.SYN = true
-	} else if pkgFlag == Ack {
-		tcp.ACK = true
-	}
-
-	err := tcp.SetNetworkLayerForChecksum(&ip4)
-	if err != nil {
-		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		}
-	} else {
-		err = s.send(ip, tcpConn4, &tcp)
-		if err != nil {
-			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			}
-		}
-	}
-}
-
-func (s *Scanner) sendAsyncUDP4(ip string, p *port.Port, pkgFlag PkgFlag) {
-	// Construct all the network layers we need.
-	ip4 := layers.IPv4{
-		DstIP:    net.ParseIP(ip),
-		Version:  4,
-		TTL:      255,
-		Protocol: layers.IPProtocolUDP,
-	}
-	if s.SourceIP4 != nil {
-		ip4.SrcIP = s.SourceIP4
-	} else {
-		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
-			return
-		}
-		ip4.SrcIP = sourceIP
-	}
-
-	udp := layers.UDP{
-		SrcPort: layers.UDPPort(ListenPort),
-		DstPort: layers.UDPPort(p.Port),
-	}
-
-	err := udp.SetNetworkLayerForChecksum(&ip4)
-	if err != nil {
-		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		}
-	} else {
-		err = s.send(ip, udpConn4, &udp)
-		if err != nil {
-			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			}
-		}
-	}
-}
-
-func (s *Scanner) sendAsyncTCP6(ip string, p *port.Port, pkgFlag PkgFlag) {
-	// Construct all the network layers we need.
-	ip6 := layers.IPv6{
-		DstIP:      net.ParseIP(ip),
-		Version:    6,
-		HopLimit:   255,
-		NextHeader: layers.IPProtocolTCP,
-	}
-
-	if s.SourceIP6 != nil {
-		ip6.SrcIP = s.SourceIP6
-	} else {
-		_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-			return
-		}
-		ip6.SrcIP = sourceIP
-	}
-
-	tcpOption := layers.TCPOption{
-		OptionType:   layers.TCPOptionKindMSS,
-		OptionLength: 4,
-		OptionData:   []byte{0x05, 0xB4},
-	}
-
-	tcp := layers.TCP{
-		SrcPort: layers.TCPPort(ListenPort),
-		DstPort: layers.TCPPort(p.Port),
-		Window:  1024,
-		Seq:     s.tcpsequencer.Next(),
-		Options: []layers.TCPOption{tcpOption},
-	}
-
-	if pkgFlag == Syn {
-		tcp.SYN = true
-	} else if pkgFlag == Ack {
-		tcp.ACK = true
-	}
-
-	err := tcp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
-		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		}
-	} else {
-		err = s.send(ip, tcpConn6, &tcp)
-		if err != nil {
-			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			}
-		}
-	}
-}
-
-func (s *Scanner) sendAsyncUDP6(ip string, p *port.Port, pkgFlag PkgFlag) {
-	// Construct all the network layers we need.
-	ip6 := layers.IPv6{
-		DstIP:      net.ParseIP(ip),
-		Version:    6,
-		HopLimit:   255,
-		NextHeader: layers.IPProtocolUDP,
-	}
-
-	if s.SourceIP6 != nil {
-		ip6.SrcIP = s.SourceIP6
-	} else {
-		_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-			return
-		}
-		ip6.SrcIP = sourceIP
-	}
-
-	udp := layers.UDP{
-		SrcPort: layers.UDPPort(ListenPort),
-		DstPort: layers.UDPPort(p.Port),
-	}
-
-	err := udp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
-		if s.debug {
-			gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		}
-	} else {
-		err = s.send(ip, udpConn6, &udp)
-		if err != nil {
-			if s.debug {
-				gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			}
-		}
-	}
 }

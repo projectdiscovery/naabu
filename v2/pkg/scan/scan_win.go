@@ -3,5 +3,5 @@
 package scan
 
 func init() {
-	TransportReadWorkerPCAP = func(s *Scanner) {}
+	InitScanner = func(s *Scanner) error { return nil }
 }
