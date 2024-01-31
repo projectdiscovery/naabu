@@ -46,7 +46,7 @@ jobs:
 
       - name: Race Condition Tests - Root User
         run: |
-          sudo go run -race . -host scanme.sh
+          sudo go run -race . -host scanme.sh -Pn
         working-directory: v2/cmd/naabu/
 
   build-mac:
@@ -87,7 +87,7 @@ jobs:
 
       - name: Race Condition Tests - Root User
         run: |
-          sudo go run -race . -host scanme.sh
+          sudo go run -race . -host scanme.sh -Pn
         working-directory: v2/cmd/naabu/
 
   # build-windows:
