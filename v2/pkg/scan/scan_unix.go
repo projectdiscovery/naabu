@@ -53,7 +53,7 @@ func init() {
 
 	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
 	if err != nil {
-		panic(err)
+		gologger.Error().Msgf("could not setup ip6:icmp: %s", err)
 	}
 
 	icmpPacketSend = make(chan *PkgSend, packetSendSize)
@@ -84,12 +84,12 @@ func init() {
 
 		listenHandler.TcpConn6, err = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip6:tcp: %s\n", err)
 		}
 
 		listenHandler.UdpConn6, err = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip6:udp: %s\n", err)
 		}
 
 		go listenHandler.ICMPReadWorker4()
@@ -353,6 +353,9 @@ func (l *ListenHandler) ICMPReadWorker4() {
 
 // ICMPReadWorker6 reads packets from the network layer
 func (l *ListenHandler) ICMPReadWorker6() {
+	if icmpConn6 == nil {
+		return
+	}
 	data := make([]byte, 1500)
 	for {
 		n, addr, err := icmpConn6.ReadFrom(data)
@@ -420,6 +423,9 @@ func (l *ListenHandler) TcpReadWorker4() {
 }
 
 func (l *ListenHandler) TcpReadWorker6() {
+	if l.TcpConn6 == nil {
+		return
+	}
 	data := make([]byte, 4096)
 	for {
 		_, _, _ = l.TcpConn6.ReadFrom(data)
@@ -433,6 +439,9 @@ func (l *ListenHandler) UdpReadWorker4() {
 	}
 }
 func (l *ListenHandler) UdpReadWorker6() {
+	if l.UdpConn6 == nil {
+		return
+	}
 	data := make([]byte, 4096)
 	for {
 		_, _, _ = l.UdpConn6.ReadFrom(data)
