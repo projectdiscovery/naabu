@@ -99,7 +99,6 @@ func NewRunner(options *Options) (*Runner, error) {
 		Retries:       options.Retries,
 		Rate:          options.Rate,
 		PortThreshold: options.PortThreshold,
-		Debug:         options.Debug,
 		ExcludeCdn:    options.ExcludeCDN,
 		OutputCdn:     options.OutputCDN,
 		ExcludedIps:   excludedIps,

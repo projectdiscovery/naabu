@@ -202,15 +202,11 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	err = tcp.SetNetworkLayerForChecksum(&ip4)
 	if err != nil {
-		// if s.debug {
-		// 	gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		// }
+		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		err = send(ip, listenHandler.TcpConn4, &tcp)
 		if err != nil {
-			// if s.debug {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			// }
 		}
 	}
 }
@@ -240,15 +236,11 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	err = udp.SetNetworkLayerForChecksum(&ip4)
 	if err != nil {
-		// if s.debug {
-		// 	gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		// }
+		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		err = send(ip, listenHandler.UdpConn4, &udp)
 		if err != nil {
-			// if s.debug {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			// }
 		}
 	}
 }
@@ -294,15 +286,11 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	err = tcp.SetNetworkLayerForChecksum(&ip6)
 	if err != nil {
-		// if s.debug {
-		// 	gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		// }
+		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		err = send(ip, listenHandler.TcpConn6, &tcp)
 		if err != nil {
-			// if s.debug {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			// }
 		}
 	}
 }
@@ -333,15 +321,11 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	err = udp.SetNetworkLayerForChecksum(&ip6)
 	if err != nil {
-		// if s.debug {
-		// 	gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
-		// }
+		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		err = send(ip, listenHandler.UdpConn6, &udp)
 		if err != nil {
-			// if s.debug {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-			// }
 		}
 	}
 }
@@ -832,9 +816,7 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 
 		// not matching ip
 		if addr.String() != dstIP {
-			// if s.debug {
-			// 	gologger.Debug().Msgf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
-			// }
+			gologger.Debug().Msgf("Discarding TCP packet from non target ip %s for %s\n", dstIP, addr.String())
 			continue
 		}
 
@@ -846,15 +828,11 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 			}
 			// We consider only incoming packets
 			if tcp.DstPort != layers.TCPPort(rawPort.Port) {
-				// if s.debug {
-				// 	gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort.Port)
-				// }
+				gologger.Debug().Msgf("Discarding TCP packet from %s:%d not matching %s:%d port\n", addr.String(), tcp.DstPort, dstIP, rawPort.Port)
 				continue
 			} else if tcp.RST {
-				// if s.debug {
 				gologger.Debug().Msgf("Accepting RST packet from %s:%d\n", addr.String(), tcp.DstPort)
 				return true, nil
-				// }
 			}
 		}
 	}

@@ -10,7 +10,6 @@ type Options struct {
 	Retries       int
 	Rate          int
 	PortThreshold int
-	Debug         bool
 	ExcludeCdn    bool
 	OutputCdn     bool
 	ExcludedIps   []string

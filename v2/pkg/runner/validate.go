@@ -143,9 +143,11 @@ func (options *Options) ValidateOptions() error {
 
 // configureOutput configures the output on the screen
 func (options *Options) configureOutput() {
-	// If the user desires verbose output, show verbose output
 	if options.Verbose {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
+	}
+	if options.Debug {
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelDebug)
 	}
 	if options.NoColor {
 		gologger.DefaultLogger.SetFormatter(formatter.NewCLI(true))

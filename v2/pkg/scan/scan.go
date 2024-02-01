@@ -90,7 +90,6 @@ type Scanner struct {
 	NetworkInterface     *net.Interface
 	cdn                  *cdncheck.Client
 	tcpsequencer         *TCPSequencer
-	debug                bool
 	stream               bool
 	ListenHandler        *ListenHandler
 }
@@ -136,7 +135,6 @@ func NewScanner(options *Options) (*Scanner, error) {
 		retries:       options.Retries,
 		rate:          options.Rate,
 		portThreshold: options.PortThreshold,
-		debug:         options.Debug,
 		tcpsequencer:  NewTCPSequencer(),
 		IPRanger:      iprang,
 	}
