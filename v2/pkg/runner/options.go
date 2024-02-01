@@ -61,7 +61,8 @@ type Options struct {
 	ProxyAuth         string              // Socks5 proxy authentication (username:password)
 	Resolvers         string              // Resolvers (comma separated or file)
 	baseResolvers     []string
-	OnResult          OnResultCallback // OnResult callback
+	OnResult          result.ResultFn // callback on final host result
+	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
 	Resume            bool
 	ResumeCfg         *ResumeCfg
@@ -95,9 +96,6 @@ type Options struct {
 	// MetricsPort with statistics
 	MetricsPort int
 }
-
-// OnResultCallback (hostResult)
-type OnResultCallback func(*result.HostResult)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {

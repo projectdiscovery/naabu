@@ -92,6 +92,7 @@ type Scanner struct {
 	tcpsequencer         *TCPSequencer
 	stream               bool
 	ListenHandler        *ListenHandler
+	OnReceive            result.ResultFn
 }
 
 // PkgSend is a TCP package
@@ -137,6 +138,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		portThreshold: options.PortThreshold,
 		tcpsequencer:  NewTCPSequencer(),
 		IPRanger:      iprang,
+		OnReceive:     options.OnReceive,
 	}
 
 	scanner.HostDiscoveryResults = result.NewResult()
@@ -167,7 +169,11 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 	scanner.stream = options.Stream
 
-	scanner.ListenHandler, err = Acquire()
+	if handler, err := Acquire(); err != nil {
+		return scanner, err
+	} else {
+		scanner.ListenHandler = handler
+	}
 
 	return scanner, err
 }
@@ -253,6 +259,15 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
+			if s.OnReceive != nil {
+				singlePort := []*port.Port{ip.port}
+				if ip.ipv4 != "" {
+					s.OnReceive(&result.HostResult{IP: ip.ipv4, Ports: singlePort})
+				}
+				if ip.ipv6 != "" {
+					s.OnReceive(&result.HostResult{IP: ip.ipv6, Ports: singlePort})
+				}
+			}
 			if s.ListenHandler.Phase.Is(HostDiscovery) {
 				gologger.Debug().Msgf("Received Transport (TCP|UDP) probe response from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
 				if ip.ipv4 != "" {

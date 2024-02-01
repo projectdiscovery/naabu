@@ -105,6 +105,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		Proxy:         options.Proxy,
 		ProxyAuth:     options.ProxyAuth,
 		Stream:        options.Stream,
+		OnReceive:     options.OnReceive,
 	})
 	if err != nil {
 		return nil, err
