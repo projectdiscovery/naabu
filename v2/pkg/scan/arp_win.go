@@ -3,5 +3,5 @@
 package scan
 
 func init() {
-	ArpRequestAsync = func(s *Scanner, ip string) {}
+	ArpRequestAsync = func(ip string) {}
 }

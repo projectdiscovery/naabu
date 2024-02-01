@@ -1,7 +1,3 @@
-//go:build windows
+//go:build windowz
 
 package scan
-
-func init() {
-
-}
