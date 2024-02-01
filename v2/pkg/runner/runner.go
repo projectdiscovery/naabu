@@ -178,7 +178,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
 		showHostDiscoveryInfo()
-		r.scanner.Phase.Set(scan.HostDiscovery)
+		r.scanner.ListenHandler.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
 		_, targetsV4, targetsv6, _, err := r.GetTargetIps(r.getPreprocessedIps)
 		if err != nil {
@@ -228,7 +228,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 
 		handleStreamIp := func(target string, port *port.Port) bool {
 			if r.scanner.ScanResults.HasSkipped(target) {
@@ -273,7 +273,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 		for target := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
@@ -349,7 +349,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		portsCount = uint64(len(r.scanner.Ports))
 		targetsWithPortCount = uint64(len(targetsWithPort))
 
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 		Range := targetsCount * portsCount
 		if r.options.EnableProgressBar {
 			r.stats.AddStatic("ports", portsCount)
@@ -478,7 +478,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		r.scanner.Phase.Set(scan.Done)
+		r.scanner.ListenHandler.Phase.Set(scan.Done)
 
 		// Validate the hosts if the user has asked for second step validation
 		if r.options.Verify {
@@ -580,7 +580,7 @@ func (r *Runner) PickPort(index int) *port.Port {
 }
 
 func (r *Runner) ConnectVerification() {
-	r.scanner.Phase.Set(scan.Scan)
+	r.scanner.ListenHandler.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 

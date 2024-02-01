@@ -4,7 +4,6 @@ package scan
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -40,8 +39,6 @@ type Handlers struct {
 }
 
 func init() {
-	InitScanner = initScanner
-
 	if !privileges.IsPrivileged {
 		return
 	}
@@ -458,20 +455,6 @@ func (l *ListenHandler) UdpReadWorker6() {
 	}
 }
 
-func initScanner(s *Scanner) error {
-	if !privileges.IsPrivileged {
-		return nil
-	}
-	for _, listenHandler := range ListenHandlers {
-		if !listenHandler.Busy {
-			listenHandler.Busy = true
-			s.ListenHandler = listenHandler
-			return nil
-		}
-	}
-	return errors.New("no free handlers")
-}
-
 // SetupHandlerUnix on unix OS
 func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Protocol) error {
 	for _, proto := range protocols {
@@ -583,9 +566,9 @@ func TransportReadWorker() {
 				}
 				var srcIP4, srcIP6 string
 				if ipv4, ok := ipLayer.(*layers.IPv4); ok {
-					srcIP4 = ipv4.SrcIP.String()
+					srcIP4 = ToString(ipv4.SrcIP)
 				} else if ipv6, ok := ipLayer.(*layers.IPv6); ok {
-					srcIP6 = ipv6.SrcIP.String()
+					srcIP6 = ToString(ipv6.SrcIP)
 				}
 
 				var ok bool
@@ -660,8 +643,8 @@ func TransportReadWorker() {
 					}
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
-							srcIP4 := ip4.SrcIP.String()
-							srcIP6 := ip6.SrcIP.String()
+							srcIP4 := ToString(ip4.SrcIP)
+							srcIP6 := ToString(ip6.SrcIP)
 							transportReaderCallback(tcp, udp, srcIP4, srcIP6)
 						}
 					}
@@ -716,7 +699,7 @@ func TransportReadWorker() {
 							srcIP4 := net.IP(arp.SourceProtAddress)
 
 							for _, listenHandler := range ListenHandlers {
-								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4.String()}
+								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: ToString(srcIP4)}
 							}
 						}
 					}
