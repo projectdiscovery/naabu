@@ -763,6 +763,9 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
+			if r.scanner.OnReceive != nil {
+				r.scanner.OnReceive(&result.HostResult{IP: host, Ports: []*port.Port{p}})
+			}
 		}
 	}
 }

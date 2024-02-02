@@ -42,6 +42,9 @@ func NewResumeCfg() *ResumeCfg {
 
 // SaveResumeConfig to file
 func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
+	resumeCfg.RLock()
+	defer resumeCfg.RUnlock()
+
 	data, err := json.MarshalIndent(resumeCfg, "", "\t")
 	if err != nil {
 		return err
@@ -56,6 +59,9 @@ func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
 
 // ConfigureResume read the resume config file
 func (resumeCfg *ResumeCfg) ConfigureResume() error {
+	resumeCfg.RLock()
+	defer resumeCfg.RUnlock()
+
 	gologger.Info().Msg("Resuming from save checkpoint")
 	file, err := os.ReadFile(DefaultResumeFilePath())
 	if err != nil {
