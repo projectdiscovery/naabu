@@ -6,6 +6,7 @@ import (
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	fileutil "github.com/projectdiscovery/utils/file"
 
 	"github.com/projectdiscovery/goflags"
@@ -139,7 +140,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{"4"}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
+		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPV4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),

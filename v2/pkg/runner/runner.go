@@ -947,10 +947,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 func ipMatchesIpVersions(ip string, ipVersions ...string) bool {
 	for _, ipVersion := range ipVersions {
-		if ipVersion == "4" && iputil.IsIPv4(ip) {
+		if ipVersion == scan.IPV4 && iputil.IsIPv4(ip) {
 			return true
 		}
-		if ipVersion == "6" && iputil.IsIPv6(ip) {
+		if ipVersion == scan.IPv6 && iputil.IsIPv6(ip) {
 			return true
 		}
 	}

@@ -9,6 +9,11 @@ import (
 	"golang.org/x/net/icmp"
 )
 
+const (
+	IPV4 = "4"
+	IPv6 = "6"
+)
+
 var (
 	ListenHandlers                                          []*ListenHandler
 	NetworkInterface                                        string
