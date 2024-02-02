@@ -789,6 +789,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				continue
 			}
 
+			if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
+				continue
+			}
+
 			// recover hostnames from ip:port combination
 			for _, p := range hostResult.Ports {
 				ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
@@ -882,6 +886,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			if err != nil {
 				continue
 			}
+			if !ipMatchesIpVersions(hostIP, r.options.IPVersion...) {
+				continue
+			}
+
 			buffer := bytes.Buffer{}
 			writer := csv.NewWriter(&buffer)
 			for _, host := range dt {
@@ -935,5 +943,16 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			csvFileHeaderEnabled = false
 		}
 	}
+}
 
+func ipMatchesIpVersions(ip string, ipVersions ...string) bool {
+	for _, ipVersion := range ipVersions {
+		if ipVersion == "4" && iputil.IsIPv4(ip) {
+			return true
+		}
+		if ipVersion == "6" && iputil.IsIPv6(ip) {
+			return true
+		}
+	}
+	return false
 }
