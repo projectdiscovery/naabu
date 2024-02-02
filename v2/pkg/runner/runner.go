@@ -62,6 +62,11 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureHostDiscovery()
 
+	// default to ipv4 if no ipversion was specified
+	if len(options.IPVersion) == 0 {
+		options.IPVersion = []string{scan.IPv4}
+	}
+
 	if options.Retries == 0 {
 		options.Retries = DefaultRetriesSynScan
 	}
@@ -947,7 +952,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 func ipMatchesIpVersions(ip string, ipVersions ...string) bool {
 	for _, ipVersion := range ipVersions {
-		if ipVersion == scan.IPV4 && iputil.IsIPv4(ip) {
+		if ipVersion == scan.IPv4 && iputil.IsIPv4(ip) {
 			return true
 		}
 		if ipVersion == scan.IPv6 && iputil.IsIPv6(ip) {

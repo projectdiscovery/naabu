@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	IPV4 = "4"
+	IPv4 = "4"
 	IPv6 = "6"
 )
 

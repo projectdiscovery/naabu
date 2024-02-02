@@ -21,7 +21,7 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 			return nil, nil, err
 		}
 		if len(r.options.IPVersion) > 0 {
-			if sliceutil.Contains(r.options.IPVersion, scan.IPV4) {
+			if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
 				targetIPsV4 = append(targetIPsV4, dnsData.A...)
 			}
 			if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
