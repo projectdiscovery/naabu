@@ -403,7 +403,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					}
 
 					for _, p := range data.Ports {
-						r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
+						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+						if r.scanner.OnReceive != nil {
+							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
+						}
+						r.scanner.ScanResults.AddPort(ip, pp)
 					}
 				}(ip)
 			}
