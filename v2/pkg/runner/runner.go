@@ -99,7 +99,7 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	runner.streamChannel = make(chan Target)
 
-	scanner, err := scan.NewScanner(&scan.Options{
+	scanOpts := &scan.Options{
 		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
 		Retries:       options.Retries,
 		Rate:          options.Rate,
@@ -111,7 +111,13 @@ func NewRunner(options *Options) (*Runner, error) {
 		ProxyAuth:     options.ProxyAuth,
 		Stream:        options.Stream,
 		OnReceive:     options.OnReceive,
-	})
+	}
+
+	if scanOpts.OnReceive == nil {
+		scanOpts.OnReceive = runner.onReceive
+	}
+
+	scanner, err := scan.NewScanner(scanOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -134,6 +140,88 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	return runner, nil
+}
+
+func (r *Runner) onReceive(hostResult *result.HostResult) {
+	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
+		return
+	}
+
+	dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+	if err != nil {
+		return
+	}
+
+	// recover hostnames from ip:port combination
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+		if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
+			if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
+				// replace bare ip:port with host
+				for idx, ipCandidate := range dt {
+					if iputil.IsIP(ipCandidate) {
+						dt[idx] = otherName
+					}
+				}
+			}
+		}
+	}
+
+	csvHeaderEnabled := true
+
+	buffer := bytes.Buffer{}
+	writer := csv.NewWriter(&buffer)
+	for _, host := range dt {
+		buffer.Reset()
+		if host == "ip" {
+			host = hostResult.IP
+		}
+		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
+		// console output
+		if r.options.JSON || r.options.CSV {
+			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+			if r.options.OutputCDN {
+				data.IsCDNIP = isCDNIP
+				data.CDNName = cdnName
+			}
+			if host != hostResult.IP {
+				data.Host = host
+			}
+			for _, p := range hostResult.Ports {
+				data.Port = p.Port
+				data.Protocol = p.Protocol.String()
+				data.TLS = p.TLS
+				if r.options.JSON {
+					b, err := data.JSON()
+					if err != nil {
+						continue
+					}
+					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+				} else if r.options.CSV {
+					if csvHeaderEnabled {
+						writeCSVHeaders(data, writer)
+						csvHeaderEnabled = false
+					}
+					writeCSVRow(data, writer)
+				}
+			}
+		}
+		if r.options.JSON {
+			gologger.Silent().Msgf("%s", buffer.String())
+		} else if r.options.CSV {
+			writer.Flush()
+			gologger.Silent().Msgf("%s", buffer.String())
+		} else {
+			for _, p := range hostResult.Ports {
+				if r.options.OutputCDN && isCDNIP {
+					gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
+				} else {
+					gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+				}
+			}
+		}
+
+	}
 }
 
 // RunEnumeration runs the ports enumeration flow on the targets specified
@@ -788,7 +876,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	switch {
 	case scanResults.HasIPsPorts():
 		for hostResult := range scanResults.GetIPsPorts() {
-			csvHeaderEnabled := true
 			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
 			if err != nil {
 				continue
@@ -814,7 +901,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			}
 
 			buffer := bytes.Buffer{}
-			writer := csv.NewWriter(&buffer)
 			for _, host := range dt {
 				buffer.Reset()
 				if host == "ip" {
@@ -822,49 +908,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
-				// console output
-				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
-					if r.options.OutputCDN {
-						data.IsCDNIP = isCDNIP
-						data.CDNName = cdnName
-					}
-					if host != hostResult.IP {
-						data.Host = host
-					}
-					for _, p := range hostResult.Ports {
-						data.Port = p.Port
-						data.Protocol = p.Protocol.String()
-						data.TLS = p.TLS
-						if r.options.JSON {
-							b, marshallErr := data.JSON()
-							if marshallErr != nil {
-								continue
-							}
-							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
-						} else if r.options.CSV {
-							if csvHeaderEnabled {
-								writeCSVHeaders(data, writer)
-								csvHeaderEnabled = false
-							}
-							writeCSVRow(data, writer)
-						}
-					}
-				}
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else {
-					for _, p := range hostResult.Ports {
-						if r.options.OutputCDN && isCDNIP {
-							gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
-						} else {
-							gologger.Silent().Msgf("%s:%d\n", host, p.Port)
-						}
-					}
-				}
 				// file output
 				if file != nil {
 					if r.options.JSON {
