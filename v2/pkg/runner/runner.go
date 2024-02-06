@@ -60,6 +60,8 @@ type Target struct {
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
+	options.configureOutput()
+
 	options.configureHostDiscovery()
 
 	// default to ipv4 if no ipversion was specified
