@@ -52,7 +52,7 @@ func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
 	}
 	resumeFolderPath := DefaultResumeFolderPath()
 	if !fileutil.FolderExists(resumeFolderPath) {
-		fileutil.CreateFolder(DefaultResumeFolderPath())
+		_ = fileutil.CreateFolder(DefaultResumeFolderPath())
 	}
 
 	return os.WriteFile(DefaultResumeFilePath(), data, permissionutil.ConfigFilePermission)
