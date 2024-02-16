@@ -259,6 +259,13 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
+			srcIP4WithPort := net.JoinHostPort(ip.ipv4, ip.port.String())
+			srcIP6WithPort := net.JoinHostPort(ip.ipv6, ip.port.String())
+			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
+			if !isIPInRange {
+				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
+			}
+
 			if s.OnReceive != nil {
 				singlePort := []*port.Port{ip.port}
 				if ip.ipv4 != "" {
