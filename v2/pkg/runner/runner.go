@@ -646,8 +646,12 @@ func (r *Runner) Close() {
 	if r.options.EnableProgressBar {
 		_ = r.stats.Stop()
 	}
-	r.scanner.Close()
-	r.limiter.Stop()
+	if r.scanner != nil {
+		r.scanner.Close()
+	}
+	if r.limiter != nil {
+		r.limiter.Stop()
+	}
 }
 
 // PickIP randomly
