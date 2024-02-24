@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Mzack9999/gcache"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
@@ -48,6 +49,8 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan Target
+
+	unique gcache.Cache[string, struct{}]
 }
 
 type Target struct {
@@ -100,6 +103,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 
 	runner.streamChannel = make(chan Target)
+
+	uniqueCache := gcache.New[string, struct{}](1500).Build()
+	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
 		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
@@ -154,6 +160,14 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		return
 	}
 
+	// receive event has only one port
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+		if r.unique.Has(ipPort) {
+			return
+		}
+	}
+
 	// recover hostnames from ip:port combination
 	for _, p := range hostResult.Ports {
 		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
@@ -167,6 +181,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
+		r.unique.Set(ipPort, struct{}{})
 	}
 
 	csvHeaderEnabled := true
@@ -178,6 +193,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		if host == "ip" {
 			host = hostResult.IP
 		}
+
 		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 		// console output
 		if r.options.JSON || r.options.CSV {
@@ -222,7 +238,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
-
 	}
 }
 
@@ -722,6 +737,11 @@ func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Po
 			gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
 			return
 		}
+
+		if r.scanner.ScanResults.IPHasPort(ip, p) {
+			return
+		}
+
 		r.limiter.Take()
 		switch p.Protocol {
 		case protocol.TCP:
