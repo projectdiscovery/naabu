@@ -181,7 +181,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
-		r.unique.Set(ipPort, struct{}{})
+		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
 	csvHeaderEnabled := true
