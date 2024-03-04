@@ -12,15 +12,15 @@ require (
 	github.com/projectdiscovery/blackrock v0.0.1
 	github.com/projectdiscovery/cdncheck v1.0.9
 	github.com/projectdiscovery/clistats v0.0.20
-	github.com/projectdiscovery/dnsx v1.1.6
+	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.39
+	github.com/projectdiscovery/goflags v0.1.41
 	github.com/projectdiscovery/gologger v1.1.12
 	github.com/projectdiscovery/ipranger v0.0.36
 	github.com/projectdiscovery/mapcidr v1.1.16
 	github.com/projectdiscovery/networkpolicy v0.0.7
-	github.com/projectdiscovery/ratelimit v0.0.27
+	github.com/projectdiscovery/ratelimit v0.0.30
 	github.com/projectdiscovery/retryablehttp-go v1.0.49
 	github.com/projectdiscovery/uncover v1.0.7
 	github.com/projectdiscovery/utils v0.0.82
@@ -79,7 +79,7 @@ require (
 	github.com/pierrec/lz4/v4 v4.1.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
-	github.com/projectdiscovery/asnmap v1.0.6 // indirect
+	github.com/projectdiscovery/asnmap v1.1.0 // indirect
 	github.com/projectdiscovery/fastdialer v0.0.60 // indirect
 	github.com/projectdiscovery/hmap v0.0.40 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
@@ -115,6 +115,7 @@ require (
 	golang.org/x/crypto v0.19.0 // indirect
 	golang.org/x/mod v0.14.0 // indirect
 	golang.org/x/oauth2 v0.11.0 // indirect
+	golang.org/x/term v0.17.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
