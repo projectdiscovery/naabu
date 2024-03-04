@@ -102,6 +102,7 @@ type OnResultCallback func(*result.HostResult)
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{}
+	var cfgFile string
 
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
@@ -140,6 +141,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
+		flagSet.StringVar(&cfgFile, "config", "", "path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)"),
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", nil, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
@@ -202,6 +204,16 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
+
+	if cfgFile != "" {
+		if !fileutil.FileExists(cfgFile) {
+			gologger.Fatal().Msgf("given config file '%s' does not exist", cfgFile)
+		}
+		// merge config file with flags
+		if err := flagSet.MergeConfigFile(cfgFile); err != nil {
+			gologger.Fatal().Msgf("Could not read config: %s\n", err)
+		}
+	}
 
 	if options.HealthCheck {
 		gologger.Print().Msgf("%s\n", DoHealthCheck(options, flagSet))
