@@ -351,7 +351,7 @@ Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80`
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
 # Scan Status
-Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636` (the port can be changed via the `-metrics-port` flag)
+Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` (the port can be changed via the `-metrics-port` flag)
 
 # Using naabu as library
 The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:

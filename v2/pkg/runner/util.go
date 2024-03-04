@@ -5,6 +5,7 @@ import (
 	"net"
 
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	iputil "github.com/projectdiscovery/utils/ip"
 	osutil "github.com/projectdiscovery/utils/os"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -20,10 +21,10 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 			return nil, nil, err
 		}
 		if len(r.options.IPVersion) > 0 {
-			if sliceutil.Contains(r.options.IPVersion, "4") {
+			if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
 				targetIPsV4 = append(targetIPsV4, dnsData.A...)
 			}
-			if sliceutil.Contains(r.options.IPVersion, "6") {
+			if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
 				targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
 			}
 		} else {

@@ -6,6 +6,7 @@ import (
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	fileutil "github.com/projectdiscovery/utils/file"
 
 	"github.com/projectdiscovery/goflags"
@@ -61,7 +62,8 @@ type Options struct {
 	ProxyAuth         string              // Socks5 proxy authentication (username:password)
 	Resolvers         string              // Resolvers (comma separated or file)
 	baseResolvers     []string
-	OnResult          OnResultCallback // OnResult callback
+	OnResult          result.ResultFn // callback on final host result
+	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
 	Resume            bool
 	ResumeCfg         *ResumeCfg
@@ -95,9 +97,6 @@ type Options struct {
 	// MetricsPort with statistics
 	MetricsPort int
 }
-
-// OnResultCallback (hostResult)
-type OnResultCallback func(*result.HostResult)
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
@@ -141,7 +140,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", nil, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
+		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
@@ -198,7 +197,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
 		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan (deprecated)"),
 		flagSet.IntVarP(&options.StatsInterval, "stats-interval", "si", DefautStatsInterval, "number of seconds to wait between showing a statistics update (deprecated)"),
-		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose nuclei metrics on"),
+		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on"),
 	)
 
 	_ = flagSet.Parse()
@@ -211,8 +210,6 @@ func ParseOptions() *Options {
 	// Check if stdin pipe was given
 	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
-	// Read the inputs and configure the logging
-	options.configureOutput()
 	options.ResumeCfg = NewResumeCfg()
 	if options.ShouldLoadResume() {
 		if err := options.ResumeCfg.ConfigureResume(); err != nil {
@@ -230,9 +227,7 @@ func ParseOptions() *Options {
 	if !options.DisableUpdateCheck {
 		latestVersion, err := updateutils.GetToolVersionCallback("naabu", version)()
 		if err != nil {
-			if options.Verbose {
-				gologger.Error().Msgf("naabu version check failed: %v", err.Error())
-			}
+			gologger.Verbose().Msgf("naabu version check failed: %v", err.Error())
 		} else {
 			gologger.Info().Msgf("Current naabu version %v %v", version, updateutils.GetVersionDescription(version, latestVersion))
 		}
