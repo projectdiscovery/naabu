@@ -19,7 +19,7 @@ import (
 )
 
 func (r *Runner) Load() error {
-	r.scanner.Phase.Set(scan.Init)
+	r.scanner.ListenHandler.Phase.Set(scan.Init)
 
 	// merge all target sources into a file
 	targetfile, err := r.mergeToFile()

@@ -14,7 +14,7 @@ mv integration-test ../../../integration_tests/integration-test
 cd ../../../integration_tests
 echo "::endgroup::"
 
-./integration-test
+sudo ./integration-test
 if [ $? -eq 0 ]
 then
   exit 0

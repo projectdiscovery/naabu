@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	fileutil "github.com/projectdiscovery/utils/file"
+	permissionutil "github.com/projectdiscovery/utils/permission"
 )
 
 // Default resume file
@@ -42,20 +43,26 @@ func NewResumeCfg() *ResumeCfg {
 
 // SaveResumeConfig to file
 func (resumeCfg *ResumeCfg) SaveResumeConfig() error {
+	resumeCfg.RLock()
+	defer resumeCfg.RUnlock()
+
 	data, err := json.MarshalIndent(resumeCfg, "", "\t")
 	if err != nil {
 		return err
 	}
 	resumeFolderPath := DefaultResumeFolderPath()
 	if !fileutil.FolderExists(resumeFolderPath) {
-		_ = os.MkdirAll(DefaultResumeFolderPath(), 0644)
+		_ = fileutil.CreateFolder(DefaultResumeFolderPath())
 	}
 
-	return os.WriteFile(DefaultResumeFilePath(), data, 0644)
+	return os.WriteFile(DefaultResumeFilePath(), data, permissionutil.ConfigFilePermission)
 }
 
 // ConfigureResume read the resume config file
 func (resumeCfg *ResumeCfg) ConfigureResume() error {
+	resumeCfg.RLock()
+	defer resumeCfg.RUnlock()
+
 	gologger.Info().Msg("Resuming from save checkpoint")
 	file, err := os.ReadFile(DefaultResumeFilePath())
 	if err != nil {

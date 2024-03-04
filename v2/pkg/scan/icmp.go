@@ -24,11 +24,7 @@ const (
 
 func init() {
 	pingIcmpEchoRequestCallback = PingIcmpEchoRequest
-	pingIcmpEchoRequestAsyncCallback = PingIcmpEchoRequestAsync
 	pingIcmpTimestampRequestCallback = PingIcmpTimestampRequest
-	pingIcmpTimestampRequestAsyncCallback = PingIcmpTimestampRequestAsync
-	pingIcmpAddressMaskRequestAsyncCallback = PingIcmpAddressMaskRequestAsync
-	pingNdpRequestAsyncCallback = PingNdpRequestAsync
 }
 
 // PingIcmpEchoRequest synchronous to the target ip address
@@ -78,7 +74,7 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpEchoRequestAsync asynchronous to the target ip address
-func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
+func PingIcmpEchoRequestAsync(ip string) {
 	destinationIP := net.ParseIP(ip)
 	var destAddr net.Addr
 	m := icmp.Message{
@@ -94,12 +90,12 @@ func PingIcmpEchoRequestAsync(s *Scanner, ip string) {
 	switch {
 	case iputil.IsIPv4(ip):
 		m.Type = ipv4.ICMPTypeEcho
-		packetListener = s.icmpPacketListener4
+		packetListener = icmpConn4
 		destAddr = &net.IPAddr{IP: destinationIP}
 	case iputil.IsIPv6(ip):
 		m.Type = ipv6.ICMPTypeEchoRequest
-		packetListener = s.icmpPacketListener6
-		networkInterface, _, _, err := s.Router.Route(destinationIP)
+		packetListener = icmpConn6
+		networkInterface, _, _, err := pkgRouter.Route(destinationIP)
 		if networkInterface == nil {
 			err = fmt.Errorf("could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
 		}
@@ -177,7 +173,7 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 }
 
 // PingIcmpTimestampRequestAsync synchronous to the target ip address - ipv4 only
-func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
+func PingIcmpTimestampRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
 		return
 	}
@@ -197,7 +193,7 @@ func PingIcmpTimestampRequestAsync(s *Scanner, ip string) {
 		return
 	}
 
-	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	_, err = icmpConn4.WriteTo(data, destAddr)
 	if err != nil {
 		return
 	}
@@ -264,7 +260,7 @@ func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 }
 
 // PingIcmpAddressMaskRequestAsync asynchronous to the target ip address - ipv4 only
-func PingIcmpAddressMaskRequestAsync(s *Scanner, ip string) {
+func PingIcmpAddressMaskRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
 		return
 	}
@@ -288,7 +284,7 @@ send:
 	if retries >= maxRetries {
 		return
 	}
-	_, err = s.icmpPacketListener4.WriteTo(data, destAddr)
+	_, err = icmpConn4.WriteTo(data, destAddr)
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
