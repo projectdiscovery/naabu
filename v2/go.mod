@@ -25,7 +25,7 @@ require (
 	github.com/projectdiscovery/uncover v1.0.7
 	github.com/projectdiscovery/utils v0.0.77
 	github.com/remeh/sizedwaitgroup v1.0.0
-	github.com/stretchr/testify v1.8.4
+	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
 	golang.org/x/exp v0.0.0-20231006140011-7918f672742d
 	golang.org/x/net v0.21.0
