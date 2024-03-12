@@ -7,6 +7,8 @@ import (
 	"golang.org/x/exp/maps"
 )
 
+type ResultFn func(*HostResult)
+
 type HostResult struct {
 	Host  string
 	IP    string

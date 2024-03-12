@@ -13,13 +13,9 @@ import (
 	"golang.org/x/net/ipv6"
 )
 
-func init() {
-	pingNdpRequestAsyncCallback = PingNdpRequestAsync
-}
-
 // PingNdpRequestAsync asynchronous to the target ip address
-func PingNdpRequestAsync(s *Scanner, ip string) {
-	networkInterface, _, _, err := s.Router.Route(net.ParseIP(ip))
+func PingNdpRequestAsync(ip string) {
+	networkInterface, _, _, err := pkgRouter.Route(net.ParseIP(ip))
 	if networkInterface == nil {
 		err = errors.New("Could not send PingNdp Request packet to " + ip + ": no interface with outbound source found")
 	}
@@ -47,7 +43,7 @@ send:
 	if retries >= maxRetries {
 		return
 	}
-	_, err = s.icmpPacketListener6.WriteTo(data, destAddr)
+	_, err = icmpConn6.WriteTo(data, destAddr)
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
