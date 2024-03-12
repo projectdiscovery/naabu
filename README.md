@@ -187,7 +187,7 @@ The ports to scan for on the host can be specified via `-p` parameter (udp ports
 naabu -p 80,443,21-23,u:53 -host hackerone.com
 ```
 
-By default, the Naabu checks for nmap's `Top 100` ports. It supports following in-built port lists -
+By default, the Naabu checks for nmap's `Top 100` ports. It supports the following in-built port lists -
 
 | Flag              | Description                          |
 |-------------------|--------------------------------------|
