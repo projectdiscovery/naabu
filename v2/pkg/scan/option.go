@@ -2,6 +2,8 @@ package scan
 
 import (
 	"time"
+
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 )
 
 // Options of the scan
@@ -10,11 +12,11 @@ type Options struct {
 	Retries       int
 	Rate          int
 	PortThreshold int
-	Debug         bool
 	ExcludeCdn    bool
 	OutputCdn     bool
 	ExcludedIps   []string
 	Proxy         string
 	ProxyAuth     string
 	Stream        bool
+	OnReceive     result.ResultFn
 }

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Mzack9999/gcache"
 	"github.com/miekg/dns"
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/blackrock"
@@ -48,6 +49,8 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan Target
+
+	unique gcache.Cache[string, struct{}]
 }
 
 type Target struct {
@@ -60,7 +63,14 @@ type Target struct {
 // NewRunner creates a new runner struct instance by parsing
 // the configuration options, configuring sources, reading lists, etc
 func NewRunner(options *Options) (*Runner, error) {
+	options.configureOutput()
+
 	options.configureHostDiscovery()
+
+	// default to ipv4 if no ipversion was specified
+	if len(options.IPVersion) == 0 {
+		options.IPVersion = []string{scan.IPv4}
+	}
 
 	if options.Retries == 0 {
 		options.Retries = DefaultRetriesSynScan
@@ -94,19 +104,28 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	runner.streamChannel = make(chan Target)
 
-	scanner, err := scan.NewScanner(&scan.Options{
+	uniqueCache := gcache.New[string, struct{}](1500).Build()
+	runner.unique = uniqueCache
+
+	scanOpts := &scan.Options{
 		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
 		Retries:       options.Retries,
 		Rate:          options.Rate,
 		PortThreshold: options.PortThreshold,
-		Debug:         options.Debug,
 		ExcludeCdn:    options.ExcludeCDN,
 		OutputCdn:     options.OutputCDN,
 		ExcludedIps:   excludedIps,
 		Proxy:         options.Proxy,
 		ProxyAuth:     options.ProxyAuth,
 		Stream:        options.Stream,
-	})
+		OnReceive:     options.OnReceive,
+	}
+
+	if scanOpts.OnReceive == nil {
+		scanOpts.OnReceive = runner.onReceive
+	}
+
+	scanner, err := scan.NewScanner(scanOpts)
 	if err != nil {
 		return nil, err
 	}
@@ -131,9 +150,101 @@ func NewRunner(options *Options) (*Runner, error) {
 	return runner, nil
 }
 
+func (r *Runner) onReceive(hostResult *result.HostResult) {
+	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
+		return
+	}
+
+	dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+	if err != nil {
+		return
+	}
+
+	// receive event has only one port
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+		if r.unique.Has(ipPort) {
+			return
+		}
+	}
+
+	// recover hostnames from ip:port combination
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+		if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
+			if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
+				// replace bare ip:port with host
+				for idx, ipCandidate := range dt {
+					if iputil.IsIP(ipCandidate) {
+						dt[idx] = otherName
+					}
+				}
+			}
+		}
+		_ = r.unique.Set(ipPort, struct{}{})
+	}
+
+	csvHeaderEnabled := true
+
+	buffer := bytes.Buffer{}
+	writer := csv.NewWriter(&buffer)
+	for _, host := range dt {
+		buffer.Reset()
+		if host == "ip" {
+			host = hostResult.IP
+		}
+
+		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
+		// console output
+		if r.options.JSON || r.options.CSV {
+			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+			if r.options.OutputCDN {
+				data.IsCDNIP = isCDNIP
+				data.CDNName = cdnName
+			}
+			if host != hostResult.IP {
+				data.Host = host
+			}
+			for _, p := range hostResult.Ports {
+				data.Port = p.Port
+				data.Protocol = p.Protocol.String()
+				data.TLS = p.TLS
+				if r.options.JSON {
+					b, err := data.JSON()
+					if err != nil {
+						continue
+					}
+					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+				} else if r.options.CSV {
+					if csvHeaderEnabled {
+						writeCSVHeaders(data, writer)
+						csvHeaderEnabled = false
+					}
+					writeCSVRow(data, writer)
+				}
+			}
+		}
+		if r.options.JSON {
+			gologger.Silent().Msgf("%s", buffer.String())
+		} else if r.options.CSV {
+			writer.Flush()
+			gologger.Silent().Msgf("%s", buffer.String())
+		} else {
+			for _, p := range hostResult.Ports {
+				if r.options.OutputCDN && isCDNIP {
+					gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
+				} else {
+					gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+				}
+			}
+		}
+	}
+}
+
 // RunEnumeration runs the ports enumeration flow on the targets specified
-func (r *Runner) RunEnumeration() error {
-	defer r.Close()
+func (r *Runner) RunEnumeration(pctx context.Context) error {
+	ctx, cancel := context.WithCancel(pctx)
+	defer cancel()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
@@ -155,12 +266,7 @@ func (r *Runner) RunEnumeration() error {
 				return err
 			}
 		}
-
-		err := r.scanner.SetupHandlers()
-		if err != nil {
-			return err
-		}
-		r.BackgroundWorkers()
+		r.BackgroundWorkers(ctx)
 	}
 
 	if r.options.Stream {
@@ -182,7 +288,7 @@ func (r *Runner) RunEnumeration() error {
 	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
 		showHostDiscoveryInfo()
-		r.scanner.Phase.Set(scan.HostDiscovery)
+		r.scanner.ListenHandler.Phase.Set(scan.HostDiscovery)
 		// shrinks the ips to the minimum amount of cidr
 		_, targetsV4, targetsv6, _, err := r.GetTargetIps(r.getPreprocessedIps)
 		if err != nil {
@@ -232,7 +338,7 @@ func (r *Runner) RunEnumeration() error {
 	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 
 		handleStreamIp := func(target string, port *port.Port) bool {
 			if r.scanner.ScanResults.HasSkipped(target) {
@@ -245,10 +351,10 @@ func (r *Runner) RunEnumeration() error {
 				return false
 			}
 			if shouldUseRawPackets {
-				r.RawSocketEnumeration(target, port)
+				r.RawSocketEnumeration(ctx, target, port)
 			} else {
 				r.wgscan.Add()
-				go r.handleHostPort(target, port)
+				go r.handleHostPort(ctx, target, port)
 			}
 			return true
 		}
@@ -277,7 +383,7 @@ func (r *Runner) RunEnumeration() error {
 		showNetworkCapabilities(r.options)
 		// create retryablehttp instance
 		httpClient := retryablehttp.NewClient(retryablehttp.DefaultOptionsSingle)
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 		for target := range r.streamChannel {
 			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
@@ -314,7 +420,11 @@ func (r *Runner) RunEnumeration() error {
 					}
 
 					for _, p := range data.Ports {
-						r.scanner.ScanResults.AddPort(ip, &port.Port{Port: p, Protocol: protocol.TCP})
+						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+						if r.scanner.OnReceive != nil {
+							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
+						}
+						r.scanner.ScanResults.AddPort(ip, pp)
 					}
 				}(ip)
 			}
@@ -353,7 +463,7 @@ func (r *Runner) RunEnumeration() error {
 		portsCount = uint64(len(r.scanner.Ports))
 		targetsWithPortCount = uint64(len(targetsWithPort))
 
-		r.scanner.Phase.Set(scan.Scan)
+		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 		Range := targetsCount * portsCount
 		if r.options.EnableProgressBar {
 			r.stats.AddStatic("ports", portsCount)
@@ -424,10 +534,10 @@ func (r *Runner) RunEnumeration() error {
 
 				// connect scan
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, port)
+					r.RawSocketEnumeration(ctx, ip, port)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ip, port)
+					go r.handleHostPort(ctx, ip, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -455,10 +565,10 @@ func (r *Runner) RunEnumeration() error {
 
 				// connect scan
 				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ip, &portWithMetadata)
+					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ip, &portWithMetadata)
+					go r.handleHostPort(ctx, ip, &portWithMetadata)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -482,7 +592,7 @@ func (r *Runner) RunEnumeration() error {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 		}
 
-		r.scanner.Phase.Set(scan.Done)
+		r.scanner.ListenHandler.Phase.Set(scan.Done)
 
 		// Validate the hosts if the user has asked for second step validation
 		if r.options.Verify {
@@ -551,6 +661,12 @@ func (r *Runner) Close() {
 	if r.options.EnableProgressBar {
 		_ = r.stats.Stop()
 	}
+	if r.scanner != nil {
+		r.scanner.Close()
+	}
+	if r.limiter != nil {
+		r.limiter.Stop()
+	}
 }
 
 // PickIP randomly
@@ -582,7 +698,7 @@ func (r *Runner) PickPort(index int) *port.Port {
 }
 
 func (r *Runner) ConnectVerification() {
-	r.scanner.Phase.Set(scan.Scan)
+	r.scanner.ListenHandler.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 
@@ -603,26 +719,36 @@ func (r *Runner) ConnectVerification() {
 	swg.Wait()
 }
 
-func (r *Runner) BackgroundWorkers() {
-	r.scanner.StartWorkers()
+func (r *Runner) BackgroundWorkers(ctx context.Context) {
+	r.scanner.StartWorkers(ctx)
 }
 
 func (r *Runner) RawSocketHostDiscovery(ip string) {
 	r.handleHostDiscovery(ip)
 }
 
-func (r *Runner) RawSocketEnumeration(ip string, p *port.Port) {
-	// performs cdn/waf scan exclusions checks
-	if !r.canIScanIfCDN(ip, p) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
+	select {
+	case <-ctx.Done():
 		return
-	}
-	r.limiter.Take()
-	switch p.Protocol {
-	case protocol.TCP:
-		r.scanner.EnqueueTCP(ip, scan.Syn, p)
-	case protocol.UDP:
-		r.scanner.EnqueueUDP(ip, p)
+	default:
+		// performs cdn/waf scan exclusions checks
+		if !r.canIScanIfCDN(ip, p) {
+			gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", ip, p.Port)
+			return
+		}
+
+		if r.scanner.ScanResults.IPHasPort(ip, p) {
+			return
+		}
+
+		r.limiter.Take()
+		switch p.Protocol {
+		case protocol.TCP:
+			r.scanner.EnqueueTCP(ip, scan.Syn, p)
+		case protocol.UDP:
+			r.scanner.EnqueueUDP(ip, p)
+		}
 	}
 }
 
@@ -642,23 +768,31 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(host string, p *port.Port) {
+func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) {
 	defer r.wgscan.Done()
 
-	// performs cdn scan exclusions checks
-	if !r.canIScanIfCDN(host, p) {
-		gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
+	select {
+	case <-ctx.Done():
 		return
-	}
+	default:
+		// performs cdn scan exclusions checks
+		if !r.canIScanIfCDN(host, p) {
+			gologger.Debug().Msgf("Skipping cdn target: %s:%d\n", host, p.Port)
+			return
+		}
 
-	if r.scanner.ScanResults.IPHasPort(host, p) {
-		return
-	}
+		if r.scanner.ScanResults.IPHasPort(host, p) {
+			return
+		}
 
-	r.limiter.Take()
-	open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
-	if open && err == nil {
-		r.scanner.ScanResults.AddPort(host, p)
+		r.limiter.Take()
+		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
+		if open && err == nil {
+			r.scanner.ScanResults.AddPort(host, p)
+			if r.scanner.OnReceive != nil {
+				r.scanner.OnReceive(&result.HostResult{IP: host, Ports: []*port.Port{p}})
+			}
+		}
 	}
 }
 
@@ -726,7 +860,7 @@ func (r *Runner) SetSourcePort(sourcePort string) error {
 		return err
 	}
 
-	r.scanner.SourcePort = port
+	r.scanner.ListenHandler.Port = port
 
 	return nil
 }
@@ -775,9 +909,12 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	switch {
 	case scanResults.HasIPsPorts():
 		for hostResult := range scanResults.GetIPsPorts() {
-			csvHeaderEnabled := true
 			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
 			if err != nil {
+				continue
+			}
+
+			if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
 				continue
 			}
 
@@ -797,7 +934,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			}
 
 			buffer := bytes.Buffer{}
-			writer := csv.NewWriter(&buffer)
 			for _, host := range dt {
 				buffer.Reset()
 				if host == "ip" {
@@ -805,49 +941,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
-				// console output
-				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
-					if r.options.OutputCDN {
-						data.IsCDNIP = isCDNIP
-						data.CDNName = cdnName
-					}
-					if host != hostResult.IP {
-						data.Host = host
-					}
-					for _, p := range hostResult.Ports {
-						data.Port = p.Port
-						data.Protocol = p.Protocol.String()
-						data.TLS = p.TLS
-						if r.options.JSON {
-							b, marshallErr := data.JSON()
-							if marshallErr != nil {
-								continue
-							}
-							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
-						} else if r.options.CSV {
-							if csvHeaderEnabled {
-								writeCSVHeaders(data, writer)
-								csvHeaderEnabled = false
-							}
-							writeCSVRow(data, writer)
-						}
-					}
-				}
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else {
-					for _, p := range hostResult.Ports {
-						if r.options.OutputCDN && isCDNIP {
-							gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
-						} else {
-							gologger.Silent().Msgf("%s:%d\n", host, p.Port)
-						}
-					}
-				}
 				// file output
 				if file != nil {
 					if r.options.JSON {
@@ -874,6 +967,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			if err != nil {
 				continue
 			}
+			if !ipMatchesIpVersions(hostIP, r.options.IPVersion...) {
+				continue
+			}
+
 			buffer := bytes.Buffer{}
 			writer := csv.NewWriter(&buffer)
 			for _, host := range dt {
@@ -927,5 +1024,16 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			csvFileHeaderEnabled = false
 		}
 	}
+}
 
+func ipMatchesIpVersions(ip string, ipVersions ...string) bool {
+	for _, ipVersion := range ipVersions {
+		if ipVersion == scan.IPv4 && iputil.IsIPv4(ip) {
+			return true
+		}
+		if ipVersion == scan.IPv6 && iputil.IsIPv6(ip) {
+			return true
+		}
+	}
+	return false
 }

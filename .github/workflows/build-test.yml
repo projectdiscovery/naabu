@@ -11,13 +11,13 @@ jobs:
   build-linux:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out code
+        uses: actions/checkout@v3
+
       - name: Set up Go
         uses: actions/setup-go@v4
         with:
           go-version: 1.21.x
-
-      - name: Check out code
-        uses: actions/checkout@v3
 
       - name: Install libpcap-dev
         run: sudo apt install libpcap-dev
@@ -39,10 +39,14 @@ jobs:
         run: bash run.sh
         working-directory: integration_tests/
 
-      - name: Race Condition Tests
+      - name: Race Condition Tests - Standard User
         run: |
           go run -race . -host scanme.sh
-          sudo go run -race . -host scanme.sh
+        working-directory: v2/cmd/naabu/
+
+      - name: Race Condition Tests - Root User
+        run: |
+          sudo go run -race . -host scanme.sh -Pn
         working-directory: v2/cmd/naabu/
 
   build-mac:
@@ -76,10 +80,14 @@ jobs:
         run: bash run.sh
         working-directory: integration_tests/
 
-      - name: Race Condition Tests
+      - name: Race Condition Tests - Standard User
         run: |
           go run -race . -host scanme.sh
-          sudo go run -race . -host scanme.sh
+        working-directory: v2/cmd/naabu/
+
+      - name: Race Condition Tests - Root User
+        run: |
+          sudo go run -race . -host scanme.sh -Pn
         working-directory: v2/cmd/naabu/
 
   build-windows:

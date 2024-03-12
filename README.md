@@ -85,8 +85,9 @@ OUTPUT:
    -csv                write output in csv format
 
 CONFIGURATION:
+   -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
    -scan-all-ips, -sa               scan all the IP's associated with DNS record
-   -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4)
+   -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4) (default ["4"])
    -scan-type, -s string            type of port scan (SYN/CONNECT) (default "s")
    -source-ip string                source ip and port (x.x.x.x:yyy)
    -interface-list, -il             list available interfaces and public ip
@@ -130,7 +131,7 @@ DEBUG:
    -version                  display version of naabu
    -stats                    display stats of the running scan (deprecated)
    -si, -stats-interval int  number of seconds to wait between showing a statistics update (deprecated) (default 5)
-   -mp, -metrics-port int    port to expose nuclei metrics on (default 63636)
+   -mp, -metrics-port int    port to expose naabu metrics on (default 63636)
 ```
 
 # Installation Instructions
@@ -351,7 +352,7 @@ Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80`
 Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
 
 # Scan Status
-Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636` (the port can be changed via the `-metrics-port` flag)
+Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` (the port can be changed via the `-metrics-port` flag)
 
 # Using naabu as library
 The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:
