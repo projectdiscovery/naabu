@@ -12,7 +12,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -421,17 +420,22 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 
-					excludePorts := strings.Split(r.options.ExcludePorts, ",")
-					for _, p := range data.Ports {
-						if slices.Contains(excludePorts, strconv.Itoa(p)) {
-							continue
-						}
+					parsedPorts, err := parsePortsList(strings.Trim(strings.Join(strings.Fields(fmt.Sprint(data.Ports)), ","), "[]"))
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't parse ports for %s: %s\n", ip, err)
+						return
+					}
 
-						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+					filteredPorts, err := excludePorts(r.options, parsedPorts)
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
+						return
+					}
+					for _, p := range filteredPorts {
 						if r.scanner.OnReceive != nil {
-							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
+							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
 						}
-						r.scanner.ScanResults.AddPort(ip, pp)
+						r.scanner.ScanResults.AddPort(ip, p)
 					}
 				}(ip)
 			}
