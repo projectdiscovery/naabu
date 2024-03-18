@@ -12,7 +12,9 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -419,7 +421,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 
+					excludePorts := strings.Split(r.options.ExcludePorts, ",")
 					for _, p := range data.Ports {
+						if slices.Contains(excludePorts, strconv.Itoa(p)) {
+							continue
+						}
+
 						pp := &port.Port{Port: p, Protocol: protocol.TCP}
 						if r.scanner.OnReceive != nil {
 							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
