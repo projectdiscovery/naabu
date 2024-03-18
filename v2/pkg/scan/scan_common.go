@@ -32,6 +32,8 @@ var (
 type ListenHandler struct {
 	Busy                                   bool
 	Phase                                  *Phase
+	SourceIp4                              net.IP
+	SourceIP6                              net.IP
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult

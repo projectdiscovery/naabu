@@ -178,7 +178,11 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
 		return
 	}
-	ip4.SrcIP = sourceIP
+	if listenHandler.SourceIp4 != nil {
+		ip4.SrcIP = listenHandler.SourceIp4
+	} else {
+		ip4.SrcIP = sourceIP
+	}
 
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
@@ -227,7 +231,12 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
 		return
 	}
-	ip4.SrcIP = sourceIP
+
+	if listenHandler.SourceIp4 != nil {
+		ip4.SrcIP = listenHandler.SourceIp4
+	} else {
+		ip4.SrcIP = sourceIP
+	}
 
 	udp := layers.UDP{
 		SrcPort: layers.UDPPort(listenHandler.Port),
@@ -262,7 +271,6 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
 		return
 	}
-	ip6.SrcIP = sourceIP
 
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
@@ -312,7 +320,12 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
 		return
 	}
-	ip6.SrcIP = sourceIP
+
+	if listenHandler.SourceIP6 != nil {
+		ip6.SrcIP = listenHandler.SourceIP6
+	} else {
+		ip6.SrcIP = sourceIP
+	}
 
 	udp := layers.UDP{
 		SrcPort: layers.UDPPort(listenHandler.Port),
@@ -789,7 +802,12 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 	if err != nil {
 		return false, err
 	}
-	ip4.SrcIP = sourceIP
+
+	if listenHandler.SourceIp4 != nil {
+		ip4.SrcIP = listenHandler.SourceIp4
+	} else {
+		ip4.SrcIP = sourceIP
+	}
 
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,

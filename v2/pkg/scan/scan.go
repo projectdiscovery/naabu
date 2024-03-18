@@ -74,8 +74,6 @@ const (
 )
 
 type Scanner struct {
-	SourceIP4     net.IP
-	SourceIP6     net.IP
 	retries       int
 	rate          int
 	portThreshold int
