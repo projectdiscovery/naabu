@@ -13,7 +13,6 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -420,13 +419,13 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 
-					parsedPorts, err := parsePortsList(strings.Trim(strings.Join(strings.Fields(fmt.Sprint(data.Ports)), ","), "[]"))
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't parse ports for %s: %s\n", ip, err)
-						return
+					var passivePorts []*port.Port
+					for _, p := range data.Ports {
+						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+						passivePorts = append(passivePorts, pp)
 					}
 
-					filteredPorts, err := excludePorts(r.options, parsedPorts)
+					filteredPorts, err := excludePorts(r.options, passivePorts)
 					if err != nil {
 						gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
 						return
