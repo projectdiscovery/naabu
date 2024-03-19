@@ -4,6 +4,7 @@ package scan
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -19,6 +20,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	iputil "github.com/projectdiscovery/utils/ip"
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv4"
@@ -31,6 +33,7 @@ var (
 
 // Handlers contains the list of pcap handlers
 type Handlers struct {
+	InterfaceHandle   map[string]*pcap.Handle
 	TransportActive   []*pcap.Handle
 	LoopbackHandlers  []*pcap.Handle
 	TransportInactive []*pcap.InactiveHandle
@@ -102,7 +105,9 @@ func init() {
 		ListenHandlers = append(ListenHandlers, &listenHandler)
 	}
 
-	handlers = &Handlers{}
+	handlers = &Handlers{
+		InterfaceHandle: make(map[string]*pcap.Handle),
+	}
 	if err := SetupHandlers(); err != nil {
 		panic(err)
 	}
@@ -164,23 +169,44 @@ func SendAsyncPkg(listenHandler *ListenHandler, ip string, p *port.Port, pkgFlag
 
 func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFlag PkgFlag) {
 	// Construct all the network layers we need.
+	var eth layers.Ethernet
 	ip4 := layers.IPv4{
 		DstIP:    net.ParseIP(ip),
 		Version:  4,
 		TTL:      255,
 		Protocol: layers.IPProtocolTCP,
 	}
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
-	if err != nil {
-		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-		return
-	} else if sourceIP == nil {
-		gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
-		return
-	}
-	if listenHandler.SourceIp4 != nil {
+
+	hasSourceIp := listenHandler.SourceIp4 != nil
+	var iface *net.Interface
+	if hasSourceIp {
+		itf, gateway, _, err := pkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
+		if err != nil {
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
+			return
+		}
+		gatewayMac, err := routing.GetGatewayMac(gateway.String())
+		if err != nil {
+			gologger.Debug().Msgf("could not find gateway MAC %s:%d: %s\n", ip, p.Port, err)
+			return
+		}
+
+		eth = layers.Ethernet{
+			EthernetType: layers.EthernetTypeIPv4,
+			SrcMAC:       listenHandler.SourceHW,
+			DstMAC:       gatewayMac,
+		}
 		ip4.SrcIP = listenHandler.SourceIp4
+		iface = itf
 	} else {
+		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+		if err != nil {
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
+			return
+		} else if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
+			return
+		}
 		ip4.SrcIP = sourceIP
 	}
 
@@ -204,14 +230,18 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		tcp.ACK = true
 	}
 
-	err = tcp.SetNetworkLayerForChecksum(&ip4)
+	err := tcp.SetNetworkLayerForChecksum(&ip4)
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
+	}
+
+	if hasSourceIp {
+		err = sendWithHandler(ip, iface, &eth, &ip4, &tcp)
 	} else {
-		err = send(ip, listenHandler.TcpConn4, &tcp)
-		if err != nil {
-			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
-		}
+		err = sendWithConn(ip, listenHandler.TcpConn4, &tcp)
+	}
+	if err != nil {
+		gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 	}
 }
 
@@ -247,7 +277,7 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
-		err = send(ip, listenHandler.UdpConn4, &udp)
+		err = sendWithConn(ip, listenHandler.UdpConn4, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
@@ -296,7 +326,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
-		err = send(ip, listenHandler.TcpConn6, &tcp)
+		err = sendWithConn(ip, listenHandler.TcpConn6, &tcp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
@@ -336,7 +366,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
-		err = send(ip, listenHandler.UdpConn6, &udp)
+		err = sendWithConn(ip, listenHandler.UdpConn6, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
@@ -403,7 +433,7 @@ var defaultSerializeOptions = gopacket.SerializeOptions{
 }
 
 // send sends the given layers as a single packet on the network.
-func send(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
+func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
 		return err
@@ -419,6 +449,38 @@ send:
 		return err
 	}
 	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
+	if err != nil {
+		retries++
+		// introduce a small delay to allow the network interface to flush the queue
+		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
+		goto send
+	}
+	return err
+}
+
+func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.SerializableLayer) error {
+	buf := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
+		return err
+	}
+
+	var (
+		retries int
+		err     error
+	)
+
+	// find the correct handler
+	handler, ok := handlers.InterfaceHandle[iface.Name]
+	if !ok {
+		return errors.New("could not find correct pcap handler")
+	}
+
+send:
+
+	if retries >= maxRetries {
+		return err
+	}
+	err = handler.WritePacketData(buf.Bytes())
 	if err != nil {
 		retries++
 		// introduce a small delay to allow the network interface to flush the queue
@@ -516,6 +578,7 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 			} else {
 				handlers.TransportActive = append(handlers.TransportActive, handle)
 			}
+			handlers.InterfaceHandle[iface.Name] = handle
 		case protocol.ARP:
 			handlers.EthernetActive = append(handlers.EthernetActive, handle)
 		default:
@@ -829,7 +892,7 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 		return false, err
 	}
 
-	err = send(dstIP, conn, &tcp)
+	err = sendWithConn(dstIP, conn, &tcp)
 	if err != nil {
 		return false, err
 	}

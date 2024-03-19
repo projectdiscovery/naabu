@@ -872,6 +872,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	}
 
 	r.scanner.NetworkInterface = networkInterface
+	r.scanner.ListenHandler.SourceHW = networkInterface.HardwareAddr
 	return nil
 }
 

@@ -32,6 +32,7 @@ var (
 type ListenHandler struct {
 	Busy                                   bool
 	Phase                                  *Phase
+	SourceHW                               net.HardwareAddr
 	SourceIp4                              net.IP
 	SourceIP6                              net.IP
 	Port                                   int
