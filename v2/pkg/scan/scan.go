@@ -380,7 +380,15 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 			return false, err
 		}
 	} else {
-		conn, err = net.DialTimeout(p.Protocol.String(), hostport, timeout)
+		netDialer := net.Dialer{
+			Timeout: timeout,
+		}
+		if s.ListenHandler.SourceIp4 != nil {
+			netDialer.LocalAddr = &net.TCPAddr{IP: s.ListenHandler.SourceIp4}
+		} else if s.ListenHandler.SourceIP6 != nil {
+			netDialer.LocalAddr = &net.TCPAddr{IP: s.ListenHandler.SourceIP6}
+		}
+		conn, err = netDialer.Dial(p.Protocol.String(), hostport)
 	}
 	if err != nil {
 		return false, err
