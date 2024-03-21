@@ -419,12 +419,22 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 
+					var passivePorts []*port.Port
 					for _, p := range data.Ports {
 						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+						passivePorts = append(passivePorts, pp)
+					}
+
+					filteredPorts, err := excludePorts(r.options, passivePorts)
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
+						return
+					}
+					for _, p := range filteredPorts {
 						if r.scanner.OnReceive != nil {
-							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
+							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
 						}
-						r.scanner.ScanResults.AddPort(ip, pp)
+						r.scanner.ScanResults.AddPort(ip, p)
 					}
 				}(ip)
 			}
