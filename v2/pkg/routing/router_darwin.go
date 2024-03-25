@@ -140,7 +140,7 @@ func (r *RouterDarwin) Route(dst net.IP) (iface *net.Interface, gateway, preferr
 		return nil, nil, nil, errors.Wrap(err, "could not find source ip")
 	}
 
-	return route.NetworkInterface, net.IP(route.Gateway), ip, nil
+	return route.NetworkInterface, net.ParseIP(route.Gateway), ip, nil
 }
 
 func (r *RouterDarwin) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
@@ -148,6 +148,5 @@ func (r *RouterDarwin) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (if
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
-	return route.NetworkInterface, net.IP(route.Gateway), src, nil
+	return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
 }
