@@ -139,6 +139,11 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
+	if options.ScanType == SynScan && scan.PkgRouter == nil {
+		gologger.Warning().Msgf("Routing could not be determined (are you using a VPN?).falling back to connect scan")
+		options.ScanType = ConnectScan
+	}
+
 	return nil
 }
 
