@@ -218,8 +218,8 @@ github.com/projectdiscovery/uncover v1.0.7 h1:ut+2lTuvmftmveqF5RTjMWAgyLj8ltPQC7
 github.com/projectdiscovery/uncover v1.0.7/go.mod h1:HFXgm1sRPuoN0D4oATljPIdmbo/EEh1wVuxQqo/dwFE=
 github.com/projectdiscovery/utils v0.0.83 h1:r7OBAuEwe4lyEwTITbCEZytoxvjk/s0Xra2NT+K4fm4=
 github.com/projectdiscovery/utils v0.0.83/go.mod h1:2XFoaGD5NPUp6liTRHC2tGmMQnIhQSXscpP3zfAG7iE=
-github.com/quic-go/quic-go v0.38.2 h1:VWv/6gxIoB8hROQJhx1JEyiegsUQ+zMN3em3kynTGdg=
-github.com/quic-go/quic-go v0.38.2/go.mod h1:ijnZM7JsFIkp4cRyjxJNIzdSfCLmUMg9wdyhGmg+SN4=
+github.com/quic-go/quic-go v0.42.0 h1:uSfdap0eveIl8KXnipv9K7nlwZ5IqLlYOpJ58u5utpM=
+github.com/quic-go/quic-go v0.42.0/go.mod h1:132kz4kL3F9vxhW3CtQJLDVwcFe5wdWeJXXijhsO57M=
 github.com/refraction-networking/utls v1.5.4 h1:9k6EO2b8TaOGsQ7Pl7p9w6PUhx18/ZCeT0WNTZ7Uw4o=
 github.com/refraction-networking/utls v1.5.4/go.mod h1:SPuDbBmgLGp8s+HLNc83FuavwZCFoMmExj+ltUHiHUw=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
