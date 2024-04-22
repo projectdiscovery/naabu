@@ -218,8 +218,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.57 h1:OGfUXKXV4bE5msGxeRrNtMaD
 github.com/projectdiscovery/retryablehttp-go v1.0.57/go.mod h1:Lo2EU1wV1draQ/dHuiSkokW4gZ216F/qi/t12DIdMbA=
 github.com/projectdiscovery/uncover v1.0.7 h1:ut+2lTuvmftmveqF5RTjMWAgyLj8ltPQC7siFy9sj0A=
 github.com/projectdiscovery/uncover v1.0.7/go.mod h1:HFXgm1sRPuoN0D4oATljPIdmbo/EEh1wVuxQqo/dwFE=
-github.com/projectdiscovery/utils v0.0.89 h1:ruH2bSkpX/rB7EPp2EV/rWyAubQVxCVU38nRcLp4L1w=
-github.com/projectdiscovery/utils v0.0.89/go.mod h1:Dwh5cxn7y97jvyYG3GmBvj0negfH9IjH15qXnzFNtOI=
+github.com/projectdiscovery/utils v0.0.90 h1:ZBClkrtC6U2xuT8AI6/MrYgm3cxQnwSZmM8/tIlA0Yk=
+github.com/projectdiscovery/utils v0.0.90/go.mod h1:laZCMcUTT1vTmclUCW+zpi/fjeYsgU1gMwgv2CxNcRk=
 github.com/quic-go/quic-go v0.42.0 h1:uSfdap0eveIl8KXnipv9K7nlwZ5IqLlYOpJ58u5utpM=
 github.com/quic-go/quic-go v0.42.0/go.mod h1:132kz4kL3F9vxhW3CtQJLDVwcFe5wdWeJXXijhsO57M=
 github.com/refraction-networking/utls v1.5.4 h1:9k6EO2b8TaOGsQ7Pl7p9w6PUhx18/ZCeT0WNTZ7Uw4o=
