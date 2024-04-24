@@ -228,6 +228,7 @@ func ParseOptions() *Options {
 			gologger.Fatal().Msgf("%s\n", err)
 		}
 	}
+	options.configureOutput()
 	// Show the user the banner
 	showBanner()
 
