@@ -168,7 +168,7 @@ func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 				return nil, fmt.Errorf("invalid port number: '%s'", parts[1])
 			}
 
-			if p1 > p2 {
+			if p1 > p2 || p2 > 65535 {
 				return nil, fmt.Errorf("invalid port range: %d-%d", p1, p2)
 			}
 
@@ -178,7 +178,7 @@ func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 			}
 		} else {
 			portNumber, err := strconv.Atoi(r)
-			if err != nil {
+			if err != nil || portNumber > 65535 {
 				return nil, fmt.Errorf("invalid port number: '%s'", r)
 			}
 			port := &port.Port{Port: portNumber, Protocol: portProtocol}
