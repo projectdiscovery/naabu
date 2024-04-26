@@ -67,9 +67,6 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 		defer r.RUnlock()
 
 		for ip, ports := range r.ipPorts {
-			if r.HasSkipped(ip) {
-				continue
-			}
 			out <- &HostResult{IP: ip, Ports: maps.Values(ports)}
 		}
 	}()
