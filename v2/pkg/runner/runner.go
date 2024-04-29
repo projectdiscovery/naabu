@@ -334,7 +334,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return nil
 		}
 	}
-
+	payload := r.options.ConnectPayload
 	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
@@ -354,7 +354,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.RawSocketEnumeration(ctx, target, port)
 			} else {
 				r.wgscan.Add()
-				go r.handleHostPort(ctx, target, port)
+				go r.handleHostPort(ctx, target, payload, port)
 			}
 			return true
 		}
@@ -547,7 +547,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, port)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, port)
+					go r.handleHostPort(ctx, ip, payload, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -578,7 +578,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, &portWithMetadata)
+					go r.handleHostPort(ctx, ip, payload, &portWithMetadata)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -778,7 +778,7 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) {
+func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *port.Port) {
 	defer r.wgscan.Done()
 
 	select {
@@ -796,7 +796,7 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		}
 
 		r.limiter.Take()
-		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
+		open, err := r.scanner.ConnectPort(host, payload, p, time.Duration(r.options.Timeout)*time.Millisecond)
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			if r.scanner.OnReceive != nil {

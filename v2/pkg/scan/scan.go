@@ -364,7 +364,7 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 }
 
 // ConnectPort a single host and port
-func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) (bool, error) {
+func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.Duration) (bool, error) {
 	hostport := net.JoinHostPort(host, fmt.Sprint(p.Port))
 	var (
 		err  error
@@ -395,7 +395,7 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return false, err
 		}
-		if _, err := conn.Write(nil); err != nil {
+		if _, err := conn.Write([]byte(payload)); err != nil {
 			return false, err
 		}
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {

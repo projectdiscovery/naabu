@@ -19,4 +19,9 @@ func TestOptions(t *testing.T) {
 
 	options.Resolvers = "aaabbbccc"
 	assert.NotNil(t, options.ValidateOptions())
+
+	options.Rate = 2
+	options.ConnectPayload = "aabbcc"
+	options.ScanType = SynScan
+	assert.EqualError(t, options.ValidateOptions(), "connect payload can only be used with connect scan")
 }

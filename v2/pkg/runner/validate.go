@@ -139,6 +139,10 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
+	if options.ConnectPayload != "" && options.ScanType != ConnectScan {
+		return errors.New("connect payload can only be used with connect scan")
+	}
+
 	return nil
 }
 
