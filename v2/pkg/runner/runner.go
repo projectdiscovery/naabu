@@ -119,6 +119,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		ProxyAuth:     options.ProxyAuth,
 		Stream:        options.Stream,
 		OnReceive:     options.OnReceive,
+		ScanType:      options.ScanType,
 	}
 
 	if scanOpts.OnReceive == nil {

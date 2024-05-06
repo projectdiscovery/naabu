@@ -169,7 +169,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 	scanner.stream = options.Stream
 
-	if handler, err := Acquire(); err != nil {
+	if handler, err := Acquire(options); err != nil {
 		return scanner, err
 	} else {
 		scanner.ListenHandler = handler
