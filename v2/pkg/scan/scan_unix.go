@@ -43,8 +43,6 @@ func init() {
 		return
 	}
 
-	return
-
 	transportPacketSend = make(chan *PkgSend, packetSendSize)
 
 	var err error
