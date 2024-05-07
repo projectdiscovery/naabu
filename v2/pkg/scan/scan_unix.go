@@ -39,7 +39,7 @@ type Handlers struct {
 }
 
 func init() {
-	if !privileges.IsPrivileged {
+	if PkgRouter == nil || !privileges.IsPrivileged {
 		return
 	}
 
@@ -174,7 +174,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		TTL:      255,
 		Protocol: layers.IPProtocolTCP,
 	}
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -223,7 +223,7 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		TTL:      255,
 		Protocol: layers.IPProtocolUDP,
 	}
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -258,7 +258,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -308,7 +308,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolUDP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -789,7 +789,7 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 		Protocol: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 	if err != nil {
 		return false, err
 	}
