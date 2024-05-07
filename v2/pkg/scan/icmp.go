@@ -95,7 +95,7 @@ func PingIcmpEchoRequestAsync(ip string) {
 	case iputil.IsIPv6(ip):
 		m.Type = ipv6.ICMPTypeEchoRequest
 		packetListener = icmpConn6
-		networkInterface, _, _, err := pkgRouter.Route(destinationIP)
+		networkInterface, _, _, err := PkgRouter.Route(destinationIP)
 		if networkInterface == nil {
 			err = fmt.Errorf("could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
 		}
