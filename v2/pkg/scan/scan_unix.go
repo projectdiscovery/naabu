@@ -63,7 +63,8 @@ func init() {
 	for i := 0; i < NumberOfHandlers; i++ {
 		var listenHandler ListenHandler
 		if port, err := freeport.GetFreeTCPPort(""); err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup get free port: %s", err)
+			return
 		} else {
 			listenHandler.Port = port.Port
 		}
@@ -75,11 +76,13 @@ func init() {
 		var err error
 		listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip4:tcp: %s", err)
+			return
 		}
 		listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip4:udp: %s", err)
+			return
 		}
 
 		listenHandler.TcpConn6, err = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
@@ -104,7 +107,8 @@ func init() {
 
 	handlers = &Handlers{}
 	if err := SetupHandlers(); err != nil {
-		panic(err)
+		gologger.Error().Msgf("could not setup handlers: %s\n", err)
+		return
 	}
 	go TransportReadWorker()
 	go TransportWriteWorker()
