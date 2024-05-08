@@ -65,7 +65,13 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureOutput()
 
-	options.configureHostDiscovery()
+	// automatically disable host discovery when less than two ports for scan are provided
+	ports, err := ParsePorts(options)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse ports: %s", err)
+	}
+
+	options.configureHostDiscovery(ports)
 
 	// default to ipv4 if no ipversion was specified
 	if len(options.IPVersion) == 0 {
@@ -132,10 +138,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.scanner = scanner
 
-	runner.scanner.Ports, err = ParsePorts(options)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse ports: %s", err)
-	}
+	runner.scanner.Ports = ports
 
 	if options.EnableProgressBar {
 		defaultOptions := &clistats.DefaultOptions
