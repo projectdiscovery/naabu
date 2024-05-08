@@ -42,7 +42,7 @@ type Handlers struct {
 }
 
 func init() {
-	if !privileges.IsPrivileged {
+	if PkgRouter == nil || !privileges.IsPrivileged {
 		return
 	}
 
@@ -66,7 +66,8 @@ func init() {
 	for i := 0; i < NumberOfHandlers; i++ {
 		var listenHandler ListenHandler
 		if port, err := freeport.GetFreeTCPPort(""); err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup get free port: %s", err)
+			return
 		} else {
 			listenHandler.Port = port.Port
 		}
@@ -78,11 +79,13 @@ func init() {
 		var err error
 		listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip4:tcp: %s", err)
+			return
 		}
 		listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
 		if err != nil {
-			panic(err)
+			gologger.Error().Msgf("could not setup ip4:udp: %s", err)
+			return
 		}
 
 		listenHandler.TcpConn6, err = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
@@ -109,7 +112,8 @@ func init() {
 		InterfaceHandle: make(map[string]*pcap.Handle),
 	}
 	if err := SetupHandlers(); err != nil {
-		panic(err)
+		gologger.Error().Msgf("could not setup handlers: %s\n", err)
+		return
 	}
 	go TransportReadWorker()
 	go TransportWriteWorker()
@@ -180,7 +184,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	hasSourceIp := listenHandler.SourceIp4 != nil
 	var iface *net.Interface
 	if hasSourceIp {
-		itf, gateway, _, err := pkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
+		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -199,7 +203,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		ip4.SrcIP = listenHandler.SourceIp4
 		iface = itf
 	} else {
-		_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+		_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -253,7 +257,7 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		TTL:      255,
 		Protocol: layers.IPProtocolUDP,
 	}
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -293,7 +297,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -342,7 +346,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolUDP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip6.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
 	if err != nil {
 		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 		return
@@ -861,7 +865,7 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 		Protocol: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := pkgRouter.Route(ip4.DstIP)
+	_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
 	if err != nil {
 		return false, err
 	}

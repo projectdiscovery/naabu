@@ -19,4 +19,5 @@ type Options struct {
 	ProxyAuth     string
 	Stream        bool
 	OnReceive     result.ResultFn
+	ScanType      string
 }

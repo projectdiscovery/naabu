@@ -228,6 +228,7 @@ func ParseOptions() *Options {
 			gologger.Fatal().Msgf("%s\n", err)
 		}
 	}
+	options.configureOutput()
 	// Show the user the banner
 	showBanner()
 
@@ -270,7 +271,7 @@ func (options *Options) ShouldLoadResume() bool {
 }
 
 func (options *Options) shouldDiscoverHosts() bool {
-	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive
+	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive && scan.PkgRouter != nil
 }
 
 func (options *Options) hasProbes() bool {
@@ -280,5 +281,5 @@ func (options *Options) hasProbes() bool {
 }
 
 func (options *Options) shouldUseRawPackets() bool {
-	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan
+	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan && scan.PkgRouter != nil
 }

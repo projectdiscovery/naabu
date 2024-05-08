@@ -166,8 +166,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	scanner.stream = options.Stream
-
-	if handler, err := Acquire(); err != nil {
+acquire:
+	if handler, err := Acquire(options); err != nil {
+		// automatically fallback to connect scan
+		if err != nil && options.ScanType == "s" {
+			gologger.Info().Msgf("syn scan is not possible, falling back to connect scan")
+			options.ScanType = "c"
+			goto acquire
+		}
 		return scanner, err
 	} else {
 		scanner.ListenHandler = handler
