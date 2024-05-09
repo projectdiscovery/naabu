@@ -65,7 +65,13 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureOutput()
 
-	options.configureHostDiscovery()
+	// automatically disable host discovery when less than two ports for scan are provided
+	ports, err := ParsePorts(options)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse ports: %s", err)
+	}
+
+	options.configureHostDiscovery(ports)
 
 	// default to ipv4 if no ipversion was specified
 	if len(options.IPVersion) == 0 {
@@ -119,6 +125,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		ProxyAuth:     options.ProxyAuth,
 		Stream:        options.Stream,
 		OnReceive:     options.OnReceive,
+		ScanType:      options.ScanType,
 	}
 
 	if scanOpts.OnReceive == nil {
@@ -131,10 +138,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.scanner = scanner
 
-	runner.scanner.Ports, err = ParsePorts(options)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse ports: %s", err)
-	}
+	runner.scanner.Ports = ports
 
 	if options.EnableProgressBar {
 		defaultOptions := &clistats.DefaultOptions
@@ -419,12 +423,22 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 
+					var passivePorts []*port.Port
 					for _, p := range data.Ports {
 						pp := &port.Port{Port: p, Protocol: protocol.TCP}
+						passivePorts = append(passivePorts, pp)
+					}
+
+					filteredPorts, err := excludePorts(r.options, passivePorts)
+					if err != nil {
+						gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
+						return
+					}
+					for _, p := range filteredPorts {
 						if r.scanner.OnReceive != nil {
-							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{pp}})
+							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
 						}
-						r.scanner.ScanResults.AddPort(ip, pp)
+						r.scanner.ScanResults.AddPort(ip, p)
 					}
 				}(ip)
 			}
@@ -839,9 +853,9 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 
 	switch {
 	case iputil.IsIPv4(sourceIP):
-		r.scanner.SourceIP4 = ip
+		r.scanner.ListenHandler.SourceIp4 = ip
 	case iputil.IsIPv6(sourceIP):
-		r.scanner.SourceIP6 = ip
+		r.scanner.ListenHandler.SourceIP6 = ip
 	default:
 		return errors.New("invalid ip type")
 	}
@@ -872,6 +886,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	}
 
 	r.scanner.NetworkInterface = networkInterface
+	r.scanner.ListenHandler.SourceHW = networkInterface.HardwareAddr
 	return nil
 }
 

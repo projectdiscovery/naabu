@@ -15,7 +15,7 @@ import (
 
 // PingNdpRequestAsync asynchronous to the target ip address
 func PingNdpRequestAsync(ip string) {
-	networkInterface, _, _, err := pkgRouter.Route(net.ParseIP(ip))
+	networkInterface, _, _, err := PkgRouter.Route(net.ParseIP(ip))
 	if networkInterface == nil {
 		err = errors.New("Could not send PingNdp Request packet to " + ip + ": no interface with outbound source found")
 	}

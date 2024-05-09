@@ -17,7 +17,7 @@ func init() {
 
 // ArpRequestAsync asynchronous to the target ip address
 func arpRequestAsync(ip string) {
-	networkInterface, _, sourceIP, err := pkgRouter.Route(net.ParseIP(ip))
+	networkInterface, _, sourceIP, err := PkgRouter.Route(net.ParseIP(ip))
 	if networkInterface == nil {
 		err = errors.New("Could not send ARP Request packet to " + ip + ": no interface with outbound source found")
 	}

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"net"
 
+	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"golang.org/x/net/icmp"
@@ -21,7 +22,7 @@ var (
 	transportPacketSend, icmpPacketSend, ethernetPacketSend chan *PkgSend
 	icmpConn4, icmpConn6                                    *icmp.PacketConn
 
-	pkgRouter routing.Router
+	PkgRouter routing.Router
 
 	ArpRequestAsync  func(ip string)
 	InitScanner      func(s *Scanner) error
@@ -32,15 +33,22 @@ var (
 type ListenHandler struct {
 	Busy                                   bool
 	Phase                                  *Phase
+	SourceHW                               net.HardwareAddr
+	SourceIp4                              net.IP
+	SourceIP6                              net.IP
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult
 }
 
-func Acquire() (*ListenHandler, error) {
-	// always grant to unprivileged scans
-	if !privileges.IsPrivileged {
-		return &ListenHandler{Phase: &Phase{}}, nil
+func NewListenHandler() *ListenHandler {
+	return &ListenHandler{Phase: &Phase{}}
+}
+
+func Acquire(options *Options) (*ListenHandler, error) {
+	// always grant to unprivileged scans or connect scan
+	if PkgRouter == nil || !privileges.IsPrivileged || options.ScanType == "c" {
+		return NewListenHandler(), nil
 	}
 
 	for _, listenHandler := range ListenHandlers {
@@ -60,9 +68,9 @@ func (l *ListenHandler) Release() {
 
 func init() {
 	if r, err := routing.New(); err != nil {
-		panic(err)
+		gologger.Error().Msgf("could not initialize router: %s\n", err)
 	} else {
-		pkgRouter = r
+		PkgRouter = r
 	}
 }
 

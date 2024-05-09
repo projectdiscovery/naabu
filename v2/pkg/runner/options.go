@@ -144,7 +144,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
-		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy)"),
+		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy - might not work on OSX) "),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),
@@ -228,6 +228,7 @@ func ParseOptions() *Options {
 			gologger.Fatal().Msgf("%s\n", err)
 		}
 	}
+	options.configureOutput()
 	// Show the user the banner
 	showBanner()
 
@@ -270,7 +271,7 @@ func (options *Options) ShouldLoadResume() bool {
 }
 
 func (options *Options) shouldDiscoverHosts() bool {
-	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive
+	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive && scan.PkgRouter != nil
 }
 
 func (options *Options) hasProbes() bool {
@@ -280,5 +281,5 @@ func (options *Options) hasProbes() bool {
 }
 
 func (options *Options) shouldUseRawPackets() bool {
-	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan
+	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan && scan.PkgRouter != nil
 }

@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	fileutil "github.com/projectdiscovery/utils/file"
@@ -139,6 +140,11 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
+	if options.ScanType == SynScan && scan.PkgRouter == nil {
+		gologger.Warning().Msgf("Routing could not be determined (are you using a VPN?).falling back to connect scan")
+		options.ScanType = ConnectScan
+	}
+
 	return nil
 }
 
@@ -160,7 +166,12 @@ func (options *Options) configureOutput() {
 
 // ConfigureHostDiscovery enables default probes if none is specified
 // but host discovery option was requested
-func (options *Options) configureHostDiscovery() {
+func (options *Options) configureHostDiscovery(ports []*port.Port) {
+	// if less than two ports are specified as input, reduce time and scan directly
+	if len(ports) <= 2 {
+		gologger.Info().Msgf("Host discovery disabled: less than two ports were specified")
+		options.SkipHostDiscovery = true
+	}
 	if options.shouldDiscoverHosts() && !options.hasProbes() {
 		// if no options were defined enable
 		// - ICMP Echo Request

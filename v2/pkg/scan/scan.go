@@ -74,8 +74,6 @@ const (
 )
 
 type Scanner struct {
-	SourceIP4     net.IP
-	SourceIP6     net.IP
 	retries       int
 	rate          int
 	portThreshold int
@@ -168,8 +166,14 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	scanner.stream = options.Stream
-
-	if handler, err := Acquire(); err != nil {
+acquire:
+	if handler, err := Acquire(options); err != nil {
+		// automatically fallback to connect scan
+		if err != nil && options.ScanType == "s" {
+			gologger.Info().Msgf("syn scan is not possible, falling back to connect scan")
+			options.ScanType = "c"
+			goto acquire
+		}
 		return scanner, err
 	} else {
 		scanner.ListenHandler = handler
@@ -382,7 +386,15 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 			return false, err
 		}
 	} else {
-		conn, err = net.DialTimeout(p.Protocol.String(), hostport, timeout)
+		netDialer := net.Dialer{
+			Timeout: timeout,
+		}
+		if s.ListenHandler.SourceIp4 != nil {
+			netDialer.LocalAddr = &net.TCPAddr{IP: s.ListenHandler.SourceIp4}
+		} else if s.ListenHandler.SourceIP6 != nil {
+			netDialer.LocalAddr = &net.TCPAddr{IP: s.ListenHandler.SourceIP6}
+		}
+		conn, err = netDialer.Dial(p.Protocol.String(), hostport)
 	}
 	if err != nil {
 		return false, err
