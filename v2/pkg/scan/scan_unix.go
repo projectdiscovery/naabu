@@ -61,7 +61,7 @@ func init() {
 
 	// pre-reserve up to 10 ports
 	for i := 0; i < NumberOfHandlers; i++ {
-		var listenHandler ListenHandler
+		listenHandler := NewListenHandler()
 		if port, err := freeport.GetFreeTCPPort(""); err != nil {
 			gologger.Error().Msgf("could not setup get free port: %s", err)
 			return
@@ -102,7 +102,7 @@ func init() {
 		go listenHandler.UdpReadWorker4()
 		go listenHandler.UdpReadWorker6()
 
-		ListenHandlers = append(ListenHandlers, &listenHandler)
+		ListenHandlers = append(ListenHandlers, listenHandler)
 	}
 
 	handlers = &Handlers{}

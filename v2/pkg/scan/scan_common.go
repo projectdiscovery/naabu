@@ -38,10 +38,14 @@ type ListenHandler struct {
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult
 }
 
+func NewListenHandler() *ListenHandler {
+	return &ListenHandler{Phase: &Phase{}}
+}
+
 func Acquire(options *Options) (*ListenHandler, error) {
 	// always grant to unprivileged scans or connect scan
 	if PkgRouter == nil || !privileges.IsPrivileged || options.ScanType == "c" {
-		return &ListenHandler{Phase: &Phase{}}, nil
+		return NewListenHandler(), nil
 	}
 
 	for _, listenHandler := range ListenHandlers {
