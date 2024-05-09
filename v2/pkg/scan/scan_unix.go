@@ -102,7 +102,7 @@ func init() {
 		go listenHandler.UdpReadWorker4()
 		go listenHandler.UdpReadWorker6()
 
-		ListenHandlers = append(ListenHandlers, &listenHandler)
+		ListenHandlers = append(ListenHandlers, listenHandler)
 	}
 
 	handlers = &Handlers{}
