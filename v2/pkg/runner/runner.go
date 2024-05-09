@@ -853,9 +853,9 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 
 	switch {
 	case iputil.IsIPv4(sourceIP):
-		r.scanner.SourceIP4 = ip
+		r.scanner.ListenHandler.SourceIp4 = ip
 	case iputil.IsIPv6(sourceIP):
-		r.scanner.SourceIP6 = ip
+		r.scanner.ListenHandler.SourceIP6 = ip
 	default:
 		return errors.New("invalid ip type")
 	}
@@ -886,6 +886,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	}
 
 	r.scanner.NetworkInterface = networkInterface
+	r.scanner.ListenHandler.SourceHW = networkInterface.HardwareAddr
 	return nil
 }
 
