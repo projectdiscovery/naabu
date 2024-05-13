@@ -22,7 +22,7 @@ jobs:
           go-version: 1.21.x
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: Install required packages (libpcap-dev, nmap, simplehttpserver)
         run: |
