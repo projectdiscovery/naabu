@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-latest
     steps:
       - name: "Check out code"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: 
           fetch-depth: 0
 
@@ -36,7 +36,7 @@ jobs:
     runs-on: ubuntu-latest-16-cores
     steps:
       - name: "Check out code"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: 
           fetch-depth: 0
 
@@ -59,7 +59,7 @@ jobs:
     runs-on: windows-latest-8-cores
     steps:
       - name: "Check out code"
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with: 
           fetch-depth: 0
 
