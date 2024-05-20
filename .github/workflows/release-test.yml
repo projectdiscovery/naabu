@@ -26,7 +26,7 @@ jobs:
         run: brew install libpcap
 
       - name: release test
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           args: "release --clean --snapshot -f .goreleaser/mac.yml"
           version: latest
@@ -49,7 +49,7 @@ jobs:
         run: sudo apt install libpcap-dev
 
       - name: release test
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           args: "release --clean --snapshot -f .goreleaser/linux.yml"
           version: latest
@@ -69,7 +69,7 @@ jobs:
           go-version: 1.21.x
       
       - name: release test
-        uses: goreleaser/goreleaser-action@v4
+        uses: goreleaser/goreleaser-action@v5
         with:
           args: "release --clean --snapshot -f .goreleaser/windows.yml"
           version: latest
