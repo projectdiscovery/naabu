@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/ipranger v0.0.49
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.0.8
-	github.com/projectdiscovery/ratelimit v0.0.42
+	github.com/projectdiscovery/ratelimit v0.0.44
 	github.com/projectdiscovery/retryablehttp-go v1.0.63
 	github.com/projectdiscovery/uncover v1.0.8
 	github.com/projectdiscovery/utils v0.1.0
@@ -119,6 +119,7 @@ require (
 	golang.org/x/oauth2 v0.18.0 // indirect
 	golang.org/x/term v0.18.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/time v0.5.0 // indirect
 	golang.org/x/tools v0.17.0 // indirect
 	google.golang.org/appengine v1.6.8 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
