@@ -187,8 +187,8 @@ github.com/projectdiscovery/asnmap v1.1.0 h1:ynvbLB5cNpyQ2+k9IP0Rpla+0JmCJpd3mw6
 github.com/projectdiscovery/asnmap v1.1.0/go.mod h1:QNjBnGLxUBEZAgaYk/Av5cjKKWFY3i/FOfoIWCUApoY=
 github.com/projectdiscovery/blackrock v0.0.1 h1:lHQqhaaEFjgf5WkuItbpeCZv2DUIE45k0VbGJyft6LQ=
 github.com/projectdiscovery/blackrock v0.0.1/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
-github.com/projectdiscovery/cdncheck v1.0.9 h1:BS15gzj9gb5AVSKqTDzPamfSgStu7nJQOocUvrssFlg=
-github.com/projectdiscovery/cdncheck v1.0.9/go.mod h1:18SSl1w7rMj53CGeRIZTbDoa286a6xZIxGbaiEo4Fxs=
+github.com/projectdiscovery/cdncheck v1.0.11 h1:7+SsWM5mZcHHmEnpi7Q4zXivbHywocqem57k+97VO98=
+github.com/projectdiscovery/cdncheck v1.0.11/go.mod h1:pEzZKGfMj39X5yDFQQgzsqroPlAb4PlLmvd7vS1/89M=
 github.com/projectdiscovery/clistats v0.0.20 h1:5jO5SLiRJ7f0nDV0ndBNmBeesbROouPooH+DGMgoWq4=
 github.com/projectdiscovery/clistats v0.0.20/go.mod h1:GJ2av0KnOvK0AISQnP8hyDclYIji1LVkx2l0pwnzAu4=
 github.com/projectdiscovery/dnsx v1.2.1 h1:TxslYvp1Z/YZ4CP/J0gx5RYpvXREnVmyoacmTcGu5yg=
@@ -221,8 +221,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.63 h1:y/MpWrAO7702ybOLo/OuyAx6
 github.com/projectdiscovery/retryablehttp-go v1.0.63/go.mod h1:ytE1KGi63NFAyLzWqTwZJXwjAg7apgqTnJtaZeZ4qtM=
 github.com/projectdiscovery/uncover v1.0.8 h1:nE8bYJuwhqk0BEMRQRhNbjPGMy40A9gkiMk5xq6U4u0=
 github.com/projectdiscovery/uncover v1.0.8/go.mod h1:1SwsNqjwMkJEzJQ7lQr5AHIdYd+BQlyqhO5IwIYmIAM=
-github.com/projectdiscovery/utils v0.1.0 h1:r7Z/s2CBktJ0bnSN410lzOhD8S/0IxmzmFxkQudYKps=
-github.com/projectdiscovery/utils v0.1.0/go.mod h1:RaBdJLTKF5FKZ/RtMeccqFBtpsSjaggVw6/oPTpDD40=
+github.com/projectdiscovery/utils v0.1.1 h1:iQ/DyrClxbIbKMUCXfXLA1lFkqprrUM9Ti/nMU5dQj4=
+github.com/projectdiscovery/utils v0.1.1/go.mod h1:EPuSvVIvp61nXJD5EO65vaCv82OuhO+wfZpWAWA0q3o=
 github.com/quic-go/quic-go v0.42.0 h1:uSfdap0eveIl8KXnipv9K7nlwZ5IqLlYOpJ58u5utpM=
 github.com/quic-go/quic-go v0.42.0/go.mod h1:132kz4kL3F9vxhW3CtQJLDVwcFe5wdWeJXXijhsO57M=
 github.com/refraction-networking/utls v1.5.4 h1:9k6EO2b8TaOGsQ7Pl7p9w6PUhx18/ZCeT0WNTZ7Uw4o=
