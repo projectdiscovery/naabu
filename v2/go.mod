@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/ipranger v0.0.49
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.0.8
-	github.com/projectdiscovery/ratelimit v0.0.44
+	github.com/projectdiscovery/ratelimit v0.0.45
 	github.com/projectdiscovery/retryablehttp-go v1.0.65
 	github.com/projectdiscovery/uncover v1.0.8
 	github.com/projectdiscovery/utils v0.1.4
