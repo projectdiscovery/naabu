@@ -10,12 +10,12 @@ require (
 	github.com/miekg/dns v1.1.58
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.0.11
+	github.com/projectdiscovery/cdncheck v1.1.0
 	github.com/projectdiscovery/clistats v0.0.20
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
-	github.com/projectdiscovery/goflags v0.1.54
+	github.com/projectdiscovery/goflags v0.1.56
 	github.com/projectdiscovery/gologger v1.1.12
 	github.com/projectdiscovery/ipranger v0.0.49
 	github.com/projectdiscovery/mapcidr v1.1.34
@@ -42,6 +42,7 @@ require (
 	github.com/andybalholm/brotli v1.0.6 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
 	github.com/aymerick/douceur v0.2.0 // indirect
+	github.com/bits-and-blooms/bitset v1.13.0 // indirect
 	github.com/charmbracelet/glamour v0.6.0 // indirect
 	github.com/cheggaaa/pb/v3 v3.1.4 // indirect
 	github.com/cloudflare/circl v1.3.7 // indirect
@@ -52,6 +53,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5 // indirect
 	github.com/fatih/color v1.15.0 // indirect
+	github.com/gaissmai/bart v0.9.5 // indirect
 	github.com/gaukas/godicttls v0.0.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
