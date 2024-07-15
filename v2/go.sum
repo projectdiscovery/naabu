@@ -205,8 +205,8 @@ github.com/projectdiscovery/goflags v0.1.58 h1:+NRyb4/YcMFXPJvd2C+29V/Hv5Hx3vVkb
 github.com/projectdiscovery/goflags v0.1.58/go.mod h1:CFXs1uZYCuGU9fYdGxQ8CkjwssLDwPPGdQ5CEha+iZ8=
 github.com/projectdiscovery/gologger v1.1.13 h1:7h4yCnMk+DQ/43v+A3NuA1uuI4XlJd0W0xvTZioD05E=
 github.com/projectdiscovery/gologger v1.1.13/go.mod h1:PAsVPr2aHoopCzE0BOnp2bPCv+BU/Oq81ygcP3xVwgI=
-github.com/projectdiscovery/hmap v0.0.48 h1:pbxoDcwZWSdaqZ3QgaG5Aw1G1qEFN2zeQco6eWeROAo=
-github.com/projectdiscovery/hmap v0.0.48/go.mod h1:KMSbPJoIgI+9PkG6alZ0INEMRiIGnND128RUjxiY+8I=
+github.com/projectdiscovery/hmap v0.0.50 h1:ZFY1JF6y6BeBoEYXi7h0/y/LS+nxN1NUo+KsyqCSuJM=
+github.com/projectdiscovery/hmap v0.0.50/go.mod h1:cu4xZ/ZkntYI5NH7/ity6kK15XyjUF3fp78qb4shUxo=
 github.com/projectdiscovery/ipranger v0.0.53 h1:gb4yEqtC2MJl1tSdx/ycao1A1wl7sHqjHeifZidO3Z4=
 github.com/projectdiscovery/ipranger v0.0.53/go.mod h1:r6R0DFKQRo4QR2zjZXqLRCp0ovbco8F/NmOI+pK4db8=
 github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 h1:ZScLodGSezQVwsQDtBSMFp72WDq0nNN+KE/5DHKY5QE=
@@ -223,8 +223,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.68 h1:MN/kfccDnebmp1kNcCnGlGuC
 github.com/projectdiscovery/retryablehttp-go v1.0.68/go.mod h1:F3QNCoJExPFT59AACrVgYVhNiDW5Fp8s5HbXc+8CaaU=
 github.com/projectdiscovery/uncover v1.0.9 h1:s5RbkD/V4r8QcPkys4gTTqMuRSgXq0JprejqLSopN9Y=
 github.com/projectdiscovery/uncover v1.0.9/go.mod h1:2PUF3SpB5QNIJ8epaB2xbRzkPaxEAWRDm3Ir2ijt81U=
-github.com/projectdiscovery/utils v0.1.6 h1:fzdN+oCTics3hPPOEV1FWqf/Hpenav5Ml/73aEwpTZc=
-github.com/projectdiscovery/utils v0.1.6/go.mod h1:kOnMoFfuQMY8U+nh8e32odjC00iEbiLVBcDxyAZFwCc=
+github.com/projectdiscovery/utils v0.2.0 h1:GC9FOq2mVacVYZgD2s6XW7RP6jAC/XjOKclSpLYPUUQ=
+github.com/projectdiscovery/utils v0.2.0/go.mod h1:kOnMoFfuQMY8U+nh8e32odjC00iEbiLVBcDxyAZFwCc=
 github.com/quic-go/quic-go v0.42.0 h1:uSfdap0eveIl8KXnipv9K7nlwZ5IqLlYOpJ58u5utpM=
 github.com/quic-go/quic-go v0.42.0/go.mod h1:132kz4kL3F9vxhW3CtQJLDVwcFe5wdWeJXXijhsO57M=
 github.com/refraction-networking/utls v1.5.4 h1:9k6EO2b8TaOGsQ7Pl7p9w6PUhx18/ZCeT0WNTZ7Uw4o=
