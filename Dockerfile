@@ -8,7 +8,7 @@ RUN go mod download
 RUN go build ./cmd/naabu
 
 # Release
-FROM alpine:3.20.1
+FROM alpine:3.20.2
 RUN apk add --no-cache nmap libpcap-dev bind-tools ca-certificates nmap-scripts
 COPY --from=builder /app/v2/naabu /usr/local/bin/
 ENTRYPOINT ["naabu"]
