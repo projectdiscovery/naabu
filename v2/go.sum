@@ -185,8 +185,8 @@ github.com/projectdiscovery/clistats v0.0.20 h1:5jO5SLiRJ7f0nDV0ndBNmBeesbROouPo
 github.com/projectdiscovery/clistats v0.0.20/go.mod h1:GJ2av0KnOvK0AISQnP8hyDclYIji1LVkx2l0pwnzAu4=
 github.com/projectdiscovery/dnsx v1.2.1 h1:TxslYvp1Z/YZ4CP/J0gx5RYpvXREnVmyoacmTcGu5yg=
 github.com/projectdiscovery/dnsx v1.2.1/go.mod h1:6dAsMCEDu7FArZy2qjyTeUQrqpZ4ITLU11fcmUvFqt0=
-github.com/projectdiscovery/fastdialer v0.2.2 h1:AiUT4jIbS6JyM2QBQH9f+ZFBgvOVHzQG5K+M2FCA5jA=
-github.com/projectdiscovery/fastdialer v0.2.2/go.mod h1:QKrkTQiUhedqxqR65hLeN+FTbkul50TzMxgkk5Va+Uk=
+github.com/projectdiscovery/fastdialer v0.2.3 h1:K03x5XEXGyVWxS2rtSR104E9kHF0aphN7kOCzbh8zv0=
+github.com/projectdiscovery/fastdialer v0.2.3/go.mod h1:a0BKvETrO1EAohUYp9gwtbbce0hKD1qGrTegyAUqyRo=
 github.com/projectdiscovery/fdmax v0.0.4 h1:K9tIl5MUZrEMzjvwn/G4drsHms2aufTn1xUdeVcmhmc=
 github.com/projectdiscovery/fdmax v0.0.4/go.mod h1:oZLqbhMuJ5FmcoaalOm31B1P4Vka/CqP50nWjgtSz+I=
 github.com/projectdiscovery/freeport v0.0.5 h1:jnd3Oqsl4S8n0KuFkE5Hm8WGDP24ITBvmyw5pFTHS8Q=
