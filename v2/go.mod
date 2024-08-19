@@ -21,7 +21,7 @@ require (
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.0.9
 	github.com/projectdiscovery/ratelimit v0.0.51
-	github.com/projectdiscovery/retryablehttp-go v1.0.72
+	github.com/projectdiscovery/retryablehttp-go v1.0.74
 	github.com/projectdiscovery/uncover v1.0.9
 	github.com/projectdiscovery/utils v0.2.5
 	github.com/remeh/sizedwaitgroup v1.0.0
