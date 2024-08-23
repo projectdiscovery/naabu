@@ -527,8 +527,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					continue
 				}
 
-				r.limiter.Take()
-				//resume cfg logic
+				// resume cfg logic
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
