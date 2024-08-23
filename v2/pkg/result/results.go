@@ -4,15 +4,17 @@ import (
 	"sync"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"golang.org/x/exp/maps"
 )
 
 type ResultFn func(*HostResult)
 
 type HostResult struct {
-	Host  string
-	IP    string
-	Ports []*port.Port
+	Host       string
+	IP         string
+	Ports      []*port.Port
+	Confidence confidence.ConfidenceLevel
 }
 
 // Result of the scan
@@ -67,10 +69,11 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 		defer r.RUnlock()
 
 		for ip, ports := range r.ipPorts {
+			confidenceLevel := confidence.Normal
 			if r.HasSkipped(ip) {
-				continue
+				confidenceLevel = confidence.Low
 			}
-			out <- &HostResult{IP: ip, Ports: maps.Values(ports)}
+			out <- &HostResult{IP: ip, Ports: maps.Values(ports), Confidence: confidenceLevel}
 		}
 	}()
 

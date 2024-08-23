@@ -65,7 +65,13 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureOutput()
 
-	options.configureHostDiscovery()
+	// automatically disable host discovery when less than two ports for scan are provided
+	ports, err := ParsePorts(options)
+	if err != nil {
+		return nil, fmt.Errorf("could not parse ports: %s", err)
+	}
+
+	options.configureHostDiscovery(ports)
 
 	// default to ipv4 if no ipversion was specified
 	if len(options.IPVersion) == 0 {
@@ -132,10 +138,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.scanner = scanner
 
-	runner.scanner.Ports, err = ParsePorts(options)
-	if err != nil {
-		return nil, fmt.Errorf("could not parse ports: %s", err)
-	}
+	runner.scanner.Ports = ports
 
 	if options.EnableProgressBar {
 		defaultOptions := &clistats.DefaultOptions
@@ -849,9 +852,9 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 
 	switch {
 	case iputil.IsIPv4(sourceIP):
-		r.scanner.SourceIP4 = ip
+		r.scanner.ListenHandler.SourceIp4 = ip
 	case iputil.IsIPv6(sourceIP):
-		r.scanner.SourceIP6 = ip
+		r.scanner.ListenHandler.SourceIP6 = ip
 	default:
 		return errors.New("invalid ip type")
 	}
@@ -882,6 +885,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	}
 
 	r.scanner.NetworkInterface = networkInterface
+	r.scanner.ListenHandler.SourceHW = networkInterface.HardwareAddr
 	return nil
 }
 
