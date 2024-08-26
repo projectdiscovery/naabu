@@ -16,14 +16,14 @@ require (
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.5
 	github.com/projectdiscovery/goflags v0.1.64
-	github.com/projectdiscovery/gologger v1.1.18
+	github.com/projectdiscovery/gologger v1.1.20
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.0.9
 	github.com/projectdiscovery/ratelimit v0.0.51
 	github.com/projectdiscovery/retryablehttp-go v1.0.74
 	github.com/projectdiscovery/uncover v1.0.9
-	github.com/projectdiscovery/utils v0.2.5
+	github.com/projectdiscovery/utils v0.2.7
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
