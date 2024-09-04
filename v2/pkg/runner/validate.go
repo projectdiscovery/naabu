@@ -145,6 +145,10 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
+	if options.ServiceDiscovery || options.ServiceVersion {
+		return errors.New("service discovery feature is not implemented")
+	}
+
 	return nil
 }
 
