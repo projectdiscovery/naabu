@@ -220,8 +220,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.79 h1:XZBoyx7eMjr7/Iy0qQoYVEil
 github.com/projectdiscovery/retryablehttp-go v1.0.79/go.mod h1:F9XFivtDToesAZhbPDnnj8CVp/TmOgv9qYDG1QY1qxA=
 github.com/projectdiscovery/uncover v1.0.9 h1:s5RbkD/V4r8QcPkys4gTTqMuRSgXq0JprejqLSopN9Y=
 github.com/projectdiscovery/uncover v1.0.9/go.mod h1:2PUF3SpB5QNIJ8epaB2xbRzkPaxEAWRDm3Ir2ijt81U=
-github.com/projectdiscovery/utils v0.2.11 h1:TO7fBG5QI256sn1YuTD87yn4+4OjGJ2wT1772uEnp4Q=
-github.com/projectdiscovery/utils v0.2.11/go.mod h1:W0E74DWkKxlcyKS5XwcAwiob7+smoszPPi1NgX3vZyk=
+github.com/projectdiscovery/utils v0.2.12 h1:X0X08Km47gxLoIgc6nprWj0G28dEfRmSBLjO3/DkK8Q=
+github.com/projectdiscovery/utils v0.2.12/go.mod h1:OaYUfawin0idXUZjwLFFiDpfmpf90hDF/lAubb2qWs4=
 github.com/refraction-networking/utls v1.6.7 h1:zVJ7sP1dJx/WtVuITug3qYUq034cDq9B2MR1K67ULZM=
 github.com/refraction-networking/utls v1.6.7/go.mod h1:BC3O4vQzye5hqpmDTWUqi4P5DDhzJfkV1tdqtawQIH0=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
