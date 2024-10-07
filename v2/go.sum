@@ -200,8 +200,8 @@ github.com/projectdiscovery/freeport v0.0.7 h1:Q6uXo/j8SaV/GlAHkEYQi8WQoPXyJWxys
 github.com/projectdiscovery/freeport v0.0.7/go.mod h1:cOhWKvNBe9xM6dFJ3RrrLvJ5vXx2NQ36SecuwjenV2k=
 github.com/projectdiscovery/goflags v0.1.64 h1:FDfwdt9N97Hi8OuhbkDlKtVttpc/CRMIWQVa08VsHsI=
 github.com/projectdiscovery/goflags v0.1.64/go.mod h1:3FyHIVQtnycNOc1LE3O1jj/XR5XuMdF9QfHd0ujhnX4=
-github.com/projectdiscovery/gologger v1.1.25 h1:bHarLQ/sCfBErU6QCarE1fuGpINEkyHu8zhYUWE2oMA=
-github.com/projectdiscovery/gologger v1.1.25/go.mod h1:AmWrlwr9Xs/dRALoN3wjuNzdSpvNu0nFDXI/4+mII7Q=
+github.com/projectdiscovery/gologger v1.1.26 h1:Ten0uhugWeD2/VZGTdEhyzu+1edZEr4JAi9OX3D7hfs=
+github.com/projectdiscovery/gologger v1.1.26/go.mod h1:pdRtAhXVfEAUNTDiUj3U0gU3sd8o8Vuex1F6tyzSs+A=
 github.com/projectdiscovery/hmap v0.0.61 h1:1lmb2MfDWY7e3Xq7WufcbecD6MKYMj/7yCmKp7nueDc=
 github.com/projectdiscovery/hmap v0.0.61/go.mod h1:DQWTC4DYnSQvMgxjYv43pdQhH0gjyAAZMx28xYOCNTA=
 github.com/projectdiscovery/ipranger v0.0.53 h1:gb4yEqtC2MJl1tSdx/ycao1A1wl7sHqjHeifZidO3Z4=
