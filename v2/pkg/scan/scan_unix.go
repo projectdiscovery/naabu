@@ -64,46 +64,10 @@ func init() {
 
 	// pre-reserve up to 10 ports
 	for i := 0; i < NumberOfHandlers; i++ {
-		listenHandler := NewListenHandler()
-		if port, err := freeport.GetFreeTCPPort(""); err != nil {
-			gologger.Error().Msgf("could not setup get free port: %s", err)
-			return
-		} else {
-			listenHandler.Port = port.Port
-		}
-
-		listenHandler.TcpChan = make(chan *PkgResult, chanSize)
-		listenHandler.UdpChan = make(chan *PkgResult, chanSize)
-		listenHandler.HostDiscoveryChan = make(chan *PkgResult, chanSize)
-
-		var err error
-		listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
+		listenHandler, err := buildListenHandler()
 		if err != nil {
-			gologger.Error().Msgf("could not setup ip4:tcp: %s", err)
 			return
 		}
-		listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
-		if err != nil {
-			gologger.Error().Msgf("could not setup ip4:udp: %s", err)
-			return
-		}
-
-		listenHandler.TcpConn6, err = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
-		if err != nil {
-			gologger.Error().Msgf("could not setup ip6:tcp: %s\n", err)
-		}
-
-		listenHandler.UdpConn6, err = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
-		if err != nil {
-			gologger.Error().Msgf("could not setup ip6:udp: %s\n", err)
-		}
-
-		go listenHandler.ICMPReadWorker4()
-		go listenHandler.ICMPReadWorker6()
-		go listenHandler.TcpReadWorker4()
-		go listenHandler.TcpReadWorker6()
-		go listenHandler.UdpReadWorker4()
-		go listenHandler.UdpReadWorker6()
 
 		ListenHandlers = append(ListenHandlers, listenHandler)
 	}
@@ -118,6 +82,42 @@ func init() {
 	go TransportReadWorker()
 	go TransportWriteWorker()
 	go ICMPWriteWorker()
+}
+
+func buildListenHandler() (*ListenHandler, error) {
+	listenHandler := NewListenHandler()
+	if port, err := freeport.GetFreeTCPPort(""); err != nil {
+
+		return nil, fmt.Errorf("could not setup get free port: %s", err)
+	} else {
+		listenHandler.Port = port.Port
+	}
+
+	listenHandler.TcpChan = make(chan *PkgResult, chanSize)
+	listenHandler.UdpChan = make(chan *PkgResult, chanSize)
+	listenHandler.HostDiscoveryChan = make(chan *PkgResult, chanSize)
+
+	var err error
+	listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
+	if err != nil {
+		return nil, fmt.Errorf("could not setup ip4:tcp: %s", err)
+	}
+	listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
+	if err != nil {
+		return nil, fmt.Errorf("could not setup ip4:udp: %s", err)
+	}
+
+	listenHandler.TcpConn6, _ = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
+
+	listenHandler.UdpConn6, _ = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
+
+	go listenHandler.ICMPReadWorker4()
+	go listenHandler.ICMPReadWorker6()
+	go listenHandler.TcpReadWorker4()
+	go listenHandler.TcpReadWorker6()
+	go listenHandler.UdpReadWorker4()
+	go listenHandler.UdpReadWorker6()
+	return listenHandler, nil
 }
 
 // ICMPWriteWorker writes packet to the network layer
