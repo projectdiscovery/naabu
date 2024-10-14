@@ -8,6 +8,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	fileutil "github.com/projectdiscovery/utils/file"
+	sliceutil "github.com/projectdiscovery/utils/slice"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -282,4 +283,12 @@ func (options *Options) hasProbes() bool {
 
 func (options *Options) shouldUseRawPackets() bool {
 	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan && scan.PkgRouter != nil
+}
+
+func (options *Options) ShouldScanIPv4() bool {
+	return sliceutil.Contains(options.IPVersion, "4")
+}
+
+func (options *Options) ShouldScanIPv6() bool {
+	return sliceutil.Contains(options.IPVersion, "6")
 }
