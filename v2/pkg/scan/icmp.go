@@ -177,6 +177,9 @@ func PingIcmpTimestampRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
 		return
 	}
+	if icmpConn4 == nil {
+		return
+	}
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeTimestamp,
@@ -262,6 +265,9 @@ func ParseTimestamp(_ int, b []byte) (icmp.MessageBody, error) {
 // PingIcmpAddressMaskRequestAsync asynchronous to the target ip address - ipv4 only
 func PingIcmpAddressMaskRequestAsync(ip string) {
 	if !iputil.IsIPv4(ip) {
+		return
+	}
+	if icmpConn4 == nil {
 		return
 	}
 	destAddr := &net.IPAddr{IP: net.ParseIP(ip)}
