@@ -85,7 +85,7 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
 	github.com/projectdiscovery/fastdialer v0.2.9 // indirect
-	github.com/projectdiscovery/hmap v0.0.62 // indirect
+	github.com/projectdiscovery/hmap v0.0.63 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.80 // indirect
 	github.com/refraction-networking/utls v1.6.7 // indirect
