@@ -744,6 +744,7 @@ func (r *Runner) ConnectVerification() {
 	r.scanner.ScanResults = verifiedResult
 
 	swg.Wait()
+	limiter.Stop()
 }
 
 func (r *Runner) BackgroundWorkers(ctx context.Context) {
