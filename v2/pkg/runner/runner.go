@@ -728,6 +728,7 @@ func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
+	defer limiter.Stop()
 
 	verifiedResult := result.NewResult()
 
@@ -744,7 +745,6 @@ func (r *Runner) ConnectVerification() {
 	r.scanner.ScanResults = verifiedResult
 
 	swg.Wait()
-	limiter.Stop()
 }
 
 func (r *Runner) BackgroundWorkers(ctx context.Context) {
