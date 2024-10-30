@@ -47,7 +47,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          args: release -f .goreleaser/linux.yml --rm-dist
+          args: release -f .goreleaser/linux.yml --clean
           workdir: v2
         env: 
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
@@ -70,7 +70,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v6
         with:
           version: latest
-          args: release -f .goreleaser/windows.yml --rm-dist
+          args: release -f .goreleaser/windows.yml --clean
           workdir: v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
