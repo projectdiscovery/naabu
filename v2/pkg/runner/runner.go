@@ -530,8 +530,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					continue
 				}
 
-				r.limiter.Take()
-				//resume cfg logic
+				// resume cfg logic
 				r.options.ResumeCfg.Lock()
 				r.options.ResumeCfg.Index = index
 				r.options.ResumeCfg.Unlock()
@@ -649,15 +648,29 @@ func (r *Runner) getPreprocessedIps() (cidrs []*net.IPNet, ipsWithPort []string)
 	return
 }
 
-func (r *Runner) GetTargetIps(ipsCallback func() ([]*net.IPNet, []string)) (targets, targetsV4, targetsv6 []*net.IPNet, targetsWithPort []string, err error) {
+func (r *Runner) GetTargetIps(ipsCallback func() ([]*net.IPNet, []string)) (targets, targetsV4, targetsV6 []*net.IPNet, targetsWithPort []string, err error) {
 	targets, targetsWithPort = ipsCallback()
 
 	// shrinks the ips to the minimum amount of cidr
-	targetsV4, targetsv6 = mapcidr.CoalesceCIDRs(targets)
-	if len(targetsV4) == 0 && len(targetsv6) == 0 && len(targetsWithPort) == 0 {
+	targetsV4, targetsV6 = mapcidr.CoalesceCIDRs(targets)
+	if len(targetsV4) == 0 && len(targetsV6) == 0 && len(targetsWithPort) == 0 {
 		return nil, nil, nil, nil, errors.New("no valid ipv4 or ipv6 targets were found")
 	}
-	return targets, targetsV4, targetsv6, targetsWithPort, nil
+
+	targets = make([]*net.IPNet, 0, len(targets))
+	if r.options.ShouldScanIPv4() {
+		targets = append(targets, targetsV4...)
+	} else {
+		targetsV4 = make([]*net.IPNet, 0)
+	}
+
+	if r.options.ShouldScanIPv6() {
+		targets = append(targets, targetsV6...)
+	} else {
+		targetsV6 = make([]*net.IPNet, 0)
+	}
+
+	return targets, targetsV4, targetsV6, targetsWithPort, nil
 }
 
 func (r *Runner) ShowScanResultOnExit() {
@@ -715,6 +728,7 @@ func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
 	var swg sync.WaitGroup
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
+	defer limiter.Stop()
 
 	verifiedResult := result.NewResult()
 

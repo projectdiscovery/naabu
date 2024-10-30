@@ -107,7 +107,7 @@ func (r *Runner) handleNmap() error {
 				err := cmd.Run()
 				if err != nil {
 					errMsg := errors.Wrap(err, "Could not run nmap command")
-					gologger.Error().Msgf(errMsg.Error())
+					gologger.Error().Msg(errMsg.Error())
 					return errMsg
 				}
 			} else {

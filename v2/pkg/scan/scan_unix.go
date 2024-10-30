@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/layers"
-	"github.com/google/gopacket/pcap"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
+	"github.com/gopacket/gopacket/pcap"
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -51,7 +51,7 @@ func init() {
 	var err error
 	icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		panic(err)
+		gologger.Error().Msgf("could not setup ip4:icmp: %s", err)
 	}
 
 	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
@@ -381,6 +381,9 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 func (l *ListenHandler) ICMPReadWorker4() {
 	data := make([]byte, 1500)
 	for {
+		if icmpConn4 == nil {
+			return
+		}
 		n, addr, err := icmpConn4.ReadFrom(data)
 		if err != nil {
 			continue

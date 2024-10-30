@@ -161,24 +161,24 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 func writeCSVHeaders(data *Result, writer *csv.Writer) {
 	headers, err := data.CSVHeaders()
 	if err != nil {
-		gologger.Error().Msgf(err.Error())
+		gologger.Error().Msg(err.Error())
 		return
 	}
 
 	if err := writer.Write(headers); err != nil {
 		errMsg := errors.Wrap(err, "Could not write headers")
-		gologger.Error().Msgf(errMsg.Error())
+		gologger.Error().Msg(errMsg.Error())
 	}
 }
 
 func writeCSVRow(data *Result, writer *csv.Writer) {
 	rowData, err := data.CSVFields()
 	if err != nil {
-		gologger.Error().Msgf(err.Error())
+		gologger.Error().Msg(err.Error())
 		return
 	}
 	if err := writer.Write(rowData); err != nil {
 		errMsg := errors.Wrap(err, "Could not write row")
-		gologger.Error().Msgf(errMsg.Error())
+		gologger.Error().Msg(errMsg.Error())
 	}
 }
