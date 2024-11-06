@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"net"
 	"os"
 	"strings"
 	"testing"
@@ -39,4 +40,61 @@ func TestIsIpOrCidr(t *testing.T) {
 	for _, invalidItem := range invalid {
 		require.False(t, isIpOrCidr(invalidItem))
 	}
+}
+
+// Helper function for the following 3 tests
+func testIps(testIps []string) func() ([]*net.IPNet, []string) {
+	ips := []*net.IPNet{}
+
+	for _, ip := range testIps {
+		_, net, _ := net.ParseCIDR(ip)
+		ips = append(ips, net)
+	}
+
+	return func() ([]*net.IPNet, []string) {
+		return ips, []string{}
+	}
+}
+
+func TestIpV4Only(t *testing.T) {
+	ips := []string{"1.1.1.1/32", "2.2.2.2/32", "1.1.1.0/24", "fe80::623e:5fff:fe76:7d82/64", "100.121.237.116/32", "fd7a:115c:a1e0::fb01:ed74/48"}
+
+	r, err := NewRunner(&Options{
+		IPVersion: []string{"4"},
+	})
+	require.Nil(t, err)
+
+	targets, targetsV4, targetsV6, _, err := r.GetTargetIps(testIps(ips))
+	require.Nil(t, err)
+	require.Equal(t, targets, targetsV4)
+	require.Empty(t, targetsV6)
+}
+
+func TestIpV6Only(t *testing.T) {
+	ips := []string{"1.1.1.1/32", "2.2.2.2/32", "1.1.1.0/24", "fe80::623e:5fff:fe76:7d82/64", "100.121.237.116/32", "fd7a:115c:a1e0::fb01:ed74/48"}
+
+	r, err := NewRunner(&Options{
+		IPVersion: []string{"6"},
+	})
+	require.Nil(t, err)
+
+	targets, targetsV4, targetsV6, _, err := r.GetTargetIps(testIps(ips))
+	require.Nil(t, err)
+	require.Equal(t, targets, targetsV6)
+	require.Empty(t, targetsV4)
+}
+
+func TestIpV4AndV6(t *testing.T) {
+	ips := []string{"1.1.1.1/32", "2.2.2.2/32", "1.1.1.0/24", "fe80::623e:5fff:fe76:7d82/64", "100.121.237.116/32", "fd7a:115c:a1e0::fb01:ed74/48"}
+
+	r, err := NewRunner(&Options{
+		IPVersion: []string{"4", "6"},
+	})
+	require.Nil(t, err)
+
+	targets, targetsV4, targetsV6, _, err := r.GetTargetIps(testIps(ips))
+	expected := append(targetsV4, targetsV6...)
+
+	require.Nil(t, err)
+	require.EqualValues(t, expected, targets)
 }
