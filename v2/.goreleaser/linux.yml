@@ -21,8 +21,11 @@ builds:
       use: true
       
 archives:
-- format: zip
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
+  - format: zip
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_
+      {{- if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_
+      {{- .Arch }}
 
 checksum:
   name_template: "{{ .ProjectName }}-linux-checksums.txt"
@@ -32,8 +35,12 @@ announce:
     enabled: true
     channel: '#release'
     username: GoReleaser
-    message_template: 'New Release: {{ .ProjectName }} {{.Tag}} is published! Check it out at {{ .ReleaseURL }}'
+    message_template: >-
+      New Release: {{ .ProjectName }} {{.Tag}} is published! 
+      Check it out at {{ .ReleaseURL }}
 
   discord:
     enabled: true
-    message_template: '**New Release: {{ .ProjectName }} {{.Tag}}** is published! Check it out at {{ .ReleaseURL }}'
+    message_template: >-
+      **New Release: {{ .ProjectName }} {{.Tag}}** is published! 
+      Check it out at {{ .ReleaseURL }}
