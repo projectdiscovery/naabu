@@ -17,6 +17,8 @@ builds:
     goarch:
       - amd64
       - arm64
+    docker:
+      use: true
       
 archives:
 - format: zip
