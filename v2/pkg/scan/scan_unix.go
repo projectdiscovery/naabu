@@ -87,7 +87,6 @@ func init() {
 func buildListenHandler() (*ListenHandler, error) {
 	listenHandler := NewListenHandler()
 	if port, err := freeport.GetFreeTCPPort(""); err != nil {
-
 		return nil, fmt.Errorf("could not setup get free port: %s", err)
 	} else {
 		listenHandler.Port = port.Port
