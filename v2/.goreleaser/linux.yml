@@ -6,6 +6,7 @@ before:
   hooks:
     - go mod tidy
 project_name: naabu
+
 builds:
   - id: naabu-linux
     ldflags:
@@ -19,8 +20,9 @@ builds:
     goarch:
       - amd64
       - arm64
-    docker:
-      use: true
+
+dockers:
+  - use: true
       
 archives:
   - format: zip
