@@ -48,6 +48,8 @@ func NewListenHandler() *ListenHandler {
 func Acquire(options *Options) (*ListenHandler, error) {
 	// always grant to unprivileged scans or connect scan
 	if PkgRouter == nil || !privileges.IsPrivileged || options.ScanType == "c" {
+		h := NewListenHandler()
+		h.Busy = true
 		return NewListenHandler(), nil
 	}
 

@@ -6,6 +6,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_host2ips(t *testing.T) {
@@ -22,12 +23,10 @@ func Test_host2ips(t *testing.T) {
 	}
 
 	r, err := NewRunner(&Options{IPVersion: []string{scan.IPv4, scan.IPv6}, Retries: 1})
-	assert.Nil(t, err)
-	if dnsclient, err := dnsx.New(dnsx.DefaultOptions); err != nil {
-		assert.Error(t, err)
-	} else {
-		r.dnsclient = dnsclient
-	}
+	require.Nil(t, err)
+	dnsclient, err := dnsx.New(dnsx.DefaultOptions)
+	require.Nil(t, err)
+	r.dnsclient = dnsclient
 
 	for _, tt := range tests {
 		t.Run(tt.args, func(t *testing.T) {
