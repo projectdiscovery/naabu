@@ -15,7 +15,7 @@ require (
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
-	github.com/projectdiscovery/goflags v0.1.64
+	github.com/projectdiscovery/goflags v0.1.65
 	github.com/projectdiscovery/gologger v1.1.31
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
