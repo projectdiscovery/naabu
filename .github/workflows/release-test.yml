@@ -30,7 +30,7 @@ jobs:
         with:
           args: "release --clean --snapshot -f .goreleaser/mac.yml"
           version: latest
-          workdir: v2
+          workdir: /
 
   release-test-linux:
     runs-on: ubuntu-latest-16-cores
@@ -53,7 +53,7 @@ jobs:
         with:
           args: "release --clean --snapshot -f .goreleaser/linux.yml"
           version: latest
-          workdir: v2
+          workdir: /
 
   release-test-windows:
     runs-on: windows-latest-8-cores
@@ -73,4 +73,4 @@ jobs:
         with:
           args: "release --clean --snapshot -f .goreleaser/windows.yml"
           version: latest
-          workdir: v2
+          workdir: /

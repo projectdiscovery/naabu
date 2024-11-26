@@ -25,7 +25,7 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/mac.yml --clean
-          workdir: v2
+          workdir: /
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -48,7 +48,7 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/linux.yml --clean
-          workdir: v2
+          workdir: /
         env: 
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
           SLACK_WEBHOOK: "${{ secrets.RELEASE_SLACK_WEBHOOK }}"
@@ -71,6 +71,6 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/windows.yml --clean
-          workdir: v2
+          workdir: /
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

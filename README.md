@@ -105,7 +105,7 @@ CONFIGURATION:
 
 HOST-DISCOVERY:
    -sn, -host-discovery           Perform Only Host Discovery
-   -Pn, -skip-host-discovery      Skip Host discovery
+   -wn, -with-host-discovery      Enable Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
    -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
    -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)

@@ -73,7 +73,7 @@ type Options struct {
 	OutputCDN         bool // display cdn in use
 	HealthCheck       bool
 	OnlyHostDiscovery bool // Perform only host discovery
-	SkipHostDiscovery bool // Skip host discovery
+	WithHostDiscovery bool // Enable Host discovery
 	TcpSynPingProbes  goflags.StringSlice
 	TcpAckPingProbes  goflags.StringSlice
 	// UdpPingProbes               goflags.StringSlice - planned
@@ -162,7 +162,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("host-discovery", "Host-Discovery",
 		flagSet.BoolVarP(&options.OnlyHostDiscovery, "host-discovery", "sn", false, "Perform Only Host Discovery"),
-		flagSet.BoolVarP(&options.SkipHostDiscovery, "skip-host-discovery", "Pn", false, "Skip Host discovery"),
+		flagSet.BoolVarP(&options.WithHostDiscovery, "with-host-discovery", "wn", false, "Enable Host discovery"),
 		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", nil, "TCP SYN Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
 		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
 		flagSet.BoolVarP(&options.IcmpEchoRequestProbe, "probe-icmp-echo", "pe", false, "ICMP echo request Ping (host discovery needs to be enabled)"),
@@ -272,7 +272,7 @@ func (options *Options) ShouldLoadResume() bool {
 }
 
 func (options *Options) shouldDiscoverHosts() bool {
-	return (options.OnlyHostDiscovery || !options.SkipHostDiscovery) && !options.Passive && scan.PkgRouter != nil
+	return (options.OnlyHostDiscovery || options.WithHostDiscovery) && !options.Passive && scan.PkgRouter != nil
 }
 
 func (options *Options) hasProbes() bool {
