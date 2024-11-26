@@ -27,7 +27,7 @@ jobs:
 
       - name: Build
         run: go build .
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Test
         run: go test -race ./...
