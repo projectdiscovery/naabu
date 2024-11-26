@@ -31,7 +31,6 @@ jobs:
 
       - name: Test
         run: go test -race ./...
-        working-directory: /
 
       - name: Integration Tests
         env:
@@ -72,7 +71,6 @@ jobs:
 
       - name: Test
         run: go test -race ./...
-        working-directory: /
 
       - name: Integration Tests
         env:
@@ -107,7 +105,6 @@ jobs:
 
       - name: Test
         run: go test -race ./...
-        working-directory: /
 
       - name: Race Condition Tests
         # Known issue: https://github.com/golang/go/issues/46099
