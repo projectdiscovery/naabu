@@ -73,6 +73,8 @@ type Options struct {
 	OutputCDN         bool // display cdn in use
 	HealthCheck       bool
 	OnlyHostDiscovery bool // Perform only host discovery
+	// Deprecated: use WithHostDiscovery instead
+	SkipHostDiscovery bool // Skip Host discovery
 	WithHostDiscovery bool // Enable Host discovery
 	TcpSynPingProbes  goflags.StringSlice
 	TcpAckPingProbes  goflags.StringSlice
@@ -144,7 +146,7 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&cfgFile, "config", "", "path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)"),
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
 		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
-		flagSet.StringVarP(&options.ScanType, "s", "scan-type", SynScan, "type of port scan (SYN/CONNECT)"),
+		flagSet.StringVarP(&options.ScanType, "s", "scan-type", ConnectScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy - might not work on OSX) "),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
@@ -162,6 +164,8 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("host-discovery", "Host-Discovery",
 		flagSet.BoolVarP(&options.OnlyHostDiscovery, "host-discovery", "sn", false, "Perform Only Host Discovery"),
+		// Deprecated: use WithHostDiscovery instead
+		flagSet.BoolVarP(&options.SkipHostDiscovery, "skip-host-discovery", "Pn", false, "Skip Host discovery"),
 		flagSet.BoolVarP(&options.WithHostDiscovery, "with-host-discovery", "wn", false, "Enable Host discovery"),
 		flagSet.StringSliceVarP(&options.TcpSynPingProbes, "probe-tcp-syn", "ps", nil, "TCP SYN Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
 		flagSet.StringSliceVarP(&options.TcpAckPingProbes, "probe-tcp-ack", "pa", nil, "TCP ACK Ping (host discovery needs to be enabled)", goflags.StringSliceOptions),
