@@ -54,8 +54,9 @@ This will display help for the tool. Here are all the switches it supports.
 
 ```yaml
 Usage:
-  ./naabu [flags]
+  naabu [flags]
 
+Flags:
 INPUT:
    -host string[]              hosts to scan ports for (comma-separated)
    -list, -l string            list of hosts to scan ports (file)
@@ -88,8 +89,8 @@ CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
    -scan-all-ips, -sa               scan all the IP's associated with DNS record
    -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4) (default ["4"])
-   -scan-type, -s string            type of port scan (SYN/CONNECT) (default "s")
-   -source-ip string                source ip and port (x.x.x.x:yyy)
+   -scan-type, -s string            type of port scan (SYN/CONNECT) (default "c")
+   -source-ip string                source ip and port (x.x.x.x:yyy - might not work on OSX) 
    -interface-list, -il             list available interfaces and public ip
    -interface, -i string            network Interface to use for port scan
    -nmap                            invoke nmap scan on targets (nmap must be installed) - Deprecated
@@ -105,7 +106,8 @@ CONFIGURATION:
 
 HOST-DISCOVERY:
    -sn, -host-discovery           Perform Only Host Discovery
-   -Pn, -skip-host-discovery      Skip Host discovery
+   -Pn, -skip-host-discovery      Skip Host discovery (Deprecated: use -wn/-with-host-discovery instead)
+   -wn, -with-host-discovery      Enable Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
    -pa, -probe-tcp-ack string[]   TCP ACK Ping (host discovery needs to be enabled)
    -pe, -probe-icmp-echo          ICMP echo request Ping (host discovery needs to be enabled)
@@ -291,7 +293,7 @@ hackerone.com:80
 
 # Host Discovery
 
-Naabu optionally supports multiple options to perform host discovery, as outlined below. Host discovery is completed automatically before beginning a connect/syn scan if the process has enough privileges. `-sn` flag instructs the toll to perform host discovery only. `-Pn` flag skips the host discovery phase. Host discovery is completed using multiple internal methods; one can specify the desired approach to perform host discovery by setting available options.
+Naabu optionally supports multiple options to perform host discovery. Host discovery is optional and can be enabled with the `-wn` flag. `-sn` flag instructs the tool to perform host discovery only.
 
 Available options to perform host discovery:
 

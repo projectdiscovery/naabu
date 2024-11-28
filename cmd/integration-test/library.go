@@ -32,11 +32,10 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 	defer os.RemoveAll(testFile)
 
 	options := runner.Options{
-		HostsFile:         testFile,
-		Ports:             "80",
-		Passive:           true,
-		SkipHostDiscovery: true,
-		OnResult:          func(hr *result.HostResult) {},
+		HostsFile: testFile,
+		Ports:     "80",
+		Passive:   true,
+		OnResult:  func(hr *result.HostResult) {},
 	}
 
 	naabuRunner, err := runner.NewRunner(&options)
@@ -68,10 +67,9 @@ func (h *naabuSingleLibrary) Execute() error {
 	var got bool
 
 	options := runner.Options{
-		HostsFile:         testFile,
-		Ports:             "80",
-		SkipHostDiscovery: true,
-		ScanType:          h.scanType,
+		HostsFile: testFile,
+		Ports:     "80",
+		ScanType:  h.scanType,
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
@@ -114,10 +112,9 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 	var got bool
 
 	options := runner.Options{
-		HostsFile:         testFile,
-		Ports:             "80",
-		ScanType:          h.scanType,
-		SkipHostDiscovery: true,
+		HostsFile: testFile,
+		Ports:     "80",
+		ScanType:  h.scanType,
 		OnResult: func(hr *result.HostResult) {
 			got = true
 		},
