@@ -51,12 +51,12 @@ func init() {
 	var err error
 	icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
 	if err != nil {
-		gologger.Error().Msgf("could not setup ip4:icmp: %s", err)
+		gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
 	}
 
 	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
 	if err != nil {
-		gologger.Error().Msgf("could not setup ip6:icmp: %s", err)
+		gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
 	}
 
 	icmpPacketSend = make(chan *PkgSend, packetSendSize)
