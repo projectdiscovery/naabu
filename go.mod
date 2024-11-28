@@ -15,15 +15,15 @@ require (
 	github.com/projectdiscovery/dnsx v1.2.1
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
-	github.com/projectdiscovery/goflags v0.1.64
-	github.com/projectdiscovery/gologger v1.1.28
+	github.com/projectdiscovery/goflags v0.1.65
+	github.com/projectdiscovery/gologger v1.1.33
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.0.9
-	github.com/projectdiscovery/ratelimit v0.0.61
-	github.com/projectdiscovery/retryablehttp-go v1.0.84
+	github.com/projectdiscovery/ratelimit v0.0.63
+	github.com/projectdiscovery/retryablehttp-go v1.0.88
 	github.com/projectdiscovery/uncover v1.0.9
-	github.com/projectdiscovery/utils v0.2.16
+	github.com/projectdiscovery/utils v0.2.21
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
@@ -84,10 +84,10 @@ require (
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/fastdialer v0.2.9 // indirect
-	github.com/projectdiscovery/hmap v0.0.64 // indirect
+	github.com/projectdiscovery/fastdialer v0.2.10 // indirect
+	github.com/projectdiscovery/hmap v0.0.68 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.82 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.86 // indirect
 	github.com/refraction-networking/utls v1.6.7 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
