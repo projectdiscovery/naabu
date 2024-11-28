@@ -117,10 +117,6 @@ HOST-DISCOVERY:
    -nd, -nd-ping                  IPv6 Neighbor Discovery (host discovery needs to be enabled)
    -rev-ptr                       Reverse PTR lookup for input ips
 
-SERVICES-DISCOVERY:
-   -sD, -service-discovery  Service Discovery
-   -sV, -service-version    Service Version
-
 OPTIMIZATION:
    -retries int       number of retries for the port scan (default 3)
    -timeout int       millisecond to wait before timing out (default 1000)
