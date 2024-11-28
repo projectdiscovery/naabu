@@ -2,16 +2,16 @@
 
 echo "::group::Build naabu"
 rm integration-test naabu 2>/dev/null
-cd ../v2/cmd/naabu
+cd ../cmd/naabu
 go build
-mv naabu ../../../integration_tests/naabu
+mv naabu ../../integration_tests/naabu
 echo "::endgroup::"
 
 echo "::group::Build naabu integration-test"
 cd ../integration-test
 go build
-mv integration-test ../../../integration_tests/integration-test 
-cd ../../../integration_tests
+mv integration-test ../../integration_tests/integration-test 
+cd ../../integration_tests
 echo "::endgroup::"
 
 sudo ./integration-test
