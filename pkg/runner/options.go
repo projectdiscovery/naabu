@@ -34,7 +34,7 @@ type Options struct {
 
 	Retries        int                 // Retries is the number of retries for the port
 	Rate           int                 // Rate is the rate of port scan requests
-	Timeout        int                 // Timeout is the seconds to wait for ports to respond
+	Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
 	WarmUpTime     int                 // WarmUpTime between scan phases
 	Host           goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile      string              // HostsFile is the file containing list of hosts to find port for
