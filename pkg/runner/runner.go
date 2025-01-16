@@ -435,10 +435,15 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 					for _, p := range filteredPorts {
+						r.scanner.ScanResults.AddPort(ip, p)
+						// ignore OnReceive when verification is enabled
+						if r.options.Verify {
+							continue
+						}
 						if r.scanner.OnReceive != nil {
 							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
 						}
-						r.scanner.ScanResults.AddPort(ip, p)
+
 					}
 				}(ip)
 			}
@@ -742,9 +747,9 @@ func (r *Runner) ConnectVerification() {
 		}(hostResult)
 	}
 
-	r.scanner.ScanResults = verifiedResult
-
 	swg.Wait()
+
+	r.scanner.ScanResults = verifiedResult
 }
 
 func (r *Runner) BackgroundWorkers(ctx context.Context) {
@@ -910,6 +915,12 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		err    error
 		output string
 	)
+
+	if r.options.Verify {
+		for hostResult := range scanResults.GetIPsPorts() {
+			r.scanner.OnReceive(hostResult)
+		}
+	}
 
 	// In case the user has given an output file, write all the found
 	// ports to the output file.
