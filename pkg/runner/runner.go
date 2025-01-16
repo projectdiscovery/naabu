@@ -28,6 +28,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
@@ -739,9 +740,16 @@ func (r *Runner) ConnectVerification() {
 
 	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
 		limiter.Take()
+
 		swg.Add(1)
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
+
+			// skip low confidence
+			if hostResult.Confidence == confidence.Low {
+				return
+			}
+
 			results := r.scanner.ConnectVerify(hostResult.IP, hostResult.Ports)
 			verifiedResult.SetPorts(hostResult.IP, results)
 		}(hostResult)
@@ -822,6 +830,10 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
+			// ignore OnReceive when verification is enabled
+			if r.options.Verify {
+				return
+			}
 			if r.scanner.OnReceive != nil {
 				r.scanner.OnReceive(&result.HostResult{IP: host, Ports: []*port.Port{p}})
 			}
