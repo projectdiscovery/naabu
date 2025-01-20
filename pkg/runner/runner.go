@@ -114,7 +114,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
-		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
+		Timeout:       options.Timeout,
 		Retries:       options.Retries,
 		Rate:          options.Rate,
 		PortThreshold: options.PortThreshold,
