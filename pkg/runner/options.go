@@ -2,7 +2,6 @@ package runner
 
 import (
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -37,7 +36,6 @@ type Options struct {
 	Rate    int // Rate is the rate of port scan requests
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
 	Timeout        time.Duration
-	StrTimeout     string              // Timeout is the milliseconds to wait for ports to respond (1, 3ms, 4h etc)
 	WarmUpTime     int                 // WarmUpTime between scan phases
 	Host           goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile      string              // HostsFile is the file containing list of hosts to find port for
@@ -192,8 +190,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
-		// flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
-		flagSet.StringVar(&options.StrTimeout, "timeout", "1000ms", "millisecond to wait before timing out"),
+		flagSet.DurationVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
@@ -212,14 +209,6 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
-
-	// Handle Timeout as int or Duration
-	if duration, err := time.ParseDuration(options.StrTimeout); err == nil {
-		options.Timeout = duration
-	} else if intVal, parseErr := strconv.Atoi(options.StrTimeout); parseErr == nil {
-		options.Timeout = time.Duration(intVal) * time.Millisecond
-	}
-	// fmt.Printf("-Parsed timeout as Duration: %v\n", options.Timeout)
 
 	if cfgFile != "" {
 		if !fileutil.FileExists(cfgFile) {
