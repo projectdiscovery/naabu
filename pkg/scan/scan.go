@@ -17,7 +17,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
-	timeoututil "github.com/projectdiscovery/naabu/v2/pkg/utils/timeout"
+	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/proxy"
 )
@@ -159,7 +159,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	if options.Proxy != "" {
-		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, auth, &net.Dialer{Timeout: timeoututil.WithProxy(options.Timeout)})
+		proxyDialer, err := proxy.SOCKS5("tcp", options.Proxy, auth, &net.Dialer{Timeout: limits.TimeoutWithProxy(options.Timeout)})
 		if err != nil {
 			return nil, err
 		}
@@ -376,7 +376,7 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		conn net.Conn
 	)
 	if s.proxyDialer != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), timeoututil.WithProxy(timeout))
+		ctx, cancel := context.WithTimeout(context.Background(), limits.TimeoutWithProxy(timeout))
 		defer cancel()
 		proxyDialer, ok := s.proxyDialer.(proxy.ContextDialer)
 		if !ok {

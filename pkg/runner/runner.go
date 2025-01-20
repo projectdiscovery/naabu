@@ -29,6 +29,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
@@ -280,6 +281,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// automatically adjust rate limit if proxy is used
+	if r.options.Proxy != "" {
+		r.options.Rate = limits.RateLimitWithProxy(r.options.Rate)
 	}
 
 	// Scan workers
