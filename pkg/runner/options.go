@@ -32,9 +32,10 @@ type Options struct {
 	Nmap           bool // Invoke nmap detailed scan on results
 	InterfacesList bool // InterfacesList show interfaces list
 
-	Retries        int                 // Retries is the number of retries for the port
-	Rate           int                 // Rate is the rate of port scan requests
-	Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
+	Retries int // Retries is the number of retries for the port
+	Rate    int // Rate is the rate of port scan requests
+	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
+	Timeout        time.Duration
 	WarmUpTime     int                 // WarmUpTime between scan phases
 	Host           goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile      string              // HostsFile is the file containing list of hosts to find port for
@@ -189,7 +190,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
-		flagSet.IntVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
+		flagSet.DurationVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
