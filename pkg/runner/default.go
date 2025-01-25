@@ -1,8 +1,10 @@
 package runner
 
+import "time"
+
 const (
-	DefaultPortTimeoutSynScan     = 1000
-	DefaultPortTimeoutConnectScan = 5000
+	DefaultPortTimeoutSynScan     = time.Second
+	DefaultPortTimeoutConnectScan = time.Duration(5 * time.Second)
 
 	DefaultRateSynScan     = 1000
 	DefaultRateConnectScan = 1500

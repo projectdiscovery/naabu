@@ -5,7 +5,9 @@ import (
 	"errors"
 	"os"
 	"os/user"
+	"time"
 
+	"github.com/armon/go-socks5"
 	"github.com/projectdiscovery/naabu/v2/internal/testutils"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
@@ -18,6 +20,7 @@ var libraryTestcases = map[string]testutils.TestCase{
 	"sdk - multiple executions - connect": &naabuMultipleExecLibrary{scanType: "c"},
 	"sdk - one execution - syn":           &naabuSingleLibrary{scanType: "s"},
 	"sdk - multiple executions - syn":     &naabuMultipleExecLibrary{scanType: "s"},
+	"sdk - connect with proxy":            &naabuWithSocks5{},
 }
 
 type naabuPassiveSingleLibrary struct {
@@ -135,5 +138,62 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 		}
 		naabuRunner.Close()
 	}
+	return nil
+}
+
+type naabuWithSocks5 struct{}
+
+func (h *naabuWithSocks5) Execute() error {
+	// Start local SOCKS5 proxy server with test:test credentials
+	conf := &socks5.Config{
+		Credentials: socks5.StaticCredentials{
+			"test": "test",
+		},
+	}
+	server, err := socks5.New(conf)
+	if err != nil {
+		panic(err)
+	}
+	go func() {
+		if err = server.ListenAndServe("tcp", "127.0.0.1:38401"); err != nil {
+			panic(err)
+		}
+	}()
+
+	testFile := "test.txt"
+	err = os.WriteFile(testFile, []byte("scanme.sh"), 0644)
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(testFile)
+
+	var got bool
+
+	options := runner.Options{
+		HostsFile: testFile,
+		Ports:     "80",
+		ScanType:  "c",
+		Proxy:     "127.0.0.1:38401",
+		ProxyAuth: "test:test",
+		OnResult: func(hr *result.HostResult) {
+			got = true
+		},
+		WarmUpTime: 2,
+		Timeout:    10 * time.Second,
+	}
+
+	naabuRunner, err := runner.NewRunner(&options)
+	if err != nil {
+		return err
+	}
+	defer naabuRunner.Close()
+
+	if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
+		return err
+	}
+	if !got {
+		return errors.New("no results found")
+	}
+
 	return nil
 }

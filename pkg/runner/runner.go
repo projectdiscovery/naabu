@@ -28,7 +28,9 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
@@ -114,7 +116,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
-		Timeout:       time.Duration(options.Timeout) * time.Millisecond,
+		Timeout:       options.Timeout,
 		Retries:       options.Retries,
 		Rate:          options.Rate,
 		PortThreshold: options.PortThreshold,
@@ -282,6 +284,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		}
 	}
 
+	// automatically adjust rate limit if proxy is used
+	if r.options.Proxy != "" {
+		r.options.Rate = limits.RateLimitWithProxy(r.options.Rate)
+	}
+
 	// Scan workers
 	r.wgscan = sizedwaitgroup.New(r.options.Rate)
 	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
@@ -435,10 +442,15 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						return
 					}
 					for _, p := range filteredPorts {
+						r.scanner.ScanResults.AddPort(ip, p)
+						// ignore OnReceive when verification is enabled
+						if r.options.Verify {
+							continue
+						}
 						if r.scanner.OnReceive != nil {
 							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
 						}
-						r.scanner.ScanResults.AddPort(ip, p)
+
 					}
 				}(ip)
 			}
@@ -734,17 +746,24 @@ func (r *Runner) ConnectVerification() {
 
 	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
 		limiter.Take()
+
 		swg.Add(1)
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
+
+			// skip low confidence
+			if hostResult.Confidence == confidence.Low {
+				return
+			}
+
 			results := r.scanner.ConnectVerify(hostResult.IP, hostResult.Ports)
 			verifiedResult.SetPorts(hostResult.IP, results)
 		}(hostResult)
 	}
 
-	r.scanner.ScanResults = verifiedResult
-
 	swg.Wait()
+
+	r.scanner.ScanResults = verifiedResult
 }
 
 func (r *Runner) BackgroundWorkers(ctx context.Context) {
@@ -817,6 +836,10 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
+			// ignore OnReceive when verification is enabled
+			if r.options.Verify {
+				return
+			}
 			if r.scanner.OnReceive != nil {
 				r.scanner.OnReceive(&result.HostResult{IP: host, Ports: []*port.Port{p}})
 			}
@@ -910,6 +933,12 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		err    error
 		output string
 	)
+
+	if r.options.Verify {
+		for hostResult := range scanResults.GetIPsPorts() {
+			r.scanner.OnReceive(hostResult)
+		}
+	}
 
 	// In case the user has given an output file, write all the found
 	// ports to the output file.

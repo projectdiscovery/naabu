@@ -35,6 +35,11 @@ func (options *Options) ValidateOptions() error {
 		return errNoInputList
 	}
 
+	if (options.WithHostDiscovery || options.OnlyHostDiscovery) && options.ScanType != SynScan {
+		gologger.Warning().Msgf("host discovery requires syn scan, automatically switching to syn scan")
+		options.ScanType = SynScan
+	}
+
 	// Both verbose and silent flags were used
 	if options.Verbose && options.Silent {
 		return errOutputMode
