@@ -67,10 +67,6 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureOutput()
 
-	if options.Timeout < time.Millisecond*500 {
-		return nil, fmt.Errorf("timeout value %v is too low (minimum is 500ms)", options.Timeout)
-	}
-
 	// automatically disable host discovery when less than two ports for scan are provided
 	ports, err := ParsePorts(options)
 	if err != nil {
@@ -120,7 +116,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
-		Timeout:       options.Timeout,
+		Timeout:       options.GetTimeout(),
 		Retries:       options.Retries,
 		Rate:          options.Rate,
 		PortThreshold: options.PortThreshold,
@@ -837,7 +833,7 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		}
 
 		r.limiter.Take()
-		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
+		open, err := r.scanner.ConnectPort(host, p, r.options.GetTimeout())
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled
