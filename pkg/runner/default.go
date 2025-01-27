@@ -4,7 +4,7 @@ import "time"
 
 const (
 	DefaultPortTimeoutSynScan     = time.Second
-	DefaultPortTimeoutConnectScan = time.Duration(5 * time.Second)
+	DefaultPortTimeoutConnectScan = time.Duration(3 * time.Second)
 
 	DefaultRateSynScan     = 1000
 	DefaultRateConnectScan = 1500
