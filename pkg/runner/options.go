@@ -297,3 +297,13 @@ func (options *Options) ShouldScanIPv4() bool {
 func (options *Options) ShouldScanIPv6() bool {
 	return sliceutil.Contains(options.IPVersion, "6")
 }
+
+func (options *Options) GetTimeout() time.Duration {
+	if options.Timeout < time.Millisecond*500 {
+		if options.ScanType == SynScan {
+			return DefaultPortTimeoutSynScan
+		}
+		return DefaultPortTimeoutConnectScan
+	}
+	return options.Timeout
+}

@@ -49,12 +49,6 @@ func (options *Options) ValidateOptions() error {
 		return errTwoOutputMode
 	}
 
-	if options.Timeout == 0 {
-		return errors.Wrap(errZeroValue, "timeout")
-	} else if !privileges.IsPrivileged && options.Timeout == DefaultPortTimeoutSynScan {
-		options.Timeout = DefaultPortTimeoutConnectScan
-	}
-
 	if options.Rate == 0 {
 		return errors.Wrap(errZeroValue, "rate")
 	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
