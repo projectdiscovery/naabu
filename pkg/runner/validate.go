@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"strings"
+	"time"
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -52,6 +53,11 @@ func (options *Options) ValidateOptions() error {
 	if options.Timeout == 0 {
 		return errors.Wrap(errZeroValue, "timeout")
 	} else if !privileges.IsPrivileged && options.Timeout == DefaultPortTimeoutSynScan {
+		options.Timeout = DefaultPortTimeoutConnectScan
+	}
+
+	if options.Timeout < 500*time.Millisecond {
+		gologger.Warning().Msgf("timeout value %v is too low (minimum is 500ms), using default value (%v)", options.Timeout, DefaultPortTimeoutConnectScan)
 		options.Timeout = DefaultPortTimeoutConnectScan
 	}
 

@@ -67,6 +67,10 @@ type Target struct {
 func NewRunner(options *Options) (*Runner, error) {
 	options.configureOutput()
 
+	if options.Timeout < time.Millisecond*500 {
+		return nil, fmt.Errorf("timeout value %v is too low (minimum is 500ms)", options.Timeout)
+	}
+
 	// automatically disable host discovery when less than two ports for scan are provided
 	ports, err := ParsePorts(options)
 	if err != nil {
