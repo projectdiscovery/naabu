@@ -223,22 +223,12 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					gologger.Debug().Msgf("WriteCsvOutput ports Field Output")
-					if r.options.CSVFields != nil {
-						selectedFields := r.options.CSVFields
-						if csvHeaderEnabled {
-							writeSelectedCSVHeaders(data, writer, selectedFields)
-							csvHeaderEnabled = false
-						}
-						writeSelectedCSVRow(data, writer, selectedFields)
-
-					} else {
-						if csvHeaderEnabled {
-							writeCSVHeaders(data, writer)
-							csvHeaderEnabled = false
-						}
-						writeCSVRow(data, writer)
+					selectedFields := r.options.CSVFields
+					if csvHeaderEnabled {
+						writeCSVHeaders(data, writer, selectedFields)
+						csvHeaderEnabled = false
 					}
-
+					writeCSVRow(data, writer, selectedFields)
 				}
 			}
 		}
