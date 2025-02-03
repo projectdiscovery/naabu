@@ -134,7 +134,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer, selectedFields []string) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
 	if host != ip {
@@ -145,17 +145,36 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 		data.CDNName = cdnName
 	}
 	if header {
-		writeCSVHeaders(data, encoder)
+		// writeCSVHeaders(data, encoder)
+		gologger.Debug().Msgf("Parsed header Field Output: %s", selectedFields)
+		writeSelectedCSVHeaders(data, encoder, selectedFields)
 	}
 
 	for _, p := range ports {
 		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
 		data.TLS = p.TLS
-		writeCSVRow(data, encoder)
+		gologger.Debug().Msgf("Parsed ports Field Output: %s", selectedFields)
+		// writeCSVRow(data, encoder)
+		writeSelectedCSVRow(data, encoder, selectedFields)
 	}
 	encoder.Flush()
 	return nil
+}
+
+func writeSelectedCSVHeaders(data *Result, writer *csv.Writer, selectedFields []string) {
+	var headers []string
+	ty := reflect.TypeOf(*data)
+	for i := 0; i < ty.NumField(); i++ {
+		field := ty.Field(i)
+		csvTag := field.Tag.Get("csv")
+		if slices.Contains(selectedFields, csvTag) {
+			headers = append(headers, csvTag)
+		}
+	}
+	if err := writer.Write(headers); err != nil {
+		gologger.Error().Msg(err.Error())
+	}
 }
 
 func writeCSVHeaders(data *Result, writer *csv.Writer) {
@@ -168,6 +187,22 @@ func writeCSVHeaders(data *Result, writer *csv.Writer) {
 	if err := writer.Write(headers); err != nil {
 		errMsg := errors.Wrap(err, "Could not write headers")
 		gologger.Error().Msg(errMsg.Error())
+	}
+}
+
+func writeSelectedCSVRow(data *Result, writer *csv.Writer, selectedFields []string) {
+	var fields []string
+	vl := reflect.ValueOf(*data)
+	ty := reflect.TypeOf(*data)
+	for i := 0; i < vl.NumField(); i++ {
+		field := vl.Field(i)
+		csvTag := ty.Field(i).Tag.Get("csv")
+		if slices.Contains(selectedFields, csvTag) {
+			fields = append(fields, fmt.Sprint(field.Interface()))
+		}
+	}
+	if err := writer.Write(fields); err != nil {
+		gologger.Error().Msg(err.Error())
 	}
 }
 
