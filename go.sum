@@ -218,12 +218,12 @@ github.com/projectdiscovery/ratelimit v0.0.71 h1:vlT39eZf0u890WbRIUjZM2zae9afB3x
 github.com/projectdiscovery/ratelimit v0.0.71/go.mod h1:g0lwpDa9/dAZgS+v9BEtDipUlJ0jKZQYhO8uWfqn5ko=
 github.com/projectdiscovery/retryabledns v1.0.94 h1:MvxtRcmvxhxikxT7p/E40hcYRWRiL5fg/JQ8bpBaz+0=
 github.com/projectdiscovery/retryabledns v1.0.94/go.mod h1:croGTyMM4yNlrSWA/X7xNe3c0c7mDmCdbm8goLd8Bak=
-github.com/projectdiscovery/retryablehttp-go v1.0.96 h1:/88LMgEGVx5rpqdLYIqxyJHBluuREKxJxPVIWi1zOlA=
-github.com/projectdiscovery/retryablehttp-go v1.0.96/go.mod h1:YIN8SpckCijt5J1AV+nQApUWyCC3Y+8nAwDfK/RwhWs=
+github.com/projectdiscovery/retryablehttp-go v1.0.97 h1:6nee/vJjiZP3vOhyqLcpSADM3vqmcC2QOvaMIo+dKWQ=
+github.com/projectdiscovery/retryablehttp-go v1.0.97/go.mod h1:ZvwB6IsIHf0YlovcEQufZ6OTluyWfxRd360SrKd9fPk=
 github.com/projectdiscovery/uncover v1.0.9 h1:s5RbkD/V4r8QcPkys4gTTqMuRSgXq0JprejqLSopN9Y=
 github.com/projectdiscovery/uncover v1.0.9/go.mod h1:2PUF3SpB5QNIJ8epaB2xbRzkPaxEAWRDm3Ir2ijt81U=
-github.com/projectdiscovery/utils v0.4.8 h1:/Xd38fP8xc6kifZayjrhcYALenJrjO3sHO7lg+I8ZGk=
-github.com/projectdiscovery/utils v0.4.8/go.mod h1:S314NzLcXVCbLbwYCoorAJYcnZEwv7Uhw2d3aF5fJ4s=
+github.com/projectdiscovery/utils v0.4.9 h1:GzYKy5iiCWEZZPGxrtgTOnRTZYiIAiCditGufp0nhGU=
+github.com/projectdiscovery/utils v0.4.9/go.mod h1:/68d0OHGgYF4aW4X7kS1qlFlYOnZxgtFDN85iH732JI=
 github.com/refraction-networking/utls v1.6.7 h1:zVJ7sP1dJx/WtVuITug3qYUq034cDq9B2MR1K67ULZM=
 github.com/refraction-networking/utls v1.6.7/go.mod h1:BC3O4vQzye5hqpmDTWUqi4P5DDhzJfkV1tdqtawQIH0=
 github.com/remeh/sizedwaitgroup v1.0.0 h1:VNGGFwNo/R5+MJBf6yrsr110p0m4/OX4S3DCy7Kyl5E=
