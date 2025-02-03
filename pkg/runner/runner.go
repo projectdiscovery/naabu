@@ -222,7 +222,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
-					gologger.Debug().Msgf("WriteCsvOutput ports Field Output")
 					selectedFields := r.options.CSVFields
 					if csvHeaderEnabled {
 						writeCSVHeaders(data, writer, selectedFields)
@@ -1006,8 +1005,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						gologger.Debug().Msgf("WriteCsvOutput ports Field Output")
-
 						selectedFields := r.options.CSVFields
 						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, selectedFields)
 					} else {
@@ -1058,8 +1055,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					gologger.Silent().Msgf("%s", buffer.String())
 				} else if r.options.CSV {
 					writer.Flush()
-					gologger.Debug().Msgf("WriteCsvOutput ports Field Output")
-
 					gologger.Silent().Msgf("%s", buffer.String())
 				} else {
 					if r.options.OutputCDN && isCDNIP {
@@ -1074,8 +1069,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
 						selectedFields := r.options.CSVFields
-						gologger.Debug().Msgf("WriteCsvOutput ports Field Output")
-
 						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, selectedFields)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)

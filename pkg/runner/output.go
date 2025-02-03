@@ -146,14 +146,11 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 	}
 	if header {
 		writeCSVHeaders(data, encoder, selectedFields)
-		gologger.Debug().Msgf("Parsed header Field Output: %s", selectedFields)
 	}
-
 	for _, p := range ports {
 		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
 		data.TLS = p.TLS
-		gologger.Debug().Msgf("Parsed ports Field Output: %s", selectedFields)
 		writeCSVRow(data, encoder, selectedFields)
 	}
 	encoder.Flush()
@@ -180,7 +177,6 @@ func writeCSVHeaders(data *Result, writer *csv.Writer, selectedFields []string) 
 			gologger.Error().Msg(err.Error())
 			return
 		}
-
 		if err := writer.Write(headers); err != nil {
 			errMsg := errors.Wrap(err, "Could not write headers")
 			gologger.Error().Msg(errMsg.Error())
