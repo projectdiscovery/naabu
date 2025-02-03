@@ -22,9 +22,9 @@ require (
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.1.1
 	github.com/projectdiscovery/ratelimit v0.0.71
-	github.com/projectdiscovery/retryablehttp-go v1.0.96
+	github.com/projectdiscovery/retryablehttp-go v1.0.97
 	github.com/projectdiscovery/uncover v1.0.9
-	github.com/projectdiscovery/utils v0.4.8
+	github.com/projectdiscovery/utils v0.4.9
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.9.0
 	go.uber.org/multierr v1.11.0
