@@ -69,9 +69,9 @@ func (r *Result) JSON(selectedFields []string) ([]byte, error) {
 		case "ip":
 			dataMap["ip"] = r.IP
 		case "IsCDNIP":
-			dataMap["IsCDNIP"] = r.IsCDNIP
+			dataMap["cdn"] = r.IsCDNIP
 		case "CDNName":
-			dataMap["CDNName"] = r.CDNName
+			dataMap["cdn-name"] = r.CDNName
 		case "port":
 			dataMap["port"] = r.Port
 		case "protocol":
