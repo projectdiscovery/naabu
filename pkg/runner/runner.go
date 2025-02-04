@@ -203,7 +203,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 		// console output
 		if r.options.JSON || r.options.CSV {
-			selectedFields := r.options.Fields
 			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
 			if r.options.OutputCDN {
 				data.IsCDNIP = isCDNIP
@@ -217,7 +216,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				data.Protocol = p.Protocol.String()
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON(selectedFields)
+					b, err := data.JSON(r.options.Fields)
 					if err != nil {
 						continue
 					}
