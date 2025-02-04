@@ -39,40 +39,45 @@ type jsonResult struct {
 }
 
 func (r *Result) JSON(selectedFields []string) ([]byte, error) {
-	data := jsonResult{}
-	data.TimeStamp = r.TimeStamp
-	if r.Host != r.IP {
-		data.Host = r.Host
-	}
-	data.IP = r.IP
-	data.IsCDNIP = r.IsCDNIP
-	data.CDNName = r.CDNName
-	data.PortNumber = r.Port
-	data.Protocol = r.Protocol
-	data.TLS = r.TLS
 
 	if len(selectedFields) == 0 {
+		data := jsonResult{}
+		data.TimeStamp = r.TimeStamp
+		if r.Host != r.IP {
+			data.Host = r.Host
+		}
+		data.IP = r.IP
+		data.IsCDNIP = r.IsCDNIP
+		data.CDNName = r.CDNName
+		data.PortNumber = r.Port
+		data.Protocol = r.Protocol
+		data.TLS = r.TLS
+
 		return json.Marshal(data)
 	}
 
 	dataMap := make(map[string]interface{})
 
-	vl := reflect.ValueOf(*r)
-	ty := reflect.TypeOf(*r)
-
-	for i := 0; i < vl.NumField(); i++ {
-		field := vl.Field(i)
-		fieldName := ty.Field(i).Name
-		jsonTag := ty.Field(i).Tag.Get("json")
-
-		if jsonTag == "" {
-			jsonTag = strings.ToLower(fieldName)
-		} else {
-			jsonTag = strings.Split(jsonTag, ",")[0] // json 옵션 (omitempty 등) 제거
-		}
-
-		if slices.Contains(selectedFields, jsonTag) {
-			dataMap[jsonTag] = field.Interface()
+	for _, field := range selectedFields {
+		switch field {
+		case "timestamp":
+			dataMap["timestamp"] = r.TimeStamp
+		case "host":
+			if r.Host != r.IP {
+				dataMap["host"] = r.Host
+			}
+		case "ip":
+			dataMap["ip"] = r.IP
+		case "IsCDNIP":
+			dataMap["IsCDNIP"] = r.IsCDNIP
+		case "CDNName":
+			dataMap["CDNName"] = r.CDNName
+		case "port":
+			dataMap["port"] = r.Port
+		case "protocol":
+			dataMap["protocol"] = r.Protocol
+		case "tls":
+			dataMap["tls"] = r.TLS
 		}
 	}
 
