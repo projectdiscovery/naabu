@@ -57,7 +57,6 @@ func (r *Result) JSON(selectedFields []string) ([]byte, error) {
 
 	dataMap := make(map[string]interface{})
 
-	// `reflect`를 사용하여 동적으로 선택된 필드만 추가
 	vl := reflect.ValueOf(*r)
 	ty := reflect.TypeOf(*r)
 
@@ -66,7 +65,6 @@ func (r *Result) JSON(selectedFields []string) ([]byte, error) {
 		fieldName := ty.Field(i).Name
 		jsonTag := ty.Field(i).Tag.Get("json")
 
-		// json 태그가 존재하지 않으면 필드 이름을 그대로 사용
 		if jsonTag == "" {
 			jsonTag = strings.ToLower(fieldName)
 		} else {
