@@ -7,11 +7,10 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
@@ -59,28 +58,32 @@ var (
 	headers              = []string{}
 )
 
-func (r *Result) CSVHeaders() ([]string, error) {
+func (r *Result) CSVHeaders(selectedFields []string) ([]string, error) {
+	var headers []string
 	ty := reflect.TypeOf(*r)
+
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !slices.Contains(headers, csvTag) {
+
+		if selectedFields == nil || slices.Contains(selectedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
 	return headers, nil
 }
 
-func (r *Result) CSVFields() ([]string, error) {
+func (r *Result) CSVFields(selectedFields []string) ([]string, error) {
 	var fields []string
 	vl := reflect.ValueOf(*r)
 	ty := reflect.TypeOf(*r)
+
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		fieldValue := field.Interface()
-		if slices.Contains(headers, csvTag) {
-			fields = append(fields, fmt.Sprint(fieldValue))
+
+		if selectedFields == nil || slices.Contains(selectedFields, csvTag) {
+			fields = append(fields, fmt.Sprint(field.Interface()))
 		}
 	}
 	return fields, nil
@@ -158,56 +161,25 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 }
 
 func writeCSVHeaders(data *Result, writer *csv.Writer, selectedFields []string) {
-	if selectedFields != nil {
-		var headers []string
-		ty := reflect.TypeOf(*data)
-		for i := 0; i < ty.NumField(); i++ {
-			field := ty.Field(i)
-			csvTag := field.Tag.Get("csv")
-			if slices.Contains(selectedFields, csvTag) {
-				headers = append(headers, csvTag)
-			}
-		}
-		if err := writer.Write(headers); err != nil {
-			gologger.Error().Msg(err.Error())
-		}
-	} else {
-		headers, err := data.CSVHeaders()
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			return
-		}
-		if err := writer.Write(headers); err != nil {
-			errMsg := errors.Wrap(err, "Could not write headers")
-			gologger.Error().Msg(errMsg.Error())
-		}
+	headers, err := data.CSVHeaders(selectedFields)
+	if err != nil {
+		gologger.Error().Msg(err.Error())
+		return
+	}
+	if err := writer.Write(headers); err != nil {
+		errMsg := errors.Wrap(err, "Could not write headers")
+		gologger.Error().Msg(errMsg.Error())
 	}
 }
 
 func writeCSVRow(data *Result, writer *csv.Writer, selectedFields []string) {
-	if selectedFields != nil {
-		var fields []string
-		vl := reflect.ValueOf(*data)
-		ty := reflect.TypeOf(*data)
-		for i := 0; i < vl.NumField(); i++ {
-			field := vl.Field(i)
-			csvTag := ty.Field(i).Tag.Get("csv")
-			if slices.Contains(selectedFields, csvTag) {
-				fields = append(fields, fmt.Sprint(field.Interface()))
-			}
-		}
-		if err := writer.Write(fields); err != nil {
-			gologger.Error().Msg(err.Error())
-		}
-	} else {
-		rowData, err := data.CSVFields()
-		if err != nil {
-			gologger.Error().Msg(err.Error())
-			return
-		}
-		if err := writer.Write(rowData); err != nil {
-			errMsg := errors.Wrap(err, "Could not write row")
-			gologger.Error().Msg(errMsg.Error())
-		}
+	rowData, err := data.CSVFields(selectedFields)
+	if err != nil {
+		gologger.Error().Msg(err.Error())
+		return
+	}
+	if err := writer.Write(rowData); err != nil {
+		errMsg := errors.Wrap(err, "Could not write row")
+		gologger.Error().Msg(errMsg.Error())
 	}
 }
