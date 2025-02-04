@@ -60,13 +60,12 @@ var (
 )
 
 func (r *Result) CSVHeaders(selectedFields []string) ([]string, error) {
-	var headers []string
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
 
-		if selectedFields == nil || slices.Contains(selectedFields, csvTag) {
+		if len(selectedFields) == 0 || slices.Contains(selectedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
@@ -81,7 +80,7 @@ func (r *Result) CSVFields(selectedFields []string) ([]string, error) {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
 
-		if selectedFields == nil || slices.Contains(selectedFields, csvTag) {
+		if len(selectedFields) == 0 || slices.Contains(selectedFields, csvTag) {
 			fields = append(fields, fmt.Sprint(field.Interface()))
 		}
 	}
