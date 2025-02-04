@@ -67,7 +67,7 @@ type Options struct {
 	OnResult          result.ResultFn // callback on final host result
 	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
-	CSVFields         goflags.StringSlice // 사용자가 선택할 필드
+	CSVFields         goflags.StringSlice // Field for user selection
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
