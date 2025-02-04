@@ -38,7 +38,7 @@ type jsonResult struct {
 	TLS        bool   `json:"tls"`
 }
 
-func (r *Result) JSON() ([]byte, error) {
+func (r *Result) JSON(selectedFields []string) ([]byte, error) {
 	data := jsonResult{}
 	data.TimeStamp = r.TimeStamp
 	if r.Host != r.IP {
@@ -51,7 +51,34 @@ func (r *Result) JSON() ([]byte, error) {
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 
-	return json.Marshal(data)
+	if len(selectedFields) == 0 {
+		return json.Marshal(data)
+	}
+
+	dataMap := make(map[string]interface{})
+
+	// `reflect`를 사용하여 동적으로 선택된 필드만 추가
+	vl := reflect.ValueOf(*r)
+	ty := reflect.TypeOf(*r)
+
+	for i := 0; i < vl.NumField(); i++ {
+		field := vl.Field(i)
+		fieldName := ty.Field(i).Name
+		jsonTag := ty.Field(i).Tag.Get("json")
+
+		// json 태그가 존재하지 않으면 필드 이름을 그대로 사용
+		if jsonTag == "" {
+			jsonTag = strings.ToLower(fieldName)
+		} else {
+			jsonTag = strings.Split(jsonTag, ",")[0] // json 옵션 (omitempty 등) 제거
+		}
+
+		if slices.Contains(selectedFields, jsonTag) {
+			dataMap[jsonTag] = field.Interface()
+		}
+	}
+
+	return json.Marshal(dataMap)
 }
 
 var (

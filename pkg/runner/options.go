@@ -67,6 +67,7 @@ type Options struct {
 	OnResult          result.ResultFn // callback on final host result
 	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
+	Fields            goflags.StringSlice // 사용자가 선택할 필드
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
@@ -141,6 +142,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
 		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
+		flagSet.StringSliceVarP(&options.Fields, "f", "field", nil, "Specify fields to include in output (comma-separated)", goflags.NormalizedStringSliceOptions),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
