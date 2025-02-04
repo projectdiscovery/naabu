@@ -7,10 +7,11 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"slices"
 	"strconv"
 	"strings"
 	"time"
+
+	"golang.org/x/exp/slices"
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
@@ -61,7 +62,6 @@ var (
 func (r *Result) CSVHeaders(selectedFields []string) ([]string, error) {
 	var headers []string
 	ty := reflect.TypeOf(*r)
-
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
@@ -77,7 +77,6 @@ func (r *Result) CSVFields(selectedFields []string) ([]string, error) {
 	var fields []string
 	vl := reflect.ValueOf(*r)
 	ty := reflect.TypeOf(*r)
-
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")

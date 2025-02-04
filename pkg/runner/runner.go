@@ -222,12 +222,11 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
-					selectedFields := r.options.CSVFields
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer, selectedFields)
+						writeCSVHeaders(data, writer, r.options.CSVFields)
 						csvHeaderEnabled = false
 					}
-					writeCSVRow(data, writer, selectedFields)
+					writeCSVRow(data, writer, r.options.CSVFields)
 				}
 			}
 		}
@@ -1005,8 +1004,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						selectedFields := r.options.CSVFields
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, selectedFields)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, r.options.CSVFields)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1068,8 +1066,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						selectedFields := r.options.CSVFields
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, selectedFields)
+						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file, r.options.CSVFields)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
