@@ -10,8 +10,8 @@ type Port struct {
 	Port     int               `json:"port"`
 	Protocol protocol.Protocol `json:"protocol"`
 	// Deprecated: TLS field will be removed in a future version
-	TLS     bool    `json:"tls"`
-	Service Service `json:"service"`
+	TLS     bool     `json:"tls"`
+	Service *Service `json:"service,omitempty"`
 }
 
 func (p *Port) String() string {
@@ -19,21 +19,21 @@ func (p *Port) String() string {
 }
 
 type Service struct {
-	DeviceType  string `json:"device_type"`
-	ExtraInfo   string `json:"extra_info"`
-	HighVersion string `json:"high_version"`
-	Hostname    string `json:"hostname"`
-	LowVersion  string `json:"low_version"`
-	Method      string `json:"method"`
-	Name        string `json:"name"`
-	OSType      string `json:"os_type"`
-	Product     string `json:"product"`
-	Proto       string `json:"proto"`
-	RPCNum      string `json:"rpc_num"`
-	ServiceFP   string `json:"service_fp"`
-	Tunnel      string `json:"tunnel"`
-	Version     string `json:"version"`
-	Confidence  int    `json:"confidence"`
+	DeviceType  string `json:"device_type,omitempty"`
+	ExtraInfo   string `json:"extra_info,omitempty"`
+	HighVersion string `json:"high_version,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	LowVersion  string `json:"low_version,omitempty"`
+	Method      string `json:"method,omitempty"`
+	Name        string `json:"name,omitempty"`
+	OSType      string `json:"os_type,omitempty"`
+	Product     string `json:"product,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	RPCNum      string `json:"rpc_num,omitempty"`
+	ServiceFP   string `json:"service_fp,omitempty"`
+	Tunnel      string `json:"tunnel,omitempty"`
+	Version     string `json:"version,omitempty"`
+	Confidence  int    `json:"confidence,omitempty"`
 }
 
 func (s *Service) String() string {
