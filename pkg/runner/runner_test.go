@@ -184,7 +184,10 @@ func TestNewRunner(t *testing.T) {
 			}
 
 			if runner.stats != nil {
-				runner.stats.Stop()
+				err := runner.stats.Stop()
+				if err != nil {
+					t.Errorf("failed to stop stats: %v", err)
+				}
 			}
 		})
 	}
@@ -756,7 +759,7 @@ func TestRunnerHostDiscovery(t *testing.T) {
 		ListenHandler: &scan.ListenHandler{
 			Phase: &scan.Phase{},
 		},
-		IPRanger: runner.scanner.IPRanger, 
+		IPRanger: runner.scanner.IPRanger,
 	}
 
 	runner.scanner = mockScanner
@@ -857,5 +860,5 @@ func TestRunnerConnectVerification(t *testing.T) {
 	for range runner.scanner.ScanResults.GetIPsPorts() {
 		count++
 	}
-	require.Equal(t, 1, count) 
+	require.Equal(t, 1, count)
 }
