@@ -210,6 +210,7 @@ func TestRunnerClose(t *testing.T) {
 
 	tmpfile, err := os.CreateTemp("", "naabu-test")
 	require.NoError(t, err)
+	require.NoError(t, tmpfile.Close())
 	defer os.Remove(tmpfile.Name())
 
 	runner.targetsFile = tmpfile.Name()
