@@ -1,9 +1,11 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -12,6 +14,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/ratelimit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -59,7 +62,6 @@ func TestNewRunner(t *testing.T) {
 			wantErr: false,
 			validate: func(t *testing.T, runner *Runner) {
 				assert.Contains(t, runner.options.IPVersion, "6")
-				// Verify DNS client is configured for IPv6
 				assert.Contains(t, runner.dnsclient.Options.QuestionTypes, dns.TypeAAAA)
 			},
 		},
@@ -96,7 +98,6 @@ func TestNewRunner(t *testing.T) {
 			},
 			wantErr: false,
 			validate: func(t *testing.T, runner *Runner) {
-				// Should default to top 100 ports
 				ports, err := parsePortsList(NmapTop100)
 				require.NoError(t, err)
 				assert.Equal(t, len(ports), len(runner.scanner.Ports))
@@ -182,7 +183,6 @@ func TestNewRunner(t *testing.T) {
 				tt.validate(t, runner)
 			}
 
-			// Clean up resources if needed
 			if runner.stats != nil {
 				runner.stats.Stop()
 			}
@@ -205,7 +205,6 @@ func TestRunnerClose(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, runner)
 
-	// Create a temporary file to test cleanup
 	tmpfile, err := os.CreateTemp("", "naabu-test")
 	require.NoError(t, err)
 	defer os.Remove(tmpfile.Name())
@@ -213,7 +212,6 @@ func TestRunnerClose(t *testing.T) {
 	runner.targetsFile = tmpfile.Name()
 	runner.Close()
 
-	// Verify the temporary file was removed
 	_, err = os.Stat(tmpfile.Name())
 	assert.True(t, os.IsNotExist(err))
 }
@@ -251,6 +249,52 @@ func TestRunnerOnReceive(t *testing.T) {
 				v, exists := runner.unique.Get(ipPort)
 				require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
 				require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
+			},
+		},
+		{
+			name: "json output with cdn",
+			options: &Options{
+				IPVersion: []string{"4"},
+				Host:      []string{"example.com"},
+				Ports:     "80",
+				JSON:      true,
+				OutputCDN: true,
+			},
+			input: &result.HostResult{
+				IP: "192.168.1.4",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP, TLS: true},
+				},
+			},
+			ipRanger: map[string][]string{
+				"192.168.1.4": {"cdn.example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				require.True(t, runner.scanner.ScanResults.IPHasPort(input.IP, input.Ports[0]))
+			},
+		},
+		{
+			name: "csv output with cdn",
+			options: &Options{
+				IPVersion: []string{"4"},
+				Host:      []string{"example.com"},
+				Ports:     "80",
+				CSV:       true,
+				OutputCDN: true,
+			},
+			input: &result.HostResult{
+				IP: "192.168.1.5",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP, TLS: true},
+				},
+			},
+			ipRanger: map[string][]string{
+				"192.168.1.5": {"cdn2.example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				require.True(t, runner.scanner.ScanResults.IPHasPort(input.IP, input.Ports[0]))
 			},
 		},
 		{
@@ -329,7 +373,6 @@ func TestRunnerOnReceive(t *testing.T) {
 				v, exists := runner.unique.Get(ipPort)
 				require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
 				require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
-				// Should only be stored once
 				count := 0
 				for range runner.scanner.ScanResults.GetIPsPorts() {
 					count++
@@ -359,7 +402,6 @@ func TestRunnerOnReceive(t *testing.T) {
 				}
 			}
 
-			// Call onReceive
 			runner.onReceive(tt.input)
 
 			tt.validate(t, runner, tt.input)
@@ -537,7 +579,6 @@ func TestRunnerSetSourcePort(t *testing.T) {
 	}
 }
 
-// Helper function to parse port
 func mustParsePort(t *testing.T, s string) int {
 	port, err := net.LookupPort("tcp", s)
 	require.NoError(t, err)
@@ -610,4 +651,211 @@ func TestRunnerCanIScanIfCDN(t *testing.T) {
 			assert.Equal(t, tt.expected, result)
 		})
 	}
+}
+
+// TestRunnerEnumeration tests the full enumeration flow
+func TestRunnerEnumeration(t *testing.T) {
+	tests := []struct {
+		name     string
+		options  *Options
+		validate func(t *testing.T, runner *Runner)
+	}{
+		{
+			name: "host discovery with syn scan",
+			options: &Options{
+				Host:                      []string{"192.168.1.0/30"},
+				Ports:                     "80,443",
+				ScanType:                  SynScan,
+				IcmpEchoRequestProbe:      true,
+				IcmpTimestampRequestProbe: true,
+				TcpSynPingProbes:          []string{"80"},
+				EnableProgressBar:         true,
+				Retries:                   1,
+				Rate:                      100,
+				Timeout:                   time.Second * 5,
+			},
+			validate: func(t *testing.T, runner *Runner) {
+				require.NotNil(t, runner.scanner)
+				require.NotNil(t, runner.stats)
+			},
+		},
+		{
+			name: "connect scan with verification",
+			options: &Options{
+				Host:     []string{"127.0.0.1"},
+				Ports:    "80",
+				ScanType: ConnectScan,
+				Verify:   true,
+				Passive:  true,
+			},
+			validate: func(t *testing.T, runner *Runner) {
+				require.NotNil(t, runner.scanner)
+			},
+		},
+		{
+			name: "scan with cdn exclusion",
+			options: &Options{
+				Host:       []string{"192.168.1.1"},
+				Ports:      "80,443,8080",
+				ScanType:   ConnectScan,
+				ExcludeCDN: true,
+				OutputCDN:  true,
+			},
+			validate: func(t *testing.T, runner *Runner) {
+				require.NotNil(t, runner.scanner)
+				require.True(t, runner.options.ExcludeCDN)
+				require.True(t, runner.options.OutputCDN)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner, err := NewRunner(tt.options)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			err = runner.RunEnumeration(ctx)
+			if err != nil && !strings.Contains(err.Error(), "operation not permitted") {
+				require.NoError(t, err)
+			}
+
+			tt.validate(t, runner)
+			runner.Close()
+		})
+	}
+}
+
+// TestRunnerHostDiscovery tests host discovery methods
+func TestRunnerHostDiscovery(t *testing.T) {
+	options := &Options{
+		Host:                        []string{"127.0.0.1"},
+		Ports:                       "80,443",
+		ScanType:                    ConnectScan,
+		IcmpEchoRequestProbe:        false,
+		IcmpTimestampRequestProbe:   false,
+		IcmpAddressMaskRequestProbe: false,
+		IPv6NeighborDiscoveryPing:   false,
+		ArpPing:                     false,
+		TcpSynPingProbes:            []string{"80"},
+		TcpAckPingProbes:            []string{"443"},
+		OnlyHostDiscovery:           true,
+		Rate:                        100,
+		Timeout:                     2 * time.Second,
+		SkipHostDiscovery:           true,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+
+	mockScanner := &scan.Scanner{
+		ScanResults:          result.NewResult(),
+		HostDiscoveryResults: result.NewResult(),
+		ListenHandler: &scan.ListenHandler{
+			Phase: &scan.Phase{},
+		},
+		IPRanger: runner.scanner.IPRanger, 
+	}
+
+	runner.scanner = mockScanner
+
+	runner.limiter = ratelimit.New(context.Background(), uint(options.Rate), time.Second)
+
+	require.NotEmpty(t, options.TcpSynPingProbes)
+	require.NotEmpty(t, options.TcpAckPingProbes)
+	require.Equal(t, []string(options.TcpSynPingProbes), []string{"80"})
+	require.Equal(t, []string(options.TcpAckPingProbes), []string{"443"})
+
+	mockScanner.HostDiscoveryResults.AddIp("127.0.0.1")
+
+	require.True(t, mockScanner.HostDiscoveryResults.HasIP("127.0.0.1"))
+
+	if runner.limiter != nil {
+		runner.limiter.Stop()
+	}
+	runner.Close()
+}
+
+// TestRunnerGetIPs tests IP preprocessing methods
+func TestRunnerGetIPs(t *testing.T) {
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80,443",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4", "6"},
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer runner.Close()
+
+	err = runner.Load()
+	require.NoError(t, err, "Failed to load targets")
+
+	cidrs, ipsWithPort := runner.getPreprocessedIps()
+	require.NotEmpty(t, cidrs, "Expected non-empty CIDRs")
+	require.Empty(t, ipsWithPort, "Expected empty ipsWithPort initially")
+
+	err = runner.scanner.IPRanger.AddHostWithMetadata("192.168.1.2:80", "example.com")
+	require.NoError(t, err)
+
+	cidrs, ipsWithPort = runner.getPreprocessedIps()
+	require.NotEmpty(t, cidrs, "Expected non-empty CIDRs")
+	require.NotEmpty(t, ipsWithPort, "Expected non-empty ipsWithPort after adding host with port")
+	require.Contains(t, ipsWithPort, "192.168.1.2:80", "Expected to find added IP:port combination")
+
+	runner.scanner.HostDiscoveryResults.AddIp("192.168.1.1")
+	cidrs, ipsWithPort = runner.getHostDiscoveryIps()
+	require.NotEmpty(t, cidrs, "Expected non-empty CIDRs from host discovery")
+	require.NotEmpty(t, ipsWithPort, "Expected non-empty ipsWithPort from host discovery")
+
+	targets, targetsV4, targetsV6, targetsWithPort, err := runner.GetTargetIps(runner.getPreprocessedIps)
+	require.NoError(t, err, "Expected no error from GetTargetIps")
+	require.NotEmpty(t, targets, "Expected non-empty targets")
+	require.NotEmpty(t, targetsV4, "Expected non-empty IPv4 targets")
+	require.Empty(t, targetsV6, "Expected empty IPv6 targets as none were added")
+	require.NotEmpty(t, targetsWithPort, "Expected non-empty targetsWithPort")
+	require.Contains(t, targetsWithPort, "192.168.1.2:80", "Expected to find added IP:port combination in targets")
+
+	found := false
+	for _, target := range targetsV4 {
+		if target.String() == "192.168.1.0/24" {
+			found = true
+			break
+		}
+	}
+	require.True(t, found, "Expected to find the CIDR range 192.168.1.0/24 in targetsV4")
+}
+
+// TestRunnerConnectVerification tests port verification
+func TestRunnerConnectVerification(t *testing.T) {
+	options := &Options{
+		Host:     []string{"127.0.0.1"},
+		Ports:    "80,443",
+		ScanType: ConnectScan,
+		Rate:     100,
+		Verify:   true,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+
+	ports := []*port.Port{
+		{Port: 80, Protocol: protocol.TCP},
+		{Port: 443, Protocol: protocol.TCP},
+	}
+	for _, p := range ports {
+		runner.scanner.ScanResults.AddPort("127.0.0.1", p)
+	}
+
+	runner.ConnectVerification()
+	require.NotNil(t, runner.scanner.ScanResults)
+
+	count := 0
+	for range runner.scanner.ScanResults.GetIPsPorts() {
+		count++
+	}
+	require.Equal(t, 1, count) 
 }
