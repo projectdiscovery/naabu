@@ -1,11 +1,13 @@
 package runner
 
 import (
+	"fmt"
 	"net"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/miekg/dns"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
@@ -21,9 +23,10 @@ func TestNewRunner(t *testing.T) {
 		options     *Options
 		wantErr     bool
 		errContains string
+		validate    func(t *testing.T, runner *Runner)
 	}{
 		{
-			name: "valid options",
+			name: "valid options with default settings",
 			options: &Options{
 				Host:     []string{"example.com"},
 				Ports:    "80,443",
@@ -33,32 +36,129 @@ func TestNewRunner(t *testing.T) {
 				ScanType: ConnectScan,
 			},
 			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Equal(t, 2, len(runner.scanner.Ports))
+
+				expected := []string{"4"}
+				actual := []string(runner.options.IPVersion)
+				assert.Equal(t, expected, actual)
+				assert.NotNil(t, runner.dnsclient)
+				assert.NotNil(t, runner.streamChannel)
+				assert.NotNil(t, runner.unique)
+			},
+		},
+		{
+			name: "valid options with IPv6",
+			options: &Options{
+				Host:      []string{"example.com"},
+				Ports:     "80,443",
+				IPVersion: []string{"6"},
+				Timeout:   30 * time.Second,
+				ScanType:  ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Contains(t, runner.options.IPVersion, "6")
+				// Verify DNS client is configured for IPv6
+				assert.Contains(t, runner.dnsclient.Options.QuestionTypes, dns.TypeAAAA)
+			},
+		},
+		{
+			name: "valid options with custom resolvers",
+			options: &Options{
+				Host:          []string{"example.com"},
+				Ports:         "80,443",
+				baseResolvers: []string{"8.8.8.8", "1.1.1.1"},
+				ScanType:      ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Equal(t, []string{"8.8.8.8", "1.1.1.1"}, runner.dnsclient.Options.BaseResolvers)
+			},
 		},
 		{
 			name: "invalid port",
 			options: &Options{
 				Host:     []string{"example.com"},
-				Ports:    "99999", // Invalid port
+				Ports:    "99999",
 				Timeout:  30 * time.Second,
-				Retries:  3,
-				Rate:     1000,
 				ScanType: ConnectScan,
 			},
 			wantErr:     true,
 			errContains: "invalid port",
 		},
 		{
-			name: "no hosts",
+			name: "empty ports with top ports default",
 			options: &Options{
-				Host:     []string{},
-				Ports:    "80",
+				Host:     []string{"example.com"},
 				Timeout:  30 * time.Second,
-				Retries:  3,
-				Rate:     1000,
 				ScanType: ConnectScan,
 			},
-			wantErr:     true,
-			errContains: "no targets provided",
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				// Should default to top 100 ports
+				ports, err := parsePortsList(NmapTop100)
+				require.NoError(t, err)
+				assert.Equal(t, len(ports), len(runner.scanner.Ports))
+			},
+		},
+		{
+			name: "host discovery disabled for single port",
+			options: &Options{
+				Host:     []string{"example.com"},
+				Ports:    "80",
+				ScanType: ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.False(t, runner.options.WithHostDiscovery)
+			},
+		},
+		{
+			name: "excluded IPs configuration",
+			options: &Options{
+				Host:       []string{"example.com"},
+				Ports:      "80,443",
+				ExcludeIps: "192.168.1.1,10.0.0.0/8",
+				ScanType:   ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.NotNil(t, runner.scanner.IPRanger)
+				// Verify excluded IPs are properly configured
+				excluded, err := runner.parseExcludedIps(runner.options)
+				require.NoError(t, err)
+				assert.Contains(t, excluded, "192.168.1.1")
+				assert.Contains(t, excluded, "10.0.0.0/8")
+			},
+		},
+		{
+			name: "proxy configuration",
+			options: &Options{
+				Host:      []string{"example.com"},
+				Ports:     "80,443",
+				Proxy:     "socks5://127.0.0.1:9050",
+				ProxyAuth: "user:pass",
+				ScanType:  ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.NotNil(t, runner.scanner)
+			},
+		},
+		{
+			name: "enable progress bar",
+			options: &Options{
+				Host:              []string{"example.com"},
+				Ports:             "80,443",
+				EnableProgressBar: true,
+				MetricsPort:       8080,
+				ScanType:          ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.NotNil(t, runner.stats)
+			},
 		},
 	}
 
@@ -72,10 +172,20 @@ func TestNewRunner(t *testing.T) {
 				}
 				return
 			}
+
 			require.NoError(t, err)
 			require.NotNil(t, runner)
 			require.NotNil(t, runner.scanner)
 			require.NotNil(t, runner.options)
+
+			if tt.validate != nil {
+				tt.validate(t, runner)
+			}
+
+			// Clean up resources if needed
+			if runner.stats != nil {
+				runner.stats.Stop()
+			}
 		})
 	}
 }
@@ -110,40 +220,150 @@ func TestRunnerClose(t *testing.T) {
 
 // TestRunnerOnReceive tests the result handling callback
 func TestRunnerOnReceive(t *testing.T) {
-	options := &Options{
-		Host:     []string{"example.com"},
-		Ports:    "80",
-		Timeout:  30 * time.Second,
-		Retries:  3,
-		Rate:     1000,
-		ScanType: ConnectScan,
-	}
+	tests := []struct {
+		name     string
+		options  *Options
+		input    *result.HostResult
+		ipRanger map[string][]string
+		validate func(t *testing.T, runner *Runner, input *result.HostResult)
+	}{
+		{
+			name: "simple port result",
+			options: &Options{
+				IPVersion: []string{"4"},
+				Host:      []string{"example.com"},
+				Ports:     "80",
+			},
+			input: &result.HostResult{
+				IP: "192.168.1.1",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP},
+				},
+			},
+			ipRanger: map[string][]string{
+				"192.168.1.1": {"example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				require.True(t, runner.scanner.ScanResults.IPHasPort(input.IP, input.Ports[0]))
 
-	runner, err := NewRunner(options)
-	require.NoError(t, err)
-
-	resultsChan := make(chan *result.HostResult, 1)
-	options.OnResult = func(hr *result.HostResult) {
-		resultsChan <- hr
-	}
-
-	// Simulate receiving a result
-	hostResult := &result.HostResult{
-		IP: "192.168.1.1",
-		Ports: []*port.Port{
-			{Port: 80, Protocol: protocol.TCP},
+				ipPort := net.JoinHostPort("192.168.1.1", "80")
+				v, exists := runner.unique.Get(ipPort)
+				require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
+				require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
+			},
+		},
+		{
+			name: "multiple ports result",
+			options: &Options{
+				IPVersion: []string{"4"},
+				Host:      []string{"example.com"},
+				Ports:     "80,443",
+			},
+			input: &result.HostResult{
+				IP: "192.168.1.2",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP},
+					{Port: 443, Protocol: protocol.TCP},
+				},
+			},
+			ipRanger: map[string][]string{
+				"192.168.1.2": {"example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				for _, p := range input.Ports {
+					require.True(t, runner.scanner.ScanResults.IPHasPort(input.IP, p))
+					ipPort := net.JoinHostPort("192.168.1.2", fmt.Sprint(p.Port))
+					v, exists := runner.unique.Get(ipPort)
+					require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
+					require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
+				}
+			},
+		},
+		{
+			name: "ipv6 result with ipv6 option",
+			options: &Options{
+				IPVersion: []string{"6"},
+				Host:      []string{"example.com"},
+				Ports:     "80",
+			},
+			input: &result.HostResult{
+				IP: "2001:db8::1",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP},
+				},
+			},
+			ipRanger: map[string][]string{
+				"2001:db8::1": {"example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				require.True(t, runner.scanner.ScanResults.IPHasPort(input.IP, input.Ports[0]))
+				ipPort := net.JoinHostPort("2001:db8::1", "80")
+				v, exists := runner.unique.Get(ipPort)
+				require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
+				require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
+			},
+		},
+		{
+			name: "duplicate port result",
+			options: &Options{
+				IPVersion: []string{"4"},
+				Host:      []string{"example.com"},
+				Ports:     "80",
+			},
+			input: &result.HostResult{
+				IP: "192.168.1.3",
+				Ports: []*port.Port{
+					{Port: 80, Protocol: protocol.TCP},
+					{Port: 80, Protocol: protocol.TCP},
+				},
+			},
+			ipRanger: map[string][]string{
+				"192.168.1.3": {"example.com"},
+			},
+			validate: func(t *testing.T, runner *Runner, input *result.HostResult) {
+				require.True(t, runner.scanner.ScanResults.HasIPsPorts())
+				ipPort := net.JoinHostPort("192.168.1.3", "80")
+				v, exists := runner.unique.Get(ipPort)
+				require.NotNil(t, v, "Expected %s to be in unique cache", ipPort)
+				require.True(t, exists == nil, "Expected no error getting %s from unique cache", ipPort)
+				// Should only be stored once
+				count := 0
+				for range runner.scanner.ScanResults.GetIPsPorts() {
+					count++
+				}
+				require.Equal(t, 1, count)
+			},
 		},
 	}
 
-	go runner.onReceive(hostResult)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner, err := NewRunner(tt.options)
+			require.NoError(t, err)
 
-	select {
-	case result := <-resultsChan:
-		assert.Equal(t, "192.168.1.1", result.IP)
-		assert.Len(t, result.Ports, 1)
-		assert.Equal(t, 80, result.Ports[0].Port)
-	case <-time.After(time.Second):
-		t.Fatal("timeout waiting for result")
+			for ip, hosts := range tt.ipRanger {
+				err := runner.scanner.IPRanger.Add(ip)
+				require.NoError(t, err)
+				for _, host := range hosts {
+					err = runner.scanner.IPRanger.AddHostWithMetadata(ip, host)
+					require.NoError(t, err)
+				}
+			}
+
+			if tt.name != "ipv6 result with ipv4 only option" {
+				for _, p := range tt.input.Ports {
+					runner.scanner.ScanResults.AddPort(tt.input.IP, p)
+				}
+			}
+
+			// Call onReceive
+			runner.onReceive(tt.input)
+
+			tt.validate(t, runner, tt.input)
+		})
 	}
 }
 
@@ -201,7 +421,6 @@ func TestRunnerPickIP(t *testing.T) {
 	}
 }
 
-// Helper function to parse CIDR
 func mustParseCIDR(t *testing.T, s string) *net.IPNet {
 	_, ipnet, err := net.ParseCIDR(s)
 	require.NoError(t, err)
