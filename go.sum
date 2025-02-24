@@ -218,8 +218,8 @@ github.com/projectdiscovery/ratelimit v0.0.71 h1:vlT39eZf0u890WbRIUjZM2zae9afB3x
 github.com/projectdiscovery/ratelimit v0.0.71/go.mod h1:g0lwpDa9/dAZgS+v9BEtDipUlJ0jKZQYhO8uWfqn5ko=
 github.com/projectdiscovery/retryabledns v1.0.94 h1:MvxtRcmvxhxikxT7p/E40hcYRWRiL5fg/JQ8bpBaz+0=
 github.com/projectdiscovery/retryabledns v1.0.94/go.mod h1:croGTyMM4yNlrSWA/X7xNe3c0c7mDmCdbm8goLd8Bak=
-github.com/projectdiscovery/retryablehttp-go v1.0.99 h1:S+lQqo1ZnO5aoWsBV8HapGslJSaYVUII954SnH1RSjw=
-github.com/projectdiscovery/retryablehttp-go v1.0.99/go.mod h1:8Mv9L9vjmam16garE6/dqLFkT0ZcfLNSo9O1zFBiPlE=
+github.com/projectdiscovery/retryablehttp-go v1.0.101 h1:xmoXGVQ7DD/5YvDvtaOExbbF6aXlr5ARjssXgMdtkmY=
+github.com/projectdiscovery/retryablehttp-go v1.0.101/go.mod h1:d+xU7CAHiOL/v+QQIHT4AXbEjTO7o0B5naQQOC0JDhw=
 github.com/projectdiscovery/uncover v1.0.9 h1:s5RbkD/V4r8QcPkys4gTTqMuRSgXq0JprejqLSopN9Y=
 github.com/projectdiscovery/uncover v1.0.9/go.mod h1:2PUF3SpB5QNIJ8epaB2xbRzkPaxEAWRDm3Ir2ijt81U=
 github.com/projectdiscovery/utils v0.4.11 h1:MWqCFxYINQPa4KWMRNah7W0N1COGRhqOpGVhiR/VaO0=
