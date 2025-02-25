@@ -7,6 +7,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/networkpolicy"
 	fileutil "github.com/projectdiscovery/utils/file"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 
@@ -100,6 +101,8 @@ type Options struct {
 	DisableUpdateCheck bool
 	// MetricsPort with statistics
 	MetricsPort int
+
+	NetworkPolicyOptions *networkpolicy.Options
 }
 
 // ParseOptions parses the command line flags provided by a user
