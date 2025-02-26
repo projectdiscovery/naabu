@@ -122,9 +122,15 @@ func NewScanner(options *Options) (*Scanner, error) {
 		return nil, err
 	}
 
-	var nPolicyOptions networkpolicy.Options
+	var nPolicyOptions *networkpolicy.Options
+	if options.NetworkPolicyOptions != nil {
+		nPolicyOptions = options.NetworkPolicyOptions
+	} else {
+		nPolicyOptions = &networkpolicy.Options{}
+	}
+
 	nPolicyOptions.DenyList = append(nPolicyOptions.DenyList, options.ExcludedIps...)
-	nPolicy, err := networkpolicy.New(nPolicyOptions)
+	nPolicy, err := networkpolicy.New(*nPolicyOptions)
 	if err != nil {
 		return nil, err
 	}

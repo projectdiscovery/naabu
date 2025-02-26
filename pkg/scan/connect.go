@@ -12,7 +12,8 @@ import (
 func (s *Scanner) ConnectVerify(host string, ports []*port.Port) []*port.Port {
 	var verifiedPorts []*port.Port
 	for _, p := range ports {
-		conn, err := net.DialTimeout(p.Protocol.String(), fmt.Sprintf("%s:%d", host, p.Port), s.timeout)
+		target := net.JoinHostPort(host, fmt.Sprint(p.Port))
+		conn, err := net.DialTimeout(p.Protocol.String(), target, s.timeout)
 		if err != nil {
 			continue
 		}
