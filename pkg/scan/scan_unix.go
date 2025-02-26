@@ -305,6 +305,12 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		return
 	}
 
+	if listenHandler.SourceIP6 != nil {
+		ip6.SrcIP = listenHandler.SourceIP6
+	} else {
+		ip6.SrcIP = sourceIP
+	}
+
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
