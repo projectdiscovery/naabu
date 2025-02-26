@@ -215,6 +215,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			for _, p := range hostResult.Ports {
 				data.Port = p.Port
 				data.Protocol = p.Protocol.String()
+				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
 					b, err := data.JSON()
