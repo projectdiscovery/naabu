@@ -275,6 +275,7 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
 			if !isIPInRange {
 				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
+				continue
 			}
 
 			if s.OnReceive != nil {
@@ -314,6 +315,14 @@ func (s *Scanner) UDPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.UdpChan:
+			srcIP4WithPort := net.JoinHostPort(ip.ipv4, ip.port.String())
+			srcIP6WithPort := net.JoinHostPort(ip.ipv6, ip.port.String())
+			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
+			if !isIPInRange {
+				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
+				continue
+			}
+
 			if s.ListenHandler.Phase.Is(HostDiscovery) {
 				gologger.Debug().Msgf("Received UDP probe response from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
 				if ip.ipv4 != "" {
