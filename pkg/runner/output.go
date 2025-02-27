@@ -38,20 +38,50 @@ type jsonResult struct {
 	TLS        bool   `json:"tls"`
 }
 
-func (r *Result) JSON() ([]byte, error) {
-	data := jsonResult{}
-	data.TimeStamp = r.TimeStamp
-	if r.Host != r.IP {
-		data.Host = r.Host
-	}
-	data.IP = r.IP
-	data.IsCDNIP = r.IsCDNIP
-	data.CDNName = r.CDNName
-	data.PortNumber = r.Port
-	data.Protocol = r.Protocol
-	data.TLS = r.TLS
+func (r *Result) JSON(selectedFields []string) ([]byte, error) {
 
-	return json.Marshal(data)
+	if len(selectedFields) == 0 {
+		data := jsonResult{}
+		data.TimeStamp = r.TimeStamp
+		if r.Host != r.IP {
+			data.Host = r.Host
+		}
+		data.IP = r.IP
+		data.IsCDNIP = r.IsCDNIP
+		data.CDNName = r.CDNName
+		data.PortNumber = r.Port
+		data.Protocol = r.Protocol
+		data.TLS = r.TLS
+
+		return json.Marshal(data)
+	}
+
+	dataMap := make(map[string]interface{})
+
+	for _, field := range selectedFields {
+		switch field {
+		case "timestamp":
+			dataMap["timestamp"] = r.TimeStamp
+		case "host":
+			if r.Host != r.IP {
+				dataMap["host"] = r.Host
+			}
+		case "ip":
+			dataMap["ip"] = r.IP
+		case "IsCDNIP":
+			dataMap["cdn"] = r.IsCDNIP
+		case "CDNName":
+			dataMap["cdn-name"] = r.CDNName
+		case "port":
+			dataMap["port"] = r.Port
+		case "protocol":
+			dataMap["protocol"] = r.Protocol
+		case "tls":
+			dataMap["tls"] = r.TLS
+		}
+	}
+
+	return json.Marshal(dataMap)
 }
 
 var (
