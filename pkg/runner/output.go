@@ -59,28 +59,29 @@ var (
 	headers              = []string{}
 )
 
-func (r *Result) CSVHeaders() ([]string, error) {
+func (r *Result) CSVHeaders(selectedFields []string) ([]string, error) {
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !slices.Contains(headers, csvTag) {
+
+		if len(selectedFields) == 0 || slices.Contains(selectedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
 	return headers, nil
 }
 
-func (r *Result) CSVFields() ([]string, error) {
+func (r *Result) CSVFields(selectedFields []string) ([]string, error) {
 	var fields []string
 	vl := reflect.ValueOf(*r)
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		fieldValue := field.Interface()
-		if slices.Contains(headers, csvTag) {
-			fields = append(fields, fmt.Sprint(fieldValue))
+
+		if len(selectedFields) == 0 || slices.Contains(selectedFields, csvTag) {
+			fields = append(fields, fmt.Sprint(field.Interface()))
 		}
 	}
 	return fields, nil
@@ -135,7 +136,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer, selectedFields []string) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
 	if host != ip {
@@ -146,35 +147,33 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 		data.CDNName = cdnName
 	}
 	if header {
-		writeCSVHeaders(data, encoder)
+		writeCSVHeaders(data, encoder, selectedFields)
 	}
-
 	for _, p := range ports {
 		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
 		//nolint
 		data.TLS = p.TLS
-		writeCSVRow(data, encoder)
+		writeCSVRow(data, encoder, selectedFields)
 	}
 	encoder.Flush()
 	return nil
 }
 
-func writeCSVHeaders(data *Result, writer *csv.Writer) {
-	headers, err := data.CSVHeaders()
+func writeCSVHeaders(data *Result, writer *csv.Writer, selectedFields []string) {
+	headers, err := data.CSVHeaders(selectedFields)
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
 	}
-
 	if err := writer.Write(headers); err != nil {
 		errMsg := errors.Wrap(err, "Could not write headers")
 		gologger.Error().Msg(errMsg.Error())
 	}
 }
 
-func writeCSVRow(data *Result, writer *csv.Writer) {
-	rowData, err := data.CSVFields()
+func writeCSVRow(data *Result, writer *csv.Writer, selectedFields []string) {
+	rowData, err := data.CSVFields(selectedFields)
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
