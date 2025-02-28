@@ -708,6 +708,9 @@ func (r *Runner) Close() {
 	if r.limiter != nil {
 		r.limiter.Stop()
 	}
+	if r.options.OnClose != nil {
+		r.options.OnClose()
+	}
 }
 
 // PickIP randomly
