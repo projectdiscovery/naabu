@@ -134,6 +134,15 @@ DEBUG:
    -stats                    display stats of the running scan (deprecated)
    -si, -stats-interval int  number of seconds to wait between showing a statistics update (deprecated) (default 5)
    -mp, -metrics-port int    port to expose naabu metrics on (default 63636)
+
+CLOUD:
+   -auth                           configure projectdiscovery cloud (pdcp) api key (default true)
+   -ac, -auth-config string        configure projectdiscovery cloud (pdcp) api key credential file
+   -pd, -dashboard                 upload / view output in projectdiscovery cloud (pdcp) UI dashboard
+   -tid, -team-id string           upload asset results to given team id (optional)
+   -aid, -asset-id string          upload new assets to existing asset id (optional)
+   -aname, -asset-name string      assets group name to set (optional)
+   -pdu, -dashboard-upload string  upload naabu output file (jsonl) in projectdiscovery cloud (pdcp) UI dashboard
 ```
 
 # Installation Instructions

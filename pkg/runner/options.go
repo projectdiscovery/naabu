@@ -2,17 +2,25 @@ package runner
 
 import (
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
+	pdcpauth "github.com/projectdiscovery/utils/auth/pdcp"
 	updateutils "github.com/projectdiscovery/utils/update"
+)
+
+var (
+	PDCPApiKey = ""
+	TeamIDEnv  = env.GetEnvOrDefault("PDCP_TEAM_ID", "")
 )
 
 // Options contains the configuration options for tuning
@@ -100,6 +108,23 @@ type Options struct {
 	DisableUpdateCheck bool
 	// MetricsPort with statistics
 	MetricsPort int
+	// PdcpAuth for projectdiscovery cloud
+	PdcpAuth string
+	// PdcpAuthCredFile for projectdiscovery cloud
+	PdcpAuthCredFile string
+	// AssetUpload for projectdiscovery cloud
+	AssetUpload bool
+	// TeamID for projectdiscovery cloud
+	TeamID string
+	// AssetID for projectdiscovery cloud
+	AssetID string
+	// AssetName for projectdiscovery cloud
+	AssetName string
+	// AssetFileUpload for projectdiscovery cloud
+	AssetFileUpload string
+	// OnClose adds a callback function that is invoked when naabu is closed
+	// to be exact at end of existing closures
+	OnClose func()
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -208,6 +233,16 @@ func ParseOptions() *Options {
 		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on"),
 	)
 
+	flagSet.CreateGroup("cloud", "Cloud",
+		flagSet.DynamicVar(&options.PdcpAuth, "auth", "true", "configure projectdiscovery cloud (pdcp) api key"),
+		flagSet.StringVarP(&options.PdcpAuthCredFile, "auth-config", "ac", "", "configure projectdiscovery cloud (pdcp) api key credential file"),
+		flagSet.BoolVarP(&options.AssetUpload, "dashboard", "pd", false, "upload / view output in projectdiscovery cloud (pdcp) UI dashboard"),
+		flagSet.StringVarP(&options.TeamID, "team-id", "tid", TeamIDEnv, "upload asset results to given team id (optional)"),
+		flagSet.StringVarP(&options.AssetID, "asset-id", "aid", "", "upload new assets to existing asset id (optional)"),
+		flagSet.StringVarP(&options.AssetName, "asset-name", "aname", "", "assets group name to set (optional)"),
+		flagSet.StringVarP(&options.AssetFileUpload, "dashboard-upload", "pdu", "", "upload naabu output file (jsonl) in projectdiscovery cloud (pdcp) UI dashboard"),
+	)
+
 	_ = flagSet.Parse()
 
 	if cfgFile != "" {
@@ -217,6 +252,25 @@ func ParseOptions() *Options {
 		// merge config file with flags
 		if err := flagSet.MergeConfigFile(cfgFile); err != nil {
 			gologger.Fatal().Msgf("Could not read config: %s\n", err)
+		}
+	}
+
+	if options.PdcpAuthCredFile != "" {
+		pdcpauth.PDCPCredFile = options.PdcpAuthCredFile
+		pdcpauth.PDCPDir = filepath.Dir(pdcpauth.PDCPCredFile)
+	}
+
+	// api key hierarchy: cli flag > env var > .pdcp/credential file
+	if options.PdcpAuth == "true" {
+		AuthWithPDCP()
+	} else if len(options.PdcpAuth) == 36 {
+		PDCPApiKey = options.PdcpAuth
+		ph := pdcpauth.PDCPCredHandler{}
+		if _, err := ph.GetCreds(); err == pdcpauth.ErrNoCreds {
+			apiServer := env.GetEnvOrDefault("PDCP_API_SERVER", pdcpauth.DefaultApiServer)
+			if validatedCreds, err := ph.ValidateAPIKey(PDCPApiKey, apiServer, "naabu"); err == nil {
+				_ = ph.SaveCreds(validatedCreds)
+			}
 		}
 	}
 
@@ -239,16 +293,16 @@ func ParseOptions() *Options {
 	showBanner()
 
 	if options.Version {
-		gologger.Info().Msgf("Current Version: %s\n", version)
+		gologger.Info().Msgf("Current Version: %s\n", Version)
 		os.Exit(0)
 	}
 
 	if !options.DisableUpdateCheck {
-		latestVersion, err := updateutils.GetToolVersionCallback("naabu", version)()
+		latestVersion, err := updateutils.GetToolVersionCallback("naabu", Version)()
 		if err != nil {
 			gologger.Verbose().Msgf("naabu version check failed: %v", err.Error())
 		} else {
-			gologger.Info().Msgf("Current naabu version %v %v", version, updateutils.GetVersionDescription(version, latestVersion))
+			gologger.Info().Msgf("Current naabu version %v %v", Version, updateutils.GetVersionDescription(Version, latestVersion))
 		}
 	}
 
