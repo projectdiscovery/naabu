@@ -125,6 +125,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 	for _, p := range ports {
 		data.PortNumber = p.Port
 		data.Protocol = p.Protocol.String()
+		//nolint
 		data.TLS = p.TLS
 		if err := encoder.Encode(&data); err != nil {
 			return err
@@ -151,6 +152,7 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 	for _, p := range ports {
 		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
+		//nolint
 		data.TLS = p.TLS
 		writeCSVRow(data, encoder)
 	}
