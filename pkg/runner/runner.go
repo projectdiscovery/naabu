@@ -116,18 +116,19 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
-		Timeout:       options.GetTimeout(),
-		Retries:       options.Retries,
-		Rate:          options.Rate,
-		PortThreshold: options.PortThreshold,
-		ExcludeCdn:    options.ExcludeCDN,
-		OutputCdn:     options.OutputCDN,
-		ExcludedIps:   excludedIps,
-		Proxy:         options.Proxy,
-		ProxyAuth:     options.ProxyAuth,
-		Stream:        options.Stream,
-		OnReceive:     options.OnReceive,
-		ScanType:      options.ScanType,
+		Timeout:              options.GetTimeout(),
+		Retries:              options.Retries,
+		Rate:                 options.Rate,
+		PortThreshold:        options.PortThreshold,
+		ExcludeCdn:           options.ExcludeCDN,
+		OutputCdn:            options.OutputCDN,
+		ExcludedIps:          excludedIps,
+		Proxy:                options.Proxy,
+		ProxyAuth:            options.ProxyAuth,
+		Stream:               options.Stream,
+		OnReceive:            options.OnReceive,
+		ScanType:             options.ScanType,
+		NetworkPolicyOptions: options.NetworkPolicyOptions,
 	}
 
 	if scanOpts.OnReceive == nil {
@@ -214,6 +215,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			for _, p := range hostResult.Ports {
 				data.Port = p.Port
 				data.Protocol = p.Protocol.String()
+				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
 					b, err := data.JSON(r.options.OutputFilter)
