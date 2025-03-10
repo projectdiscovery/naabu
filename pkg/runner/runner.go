@@ -218,7 +218,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON()
+					b, err := data.JSON(r.options.Fields)
 					if err != nil {
 						continue
 					}
