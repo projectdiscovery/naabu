@@ -190,9 +190,11 @@ acquire:
 }
 
 // Close the scanner and terminate all workers
-func (s *Scanner) Close() {
+func (s *Scanner) Close() error {
 	s.ListenHandler.Busy = false
 	s.ListenHandler = nil
+
+	return nil
 }
 
 // StartWorkers of the scanner
