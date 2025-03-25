@@ -225,7 +225,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer)
+						writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
 						csvHeaderEnabled = false
 					}
 					writeCSVRow(data, writer, r.options.ExcludeОutputFields)
