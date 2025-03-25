@@ -17,13 +17,13 @@ require (
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
 	github.com/projectdiscovery/goflags v0.1.74
-	github.com/projectdiscovery/gologger v1.1.47
+	github.com/projectdiscovery/gologger v1.1.49
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/katana v1.1.2
 	github.com/projectdiscovery/mapcidr v1.1.34
 	github.com/projectdiscovery/networkpolicy v0.1.1
-	github.com/projectdiscovery/ratelimit v0.0.71
-	github.com/projectdiscovery/retryablehttp-go v1.0.101
+	github.com/projectdiscovery/ratelimit v0.0.76
+	github.com/projectdiscovery/retryablehttp-go v1.0.105
 	github.com/projectdiscovery/uncover v1.0.9
 	github.com/projectdiscovery/utils v0.4.16
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -94,10 +94,10 @@ require (
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
 	github.com/projectdiscovery/dsl v0.3.5 // indirect
-	github.com/projectdiscovery/fastdialer v0.3.0 // indirect
-	github.com/projectdiscovery/hmap v0.0.82 // indirect
+	github.com/projectdiscovery/fastdialer v0.4.0 // indirect
+	github.com/projectdiscovery/hmap v0.0.84 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.94 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.96 // indirect
 	github.com/refraction-networking/utls v1.6.7 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
