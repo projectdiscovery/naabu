@@ -43,7 +43,7 @@ type jsonResult struct {
 	TLS        bool      `json:"tls"`
 }
 
-func (r *Result) JSON(outputFilter []string) ([]byte, error) {
+func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data := jsonResult{}
 	data.TimeStamp = r.TimeStamp
 	if r.Host != r.IP {
@@ -56,8 +56,8 @@ func (r *Result) JSON(outputFilter []string) ([]byte, error) {
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 
-	if len(outputFilter) > 0 {
-		if filteredData, err := structs.FilterStruct(data, nil, outputFilter); err == nil {
+	if len(excludedFields) > 0 {
+		if filteredData, err := structs.FilterStruct(data, nil, excludedFields); err == nil {
 			data = filteredData
 		}
 	}
@@ -81,16 +81,19 @@ func (r *Result) CSVHeaders() ([]string, error) {
 	return headers, nil
 }
 
-func (r *Result) CSVFields(outputFilter []string) ([]string, error) {
-	if len(outputFilter) > 0 {
-		if filteredData, err := structs.FilterStruct(r, nil, outputFilter); err == nil {
-			r = filteredData
+func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
+
+	resultValue := *r
+
+	if len(excludedFields) > 0 {
+		if filteredData, err := structs.FilterStruct(resultValue, nil, excludedFields); err == nil {
+			resultValue = filteredData
 		}
 	}
 
 	var fields []string
-	vl := reflect.ValueOf(*r)
-	ty := reflect.TypeOf(*r)
+	vl := reflect.ValueOf(resultValue)
+	ty := reflect.TypeOf(resultValue)
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
