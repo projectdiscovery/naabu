@@ -5,6 +5,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/armon/go-socks5"
@@ -40,6 +41,7 @@ func main() {
 	defer os.RemoveAll(testFile)
 
 	var got bool
+	var mu sync.Mutex
 
 	options := runner.Options{
 		HostsFile: testFile,
@@ -48,7 +50,9 @@ func main() {
 		Proxy:     "127.0.0.1:38401",
 		ProxyAuth: "test:test",
 		OnResult: func(hr *result.HostResult) {
+			mu.Lock()
 			got = true
+			mu.Unlock()
 		},
 		WarmUpTime: 2,
 		Timeout:    10 * time.Second,
@@ -63,7 +67,10 @@ func main() {
 	if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
 		panic(err)
 	}
+
+	mu.Lock()
 	if !got {
 		panic("no results found")
 	}
+	mu.Unlock()
 }
