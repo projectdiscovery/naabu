@@ -9,13 +9,14 @@ import (
 type Port struct {
 	Port     int               `json:"port"`
 	Protocol protocol.Protocol `json:"protocol"`
+	
 	// Deprecated: TLS field will be removed in a future version
-	TLS     bool     `json:"tls"`
-	Service *Service `json:"service,omitempty"`
+	TLS      bool              `json:"tls"`
+	Service  *Service          `json:"service,omitempty"`
 }
 
 func (p *Port) String() string {
-	return fmt.Sprintf("%d-%d-%v", p.Port, p.Protocol, p.TLS)
+	return fmt.Sprintf("%d-%s-%v", p.Port, p.Protocol.String(), p.TLS)
 }
 
 type Service struct {
