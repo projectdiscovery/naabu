@@ -32,7 +32,9 @@ func main() {
 					gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
 				}
 			}
-			naabuRunner.Close()
+			if err := naabuRunner.Close(); err != nil {
+				gologger.Error().Msgf("Couldn't close runner: %s\n", err)
+			}
 			os.Exit(1)
 		}
 	}()

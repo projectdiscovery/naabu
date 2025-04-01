@@ -2,6 +2,7 @@ package port
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 )
@@ -9,13 +10,26 @@ import (
 type Port struct {
 	Port     int               `json:"port"`
 	Protocol protocol.Protocol `json:"protocol"`
+
 	// Deprecated: TLS field will be removed in a future version
 	TLS     bool     `json:"tls"`
 	Service *Service `json:"service,omitempty"`
 }
 
 func (p *Port) String() string {
-	return fmt.Sprintf("%d-%d-%v", p.Port, p.Protocol, p.TLS)
+	return fmt.Sprintf("%d", p.Port)
+}
+
+func (p *Port) StringWithDetails() string {
+	var builder strings.Builder
+	builder.WriteString(fmt.Sprintf("%d", p.Port))
+	builder.WriteString(" [")
+	builder.WriteString(p.Protocol.String())
+	if p.TLS {
+		builder.WriteString("/tls")
+	}
+	builder.WriteString("]")
+	return builder.String()
 }
 
 type Service struct {
