@@ -11,7 +11,7 @@ require (
 	github.com/miekg/dns v1.1.58
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.1.0
+	github.com/projectdiscovery/cdncheck v1.1.13
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/fdmax v0.0.4
