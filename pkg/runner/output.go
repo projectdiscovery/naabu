@@ -118,7 +118,7 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 		sb.WriteString("\n")
 		_, err := bufwriter.WriteString(sb.String())
 		if err != nil {
-			bufwriter.Flush()
+			_ = bufwriter.Flush()
 			return err
 		}
 		sb.Reset()
