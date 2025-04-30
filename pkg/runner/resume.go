@@ -83,6 +83,6 @@ func (resumeCfg *ResumeCfg) ShouldSaveResume() bool {
 // CleanupResumeConfig cleaning up the config file
 func (resumeCfg *ResumeCfg) CleanupResumeConfig() {
 	if fileutil.FileExists(DefaultResumeFilePath()) {
-		os.Remove(DefaultResumeFilePath())
+		_ = os.Remove(DefaultResumeFilePath())
 	}
 }

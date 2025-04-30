@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"log"
 	"testing"
 
 	"github.com/projectdiscovery/ipranger"
@@ -10,7 +11,11 @@ import (
 
 func Test_AddTarget(t *testing.T) {
 	ipranger, _ := ipranger.New()
-	defer ipranger.Close()
+	defer func() {
+		if err := ipranger.Close(); err != nil {
+			log.Printf("could not close ipranger: %s\n", err)
+		}
+	}()
 
 	r := &Runner{
 		options: &Options{},

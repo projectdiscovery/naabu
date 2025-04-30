@@ -417,7 +417,9 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// udp needs data probe
 	switch p.Protocol {

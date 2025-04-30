@@ -41,7 +41,11 @@ func runFunctionalTests() error {
 	if err != nil {
 		return errors.Wrap(err, "could not open test cases")
 	}
-	defer file.Close()
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Printf("could not close test cases file: %s\n", err)
+		}
+	}()
 
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {

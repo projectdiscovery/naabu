@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -28,7 +29,11 @@ func TestParseExcludedIps(t *testing.T) {
 	require.Nil(t, err)
 	require.Equal(t, expected, actual)
 
-	defer os.RemoveAll(tmpFileName)
+	defer func() {
+		if err := os.RemoveAll(tmpFileName); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 }
 
 func TestIsIpOrCidr(t *testing.T) {

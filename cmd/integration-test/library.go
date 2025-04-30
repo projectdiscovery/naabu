@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"log"
 	"os"
 	"os/user"
 	"time"
@@ -32,7 +33,11 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(testFile)
+	defer func() {
+		if err := os.RemoveAll(testFile); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 
 	options := runner.Options{
 		HostsFile: testFile,
@@ -45,7 +50,11 @@ func (h *naabuPassiveSingleLibrary) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer naabuRunner.Close()
+	defer func() {
+		if err := naabuRunner.Close(); err != nil {
+			log.Printf("could not close naabu runner: %s\n", err)
+		}
+	}()
 
 	return naabuRunner.RunEnumeration(context.TODO())
 }
@@ -65,7 +74,11 @@ func (h *naabuSingleLibrary) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(testFile)
+	defer func() {
+		if err := os.RemoveAll(testFile); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 
 	var got bool
 
@@ -83,7 +96,11 @@ func (h *naabuSingleLibrary) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer naabuRunner.Close()
+	defer func() {
+		if err := naabuRunner.Close(); err != nil {
+			log.Printf("could not close naabu runner: %s\n", err)
+		}
+	}()
 
 	if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
 		return err
@@ -110,7 +127,11 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(testFile)
+	defer func() {
+		if err := os.RemoveAll(testFile); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 
 	var got bool
 
@@ -136,7 +157,9 @@ func (h *naabuMultipleExecLibrary) Execute() error {
 		if !got {
 			return errors.New("no results found")
 		}
-		naabuRunner.Close()
+		if err := naabuRunner.Close(); err != nil {
+			log.Printf("could not close naabu runner: %s\n", err)
+		}
 	}
 	return nil
 }
@@ -165,7 +188,11 @@ func (h *naabuWithSocks5) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer os.RemoveAll(testFile)
+	defer func() {
+		if err := os.RemoveAll(testFile); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 
 	var got bool
 
@@ -186,7 +213,11 @@ func (h *naabuWithSocks5) Execute() error {
 	if err != nil {
 		return err
 	}
-	defer naabuRunner.Close()
+	defer func() {
+		if err := naabuRunner.Close(); err != nil {
+			log.Printf("could not close naabu runner: %s\n", err)
+		}
+	}()
 
 	if err = naabuRunner.RunEnumeration(context.TODO()); err != nil {
 		return err
