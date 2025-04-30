@@ -975,7 +975,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+			}
+		}()
 	}
 	csvFileHeaderEnabled := true
 

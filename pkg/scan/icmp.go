@@ -34,7 +34,9 @@ func PingIcmpEchoRequest(ip string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeEcho,
@@ -131,7 +133,9 @@ func PingIcmpTimestampRequest(ip string, timeout time.Duration) bool {
 	if err != nil {
 		return false
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	m := icmp.Message{
 		Type: ipv4.ICMPTypeTimestamp,

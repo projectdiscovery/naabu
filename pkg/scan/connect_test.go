@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"log"
 	"net"
 	"testing"
 
@@ -16,13 +17,19 @@ func TestConnectVerify(t *testing.T) {
 		if err != nil {
 			assert.Nil(t, err)
 		}
-		defer l.Close()
+		defer func() {
+			if err := l.Close(); err != nil {
+				log.Printf("could not close listener: %s\n", err)
+			}
+		}()
 		for {
 			conn, err := l.Accept()
 			if err != nil {
 				return
 			}
-			defer conn.Close()
+			defer func() {
+				_ = conn.Close()
+			}()
 		}
 	}()
 

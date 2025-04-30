@@ -122,14 +122,14 @@ func buildListenHandler() (*ListenHandler, error) {
 // ICMPWriteWorker writes packet to the network layer
 func ICMPWriteWorker() {
 	for pkg := range icmpPacketSend {
-		switch {
-		case pkg.flag == IcmpEchoRequest:
+		switch pkg.flag {
+		case IcmpEchoRequest:
 			PingIcmpEchoRequestAsync(pkg.ip)
-		case pkg.flag == IcmpTimestampRequest:
+		case IcmpTimestampRequest:
 			PingIcmpTimestampRequestAsync(pkg.ip)
-		case pkg.flag == IcmpAddressMaskRequest:
+		case IcmpAddressMaskRequest:
 			PingIcmpAddressMaskRequestAsync(pkg.ip)
-		case pkg.flag == Ndp:
+		case Ndp:
 			PingNdpRequestAsync(pkg.ip)
 		}
 	}
@@ -138,8 +138,8 @@ func ICMPWriteWorker() {
 // EthernetWriteWorker writes packet to the network layer
 func EthernetWriteWorker() {
 	for pkg := range ethernetPacketSend {
-		switch {
-		case pkg.flag == Arp:
+		switch pkg.flag {
+		case Arp:
 			ArpRequestAsync(pkg.ip)
 		}
 	}
@@ -235,9 +235,10 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -333,9 +334,10 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -866,7 +868,9 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {
