@@ -29,7 +29,11 @@ func main() {
 		if err != nil {
 			gologger.Fatal().Msgf("Could not open file: %s\n", err)
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				gologger.Error().Msgf("Could not close file: %s\n", err)
+			}
+		}()
 		dec := json.NewDecoder(file)
 		for dec.More() {
 			var r runner.Result

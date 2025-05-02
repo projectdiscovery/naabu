@@ -200,7 +200,9 @@ func (u *UploadWriter) upload(data []byte) error {
 	if err != nil {
 		return errorutil.NewWithErr(err).Msgf("could not upload results")
 	}
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 	bin, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return errorutil.NewWithErr(err).Msgf("could not get id from response")
@@ -238,12 +240,12 @@ func (u *UploadWriter) getRequest(bin []byte) (*retryablehttp.Request, error) {
 		return nil, errorutil.NewWithErr(err).Msgf("could not create cloud upload request")
 	}
 	// add pdtm meta params
-	req.URL.Params.Merge(updateutils.GetpdtmParams(runner.Version))
+	req.Params.Merge(updateutils.GetpdtmParams(runner.Version))
 	// if it is upload endpoint also include name if it exists
-	if u.assetGroupName != "" && req.URL.Path == uploadEndpoint {
-		req.URL.Params.Add("name", u.assetGroupName)
+	if u.assetGroupName != "" && req.Path == uploadEndpoint {
+		req.Params.Add("name", u.assetGroupName)
 	}
-	req.URL.Update()
+	req.Update()
 
 	req.Header.Set(pdcpauth.ApiKeyHeaderName, u.creds.APIKey)
 	if u.TeamID != "" {
