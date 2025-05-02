@@ -719,6 +719,9 @@ func (r *Runner) Close() error {
 	if r.limiter != nil {
 		r.limiter.Stop()
 	}
+	if r.options.OnClose != nil {
+		r.options.OnClose()
+	}
 
 	return nil
 }
