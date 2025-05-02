@@ -122,14 +122,14 @@ func buildListenHandler() (*ListenHandler, error) {
 // ICMPWriteWorker writes packet to the network layer
 func ICMPWriteWorker() {
 	for pkg := range icmpPacketSend {
-		switch {
-		case pkg.flag == IcmpEchoRequest:
+		switch pkg.flag {
+		case IcmpEchoRequest:
 			PingIcmpEchoRequestAsync(pkg.ip)
-		case pkg.flag == IcmpTimestampRequest:
+		case IcmpTimestampRequest:
 			PingIcmpTimestampRequestAsync(pkg.ip)
-		case pkg.flag == IcmpAddressMaskRequest:
+		case IcmpAddressMaskRequest:
 			PingIcmpAddressMaskRequestAsync(pkg.ip)
-		case pkg.flag == Ndp:
+		case Ndp:
 			PingNdpRequestAsync(pkg.ip)
 		}
 	}
@@ -138,8 +138,8 @@ func ICMPWriteWorker() {
 // EthernetWriteWorker writes packet to the network layer
 func EthernetWriteWorker() {
 	for pkg := range ethernetPacketSend {
-		switch {
-		case pkg.flag == Arp:
+		switch pkg.flag {
+		case Arp:
 			ArpRequestAsync(pkg.ip)
 		}
 	}
@@ -182,7 +182,9 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	hasSourceIp := listenHandler.SourceIp4 != nil
 	var iface *net.Interface
-	if hasSourceIp {
+	if hasSourceIp && listenHandler.SourceHW != nil {
+		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
+		// both source IP and HW.
 		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
@@ -202,15 +204,21 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		ip4.SrcIP = listenHandler.SourceIp4
 		iface = itf
 	} else {
-		_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
-			return
+		if hasSourceIp {
+			// NOTE(dwisiswant0): We have source IP but no HW, so use it
+			// regular raw socket
+			ip4.SrcIP = listenHandler.SourceIp4
+		} else {
+			_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
+			if err != nil {
+				gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
+				return
+			} else if sourceIP == nil {
+				gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
+				return
+			}
+			ip4.SrcIP = sourceIP
 		}
-		ip4.SrcIP = sourceIP
 	}
 
 	tcpOption := layers.TCPOption{
@@ -227,9 +235,10 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -238,7 +247,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	}
 
-	if hasSourceIp {
+	if hasSourceIp && listenHandler.SourceHW != nil && iface != nil {
 		err = sendWithHandler(ip, iface, &eth, &ip4, &tcp)
 	} else {
 		err = sendWithConn(ip, listenHandler.TcpConn4, &tcp)
@@ -325,9 +334,10 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -858,7 +868,9 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {

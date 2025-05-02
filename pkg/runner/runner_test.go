@@ -3,6 +3,7 @@ package runner
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
 	"os"
 	"strings"
@@ -211,10 +212,15 @@ func TestRunnerClose(t *testing.T) {
 	tmpfile, err := os.CreateTemp("", "naabu-test")
 	require.NoError(t, err)
 	require.NoError(t, tmpfile.Close())
-	defer os.Remove(tmpfile.Name())
+	defer func() {
+		if err := os.Remove(tmpfile.Name()); err != nil {
+			log.Printf("could not remove test file: %s\n", err)
+		}
+	}()
 
 	runner.targetsFile = tmpfile.Name()
-	runner.Close()
+	err = runner.Close()
+	require.NoError(t, err)
 
 	_, err = os.Stat(tmpfile.Name())
 	assert.True(t, os.IsNotExist(err))
@@ -727,7 +733,8 @@ func TestRunnerEnumeration(t *testing.T) {
 			}
 
 			tt.validate(t, runner)
-			runner.Close()
+			err = runner.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -779,7 +786,8 @@ func TestRunnerHostDiscovery(t *testing.T) {
 	if runner.limiter != nil {
 		runner.limiter.Stop()
 	}
-	runner.Close()
+	err = runner.Close()
+	require.NoError(t, err)
 }
 
 // TestRunnerGetIPs tests IP preprocessing methods
@@ -793,7 +801,10 @@ func TestRunnerGetIPs(t *testing.T) {
 
 	runner, err := NewRunner(options)
 	require.NoError(t, err)
-	defer runner.Close()
+	defer func() {
+		err := runner.Close()
+		require.NoError(t, err)
+	}()
 
 	err = runner.Load()
 	require.NoError(t, err, "Failed to load targets")

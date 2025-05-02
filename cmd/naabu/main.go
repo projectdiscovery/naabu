@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"os/signal"
+	"syscall"
 
 	"github.com/logrusorgru/aurora"
 	_ "github.com/projectdiscovery/fdmax/autofdmax"
@@ -59,32 +60,57 @@ func main() {
 	if err != nil {
 		gologger.Fatal().Msgf("Could not create runner: %s\n", err)
 	}
-	// Setup graceful exits
+
+	// Setup context with cancelation
+	ctx, cancel := context.WithCancel(context.Background())
+
+	// Setup signal handling
 	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func() {
-		for range c {
-			naabuRunner.ShowScanResultOnExit()
-			gologger.Info().Msgf("CTRL+C pressed: Exiting\n")
-			if options.ResumeCfg.ShouldSaveResume() {
-				gologger.Info().Msgf("Creating resume file: %s\n", runner.DefaultResumeFilePath())
-				err := options.ResumeCfg.SaveResumeConfig()
-				if err != nil {
-					gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
-				}
+		sig := <-c
+		gologger.Info().Msgf("Received signal: %s, exiting gracefully...\n", sig)
+
+		// Cancel context to stop ongoing tasks
+		cancel()
+
+		// Try to save resume config if needed
+		if options.ResumeCfg != nil && options.ResumeCfg.ShouldSaveResume() {
+			gologger.Info().Msgf("Creating resume file: %s\n", runner.DefaultResumeFilePath())
+			if err := options.ResumeCfg.SaveResumeConfig(); err != nil {
+				gologger.Error().Msgf("Couldn't create resume file: %s\n", err)
 			}
-			naabuRunner.Close()
-			os.Exit(1)
 		}
+
+		// Show scan result if runner is available
+		if naabuRunner != nil {
+			naabuRunner.ShowScanResultOnExit()
+
+			if err := naabuRunner.Close(); err != nil {
+				gologger.Error().Msgf("Couldn't close runner: %s\n", err)
+			}
+		}
+
+		// Final flush if gologger has a Close method (placeholder if exists)
+		// Example: gologger.Close()
+
+		os.Exit(1)
 	}()
 
-	err = naabuRunner.RunEnumeration(context.TODO())
-	if err != nil {
+	// Start enumeration
+	if err := naabuRunner.RunEnumeration(ctx); err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
-	// on successful execution remove the resume file in case it exists
-	options.ResumeCfg.CleanupResumeConfig()
-	naabuRunner.Close()
+
+	defer func() {
+		if err := naabuRunner.Close(); err != nil {
+			gologger.Error().Msgf("Couldn't close runner: %s\n", err)
+		}
+		// On successful execution, cleanup resume config if needed
+		if options.ResumeCfg != nil {
+			options.ResumeCfg.CleanupResumeConfig()
+		}
+	}()
 }
 
 // setupOptionalAssetUpload is used to setup optional asset upload

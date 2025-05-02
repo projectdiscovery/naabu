@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -12,6 +13,7 @@ import (
 	"github.com/projectdiscovery/utils/env"
 	fileutil "github.com/projectdiscovery/utils/file"
 	sliceutil "github.com/projectdiscovery/utils/slice"
+	"github.com/projectdiscovery/utils/structs"
 
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/gologger"
@@ -44,24 +46,26 @@ type Options struct {
 	Retries int // Retries is the number of retries for the port
 	Rate    int // Rate is the rate of port scan requests
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
-	Timeout        time.Duration
-	WarmUpTime     int                 // WarmUpTime between scan phases
-	Host           goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile      string              // HostsFile is the file containing list of hosts to find port for
-	Output         string              // Output is the file to write found ports to.
-	Ports          string              // Ports is the ports to use for enumeration
-	PortsFile      string              // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts   string              // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps     string              // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile string              // File containing Ips or cidr to exclude from the scan
-	TopPorts       string              // Tops ports to scan
-	PortThreshold  int                 // PortThreshold is the number of ports to find before skipping the host
-	SourceIP       string              // SourceIP to use in TCP packets
-	SourcePort     string              // Source Port to use in packets
-	Interface      string              // Interface to use for TCP packets
-	ConfigFile     string              // Config file contains a scan configuration
-	NmapCLI        string              // Nmap command (has priority over config file)
-	Threads        int                 // Internal worker threads
+	Timeout             time.Duration
+	WarmUpTime          int                 // WarmUpTime between scan phases
+	Host                goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
+	HostsFile           string              // HostsFile is the file containing list of hosts to find port for
+	Output              string              // Output is the file to write found ports to.
+	ListOutputFields    bool                // OutputFields is the list of fields to output (comma separated)
+	ExcludeОutputFields goflags.StringSlice // ExcludeОutputFields is the list of fields to exclude from the output
+	Ports               string              // Ports is the ports to use for enumeration
+	PortsFile           string              // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts        string              // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps          string              // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile      string              // File containing Ips or cidr to exclude from the scan
+	TopPorts            string              // Tops ports to scan
+	PortThreshold       int                 // PortThreshold is the number of ports to find before skipping the host
+	SourceIP            string              // SourceIP to use in TCP packets
+	SourcePort          string              // Source Port to use in packets
+	Interface           string              // Interface to use for TCP packets
+	ConfigFile          string              // Config file contains a scan configuration
+	NmapCLI             string              // Nmap command (has priority over config file)
+	Threads             int                 // Internal worker threads
 	// Deprecated: stats are automatically available through local endpoint
 	EnableProgressBar bool // Enable progress bar
 	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
@@ -167,6 +171,8 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
+		flagSet.BoolVarP(&options.ListOutputFields, "list-output-fields", "lof", false, "list of fields to output (comma separated)"),
+		flagSet.StringSliceVarP(&options.ExcludeОutputFields, "exclude-output-fields", "eof", nil, "exclude output fields output based on a condition", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
@@ -247,6 +253,17 @@ func ParseOptions() *Options {
 	)
 
 	_ = flagSet.Parse()
+
+	if options.ListOutputFields {
+		fields, err := structs.GetStructFields(Result{})
+		if err != nil {
+			gologger.Fatal().Msgf("Could not get struct fields: %s\n", err)
+		}
+		for _, field := range fields {
+			fmt.Println(field)
+		}
+		os.Exit(0)
+	}
 
 	if cfgFile != "" {
 		if !fileutil.FileExists(cfgFile) {

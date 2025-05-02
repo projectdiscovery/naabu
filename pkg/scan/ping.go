@@ -47,7 +47,9 @@ func PingHosts(addresses []string) (*PingResult, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer c.Close()
+	defer func() {
+		_ = c.Close()
+	}()
 
 	results := &PingResult{Hosts: []Ping{}}
 	var sequence int
