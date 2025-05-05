@@ -250,8 +250,14 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if hasSourceIp && listenHandler.SourceHW != nil && iface != nil {
 		err = sendWithHandler(ip, iface, &eth, &ip4, &tcp)
 	} else {
+		if listenHandler.TcpConn4 == nil {
+			gologger.Debug().Msgf("TcpConn4 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.TcpConn4, &tcp)
 	}
+
 	if err != nil {
 		gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 	}
@@ -289,6 +295,11 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.UdpConn4 == nil {
+			gologger.Debug().Msgf("UdpConn4 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.UdpConn4, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -345,6 +356,11 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.TcpConn6 == nil {
+			gologger.Debug().Msgf("TcpConn6 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.TcpConn6, &tcp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -385,6 +401,11 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.UdpConn6 == nil {
+			gologger.Debug().Msgf("UdpConn6 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.UdpConn6, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -456,60 +477,60 @@ var defaultSerializeOptions = gopacket.SerializeOptions{
 
 // send sends the given layers as a single packet on the network.
 func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
+	var err error
+
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
 		return err
 	}
+	data := buf.Bytes()
+	addr := &net.IPAddr{IP: net.ParseIP(destIP)}
 
-	var (
-		retries int
-		err     error
-	)
+	for retries := 0; retries < maxRetries; retries++ {
+		_, err = conn.WriteTo(data, addr)
+		if err == nil {
+			return nil
+		}
 
-send:
-	if retries >= maxRetries {
-		return err
-	}
-	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
-	if err != nil {
-		retries++
-		// introduce a small delay to allow the network interface to flush the queue
 		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
-		goto send
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+	}
+
+	return nil
 }
 
 func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.SerializableLayer) error {
+	var err error
+
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
 		return err
 	}
-
-	var (
-		retries int
-		err     error
-	)
+	data := buf.Bytes()
 
 	// find the correct handler
 	handler, ok := handlers.InterfaceHandle[iface.Name]
-	if !ok {
+	if handler == nil || !ok {
 		return errors.New("could not find correct pcap handler")
 	}
 
-send:
+	for retries := 0; retries < maxRetries; retries++ {
+		err = handler.WritePacketData(data)
+		if err == nil {
+			return nil
+		}
 
-	if retries >= maxRetries {
-		return err
-	}
-	err = handler.WritePacketData(buf.Bytes())
-	if err != nil {
-		retries++
-		// introduce a small delay to allow the network interface to flush the queue
 		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
-		goto send
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+	}
+
+	return nil
 }
 
 func (l *ListenHandler) TcpReadWorker4() {

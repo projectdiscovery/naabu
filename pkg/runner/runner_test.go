@@ -6,7 +6,9 @@ import (
 	"log"
 	"net"
 	"os"
+	"runtime"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -873,4 +875,66 @@ func TestRunnerConnectVerification(t *testing.T) {
 		count++
 	}
 	require.Equal(t, 1, count)
+}
+
+func TestConcurrentSYNScans(t *testing.T) {
+	if os.Geteuid() != 0 {
+		t.Skip("Test requires root privileges")
+	}
+
+	targets := []string{"127.0.0.1", "localhost", "scanme.sh"}
+	numGoroutines := runtime.NumCPU()
+
+	var wg sync.WaitGroup
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+
+	errChan := make(chan error, numGoroutines)
+
+	for i := 0; i < numGoroutines; i++ {
+		wg.Add(1)
+		go func(target string) {
+			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				return // Stop if context is cancelled
+			default:
+			}
+
+			options := &Options{
+				Host:     []string{target},
+				ScanType: SynScan,
+				Ports:    "80,443,8080",
+				Retries:  5,
+				Verbose:  false,
+				Silent:   true,
+			}
+
+			naabuRunner, err := NewRunner(options)
+			if err != nil {
+				t.Logf("Error creating runner for %s: %v", target, err)
+				errChan <- fmt.Errorf("runner creation failed for %s: %w", target, err)
+				return
+			}
+
+			defer func() {
+				closeErr := naabuRunner.Close()
+				if closeErr != nil {
+					t.Logf("Error closing runner for %s: %v", target, closeErr)
+				}
+			}()
+
+			runErr := naabuRunner.RunEnumeration(ctx)
+			if runErr != nil {
+				errChan <- fmt.Errorf("enumeration failed for %s: %w", target, runErr)
+			}
+		}(targets[i%len(targets)]) // cycle thru targets
+	}
+
+	wg.Wait()
+	close(errChan)
+
+	for err := range errChan {
+		t.Error(err)
+	}
 }
