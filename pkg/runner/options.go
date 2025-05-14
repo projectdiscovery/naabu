@@ -30,108 +30,108 @@ var (
 // the port enumeration process.
 // nolint:maligned // just an option structure
 type Options struct {
-	Verbose        bool // Verbose flag indicates whether to show verbose output or not
-	NoColor        bool // No-Color disables the colored output
-	JSON           bool // JSON specifies whether to use json for output format or text file
-	Silent         bool // Silent suppresses any extra text and only writes found host:port to screen
-	Stdin          bool // Stdin specifies whether stdin input was given to the process
-	Verify         bool // Verify is used to check if the ports found were valid using CONNECT method
-	Version        bool // Version specifies if we should just show version and exit
-	Ping           bool // Ping uses ping probes to discover fastest active host and discover dead hosts
-	Debug          bool // Prints out debug information
-	ExcludeCDN     bool // Excludes ip of knows CDN ranges for full port scan
-	Nmap           bool // Invoke nmap detailed scan on results
-	InterfacesList bool // InterfacesList show interfaces list
+	Verbose        bool `yaml:"verbose,omitempty" json:"verbose,omitempty"`                 // Verbose flag indicates whether to show verbose output or not
+	NoColor        bool `yaml:"no_color,omitempty" json:"no_color,omitempty"`               // No-Color disables the colored output
+	JSON           bool `yaml:"json,omitempty" json:"json,omitempty"`                       // JSON specifies whether to use json for output format or text file
+	Silent         bool `yaml:"silent,omitempty" json:"silent,omitempty"`                   // Silent suppresses any extra text and only writes found host:port to screen
+	Stdin          bool `yaml:"stdin,omitempty" json:"stdin,omitempty"`                     // Stdin specifies whether stdin input was given to the process
+	Verify         bool `yaml:"verify,omitempty" json:"verify,omitempty"`                   // Verify is used to check if the ports found were valid using CONNECT method
+	Version        bool `yaml:"version,omitempty" json:"version,omitempty"`                 // Version specifies if we should just show version and exit
+	Ping           bool `yaml:"ping,omitempty" json:"ping,omitempty"`                       // Ping uses ping probes to discover fastest active host and discover dead hosts
+	Debug          bool `yaml:"debug,omitempty" json:"debug,omitempty"`                     // Prints out debug information
+	ExcludeCDN     bool `yaml:"exclude_cdn,omitempty" json:"exclude_cdn,omitempty"`         // Excludes ip of knows CDN ranges for full port scan
+	Nmap           bool `yaml:"nmap,omitempty" json:"nmap,omitempty"`                       // Invoke nmap detailed scan on results
+	InterfacesList bool `yaml:"interfaces_list,omitempty" json:"interfaces_list,omitempty"` // InterfacesList show interfaces list
 
-	Retries int // Retries is the number of retries for the port
-	Rate    int // Rate is the rate of port scan requests
+	Retries int `yaml:"retries,omitempty" json:"retries,omitempty"` // Retries is the number of retries for the port
+	Rate    int `yaml:"rate,omitempty" json:"rate,omitempty"`       // Rate is the rate of port scan requests
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
-	Timeout             time.Duration
-	WarmUpTime          int                 // WarmUpTime between scan phases
-	Host                goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
-	HostsFile           string              // HostsFile is the file containing list of hosts to find port for
-	Output              string              // Output is the file to write found ports to.
-	ListOutputFields    bool                // OutputFields is the list of fields to output (comma separated)
-	ExcludeОutputFields goflags.StringSlice // ExcludeОutputFields is the list of fields to exclude from the output
-	Ports               string              // Ports is the ports to use for enumeration
-	PortsFile           string              // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts        string              // ExcludePorts is the list of ports to exclude from enumeration
-	ExcludeIps          string              // Ips or cidr to be excluded from the scan
-	ExcludeIpsFile      string              // File containing Ips or cidr to exclude from the scan
-	TopPorts            string              // Tops ports to scan
-	PortThreshold       int                 // PortThreshold is the number of ports to find before skipping the host
-	SourceIP            string              // SourceIP to use in TCP packets
-	SourcePort          string              // Source Port to use in packets
-	Interface           string              // Interface to use for TCP packets
-	ConfigFile          string              // Config file contains a scan configuration
-	NmapCLI             string              // Nmap command (has priority over config file)
-	Threads             int                 // Internal worker threads
+	Timeout             time.Duration       `yaml:"timeout,omitempty" json:"timeout,omitempty"`
+	WarmUpTime          int                 `yaml:"warm_up_time,omitempty" json:"warm_up_time,omitempty"`                   // WarmUpTime between scan phases
+	Host                goflags.StringSlice `yaml:"host,omitempty" json:"host,omitempty"`                                   // Host is the single host or comma-separated list of hosts to find ports for
+	HostsFile           string              `yaml:"hosts_file,omitempty" json:"hosts_file,omitempty"`                       // HostsFile is the file containing list of hosts to find port for
+	Output              string              `yaml:"output,omitempty" json:"output,omitempty"`                               // Output is the file to write found ports to.
+	ListOutputFields    bool                `yaml:"list_output_fields,omitempty" json:"list_output_fields,omitempty"`       // OutputFields is the list of fields to output (comma separated)
+	ExcludeОutputFields goflags.StringSlice `yaml:"exclude_оutput_fields,omitempty" json:"exclude_оutput_fields,omitempty"` // ExcludeОutputFields is the list of fields to exclude from the output
+	Ports               string              `yaml:"ports,omitempty" json:"ports,omitempty"`                                 // Ports is the ports to use for enumeration
+	PortsFile           string              `yaml:"ports_file,omitempty" json:"ports_file,omitempty"`                       // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts        string              `yaml:"exclude_ports,omitempty" json:"exclude_ports,omitempty"`                 // ExcludePorts is the list of ports to exclude from enumeration
+	ExcludeIps          string              `yaml:"exclude_ips,omitempty" json:"exclude_ips,omitempty"`                     // Ips or cidr to be excluded from the scan
+	ExcludeIpsFile      string              `yaml:"exclude_ips_file,omitempty" json:"exclude_ips_file,omitempty"`           // File containing Ips or cidr to exclude from the scan
+	TopPorts            string              `yaml:"top_ports,omitempty" json:"top_ports,omitempty"`                         // Tops ports to scan
+	PortThreshold       int                 `yaml:"port_threshold,omitempty" json:"port_threshold,omitempty"`               // PortThreshold is the number of ports to find before skipping the host
+	SourceIP            string              `yaml:"source_ip,omitempty" json:"source_ip,omitempty"`                         // SourceIP to use in TCP packets
+	SourcePort          string              `yaml:"source_port,omitempty" json:"source_port,omitempty"`                     // Source Port to use in packets
+	Interface           string              `yaml:"interface,omitempty" json:"interface,omitempty"`                         // Interface to use for TCP packets
+	ConfigFile          string              `yaml:"config_file,omitempty" json:"config_file,omitempty"`                     // Config file contains a scan configuration
+	NmapCLI             string              `yaml:"nmap_cli,omitempty" json:"nmap_cli,omitempty"`                           // Nmap command (has priority over config file)
+	Threads             int                 `yaml:"threads,omitempty" json:"threads,omitempty"`                             // Internal worker threads
 	// Deprecated: stats are automatically available through local endpoint
-	EnableProgressBar bool // Enable progress bar
+	EnableProgressBar bool `yaml:"enable_progress_bar,omitempty" json:"enable_progress_bar,omitempty"` // Enable progress bar
 	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
-	StatsInterval     int                 // StatsInterval is the number of seconds to display stats after
-	ScanAllIPS        bool                // Scan all the ips
-	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
-	ScanType          string              // Scan Type
-	Proxy             string              // Socks5 proxy
-	ProxyAuth         string              // Socks5 proxy authentication (username:password)
-	Resolvers         string              // Resolvers (comma separated or file)
+	StatsInterval     int                 `yaml:"stats_interval,omitempty" json:"stats_interval,omitempty"` // StatsInterval is the number of seconds to display stats after
+	ScanAllIPS        bool                `yaml:"scan_all_ips,omitempty" json:"scan_all_ips,omitempty"`     // Scan all the ips
+	IPVersion         goflags.StringSlice `yaml:"ip_version,omitempty" json:"ip_version,omitempty"`         // IP Version to use while resolving hostnames
+	ScanType          string              `yaml:"scan_type,omitempty" json:"scan_type,omitempty"`           // Scan Type
+	Proxy             string              `yaml:"proxy,omitempty" json:"proxy,omitempty"`                   // Socks5 proxy
+	ProxyAuth         string              `yaml:"proxy_auth,omitempty" json:"proxy_auth,omitempty"`         // Socks5 proxy authentication (username:password)
+	Resolvers         string              `yaml:"resolvers,omitempty" json:"resolvers,omitempty"`           // Resolvers (comma separated or file)
 	baseResolvers     []string
-	OnResult          result.ResultFn // callback on final host result
-	OnReceive         result.ResultFn // callback on response receive
-	CSV               bool
-	Resume            bool
-	ResumeCfg         *ResumeCfg
-	Stream            bool
-	Passive           bool
-	OutputCDN         bool // display cdn in use
-	HealthCheck       bool
-	OnlyHostDiscovery bool // Perform only host discovery
+	OnResult          result.ResultFn `yaml:"on_result,omitempty" json:"on_result,omitempty"`   // callback on final host result
+	OnReceive         result.ResultFn `yaml:"on_receive,omitempty" json:"on_receive,omitempty"` // callback on response receive
+	CSV               bool            `yaml:"csv,omitempty" json:"csv,omitempty"`
+	Resume            bool            `yaml:"resume,omitempty" json:"resume,omitempty"`
+	ResumeCfg         *ResumeCfg      `yaml:"resume_cfg,omitempty" json:"resume_cfg,omitempty"`
+	Stream            bool            `yaml:"stream,omitempty" json:"stream,omitempty"`
+	Passive           bool            `yaml:"passive,omitempty" json:"passive,omitempty"`
+	OutputCDN         bool            `yaml:"output_cdn,omitempty" json:"output_cdn,omitempty"` // display cdn in use
+	HealthCheck       bool            `yaml:"health_check,omitempty" json:"health_check,omitempty"`
+	OnlyHostDiscovery bool            `yaml:"only_host_discovery,omitempty" json:"only_host_discovery,omitempty"` // Perform only host discovery
 	// Deprecated: use WithHostDiscovery instead
-	SkipHostDiscovery bool // Skip Host discovery
-	WithHostDiscovery bool // Enable Host discovery
-	TcpSynPingProbes  goflags.StringSlice
-	TcpAckPingProbes  goflags.StringSlice
+	SkipHostDiscovery bool                `yaml:"skip_host_discovery,omitempty" json:"skip_host_discovery,omitempty"` // Skip Host discovery
+	WithHostDiscovery bool                `yaml:"with_host_discovery,omitempty" json:"with_host_discovery,omitempty"` // Enable Host discovery
+	TcpSynPingProbes  goflags.StringSlice `yaml:"tcp_syn_ping_probes,omitempty" json:"tcp_syn_ping_probes,omitempty"`
+	TcpAckPingProbes  goflags.StringSlice `yaml:"tcp_ack_ping_probes,omitempty" json:"tcp_ack_ping_probes,omitempty"`
 	// UdpPingProbes               goflags.StringSlice - planned
 	// STcpInitPingProbes          goflags.StringSlice - planned
-	IcmpEchoRequestProbe        bool
-	IcmpTimestampRequestProbe   bool
-	IcmpAddressMaskRequestProbe bool
+	IcmpEchoRequestProbe        bool `yaml:"icmp_echo_request_probe,omitempty" json:"icmp_echo_request_probe,omitempty"`
+	IcmpTimestampRequestProbe   bool `yaml:"icmp_timestamp_request_probe,omitempty" json:"icmp_timestamp_request_probe,omitempty"`
+	IcmpAddressMaskRequestProbe bool `yaml:"icmp_address_mask_request_probe,omitempty" json:"icmp_address_mask_request_probe,omitempty"`
 	// IpProtocolPingProbes        goflags.StringSlice - planned
-	ArpPing                   bool
-	IPv6NeighborDiscoveryPing bool
+	ArpPing                   bool `yaml:"arp_ping,omitempty" json:"arp_ping,omitempty"`
+	IPv6NeighborDiscoveryPing bool `yaml:"ipv6_neighbor_discovery_ping,omitempty" json:"ipv6_neighbor_discovery_ping,omitempty"`
 	// HostDiscoveryIgnoreRST      bool - planned
-	InputReadTimeout time.Duration
-	DisableStdin     bool
+	InputReadTimeout time.Duration `yaml:"input_read_timeout,omitempty" json:"input_read_timeout,omitempty"`
+	DisableStdin     bool          `yaml:"disable_stdin,omitempty" json:"disable_stdin,omitempty"`
 	// ServiceDiscovery enables service discovery on found open ports (matches port number with service)
-	ServiceDiscovery bool
+	ServiceDiscovery bool `yaml:"service_discovery,omitempty" json:"service_discovery,omitempty"`
 	// ServiceVersion attempts to discover service running on open ports with active/passive probes
-	ServiceVersion bool
+	ServiceVersion bool `yaml:"service_version,omitempty" json:"service_version,omitempty"`
 	// ReversePTR lookup for ips
-	ReversePTR bool
+	ReversePTR bool `yaml:"reverse_ptr,omitempty" json:"reverse_ptr,omitempty"`
 	//DisableUpdateCheck disables automatic update check
-	DisableUpdateCheck bool
+	DisableUpdateCheck bool `yaml:"disable_update_check,omitempty" json:"disable_update_check,omitempty"`
 	// MetricsPort with statistics
-	MetricsPort int
+	MetricsPort int `yaml:"metrics_port,omitempty" json:"metrics_port,omitempty"`
 
-	NetworkPolicyOptions *networkpolicy.Options
+	NetworkPolicyOptions *networkpolicy.Options `yaml:"network_policy_options,omitempty" json:"network_policy_options,omitempty"`
 	// PdcpAuth for projectdiscovery cloud
-	PdcpAuth string
+	PdcpAuth string `yaml:"pdcp_auth,omitempty" json:"pdcp_auth,omitempty"`
 	// PdcpAuthCredFile for projectdiscovery cloud
-	PdcpAuthCredFile string
+	PdcpAuthCredFile string `yaml:"pdcp_auth_cred_file,omitempty" json:"pdcp_auth_cred_file,omitempty"`
 	// AssetUpload for projectdiscovery cloud
-	AssetUpload bool
+	AssetUpload bool `yaml:"asset_upload,omitempty" json:"asset_upload,omitempty"`
 	// TeamID for projectdiscovery cloud
-	TeamID string
+	TeamID string `yaml:"team_id,omitempty" json:"team_id,omitempty"`
 	// AssetID for projectdiscovery cloud
-	AssetID string
+	AssetID string `yaml:"asset_id,omitempty" json:"asset_id,omitempty"`
 	// AssetName for projectdiscovery cloud
-	AssetName string
+	AssetName string `yaml:"asset_name,omitempty" json:"asset_name,omitempty"`
 	// AssetFileUpload for projectdiscovery cloud
-	AssetFileUpload string
+	AssetFileUpload string `yaml:"asset_file_upload,omitempty" json:"asset_file_upload,omitempty"`
 	// OnClose adds a callback function that is invoked when naabu is closed
 	// to be exact at end of existing closures
-	OnClose func()
+	OnClose func() `yaml:"-" json:"-"`
 }
 
 // ParseOptions parses the command line flags provided by a user
