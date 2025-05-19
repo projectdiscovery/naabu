@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/gologger v1.1.49
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
-	github.com/projectdiscovery/networkpolicy v0.1.14
+	github.com/projectdiscovery/networkpolicy v0.1.15
 	github.com/projectdiscovery/ratelimit v0.0.80
 	github.com/projectdiscovery/retryablehttp-go v1.0.112
 	github.com/projectdiscovery/uncover v1.0.9
@@ -55,7 +55,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20210315054119-f66993602bf5 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/gaissmai/bart v0.17.10 // indirect
+	github.com/gaissmai/bart v0.20.4 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
