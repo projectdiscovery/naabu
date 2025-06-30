@@ -20,7 +20,7 @@ require (
 	github.com/projectdiscovery/gologger v1.1.54
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
-	github.com/projectdiscovery/networkpolicy v0.1.16
+	github.com/projectdiscovery/networkpolicy v0.1.17
 	github.com/projectdiscovery/ratelimit v0.0.81
 	github.com/projectdiscovery/retryablehttp-go v1.0.116
 	github.com/projectdiscovery/uncover v1.1.0
