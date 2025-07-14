@@ -25,7 +25,6 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/mac.yml --clean
-          workdir: /
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -92,6 +91,5 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/windows.yml --clean
-          workdir: /
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
