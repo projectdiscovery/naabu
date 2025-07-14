@@ -122,14 +122,14 @@ func buildListenHandler() (*ListenHandler, error) {
 // ICMPWriteWorker writes packet to the network layer
 func ICMPWriteWorker() {
 	for pkg := range icmpPacketSend {
-		switch {
-		case pkg.flag == IcmpEchoRequest:
+		switch pkg.flag {
+		case IcmpEchoRequest:
 			PingIcmpEchoRequestAsync(pkg.ip)
-		case pkg.flag == IcmpTimestampRequest:
+		case IcmpTimestampRequest:
 			PingIcmpTimestampRequestAsync(pkg.ip)
-		case pkg.flag == IcmpAddressMaskRequest:
+		case IcmpAddressMaskRequest:
 			PingIcmpAddressMaskRequestAsync(pkg.ip)
-		case pkg.flag == Ndp:
+		case Ndp:
 			PingNdpRequestAsync(pkg.ip)
 		}
 	}
@@ -138,8 +138,8 @@ func ICMPWriteWorker() {
 // EthernetWriteWorker writes packet to the network layer
 func EthernetWriteWorker() {
 	for pkg := range ethernetPacketSend {
-		switch {
-		case pkg.flag == Arp:
+		switch pkg.flag {
+		case Arp:
 			ArpRequestAsync(pkg.ip)
 		}
 	}
@@ -182,7 +182,9 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	hasSourceIp := listenHandler.SourceIp4 != nil
 	var iface *net.Interface
-	if hasSourceIp {
+	if hasSourceIp && listenHandler.SourceHW != nil {
+		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
+		// both source IP and HW.
 		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
@@ -202,15 +204,21 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		ip4.SrcIP = listenHandler.SourceIp4
 		iface = itf
 	} else {
-		_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
-		if err != nil {
-			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-			return
-		} else if sourceIP == nil {
-			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
-			return
+		if hasSourceIp {
+			// NOTE(dwisiswant0): We have source IP but no HW, so use it
+			// regular raw socket
+			ip4.SrcIP = listenHandler.SourceIp4
+		} else {
+			_, _, sourceIP, err := PkgRouter.Route(ip4.DstIP)
+			if err != nil {
+				gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
+				return
+			} else if sourceIP == nil {
+				gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
+				return
+			}
+			ip4.SrcIP = sourceIP
 		}
-		ip4.SrcIP = sourceIP
 	}
 
 	tcpOption := layers.TCPOption{
@@ -227,9 +235,10 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -238,11 +247,17 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	}
 
-	if hasSourceIp {
+	if hasSourceIp && listenHandler.SourceHW != nil && iface != nil {
 		err = sendWithHandler(ip, iface, &eth, &ip4, &tcp)
 	} else {
+		if listenHandler.TcpConn4 == nil {
+			gologger.Debug().Msgf("TcpConn4 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.TcpConn4, &tcp)
 	}
+
 	if err != nil {
 		gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 	}
@@ -280,6 +295,11 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.UdpConn4 == nil {
+			gologger.Debug().Msgf("UdpConn4 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.UdpConn4, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -305,6 +325,12 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		return
 	}
 
+	if listenHandler.SourceIP6 != nil {
+		ip6.SrcIP = listenHandler.SourceIP6
+	} else {
+		ip6.SrcIP = sourceIP
+	}
+
 	tcpOption := layers.TCPOption{
 		OptionType:   layers.TCPOptionKindMSS,
 		OptionLength: 4,
@@ -319,9 +345,10 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		Options: []layers.TCPOption{tcpOption},
 	}
 
-	if pkgFlag == Syn {
+	switch pkgFlag {
+	case Syn:
 		tcp.SYN = true
-	} else if pkgFlag == Ack {
+	case Ack:
 		tcp.ACK = true
 	}
 
@@ -329,6 +356,11 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.TcpConn6 == nil {
+			gologger.Debug().Msgf("TcpConn6 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.TcpConn6, &tcp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -369,6 +401,11 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
+		if listenHandler.UdpConn6 == nil {
+			gologger.Debug().Msgf("UdpConn6 is nil, cannot send packet to %s:%d\n", ip, p.Port)
+			return
+		}
+
 		err = sendWithConn(ip, listenHandler.UdpConn6, &udp)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
@@ -440,60 +477,60 @@ var defaultSerializeOptions = gopacket.SerializeOptions{
 
 // send sends the given layers as a single packet on the network.
 func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
+	var err error
+
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
 		return err
 	}
+	data := buf.Bytes()
+	addr := &net.IPAddr{IP: net.ParseIP(destIP)}
 
-	var (
-		retries int
-		err     error
-	)
+	for retries := 0; retries < maxRetries; retries++ {
+		_, err = conn.WriteTo(data, addr)
+		if err == nil {
+			return nil
+		}
 
-send:
-	if retries >= maxRetries {
-		return err
-	}
-	_, err = conn.WriteTo(buf.Bytes(), &net.IPAddr{IP: net.ParseIP(destIP)})
-	if err != nil {
-		retries++
-		// introduce a small delay to allow the network interface to flush the queue
 		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
-		goto send
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+	}
+
+	return nil
 }
 
 func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.SerializableLayer) error {
+	var err error
+
 	buf := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buf, defaultSerializeOptions, l...); err != nil {
 		return err
 	}
-
-	var (
-		retries int
-		err     error
-	)
+	data := buf.Bytes()
 
 	// find the correct handler
 	handler, ok := handlers.InterfaceHandle[iface.Name]
-	if !ok {
+	if handler == nil || !ok {
 		return errors.New("could not find correct pcap handler")
 	}
 
-send:
+	for retries := 0; retries < maxRetries; retries++ {
+		err = handler.WritePacketData(data)
+		if err == nil {
+			return nil
+		}
 
-	if retries >= maxRetries {
-		return err
-	}
-	err = handler.WritePacketData(buf.Bytes())
-	if err != nil {
-		retries++
-		// introduce a small delay to allow the network interface to flush the queue
 		time.Sleep(time.Duration(sendDelayMsec) * time.Millisecond)
-		goto send
 	}
-	return err
+
+	if err != nil {
+		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+	}
+
+	return nil
 }
 
 func (l *ListenHandler) TcpReadWorker4() {
@@ -852,7 +889,9 @@ func ACKPort(listenHandler *ListenHandler, dstIP string, port int, timeout time.
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	rawPort, err := freeport.GetFreeTCPPort("")
 	if err != nil {

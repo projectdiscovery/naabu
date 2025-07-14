@@ -122,9 +122,15 @@ func NewScanner(options *Options) (*Scanner, error) {
 		return nil, err
 	}
 
-	var nPolicyOptions networkpolicy.Options
+	var nPolicyOptions *networkpolicy.Options
+	if options.NetworkPolicyOptions != nil {
+		nPolicyOptions = options.NetworkPolicyOptions
+	} else {
+		nPolicyOptions = &networkpolicy.Options{}
+	}
+
 	nPolicyOptions.DenyList = append(nPolicyOptions.DenyList, options.ExcludedIps...)
-	nPolicy, err := networkpolicy.New(nPolicyOptions)
+	nPolicy, err := networkpolicy.New(*nPolicyOptions)
 	if err != nil {
 		return nil, err
 	}
@@ -184,9 +190,11 @@ acquire:
 }
 
 // Close the scanner and terminate all workers
-func (s *Scanner) Close() {
+func (s *Scanner) Close() error {
 	s.ListenHandler.Busy = false
 	s.ListenHandler = nil
+
+	return nil
 }
 
 // StartWorkers of the scanner
@@ -269,6 +277,7 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
 			if !isIPInRange {
 				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
+				continue
 			}
 
 			if s.OnReceive != nil {
@@ -308,6 +317,14 @@ func (s *Scanner) UDPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.UdpChan:
+			srcIP4WithPort := net.JoinHostPort(ip.ipv4, ip.port.String())
+			srcIP6WithPort := net.JoinHostPort(ip.ipv6, ip.port.String())
+			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
+			if !isIPInRange {
+				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
+				continue
+			}
+
 			if s.ListenHandler.Phase.Is(HostDiscovery) {
 				gologger.Debug().Msgf("Received UDP probe response from ipv4:%s ipv6:%s port:%d\n", ip.ipv4, ip.ipv6, ip.port.Port)
 				if ip.ipv4 != "" {
@@ -400,7 +417,9 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 	if err != nil {
 		return false, err
 	}
-	defer conn.Close()
+	defer func() {
+		_ = conn.Close()
+	}()
 
 	// udp needs data probe
 	switch p.Protocol {

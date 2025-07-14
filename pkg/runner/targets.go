@@ -43,12 +43,16 @@ func (r *Runner) mergeToFile() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	defer tempInput.Close()
+	defer func() {
+		if err := tempInput.Close(); err != nil {
+			gologger.Error().Msgf("Could not close temp input: %s\n", err)
+		}
+	}()
 
 	// target defined via CLI argument
 	if len(r.options.Host) > 0 {
 		for _, v := range r.options.Host {
-			fmt.Fprintf(tempInput, "%s\n", v)
+			_, _ = fmt.Fprintf(tempInput, "%s\n", v)
 		}
 	}
 
@@ -58,7 +62,11 @@ func (r *Runner) mergeToFile() (string, error) {
 		if err != nil {
 			return "", err
 		}
-		defer f.Close()
+		defer func() {
+			if err := f.Close(); err != nil {
+				gologger.Error().Msgf("Could not close file %s: %s\n", r.options.HostsFile, err)
+			}
+		}()
 		if _, err := io.Copy(tempInput, f); err != nil {
 			return "", err
 		}
@@ -74,7 +82,7 @@ func (r *Runner) mergeToFile() (string, error) {
 
 	// all additional non-named cli arguments are interpreted as targets
 	for _, target := range flag.Args() {
-		fmt.Fprintf(tempInput, "%s\n", target)
+		_, _ = fmt.Fprintf(tempInput, "%s\n", target)
 	}
 
 	filename := tempInput.Name()
@@ -90,7 +98,11 @@ func (r *Runner) PreProcessTargets() error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() {
+		if err := f.Close(); err != nil {
+			gologger.Error().Msgf("Could not close file %s: %s\n", r.targetsFile, err)
+		}
+	}()
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		wg.Add()

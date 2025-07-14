@@ -31,6 +31,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
+	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
@@ -51,6 +52,7 @@ type Runner struct {
 	dnsclient     *dnsx.DNSX
 	stats         *clistats.Statistics
 	streamChannel chan Target
+	excludedIpsNP *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
 }
@@ -110,24 +112,34 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 
+	if len(excludedIps) > 0 {
+		excludedIpsNP, err := networkpolicy.New(networkpolicy.Options{
+			DenyList: excludedIps,
+		})
+		if err != nil {
+			return nil, err
+		}
+		runner.excludedIpsNP = excludedIpsNP
+	}
 	runner.streamChannel = make(chan Target)
 
 	uniqueCache := gcache.New[string, struct{}](1500).Build()
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
-		Timeout:       options.Timeout,
-		Retries:       options.Retries,
-		Rate:          options.Rate,
-		PortThreshold: options.PortThreshold,
-		ExcludeCdn:    options.ExcludeCDN,
-		OutputCdn:     options.OutputCDN,
-		ExcludedIps:   excludedIps,
-		Proxy:         options.Proxy,
-		ProxyAuth:     options.ProxyAuth,
-		Stream:        options.Stream,
-		OnReceive:     options.OnReceive,
-		ScanType:      options.ScanType,
+		Timeout:              options.GetTimeout(),
+		Retries:              options.Retries,
+		Rate:                 options.Rate,
+		PortThreshold:        options.PortThreshold,
+		ExcludeCdn:           options.ExcludeCDN,
+		OutputCdn:            options.OutputCDN,
+		ExcludedIps:          excludedIps,
+		Proxy:                options.Proxy,
+		ProxyAuth:            options.ProxyAuth,
+		Stream:               options.Stream,
+		OnReceive:            options.OnReceive,
+		ScanType:             options.ScanType,
+		NetworkPolicyOptions: options.NetworkPolicyOptions,
 	}
 
 	if scanOpts.OnReceive == nil {
@@ -214,19 +226,20 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			for _, p := range hostResult.Ports {
 				data.Port = p.Port
 				data.Protocol = p.Protocol.String()
+				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON()
+					b, err := data.JSON(r.options.ExcludeОutputFields)
 					if err != nil {
 						continue
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer)
+						writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
 						csvHeaderEnabled = false
 					}
-					writeCSVRow(data, writer)
+					writeCSVRow(data, writer, r.options.ExcludeОutputFields)
 				}
 			}
 		}
@@ -306,23 +319,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
-		// get excluded ips
-		excludedIPs, err := r.parseExcludedIps(r.options)
-		if err != nil {
-			return err
-		}
-
-		// store exclued ips to a map
-		excludedIPsMap := make(map[string]struct{})
-		for _, ipString := range excludedIPs {
-			excludedIPsMap[ipString] = struct{}{}
-		}
-
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				// only run host discovery if the ip is not present in the excludedIPsMap
-				if _, exists := excludedIPsMap[ip]; !exists {
+				if r.excludedIpsNP != nil && r.excludedIpsNP.ValidateAddress(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -532,6 +532,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				ipIndex := xxx / int64(portsCount)
 				portIndex := int(xxx % int64(portsCount))
 				ip := r.PickIP(targets, ipIndex)
+
+				if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+					continue
+				}
+
 				port := r.PickPort(portIndex)
 
 				r.options.ResumeCfg.RLock()
@@ -694,18 +699,31 @@ func (r *Runner) ShowScanResultOnExit() {
 }
 
 // Close runner instance
-func (r *Runner) Close() {
-	_ = os.RemoveAll(r.targetsFile)
-	_ = r.scanner.IPRanger.Hosts.Close()
+func (r *Runner) Close() error {
+	if err := os.RemoveAll(r.targetsFile); err != nil {
+		return err
+	}
+	if err := r.scanner.IPRanger.Hosts.Close(); err != nil {
+		return err
+	}
 	if r.options.EnableProgressBar {
-		_ = r.stats.Stop()
+		if err := r.stats.Stop(); err != nil {
+			return err
+		}
 	}
 	if r.scanner != nil {
-		r.scanner.Close()
+		if err := r.scanner.Close(); err != nil {
+			return err
+		}
 	}
 	if r.limiter != nil {
 		r.limiter.Stop()
 	}
+	if r.options.OnClose != nil {
+		r.options.OnClose()
+	}
+
+	return nil
 }
 
 // PickIP randomly
@@ -833,7 +851,7 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		}
 
 		r.limiter.Take()
-		open, err := r.scanner.ConnectPort(host, p, time.Duration(r.options.Timeout)*time.Millisecond)
+		open, err := r.scanner.ConnectPort(host, p, r.options.GetTimeout())
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled
@@ -960,7 +978,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
 			return
 		}
-		defer file.Close()
+		defer func() {
+			if err := file.Close(); err != nil {
+				gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+			}
+		}()
 	}
 	csvFileHeaderEnabled := true
 
@@ -1004,7 +1026,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1066,7 +1088,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, file)
+						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}

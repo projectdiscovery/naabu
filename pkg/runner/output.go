@@ -17,6 +17,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/utils/structs"
 )
 
 // Result contains the result for a host
@@ -32,13 +33,17 @@ type Result struct {
 }
 
 type jsonResult struct {
-	Result
-	PortNumber int    `json:"port"`
-	Protocol   string `json:"protocol"`
-	TLS        bool   `json:"tls"`
+	Host       string    `json:"host,omitempty" csv:"host"`
+	IP         string    `json:"ip,omitempty" csv:"ip"`
+	IsCDNIP    bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	PortNumber int       `json:"port"`
+	Protocol   string    `json:"protocol"`
+	TLS        bool      `json:"tls"`
 }
 
-func (r *Result) JSON() ([]byte, error) {
+func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data := jsonResult{}
 	data.TimeStamp = r.TimeStamp
 	if r.Host != r.IP {
@@ -51,6 +56,11 @@ func (r *Result) JSON() ([]byte, error) {
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 
+	if len(excludedFields) > 0 {
+		if filteredData, err := structs.FilterStruct(data, nil, excludedFields); err == nil {
+			data = filteredData
+		}
+	}
 	return json.Marshal(data)
 }
 
@@ -59,22 +69,29 @@ var (
 	headers              = []string{}
 )
 
-func (r *Result) CSVHeaders() ([]string, error) {
+func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !slices.Contains(headers, csvTag) {
+		if !slices.Contains(headers, csvTag) && !slices.Contains(excludedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
 	return headers, nil
 }
 
-func (r *Result) CSVFields() ([]string, error) {
+func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
+	data := *r
+	if len(excludedFields) > 0 {
+		if filteredData, err := structs.FilterStruct(data, nil, excludedFields); err == nil {
+			data = filteredData
+		}
+	}
+
 	var fields []string
-	vl := reflect.ValueOf(*r)
-	ty := reflect.TypeOf(*r)
+	vl := reflect.ValueOf(data)
+	ty := reflect.TypeOf(data)
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
@@ -101,7 +118,7 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 		sb.WriteString("\n")
 		_, err := bufwriter.WriteString(sb.String())
 		if err != nil {
-			bufwriter.Flush()
+			_ = bufwriter.Flush()
 			return err
 		}
 		sb.Reset()
@@ -125,6 +142,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 	for _, p := range ports {
 		data.PortNumber = p.Port
 		data.Protocol = p.Protocol.String()
+		//nolint
 		data.TLS = p.TLS
 		if err := encoder.Encode(&data); err != nil {
 			return err
@@ -134,7 +152,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 }
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
-func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, writer io.Writer) error {
+func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
 	if host != ip {
@@ -145,21 +163,22 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 		data.CDNName = cdnName
 	}
 	if header {
-		writeCSVHeaders(data, encoder)
+		writeCSVHeaders(data, encoder, excludedFields)
 	}
 
 	for _, p := range ports {
 		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
+		//nolint
 		data.TLS = p.TLS
-		writeCSVRow(data, encoder)
+		writeCSVRow(data, encoder, excludedFields)
 	}
 	encoder.Flush()
 	return nil
 }
 
-func writeCSVHeaders(data *Result, writer *csv.Writer) {
-	headers, err := data.CSVHeaders()
+func writeCSVHeaders(data *Result, writer *csv.Writer, excludedFields []string) {
+	headers, err := data.CSVHeaders(excludedFields)
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return
@@ -171,8 +190,8 @@ func writeCSVHeaders(data *Result, writer *csv.Writer) {
 	}
 }
 
-func writeCSVRow(data *Result, writer *csv.Writer) {
-	rowData, err := data.CSVFields()
+func writeCSVRow(data *Result, writer *csv.Writer, excludedFields []string) {
+	rowData, err := data.CSVFields(excludedFields)
 	if err != nil {
 		gologger.Error().Msg(err.Error())
 		return

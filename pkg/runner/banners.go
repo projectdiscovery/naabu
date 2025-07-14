@@ -7,6 +7,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/utils/auth/pdcp"
 	osutil "github.com/projectdiscovery/utils/os"
 	updateutils "github.com/projectdiscovery/utils/update"
 )
@@ -18,8 +19,8 @@ const banner = `
 /_//_/\_,_/\_,_/_.__/\_,_/
 `
 
-// Version is the current version of naabu
-const version = `2.3.4`
+// Version is the current Version of naabu
+const Version = `2.3.5`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -94,6 +95,12 @@ func showNetworkInterfaces() error {
 func GetUpdateCallback() func() {
 	return func() {
 		showBanner()
-		updateutils.GetUpdateToolCallback("naabu", version)()
+		updateutils.GetUpdateToolCallback("naabu", Version)()
 	}
+}
+
+// AuthWithPDCP is used to authenticate with PDCP
+func AuthWithPDCP() {
+	showBanner()
+	pdcp.CheckNValidateCredentials("naabu")
 }
