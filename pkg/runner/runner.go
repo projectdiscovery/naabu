@@ -202,6 +202,11 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
+	// Skip immediate JSON/CSV output if nmap CLI is specified to postpone until after nmap integration
+	if r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV) {
+		return
+	}
+
 	csvHeaderEnabled := true
 
 	buffer := bytes.Buffer{}
@@ -462,10 +467,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		r.handleOutput(r.scanner.ScanResults)
+		// handle nmap first to integrate service information
+		if err := r.handleNmap(); err != nil {
+			return err
+		}
 
-		// handle nmap
-		return r.handleNmap()
+		// then handle output with enhanced service information
+		r.handleOutput(r.scanner.ScanResults)
+		return nil
 	default:
 		showNetworkCapabilities(r.options)
 
@@ -629,10 +638,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		r.handleOutput(r.scanner.ScanResults)
+		// handle nmap first to integrate service information
+		if err := r.handleNmap(); err != nil {
+			return err
+		}
 
-		// handle nmap
-		return r.handleNmap()
+		// then handle output with enhanced service information
+		r.handleOutput(r.scanner.ScanResults)
+		return nil
 	}
 }
 
@@ -691,11 +704,13 @@ func (r *Runner) GetTargetIps(ipsCallback func() ([]*net.IPNet, []string)) (targ
 }
 
 func (r *Runner) ShowScanResultOnExit() {
-	r.handleOutput(r.scanner.ScanResults)
-	err := r.handleNmap()
-	if err != nil {
+	// handle nmap first to integrate service information
+	if err := r.handleNmap(); err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
+
+	// then handle output with enhanced service information
+	r.handleOutput(r.scanner.ScanResults)
 }
 
 // Close runner instance
@@ -1021,6 +1036,67 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+
+				// console output
+				if r.options.JSON || r.options.CSV {
+					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+					if r.options.OutputCDN {
+						data.IsCDNIP = isCDNIP
+						data.CDNName = cdnName
+					}
+					if host != hostResult.IP {
+						data.Host = host
+					}
+					for _, p := range hostResult.Ports {
+						data.Port = p.Port
+						data.Protocol = p.Protocol.String()
+						//nolint
+						data.TLS = p.TLS
+
+						// copy service information if available
+						if p.Service != nil {
+							data.DeviceType = p.Service.DeviceType
+							data.ExtraInfo = p.Service.ExtraInfo
+							data.HighVersion = p.Service.HighVersion
+							data.Hostname = p.Service.Hostname
+							data.LowVersion = p.Service.LowVersion
+							data.Method = p.Service.Method
+							data.Name = p.Service.Name
+							data.OSType = p.Service.OSType
+							data.Product = p.Service.Product
+							data.Proto = p.Service.Proto
+							data.RPCNum = p.Service.RPCNum
+							data.ServiceFP = p.Service.ServiceFP
+							data.Tunnel = p.Service.Tunnel
+							data.Version = p.Service.Version
+							data.Confidence = p.Service.Confidence
+						}
+
+						if r.options.JSON {
+							b, err := data.JSON(r.options.ExcludeОutputFields)
+							if err != nil {
+								continue
+							}
+							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+						} else if r.options.CSV {
+							writer := csv.NewWriter(&buffer)
+							if csvFileHeaderEnabled {
+								writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
+								csvFileHeaderEnabled = false
+							}
+							writeCSVRow(data, writer, r.options.ExcludeОutputFields)
+						}
+					}
+				}
+
+				if r.options.JSON {
+					gologger.Silent().Msgf("%s", buffer.String())
+				} else if r.options.CSV {
+					writer := csv.NewWriter(&buffer)
+					writer.Flush()
+					gologger.Silent().Msgf("%s", buffer.String())
+				}
+
 				// file output
 				if file != nil {
 					if r.options.JSON {
