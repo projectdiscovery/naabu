@@ -40,7 +40,7 @@ type Options struct {
 	Ping           bool // Ping uses ping probes to discover fastest active host and discover dead hosts
 	Debug          bool // Prints out debug information
 	ExcludeCDN     bool // Excludes ip of knows CDN ranges for full port scan
-	Nmap           bool // Invoke nmap detailed scan on results
+	Nmap           bool // Invoke nmap detailed scan on results (only when NmapCLI is provided)
 	InterfacesList bool // InterfacesList show interfaces list
 
 	Retries int // Retries is the number of retries for the port

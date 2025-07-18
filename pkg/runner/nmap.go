@@ -2,140 +2,231 @@ package runner
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"sort"
 	"strings"
 
-	"github.com/pkg/errors"
-
+	"github.com/Ullaakut/nmap"
 	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
-	osutil "github.com/projectdiscovery/utils/os"
 )
 
 func (r *Runner) handleNmap() error {
-	// command from CLI
-	command := r.options.NmapCLI
-	hasCLI := r.options.NmapCLI != ""
-	if hasCLI {
-		var ipsPorts []*result.HostResult
-		// build a list of all targets
-		for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
-			ipsPorts = append(ipsPorts, hostResult)
+	// Only run nmap if custom CLI arguments are provided
+	if r.options.NmapCLI == "" {
+		return nil
+	}
+
+	var ipsPorts []*result.HostResult
+	// build a list of all targets
+	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+		ipsPorts = append(ipsPorts, hostResult)
+	}
+
+	if len(ipsPorts) == 0 {
+		gologger.Info().Msg("No hosts with open ports found for nmap scan")
+		return nil
+	}
+
+	// Group hosts by port count for efficient scanning
+	ranges := make(map[int][]*result.HostResult)
+	for _, ipPorts := range ipsPorts {
+		length := len(ipPorts.Ports)
+		var index int
+		switch {
+		case length > 100 && length < 1000:
+			index = 1
+		case length >= 1000 && length < 10000:
+			index = 2
+		case length >= 10000:
+			index = 3
+		default:
+			index = 0
+		}
+		ranges[index] = append(ranges[index], ipPorts)
+	}
+
+	for rangeIndex, rang := range ranges {
+		if len(rang) == 0 {
+			continue
 		}
 
-		// sort by number of ports
-		sort.Slice(ipsPorts, func(i, j int) bool {
-			return len(ipsPorts[i].Ports) < len(ipsPorts[j].Ports)
-		})
-
-		// suggests commands grouping ips in pseudo-exp ranges
-		// 0 - 100 ports
-		// 100 - 1000 ports
-		// 1000 - 10000 ports
-		// 10000 - 60000 ports
-		ranges := make(map[int][]*result.HostResult) // for better readability
-		// collect the indexes corresponding to ranges changes
-		for _, ipPorts := range ipsPorts {
-			length := len(ipPorts.Ports)
-			var index int
-			switch {
-			case length > 100 && length < 1000:
-				index = 1
-			case length >= 1000 && length < 10000:
-				index = 2
-			case length >= 10000:
-				index = 3
-			default:
-				index = 0
-			}
-			ranges[index] = append(ranges[index], ipPorts)
-		}
-
-		for _, rang := range ranges {
-			args := strings.Split(command, " ")
-			var (
-				ips   []string
-				ports []string
-			)
-			allports := make(map[int]struct{})
-			for _, ipPorts := range rang {
-				ips = append(ips, ipPorts.IP)
-				for _, pp := range ipPorts.Ports {
-					allports[pp.Port] = struct{}{}
-				}
-			}
-			for p := range allports {
-				ports = append(ports, fmt.Sprint(p))
-			}
-
-			// if we have no open ports we avoid running nmap
-			if len(ports) == 0 {
-				continue
-			}
-
-			portsStr := strings.Join(ports, ",")
-			ipsStr := strings.Join(ips, " ")
-
-			args = append(args, "-p", portsStr)
-			args = append(args, ips...)
-
-			// if the command is not executable, we just suggest it
-			commandCanBeExecuted := isCommandExecutable(args)
-
-			// if requested via config file or via cli
-			if (r.options.Nmap || hasCLI) && commandCanBeExecuted {
-				gologger.Info().Msgf("Running nmap command: %s -p %s %s", command, portsStr, ipsStr)
-				// check when user type '-nmap-cli "nmap -sV"'
-				// automatically remove nmap
-				posArgs := 0
-				// nmapCommand helps to check if user is on a Windows machine
-				nmapCommand := "nmap"
-				if args[0] == "nmap" || args[0] == "nmap.exe" {
-					posArgs = 1
-				}
-
-				// if it's windows search for the executable
-				if osutil.IsWindows() {
-					nmapCommand = "nmap.exe"
-				}
-
-				cmd := exec.Command(nmapCommand, args[posArgs:]...)
-
-				cmd.Stdout = os.Stdout
-				err := cmd.Run()
-				if err != nil {
-					errMsg := errors.Wrap(err, "Could not run nmap command")
-					gologger.Error().Msg(errMsg.Error())
-					return errMsg
-				}
-			} else {
-				gologger.Info().Msgf("Suggested nmap command: %s -p %s %s", command, portsStr, ipsStr)
+		var (
+			ips   []string
+			ports []string
+		)
+		allports := make(map[int]struct{})
+		for _, ipPorts := range rang {
+			ips = append(ips, ipPorts.IP)
+			for _, pp := range ipPorts.Ports {
+				allports[pp.Port] = struct{}{}
 			}
 		}
+		for p := range allports {
+			ports = append(ports, fmt.Sprint(p))
+		}
+
+		// if we have no open ports we avoid running nmap
+		if len(ports) == 0 {
+			continue
+		}
+
+		portsStr := strings.Join(ports, ",")
+		ipsStr := strings.Join(ips, " ")
+
+		gologger.Info().Msgf("Running nmap scan on range %d: %s -p %s", rangeIndex, ipsStr, portsStr)
+
+		// Create scanner options
+		var scannerOptions []func(*nmap.Scanner)
+
+		// Add targets and ports
+		scannerOptions = append(scannerOptions, nmap.WithTargets(ips...))
+		scannerOptions = append(scannerOptions, nmap.WithPorts(portsStr))
+
+		// Parse the custom CLI command
+		args := strings.Fields(r.options.NmapCLI)
+
+		// Remove "nmap" from the beginning if present
+		if len(args) > 0 && (args[0] == "nmap" || args[0] == "nmap.exe") {
+			args = args[1:]
+		}
+
+		// Add custom arguments
+		scannerOptions = append(scannerOptions, nmap.WithCustomArguments(args...))
+		gologger.Info().Msgf("Using custom nmap arguments: %s", strings.Join(args, " "))
+
+		// Create nmap scanner
+		scanner, err := nmap.NewScanner(scannerOptions...)
+		if err != nil {
+			gologger.Error().Msgf("Could not create nmap scanner: %s", err)
+			continue
+		}
+
+		// Run the scan
+		result, warnings, err := scanner.Run()
+		if err != nil {
+			gologger.Error().Msgf("Could not run nmap scan: %s", err)
+			continue
+		}
+
+		// Log warnings if any
+		if len(warnings) > 0 {
+			for _, warning := range warnings {
+				gologger.Warning().Msgf("Nmap warning: %s", warning)
+			}
+		}
+
+		// Process and integrate results back into naabu scan results
+		r.integrateNmapResults(result)
 	}
 
 	return nil
 }
 
-func isCommandExecutable(args []string) bool {
-	commandLength := calculateCmdLength(args)
-	if osutil.IsWindows() {
-		// windows has a hard limit of
-		// - 2048 characters in XP
-		// - 32768 characters in Win7
-		return commandLength < 2048
+// integrateNmapResults processes nmap results and integrates them back into naabu scan results
+func (r *Runner) integrateNmapResults(nmapResult *nmap.Run) {
+	if nmapResult == nil || len(nmapResult.Hosts) == 0 {
+		gologger.Info().Msg("No nmap results to integrate")
+		return
 	}
-	// linux and darwin
-	return true
+
+	for _, host := range nmapResult.Hosts {
+		if len(host.Addresses) == 0 {
+			continue
+		}
+
+		ip := host.Addresses[0].Addr
+		gologger.Info().Msgf("Integrating nmap results for %s:", ip)
+
+		for _, nmapPort := range host.Ports {
+			if nmapPort.State.State == "open" {
+				// Convert nmap port to naabu port with enhanced service information
+				naabuPort := r.convertNmapPortToNaabuPort(nmapPort)
+
+				// Update the existing port in scan results with enhanced service information
+				r.updatePortWithServiceInfo(ip, naabuPort)
+
+				// Log the enhanced information
+				serviceInfo := ""
+				if naabuPort.Service != nil && naabuPort.Service.Name != "" {
+					serviceInfo = fmt.Sprintf(" (%s", naabuPort.Service.Name)
+					if naabuPort.Service.Version != "" {
+						serviceInfo += fmt.Sprintf(" %s", naabuPort.Service.Version)
+					}
+					if naabuPort.Service.Product != "" {
+						serviceInfo += fmt.Sprintf(" %s", naabuPort.Service.Product)
+					}
+					serviceInfo += ")"
+				}
+
+				gologger.Silent().Msgf("  %d/%s%s", naabuPort.Port, naabuPort.Protocol, serviceInfo)
+			}
+		}
+	}
 }
 
-func calculateCmdLength(args []string) int {
-	var commandLength int
-	for _, arg := range args {
-		commandLength += len(arg)
-		commandLength += 1 // space character
+// updatePortWithServiceInfo updates an existing port in scan results with enhanced service information
+func (r *Runner) updatePortWithServiceInfo(ip string, enhancedPort *port.Port) {
+	// Check if the port already exists in scan results
+	if r.scanner.ScanResults.IPHasPort(ip, enhancedPort) {
+		// Get all ports for this IP and update the matching one
+		for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+			if hostResult.IP == ip {
+				for _, existingPort := range hostResult.Ports {
+					if existingPort.Port == enhancedPort.Port && existingPort.Protocol == enhancedPort.Protocol {
+						// Update the existing port with service information
+						if enhancedPort.Service != nil {
+							existingPort.Service = enhancedPort.Service
+						}
+						return
+					}
+				}
+			}
+		}
+	} else {
+		// Port doesn't exist, add it
+		r.scanner.ScanResults.AddPort(ip, enhancedPort)
 	}
-	return commandLength
+}
+
+// convertNmapPortToNaabuPort converts an nmap port to a naabu port with service information
+func (r *Runner) convertNmapPortToNaabuPort(nmapPort nmap.Port) *port.Port {
+	// Determine protocol
+	var proto protocol.Protocol
+	switch nmapPort.Protocol {
+	case "tcp":
+		proto = protocol.TCP
+	case "udp":
+		proto = protocol.UDP
+	default:
+		proto = protocol.TCP // default to TCP
+	}
+
+	// Create naabu port
+	naabuPort := &port.Port{
+		Port:     int(nmapPort.ID), // Convert uint16 to int
+		Protocol: proto,
+	}
+
+	// Convert service information if available
+	if nmapPort.Service.Name != "" {
+		naabuPort.Service = &port.Service{
+			Name:        nmapPort.Service.Name,
+			Product:     nmapPort.Service.Product,
+			Version:     nmapPort.Service.Version,
+			ExtraInfo:   nmapPort.Service.ExtraInfo,
+			Hostname:    nmapPort.Service.Hostname,
+			OSType:      nmapPort.Service.OSType,
+			DeviceType:  nmapPort.Service.DeviceType,
+			Method:      nmapPort.Service.Method,
+			Proto:       nmapPort.Service.Proto,
+			RPCNum:      nmapPort.Service.RPCNum,
+			ServiceFP:   nmapPort.Service.ServiceFP,
+			Tunnel:      nmapPort.Service.Tunnel,
+			LowVersion:  nmapPort.Service.LowVersion,
+			HighVersion: nmapPort.Service.HighVersion,
+		}
+	}
+
+	return naabuPort
 }
