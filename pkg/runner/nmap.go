@@ -123,6 +123,30 @@ func (r *Runner) handleNmap() error {
 	return nil
 }
 
+// Helper to convert nmap.Host OS info to our OSFingerprint struct
+func nmapOS2Fingerprint(host nmap.Host) *result.OSFingerprint {
+	if len(host.OS.Matches) == 0 {
+		return nil
+	}
+	best := host.OS.Matches[0]
+	osfp := &result.OSFingerprint{
+		Target:     host.Addresses[0].Addr,
+		DeviceType: "",
+		Running:    best.Name,
+		OSCPE:      "",
+		OSDetails:  best.Name,
+	}
+	if len(best.Classes) > 0 {
+		osfp.DeviceType = best.Classes[0].Type
+		osfp.OSCPE = ""
+		if len(best.Classes[0].CPEs) > 0 {
+			osfp.OSCPE = string(best.Classes[0].CPEs[0])
+		}
+		osfp.OSDetails = best.Classes[0].Vendor + " " + best.Classes[0].OSGeneration
+	}
+	return osfp
+}
+
 // integrateNmapResults processes nmap results and integrates them back into naabu scan results
 func (r *Runner) integrateNmapResults(nmapResult *nmap.Run) {
 	if nmapResult == nil || len(nmapResult.Hosts) == 0 {
@@ -137,6 +161,8 @@ func (r *Runner) integrateNmapResults(nmapResult *nmap.Run) {
 
 		ip := host.Addresses[0].Addr
 		gologger.Info().Msgf("Integrating nmap results for %s:", ip)
+
+		osfp := nmapOS2Fingerprint(host)
 
 		for _, nmapPort := range host.Ports {
 			if nmapPort.State.State == "open" {
@@ -162,6 +188,9 @@ func (r *Runner) integrateNmapResults(nmapResult *nmap.Run) {
 				gologger.Silent().Msgf("  %d/%s%s", naabuPort.Port, naabuPort.Protocol, serviceInfo)
 			}
 		}
+
+		// After updating ports, update the OS info for this host
+		r.scanner.ScanResults.UpdateHostOS(ip, osfp)
 	}
 }
 
