@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.24.6-alpine AS build-env
+FROM golang:1.25.0-alpine AS build-env
 RUN apk add --no-cache build-base libpcap-dev
 WORKDIR /app
 COPY . /app
