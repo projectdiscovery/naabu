@@ -11,7 +11,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.1.28
+	github.com/projectdiscovery/cdncheck v1.1.33
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -20,11 +20,11 @@ require (
 	github.com/projectdiscovery/gologger v1.1.54
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.34
-	github.com/projectdiscovery/networkpolicy v0.1.20
-	github.com/projectdiscovery/ratelimit v0.0.81
+	github.com/projectdiscovery/networkpolicy v0.1.22
+	github.com/projectdiscovery/ratelimit v0.0.82
 	github.com/projectdiscovery/retryablehttp-go v1.0.120
 	github.com/projectdiscovery/uncover v1.1.0
-	github.com/projectdiscovery/utils v0.4.22
+	github.com/projectdiscovery/utils v0.4.23
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/multierr v1.11.0
@@ -59,7 +59,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/gaissmai/bart v0.23.1 // indirect
+	github.com/gaissmai/bart v0.24.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
