@@ -33,14 +33,14 @@ type Result struct {
 }
 
 type jsonResult struct {
-	Host       string    `json:"host,omitempty" csv:"host"`
-	IP         string    `json:"ip,omitempty" csv:"ip"`
-	IsCDNIP    bool      `json:"cdn,omitempty" csv:"cdn"`
-	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
-	PortNumber int       `json:"port"`
-	Protocol   string    `json:"protocol"`
-	TLS        bool      `json:"tls"`
+	Host      string    `json:"host,omitempty" csv:"host"`
+	IP        string    `json:"ip,omitempty" csv:"ip"`
+	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	Port      int       `json:"port"`
+	Protocol  string    `json:"protocol"`
+	TLS       bool      `json:"tls"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -52,16 +52,20 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.IP = r.IP
 	data.IsCDNIP = r.IsCDNIP
 	data.CDNName = r.CDNName
-	data.PortNumber = r.Port
+	data.Port = r.Port
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 
-	if len(excludedFields) > 0 {
-		if filteredData, err := structs.FilterStruct(data, nil, excludedFields); err == nil {
-			data = filteredData
-		}
+	if len(excludedFields) == 0 {
+		return json.Marshal(data)
 	}
-	return json.Marshal(data)
+
+	filteredMap, err := structs.FilterStructToMap(data, nil, excludedFields)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(filteredMap)
 }
 
 var (
@@ -140,7 +144,7 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 		data.CDNName = cdnName
 	}
 	for _, p := range ports {
-		data.PortNumber = p.Port
+		data.Port = p.Port
 		data.Protocol = p.Protocol.String()
 		//nolint
 		data.TLS = p.TLS
