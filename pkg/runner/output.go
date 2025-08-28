@@ -131,24 +131,29 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, writer io.Writer) error {
-	encoder := json.NewEncoder(writer)
-	data := jsonResult{}
-	data.TimeStamp = time.Now().UTC()
-	if host != ip {
-		data.Host = host
+func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
+	result := &Result{
+		Host:      host,
+		IP:        ip,
+		TimeStamp: time.Now().UTC(),
 	}
-	data.IP = ip
 	if outputCDN {
-		data.IsCDNIP = isCdn
-		data.CDNName = cdnName
+		result.IsCDNIP = isCdn
+		result.CDNName = cdnName
 	}
+
 	for _, p := range ports {
-		data.Port = p.Port
-		data.Protocol = p.Protocol.String()
+		result.Port = p.Port
+		result.Protocol = p.Protocol.String()
 		//nolint
-		data.TLS = p.TLS
-		if err := encoder.Encode(&data); err != nil {
+		result.TLS = p.TLS
+
+		b, err := result.JSON(excludedFields)
+		if err != nil {
+			return err
+		}
+
+		if _, err := writer.Write(append(b, '\n')); err != nil {
 			return err
 		}
 	}

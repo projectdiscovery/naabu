@@ -1024,7 +1024,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeОutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
 					} else {
@@ -1086,7 +1086,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeОutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
 					} else {
