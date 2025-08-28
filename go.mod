@@ -24,7 +24,7 @@ require (
 	github.com/projectdiscovery/ratelimit v0.0.82
 	github.com/projectdiscovery/retryablehttp-go v1.0.120
 	github.com/projectdiscovery/uncover v1.1.0
-	github.com/projectdiscovery/utils v0.4.23
+	github.com/projectdiscovery/utils v0.4.24-0.20250827174018-0c8829538cf2
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.10.0
 	go.uber.org/multierr v1.11.0
@@ -134,5 +134,3 @@ require (
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/projectdiscovery/utils => github.com/hanxen/proj.discov_utils v0.4.24-0.20250826105743-08b0e6969365
