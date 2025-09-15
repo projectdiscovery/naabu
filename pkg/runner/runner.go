@@ -322,7 +322,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				if r.excludedIpsNP != nil && r.excludedIpsNP.ValidateAddress(ip) {
+				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
