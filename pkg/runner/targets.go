@@ -93,7 +93,10 @@ func (r *Runner) PreProcessTargets() error {
 	if r.options.Stream {
 		defer close(r.streamChannel)
 	}
-	wg := sizedwaitgroup.New(r.options.Threads)
+
+	// use DNS concurrency instead of generic Threads
+	wg := sizedwaitgroup.New(r.options.DnsConcurrency)
+
 	f, err := os.Open(r.targetsFile)
 	if err != nil {
 		return err
@@ -103,6 +106,7 @@ func (r *Runner) PreProcessTargets() error {
 			gologger.Error().Msgf("Could not close file %s: %s\n", r.targetsFile, err)
 		}
 	}()
+
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		wg.Add()

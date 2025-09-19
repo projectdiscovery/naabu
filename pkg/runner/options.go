@@ -66,6 +66,7 @@ type Options struct {
 	ConfigFile          string              // Config file contains a scan configuration
 	NmapCLI             string              // Nmap command (has priority over config file)
 	Threads             int                 // Internal worker threads
+	DnsConcurrency      int                 // DNS resolution concurrency
 	// Deprecated: stats are automatically available through local endpoint
 	EnableProgressBar bool // Enable progress bar
 	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
@@ -161,6 +162,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", 25, "general internal worker threads"),
+		flagSet.IntVar(&options.DnsConcurrency, "dns-concurrency", 0, "concurrent DNS resolution threads (default: same as -c)"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
 	)
 
@@ -333,6 +335,10 @@ func ParseOptions() *Options {
 			gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 		}
 		os.Exit(0)
+	}
+
+	if options.DnsConcurrency == 0 {
+		options.DnsConcurrency = options.Threads
 	}
 
 	// Validate the options passed by the user and if any
