@@ -134,5 +134,3 @@ require (
 	gopkg.in/djherbis/times.v1 v1.3.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
-
-replace github.com/projectdiscovery/utils => github.com/hanxen/proj.discov_utils v0.4.24-0.20250826105743-08b0e6969365
