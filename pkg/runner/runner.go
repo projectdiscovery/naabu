@@ -229,17 +229,17 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON(r.options.ExcludeОutputFields)
+					b, err := data.JSON(r.options.ExcludeOutputFields)
 					if err != nil {
 						continue
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
+						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
 						csvHeaderEnabled = false
 					}
-					writeCSVRow(data, writer, r.options.ExcludeОutputFields)
+					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
 		}
@@ -1024,9 +1024,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeОutputFields, file)
+						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1086,9 +1086,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeОutputFields, file)
+						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
