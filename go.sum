@@ -160,8 +160,6 @@ github.com/gopacket/gopacket v1.2.0 h1:eXbzFad7f73P1n2EJHQlsKuvIMJjVXK5tXoSca78I
 github.com/gopacket/gopacket v1.2.0/go.mod h1:BrAKEy5EOGQ76LSqh7DMAr7z0NNPdczWm2GxCG7+I8M=
 github.com/gorilla/css v1.0.1 h1:ntNaBIghp6JmvWnxbZKANoLyuXTPZ4cAMlo6RyhlbO8=
 github.com/gorilla/css v1.0.1/go.mod h1:BvnYkspnSzMmwRK+b8/xgNPLiIuNZr6vbZBTPQ2A3b0=
-github.com/hanxen/proj.discov_utils v0.4.24-0.20250826105743-08b0e6969365 h1:7KWchBWfDdawnpWGPmbczK2WkQse2StnGwvmRNyiy8c=
-github.com/hanxen/proj.discov_utils v0.4.24-0.20250826105743-08b0e6969365/go.mod h1:ipzU2PHYP71MaMn4jllPOpdYpdMkFD0jE3Tjak4b4eM=
 github.com/hashicorp/errwrap v1.0.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
 github.com/hashicorp/errwrap v1.1.0 h1:OxrOeh75EUXMY8TBjag2fzXGZ40LB6IKw45YeGUDY2I=
 github.com/hashicorp/errwrap v1.1.0/go.mod h1:YH+1FKiLXxHSkmPseP+kNlulaMuP3n2brvKWEqk/Jc4=
@@ -288,10 +286,8 @@ github.com/projectdiscovery/retryablehttp-go v1.0.125 h1:/00K0xHXIRLn2awpn6RD66r
 github.com/projectdiscovery/retryablehttp-go v1.0.125/go.mod h1:69TkYApUaekghXT1TJxiwKLdEY1xO+H7RCDsHx5eKWg=
 github.com/projectdiscovery/uncover v1.1.0 h1:UDp/qLZn78YZb6VPoOrfyP1vz+ojEx8VrTTyjjRt9UU=
 github.com/projectdiscovery/uncover v1.1.0/go.mod h1:2rXINmMe/lmVAt2jn9CpAOs9An57/JEeLZobY3Z9kUs=
-github.com/projectdiscovery/utils v0.4.23 h1:fi6AVPIh2laomWO+Yy6G8YhvM4c2fDmQ/Viio6VZgyw=
-github.com/projectdiscovery/utils v0.4.23/go.mod h1:2K2ymMPnp4/Zao5QulCDJzKjxdyZPsucQm6Fyo09JlA=
-github.com/projectdiscovery/utils v0.4.24-0.20250827174018-0c8829538cf2 h1:3nQ8s+ijoOHebr1/KulY2bgX9Ip6JGEyQ5dwh4x/ER4=
-github.com/projectdiscovery/utils v0.4.24-0.20250827174018-0c8829538cf2/go.mod h1:ipzU2PHYP71MaMn4jllPOpdYpdMkFD0jE3Tjak4b4eM=
+github.com/projectdiscovery/utils v0.5.0 h1:DN7mg2DpyObLByuObXzAFEkdNRDoPUnqE5N2szd3b3c=
+github.com/projectdiscovery/utils v0.5.0/go.mod h1:eCAWMmyaNxyPWbiKv1oeYJLIKpxceHE2+NWx3Jodhqk=
 github.com/prometheus/client_model v0.0.0-20190812154241-14fe0d1b01d4/go.mod h1:xMI15A0UPsDsEKsMN9yxemIoYk6Tm2C1GtYGdfGttqA=
 github.com/refraction-networking/utls v1.7.1 h1:dxg+jla3uocgN8HtX+ccwDr68uCBBO3qLrkZUbqkcw0=
 github.com/refraction-networking/utls v1.7.1/go.mod h1:TUhh27RHMGtQvjQq+RyO11P6ZNQNBb3N0v7wsEjKAIQ=
