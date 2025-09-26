@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/stretchr/testify/assert"
@@ -47,12 +48,12 @@ func TestExcludePorts(t *testing.T) {
 	assert.EqualValues(t, filteredPorts, ports)
 
 	// invalid filter
-	options.ExcludePorts = "a"
+	options.ExcludePorts = goflags.StringSlice{"a"}
 	_, err = excludePorts(&options, ports)
 	assert.NotNil(t, err)
 
 	// valid filter
-	options.ExcludePorts = "1"
+	options.ExcludePorts = goflags.StringSlice{"1"}
 	filteredPorts, err = excludePorts(&options, ports)
 	assert.Nil(t, err)
 	expectedPorts := []*port.Port{
