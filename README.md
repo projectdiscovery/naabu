@@ -374,6 +374,7 @@ package main
 import (
 	"log"
 
+	"context"
 	"github.com/projectdiscovery/goflags"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/runner"
@@ -395,7 +396,7 @@ func main() {
 	}
 	defer naabuRunner.Close()
 
-	naabuRunner.RunEnumeration()
+	naabuRunner.RunEnumeration(context.Background())
 }
 ```
 
