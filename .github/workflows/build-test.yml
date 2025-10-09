@@ -12,12 +12,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
-          go-version: 1.21.x
+          go-version: 1.24.x
 
       - name: Install libpcap-dev
         run: sudo apt install libpcap-dev
@@ -27,11 +27,10 @@ jobs:
 
       - name: Build
         run: go build .
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Test
         run: go test -race ./...
-        working-directory: v2/
 
       - name: Integration Tests
         env:
@@ -42,23 +41,23 @@ jobs:
       - name: Race Condition Tests - Standard User
         run: |
           go run -race . -host scanme.sh
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Race Condition Tests - Root User
         run: |
-          sudo go run -race . -host scanme.sh -Pn
-        working-directory: v2/cmd/naabu/
+          sudo go run -race . -host scanme.sh
+        working-directory: cmd/naabu/
 
   build-mac:
     runs-on: macos-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
-          go-version: 1.21.x
+          go-version: 1.24.x
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Install libpcap-dev
         run: brew install libpcap
@@ -68,11 +67,10 @@ jobs:
 
       - name: Build
         run: go build .
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Test
         run: go test -race ./...
-        working-directory: v2/
 
       - name: Integration Tests
         env:
@@ -83,35 +81,34 @@ jobs:
       - name: Race Condition Tests - Standard User
         run: |
           go run -race . -host scanme.sh
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Race Condition Tests - Root User
         run: |
-          sudo go run -race . -host scanme.sh -Pn
-        working-directory: v2/cmd/naabu/
+          sudo go run -race . -host scanme.sh
+        working-directory: cmd/naabu/
 
   build-windows:
     runs-on: windows-latest
     steps:
       - name: Set up Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v6
         with:
-          go-version: 1.21.x
+          go-version: 1.24.x
 
       - name: Check out code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v5
 
       - name: Build
         run: go build .
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
 
       - name: Test
         run: go test -race ./...
-        working-directory: v2/
 
       - name: Race Condition Tests
         # Known issue: https://github.com/golang/go/issues/46099
         run: |
           # go run -race . -host scanme.sh
           # sudo go run -race . -host scanme.sh
-        working-directory: v2/cmd/naabu/
+        working-directory: cmd/naabu/
