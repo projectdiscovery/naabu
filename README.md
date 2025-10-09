@@ -41,6 +41,7 @@ all ports that return a reply.
  - **Passive** Port enumeration using Shodan [Internetdb](https://internetdb.shodan.io)
  - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
+ - **Custom UDP payloads** for CONNECT scans
  - Multiple input support - **STDIN/HOST/IP/CIDR/ASN**
  - Multiple output format support - **JSON/TXT/STDOUT**
 
@@ -91,6 +92,7 @@ CONFIGURATION:
    -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4) (default ["4"])
    -scan-type, -s string            type of port scan (SYN/CONNECT) (default "c")
    -source-ip string                source ip and port (x.x.x.x:yyy - might not work on OSX) 
+   -cp, -connect-payload string    payload to send in CONNECT scans (optional)
    -interface-list, -il             list available interfaces and public ip
    -interface, -i string            network Interface to use for port scan
    -nmap                            invoke nmap scan on targets (nmap must be installed) - Deprecated
@@ -196,6 +198,12 @@ The ports to scan for on the host can be specified via `-p` parameter (udp ports
 
 ```sh
 naabu -p 80,443,21-23,u:53 -host hackerone.com
+```
+
+For UDP scans, you can specify a custom payload to send using the `-cp` or `--connect-payload` flag. This is particularly useful for UDP services that require specific data to respond:
+
+```sh
+naabu -p u:53 -host example.com -cp "DNS query payload"
 ```
 
 By default, the Naabu checks for nmap's `Top 100` ports. It supports the following in-built port lists -
