@@ -3,7 +3,7 @@ package runner
 import (
 	"testing"
 
-	"github.com/pkg/errors"
+	"github.com/projectdiscovery/utils/errkit"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +13,7 @@ func TestOptions(t *testing.T) {
 
 	options.Host = []string{"target1", "target2"}
 	options.Timeout = 2
-	assert.EqualError(t, options.ValidateOptions(), errors.Wrap(errZeroValue, "rate").Error())
+	assert.EqualError(t, options.ValidateOptions(), errkit.Wrap(errZeroValue, "rate").Error())
 
 	options.Resolvers = "aaabbbccc"
 	assert.NotNil(t, options.ValidateOptions())
