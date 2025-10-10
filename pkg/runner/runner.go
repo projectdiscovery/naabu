@@ -1073,7 +1073,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						}
 
 						if r.options.JSON {
-							b, err := data.JSON(r.options.ExcludeОutputFields)
+							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {
 								continue
 							}
@@ -1081,10 +1081,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						} else if r.options.CSV {
 							writer := csv.NewWriter(&buffer)
 							if csvFileHeaderEnabled {
-								writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
+								writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
 								csvFileHeaderEnabled = false
 							}
-							writeCSVRow(data, writer, r.options.ExcludeОutputFields)
+							writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						}
 					}
 				}
