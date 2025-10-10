@@ -54,14 +54,14 @@ type Result struct {
 // - Many structures like the following one appears redundant and to complicate the codebase
 // - Dynamic fields filtering seems to be out of scope of the tool, complicating output handling
 type jsonResult struct {
-	Host       string    `json:"host,omitempty" csv:"host"`
-	IP         string    `json:"ip,omitempty" csv:"ip"`
-	IsCDNIP    bool      `json:"cdn,omitempty" csv:"cdn"`
-	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
-	PortNumber int       `json:"port"`
-	Protocol   string    `json:"protocol"`
-	TLS        bool      `json:"tls"`
+	Host      string    `json:"host,omitempty" csv:"host"`
+	IP        string    `json:"ip,omitempty" csv:"ip"`
+	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	Port      int       `json:"port"`
+	Protocol  string    `json:"protocol"`
+	TLS       bool      `json:"tls"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
@@ -91,7 +91,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.IP = r.IP
 	data.IsCDNIP = r.IsCDNIP
 	data.CDNName = r.CDNName
-	data.PortNumber = r.Port
+	data.Port = r.Port
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 
@@ -112,12 +112,16 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Version = r.Version
 	data.Confidence = r.Confidence
 
-	if len(excludedFields) > 0 {
-		if filteredData, err := structs.FilterStruct(data, nil, excludedFields); err == nil {
-			data = filteredData
-		}
+	if len(excludedFields) == 0 {
+		return json.Marshal(data)
 	}
-	return json.Marshal(data)
+
+	filteredMap, err := structs.FilterStructToMap(data, nil, excludedFields)
+	if err != nil {
+		return nil, err
+	}
+
+	return json.Marshal(filteredMap)
 }
 
 var (
@@ -183,44 +187,48 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
-func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, writer io.Writer) error {
-	encoder := json.NewEncoder(writer)
-	data := jsonResult{}
-	data.TimeStamp = time.Now().UTC()
-	if host != ip {
-		data.Host = host
+func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
+	result := &Result{
+		Host:      host,
+		IP:        ip,
+		TimeStamp: time.Now().UTC(),
 	}
-	data.IP = ip
 	if outputCDN {
-		data.IsCDNIP = isCdn
-		data.CDNName = cdnName
+		result.IsCDNIP = isCdn
+		result.CDNName = cdnName
 	}
+
 	for _, p := range ports {
-		data.PortNumber = p.Port
-		data.Protocol = p.Protocol.String()
+		result.Port = p.Port
+		result.Protocol = p.Protocol.String()
 		//nolint
-		data.TLS = p.TLS
+		result.TLS = p.TLS
 
 		// copy the service fields
 		if p.Service != nil {
-			data.DeviceType = p.Service.DeviceType
-			data.ExtraInfo = p.Service.ExtraInfo
-			data.HighVersion = p.Service.HighVersion
-			data.Hostname = p.Service.Hostname
-			data.LowVersion = p.Service.LowVersion
-			data.Method = p.Service.Method
-			data.Name = p.Service.Name
-			data.OSType = p.Service.OSType
-			data.Product = p.Service.Product
-			data.Proto = p.Service.Proto
-			data.RPCNum = p.Service.RPCNum
-			data.ServiceFP = p.Service.ServiceFP
-			data.Tunnel = p.Service.Tunnel
-			data.Version = p.Service.Version
-			data.Confidence = p.Service.Confidence
+			result.DeviceType = p.Service.DeviceType
+			result.ExtraInfo = p.Service.ExtraInfo
+			result.HighVersion = p.Service.HighVersion
+			result.Hostname = p.Service.Hostname
+			result.LowVersion = p.Service.LowVersion
+			result.Method = p.Service.Method
+			result.Name = p.Service.Name
+			result.OSType = p.Service.OSType
+			result.Product = p.Service.Product
+			result.Proto = p.Service.Proto
+			result.RPCNum = p.Service.RPCNum
+			result.ServiceFP = p.Service.ServiceFP
+			result.Tunnel = p.Service.Tunnel
+			result.Version = p.Service.Version
+			result.Confidence = p.Service.Confidence
 		}
 
-		if err := encoder.Encode(&data); err != nil {
+		b, err := result.JSON(excludedFields)
+		if err != nil {
+			return err
+		}
+
+		if _, err := writer.Write(append(b, '\n')); err != nil {
 			return err
 		}
 	}

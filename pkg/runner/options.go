@@ -52,10 +52,10 @@ type Options struct {
 	HostsFile           string              // HostsFile is the file containing list of hosts to find port for
 	Output              string              // Output is the file to write found ports to.
 	ListOutputFields    bool                // OutputFields is the list of fields to output (comma separated)
-	ExcludeОutputFields goflags.StringSlice // ExcludeОutputFields is the list of fields to exclude from the output
+	ExcludeOutputFields goflags.StringSlice // ExcludeOutputFields is the list of fields to exclude from the output
 	Ports               string              // Ports is the ports to use for enumeration
-	PortsFile           string              // PortsFile is the file containing ports to use for enumeration
-	ExcludePorts        string              // ExcludePorts is the list of ports to exclude from enumeration
+	PortsFile           goflags.StringSlice // PortsFile is the file containing ports to use for enumeration
+	ExcludePorts        goflags.StringSlice // ExcludePorts is the list of ports to exclude from enumeration
 	ExcludeIps          string              // Ips or cidr to be excluded from the scan
 	ExcludeIpsFile      string              // File containing Ips or cidr to exclude from the scan
 	TopPorts            string              // Tops ports to scan
@@ -73,6 +73,7 @@ type Options struct {
 	ScanAllIPS        bool                // Scan all the ips
 	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
 	ScanType          string              // Scan Type
+	ConnectPayload    string              // Payload to use with CONNECT scan types
 	Proxy             string              // Socks5 proxy
 	ProxyAuth         string              // Socks5 proxy authentication (username:password)
 	Resolvers         string              // Resolvers (comma separated or file)
@@ -152,8 +153,8 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("port", "Port",
 		flagSet.StringVarP(&options.Ports, "p", "port", "", "ports to scan (80,443, 100-200)"),
 		flagSet.StringVarP(&options.TopPorts, "tp", "top-ports", "", "top ports to scan (default 100) [full,100,1000]"),
-		flagSet.StringVarP(&options.ExcludePorts, "ep", "exclude-ports", "", "ports to exclude from scan (comma-separated)"),
-		flagSet.StringVarP(&options.PortsFile, "pf", "ports-file", "", "list of ports to scan (file)"),
+		flagSet.StringSliceVarP(&options.ExcludePorts, "ep", "exclude-ports", nil, "ports to exclude from scan (file or comma-separated)", goflags.FileCommaSeparatedStringSliceOptions),
+		flagSet.StringSliceVarP(&options.PortsFile, "pf", "ports-file", nil, "list of ports to scan (file or comma-separated)", goflags.FileCommaSeparatedStringSliceOptions),
 		flagSet.IntVarP(&options.PortThreshold, "pts", "port-threshold", 0, "port threshold to skip port scan for the host"),
 		flagSet.BoolVarP(&options.ExcludeCDN, "ec", "exclude-cdn", false, "skip full port scans for CDN/WAF (only scan for port 80,443)"),
 		flagSet.BoolVarP(&options.OutputCDN, "cdn", "display-cdn", false, "display cdn in use"),
@@ -172,7 +173,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("output", "Output",
 		flagSet.StringVarP(&options.Output, "output", "o", "", "file to write output to (optional)"),
 		flagSet.BoolVarP(&options.ListOutputFields, "list-output-fields", "lof", false, "list of fields to output (comma separated)"),
-		flagSet.StringSliceVarP(&options.ExcludeОutputFields, "exclude-output-fields", "eof", nil, "exclude output fields output based on a condition", goflags.NormalizedOriginalStringSliceOptions),
+		flagSet.StringSliceVarP(&options.ExcludeOutputFields, "exclude-output-fields", "eof", nil, "exclude output fields output based on a condition", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 	)
@@ -183,6 +184,7 @@ func ParseOptions() *Options {
 		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", ConnectScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy - might not work on OSX) "),
+		flagSet.StringVarP(&options.ConnectPayload, "cp", "connect-payload", "", "payload to send in CONNECT scans (optional)"),
 		flagSet.BoolVarP(&options.InterfacesList, "il", "interface-list", false, "list available interfaces and public ip"),
 		flagSet.StringVarP(&options.Interface, "i", "interface", "", "network Interface to use for port scan"),
 		flagSet.BoolVar(&options.Nmap, "nmap", false, "invoke nmap scan on targets (nmap must be installed) - Deprecated"),

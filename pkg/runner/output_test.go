@@ -32,6 +32,6 @@ func TestWriteJSONOutput(t *testing.T) {
 	}
 	var s string
 	buf := bytes.NewBufferString(s)
-	assert.Nil(t, WriteJSONOutput(host, ip, ports, true, false, "", buf))
+	assert.Nil(t, WriteJSONOutput(host, ip, ports, true, false, "", nil, buf))
 	assert.Equal(t, 3, len(strings.Split(buf.String(), "\n")))
 }

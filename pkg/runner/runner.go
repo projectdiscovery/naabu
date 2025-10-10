@@ -234,17 +234,17 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON(r.options.ExcludeОutputFields)
+					b, err := data.JSON(r.options.ExcludeOutputFields)
 					if err != nil {
 						continue
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
+						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
 						csvHeaderEnabled = false
 					}
-					writeCSVRow(data, writer, r.options.ExcludeОutputFields)
+					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
 		}
@@ -327,7 +327,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				if r.excludedIpsNP != nil && r.excludedIpsNP.ValidateAddress(ip) {
+				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -350,7 +350,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return nil
 		}
 	}
-
+	payload := r.options.ConnectPayload
 	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
@@ -370,7 +370,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.RawSocketEnumeration(ctx, target, port)
 			} else {
 				r.wgscan.Add()
-				go r.handleHostPort(ctx, target, port)
+				go r.handleHostPort(ctx, target, payload, port)
 			}
 			return true
 		}
@@ -576,7 +576,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, port)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, port)
+					go r.handleHostPort(ctx, ip, payload, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -607,7 +607,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, &portWithMetadata)
+					go r.handleHostPort(ctx, ip, payload, &portWithMetadata)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -848,7 +848,7 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) {
+func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *port.Port) {
 	defer r.wgscan.Done()
 
 	select {
@@ -866,7 +866,7 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		}
 
 		r.limiter.Take()
-		open, err := r.scanner.ConnectPort(host, p, r.options.GetTimeout())
+		open, err := r.scanner.ConnectPort(host, payload, p, r.options.GetTimeout())
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled
@@ -1100,9 +1100,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1162,9 +1162,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
