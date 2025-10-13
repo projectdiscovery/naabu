@@ -11,18 +11,18 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.4
+	github.com/projectdiscovery/cdncheck v1.2.5
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
 	github.com/projectdiscovery/goflags v0.1.74
-	github.com/projectdiscovery/gologger v1.1.57
+	github.com/projectdiscovery/gologger v1.1.58
 	github.com/projectdiscovery/ipranger v0.0.53
-	github.com/projectdiscovery/mapcidr v1.1.95
+	github.com/projectdiscovery/mapcidr v1.1.96
 	github.com/projectdiscovery/networkpolicy v0.1.26
 	github.com/projectdiscovery/ratelimit v0.0.82
-	github.com/projectdiscovery/retryablehttp-go v1.0.127
+	github.com/projectdiscovery/retryablehttp-go v1.0.128
 	github.com/projectdiscovery/uncover v1.1.0
 	github.com/projectdiscovery/utils v0.6.0
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -90,7 +90,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/fastdialer v0.4.12 // indirect
+	github.com/projectdiscovery/fastdialer v0.4.13 // indirect
 	github.com/projectdiscovery/hmap v0.0.95 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.108 // indirect
