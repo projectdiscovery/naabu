@@ -1039,15 +1039,15 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 				// console output
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
-					if r.options.OutputCDN {
-						data.IsCDNIP = isCDNIP
-						data.CDNName = cdnName
-					}
-					if host != hostResult.IP {
-						data.Host = host
-					}
 					for _, p := range hostResult.Ports {
+						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+						if r.options.OutputCDN {
+							data.IsCDNIP = isCDNIP
+							data.CDNName = cdnName
+						}
+						if host != hostResult.IP {
+							data.Host = host
+						}
 						data.Port = p.Port
 						data.Protocol = p.Protocol.String()
 						//nolint
@@ -1071,7 +1071,6 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							data.Version = p.Service.Version
 							data.Confidence = p.Service.Confidence
 						}
-
 						if r.options.JSON {
 							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {
