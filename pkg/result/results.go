@@ -193,8 +193,6 @@ func (r *Result) HasSkipped(ip string) bool {
 
 // UpdateHostOS updates the OS info for a given IP in the results
 func (r *Result) UpdateHostOS(ip string, osfp *OSFingerprint) {
-	r.Lock()
-	defer r.Unlock()
 	for hostResult := range r.GetIPsPorts() {
 		if hostResult.IP == ip {
 			hostResult.OS = osfp
