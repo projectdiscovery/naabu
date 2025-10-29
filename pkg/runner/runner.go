@@ -361,6 +361,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.scanner.ScanResults.AddSkipped(target)
 				return false
 			}
+
+			if err := scan.GetSniCache().PopulateForHost(target); err != nil {
+				gologger.Debug().Msgf("Failed to populate SNI cache for %s: %v\n", target, err)
+			}
+
 			if shouldUseRawPackets {
 				r.RawSocketEnumeration(ctx, target, port)
 			} else {
@@ -479,6 +484,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		if err != nil {
 			return err
 		}
+
+		if err := r.populateSniCacheForTargets(); err != nil {
+			gologger.Debug().Msgf("Failed to populate SNI cache for targets: %v\n", err)
+		}
 		var targetsCount, portsCount, targetsWithPortCount uint64
 		for _, target := range append(targetsV4, targetsv6...) {
 			if target == nil {
@@ -592,8 +601,13 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					Port:     pp,
 					Protocol: protocol.TCP,
 				}
-
 				// connect scan
+				if hosts, err := r.scanner.IPRanger.GetHostsByIP(ip); err == nil && len(hosts) > 0 {
+					if err := scan.GetSniCache().PopulateForHost(hosts[0]); err != nil {
+						gologger.Debug().Msgf("Failed to populate SNI cache for %s: %v\n", hosts[0], err)
+					}
+				}
+
 				if shouldUseRawPackets {
 					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {

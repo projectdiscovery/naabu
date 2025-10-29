@@ -53,3 +53,14 @@ func getPort(target string) (string, string, bool) {
 
 	return target, "", false
 }
+
+func (r *Runner) populateSniCacheForTargets() error {
+	for _, host := range r.options.Host {
+		if !iputil.IsIP(host) {
+			if err := scan.GetSniCache().PopulateForHost(host); err != nil {
+				gologger.Debug().Msgf("Failed to populate SNI cache for %s: %v\n", host, err)
+			}
+		}
+	}
+	return nil
+}

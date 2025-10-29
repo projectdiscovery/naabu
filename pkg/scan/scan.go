@@ -2,6 +2,7 @@ package scan
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"io"
@@ -21,6 +22,50 @@ import (
 	"github.com/projectdiscovery/networkpolicy"
 	"golang.org/x/net/proxy"
 )
+
+type sniEntry struct {
+	host      string
+	expiresAt time.Time
+}
+
+type sniCache struct {
+	m   sync.Map
+	ttl time.Duration
+}
+
+var globalSniCache = &sniCache{ttl: 5 * time.Minute}
+
+func GetSniCache() *sniCache {
+	return globalSniCache
+}
+
+func (c *sniCache) Set(ip, host string) {
+	c.m.Store(ip, sniEntry{host: host, expiresAt: time.Now().Add(c.ttl)})
+}
+
+func (c *sniCache) Get(ip string) (string, bool) {
+	v, ok := c.m.Load(ip)
+	if !ok {
+		return "", false
+	}
+	e := v.(sniEntry)
+	if time.Now().After(e.expiresAt) {
+		c.m.Delete(ip)
+		return "", false
+	}
+	return e.host, true
+}
+
+func (c *sniCache) PopulateForHost(originalHost string) error {
+	ips, err := net.LookupIP(originalHost)
+	if err != nil {
+		return err
+	}
+	for _, ip := range ips {
+		c.Set(ip.String(), originalHost)
+	}
+	return nil
+}
 
 // State determines the internal scan state
 type State int
@@ -439,7 +484,47 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 			return false, err
 		}
 		return n > 0, nil
+	case protocol.TCP:
+		p.TLS = detectTLS(host, p.Port, timeout)
 	}
 
 	return true, err
+}
+
+func detectTLS(host string, port int, timeout time.Duration) bool {
+	serverName, hasSni := globalSniCache.Get(host)
+
+	if !hasSni {
+		names, err := net.LookupAddr(host)
+		if err == nil && len(names) > 0 {
+			serverName = strings.TrimSuffix(names[0], ".")
+		}
+	}
+
+	dialer := &net.Dialer{Timeout: timeout}
+
+	serverNames := []string{}
+	if hasSni && serverName != "" {
+		serverNames = append(serverNames, serverName)
+	}
+	serverNames = append(serverNames, host, "")
+
+	for _, sniName := range serverNames {
+		tlsConfig := &tls.Config{
+			InsecureSkipVerify: true,
+			ServerName:         sniName,
+			MinVersion:         tls.VersionTLS10,
+		}
+
+		hostport := net.JoinHostPort(host, fmt.Sprint(port))
+		conn, err := tls.DialWithDialer(dialer, "tcp", hostport, tlsConfig)
+		if err != nil {
+			continue
+		}
+
+		_ = conn.Close()
+		return true
+	}
+
+	return false
 }
