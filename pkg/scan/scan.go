@@ -502,7 +502,8 @@ func detectTLS(host string, port int, timeout time.Duration) bool {
 	serverName, hasSni := globalSniCache.Get(host)
 
 	if !hasSni {
-		names, err := net.LookupAddr(host)
+		resolver := &net.Resolver{}
+		names, err := resolver.LookupAddr(ctx, host)
 		if err == nil && len(names) > 0 {
 			serverName = strings.TrimSuffix(names[0], ".")
 		}
