@@ -492,6 +492,9 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 }
 
 func detectTLS(host string, port int, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
 	serverName, hasSni := globalSniCache.Get(host)
 
 	if !hasSni {
@@ -501,28 +504,46 @@ func detectTLS(host string, port int, timeout time.Duration) bool {
 		}
 	}
 
-	dialer := &net.Dialer{Timeout: timeout}
-
 	serverNames := []string{}
 	if hasSni && serverName != "" {
 		serverNames = append(serverNames, serverName)
 	}
 	serverNames = append(serverNames, host, "")
 
+	hostport := net.JoinHostPort(host, fmt.Sprint(port))
+
 	for _, sniName := range serverNames {
+		select {
+		case <-ctx.Done():
+			return false
+		default:
+		}
+
 		tlsConfig := &tls.Config{
 			InsecureSkipVerify: true,
 			ServerName:         sniName,
 			MinVersion:         tls.VersionTLS10,
 		}
 
-		hostport := net.JoinHostPort(host, fmt.Sprint(port))
-		conn, err := tls.DialWithDialer(dialer, "tcp", hostport, tlsConfig)
+		dialer := &net.Dialer{}
+		conn, err := dialer.DialContext(ctx, "tcp", hostport)
 		if err != nil {
 			continue
 		}
 
-		_ = conn.Close()
+		if deadline, ok := ctx.Deadline(); ok {
+			_ = conn.SetDeadline(deadline)
+		}
+
+		tlsConn := tls.Client(conn, tlsConfig)
+
+		err = tlsConn.Handshake()
+		if err != nil {
+			_ = conn.Close()
+			continue
+		}
+
+		_ = tlsConn.Close()
 		return true
 	}
 
