@@ -48,7 +48,11 @@ func (c *sniCache) Get(ip string) (string, bool) {
 	if !ok {
 		return "", false
 	}
-	e := v.(sniEntry)
+	e, ok := v.(sniEntry)
+	if !ok {
+		c.m.Delete(ip)
+		return "", false
+	}
 	if time.Now().After(e.expiresAt) {
 		c.m.Delete(ip)
 		return "", false
