@@ -154,6 +154,11 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("service discovery feature is not implemented")
 	}
 
+	if options.WarmUpTime <= 0 {
+		gologger.Debug().Msgf("Warm up time must be greater than 0, setting to 2")
+		options.WarmUpTime = 2
+	}
+
 	return nil
 }
 
