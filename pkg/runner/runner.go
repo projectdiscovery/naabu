@@ -220,7 +220,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 		// console output
 		if r.options.JSON || r.options.CSV {
-			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress}
 			if r.options.OutputCDN {
 				data.IsCDNIP = isCDNIP
 				data.CDNName = cdnName
@@ -1043,7 +1043,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// console output
 				if r.options.JSON || r.options.CSV {
 					for _, p := range hostResult.Ports {
-						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress}
 						if r.options.OutputCDN {
 							data.IsCDNIP = isCDNIP
 							data.CDNName = cdnName
@@ -1102,9 +1102,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
+						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1139,8 +1139,14 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostIP)
 				gologger.Info().Msgf("Found alive host %s (%s)\n", host, hostIP)
 				// console output
+				var macAddress string
+				if parsedIP := net.ParseIP(hostIP); parsedIP != nil && parsedIP.IsPrivate() {
+					if mac, err := result.GetMacAddress(hostIP); err == nil {
+						macAddress = mac
+					}
+				}
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC()}
+					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), MacAddress: macAddress}
 					if r.options.OutputCDN {
 						data.IsCDNIP = isCDNIP
 						data.CDNName = cdnName
@@ -1164,9 +1170,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
+						err = WriteJSONOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						err = WriteCsvOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
