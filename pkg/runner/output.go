@@ -30,8 +30,29 @@ type Result struct {
 	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
 	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
 	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+
+	// TODO: flattening fields should be fully reworked to reuse nested structs
+	// just add the service flat structure
+	DeviceType  string `json:"device_type,omitempty"`
+	ExtraInfo   string `json:"extra_info,omitempty"`
+	HighVersion string `json:"high_version,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	LowVersion  string `json:"low_version,omitempty"`
+	Method      string `json:"method,omitempty"`
+	Name        string `json:"name,omitempty"`
+	OSType      string `json:"os_type,omitempty"`
+	Product     string `json:"product,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	RPCNum      string `json:"rpc_num,omitempty"`
+	ServiceFP   string `json:"service_fp,omitempty"`
+	Tunnel      string `json:"tunnel,omitempty"`
+	Version     string `json:"version,omitempty"`
+	Confidence  int    `json:"confidence,omitempty"`
 }
 
+// TODO:
+// - Many structures like the following one appears redundant and to complicate the codebase
+// - Dynamic fields filtering seems to be out of scope of the tool, complicating output handling
 type jsonResult struct {
 	Host      string    `json:"host,omitempty" csv:"host"`
 	IP        string    `json:"ip,omitempty" csv:"ip"`
@@ -41,6 +62,24 @@ type jsonResult struct {
 	Port      int       `json:"port"`
 	Protocol  string    `json:"protocol"`
 	TLS       bool      `json:"tls"`
+
+	// TODO: flattening fields should be fully reworked to reuse nested structs
+	// just add the service flat structure
+	DeviceType  string `json:"device_type,omitempty"`
+	ExtraInfo   string `json:"extra_info,omitempty"`
+	HighVersion string `json:"high_version,omitempty"`
+	Hostname    string `json:"hostname,omitempty"`
+	LowVersion  string `json:"low_version,omitempty"`
+	Method      string `json:"method,omitempty"`
+	Name        string `json:"name,omitempty"`
+	OSType      string `json:"os_type,omitempty"`
+	Product     string `json:"product,omitempty"`
+	Proto       string `json:"proto,omitempty"`
+	RPCNum      string `json:"rpc_num,omitempty"`
+	ServiceFP   string `json:"service_fp,omitempty"`
+	Tunnel      string `json:"tunnel,omitempty"`
+	Version     string `json:"version,omitempty"`
+	Confidence  int    `json:"confidence,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -55,6 +94,23 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Port = r.Port
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
+
+	// copy the service fields
+	data.DeviceType = r.DeviceType
+	data.ExtraInfo = r.ExtraInfo
+	data.HighVersion = r.HighVersion
+	data.Hostname = r.Hostname
+	data.LowVersion = r.LowVersion
+	data.Method = r.Method
+	data.Name = r.Name
+	data.OSType = r.OSType
+	data.Product = r.Product
+	data.Proto = r.Proto
+	data.RPCNum = r.RPCNum
+	data.ServiceFP = r.ServiceFP
+	data.Tunnel = r.Tunnel
+	data.Version = r.Version
+	data.Confidence = r.Confidence
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -147,6 +203,25 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 		result.Protocol = p.Protocol.String()
 		//nolint
 		result.TLS = p.TLS
+
+		// copy the service fields
+		if p.Service != nil {
+			result.DeviceType = p.Service.DeviceType
+			result.ExtraInfo = p.Service.ExtraInfo
+			result.HighVersion = p.Service.HighVersion
+			result.Hostname = p.Service.Hostname
+			result.LowVersion = p.Service.LowVersion
+			result.Method = p.Service.Method
+			result.Name = p.Service.Name
+			result.OSType = p.Service.OSType
+			result.Product = p.Service.Product
+			result.Proto = p.Service.Proto
+			result.RPCNum = p.Service.RPCNum
+			result.ServiceFP = p.Service.ServiceFP
+			result.Tunnel = p.Service.Tunnel
+			result.Version = p.Service.Version
+			result.Confidence = p.Service.Confidence
+		}
 
 		b, err := result.JSON(excludedFields)
 		if err != nil {

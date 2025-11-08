@@ -41,6 +41,23 @@ func main() {
 			if err != nil {
 				gologger.Fatal().Msgf("Could not decode jsonl file: %s\n", err)
 			}
+			service := &port.Service{
+				DeviceType:  r.DeviceType,
+				ExtraInfo:   r.ExtraInfo,
+				HighVersion: r.HighVersion,
+				Hostname:    r.Hostname,
+				LowVersion:  r.LowVersion,
+				Method:      r.Method,
+				Name:        r.Name,
+				OSType:      r.OSType,
+				Product:     r.Product,
+				Proto:       r.Proto,
+				RPCNum:      r.RPCNum,
+				ServiceFP:   r.ServiceFP,
+				Tunnel:      r.Tunnel,
+				Version:     r.Version,
+				Confidence:  r.Confidence,
+			}
 			options.OnResult(&result.HostResult{
 				Host: r.Host,
 				IP:   r.IP,
@@ -49,6 +66,7 @@ func main() {
 						Port:     r.Port,
 						Protocol: protocol.ParseProtocol(r.Protocol),
 						TLS:      r.TLS,
+						Service:  service,
 					},
 				},
 			})

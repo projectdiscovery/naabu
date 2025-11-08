@@ -10,11 +10,20 @@ import (
 
 type ResultFn func(*HostResult)
 
+type OSFingerprint struct {
+	Target     string
+	DeviceType string
+	Running    string
+	OSCPE      string
+	OSDetails  string
+}
+
 type HostResult struct {
 	Host       string
 	IP         string
 	Ports      []*port.Port
 	Confidence confidence.ConfidenceLevel
+	OS         *OSFingerprint
 }
 
 // Result of the scan
@@ -180,4 +189,14 @@ func (r *Result) HasSkipped(ip string) bool {
 
 	_, ok := r.skipped[ip]
 	return ok
+}
+
+// UpdateHostOS updates the OS info for a given IP in the results
+func (r *Result) UpdateHostOS(ip string, osfp *OSFingerprint) {
+	for hostResult := range r.GetIPsPorts() {
+		if hostResult.IP == ip {
+			hostResult.OS = osfp
+			return
+		}
+	}
 }
