@@ -19,6 +19,8 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
+	envutil "github.com/projectdiscovery/utils/env"
+	netutil "github.com/projectdiscovery/utils/net"
 	"golang.org/x/net/proxy"
 )
 
@@ -111,8 +113,9 @@ type PkgResult struct {
 }
 
 var (
-	pingIcmpEchoRequestCallback      func(ip string, timeout time.Duration) bool //nolint
-	pingIcmpTimestampRequestCallback func(ip string, timeout time.Duration) bool //nolint
+	pingIcmpEchoRequestCallback      func(ip string, timeout time.Duration) bool              //nolint
+	pingIcmpTimestampRequestCallback func(ip string, timeout time.Duration) bool              //nolint
+	EnableTLSDetection               = envutil.GetEnvOrDefault("ENABLE_TLS_DETECTION", false) // Enable TLS detection for connect scans
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -439,6 +442,12 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 			return false, err
 		}
 		return n > 0, nil
+	case protocol.TCP:
+		// Perform TLS detection for TCP connections if enabled
+		if EnableTLSDetection {
+			//nolint
+			p.TLS = netutil.DetectTLS(conn, host, timeout)
+		}
 	}
 
 	return true, err
