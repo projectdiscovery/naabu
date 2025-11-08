@@ -12,18 +12,18 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.4
+	github.com/projectdiscovery/cdncheck v1.2.8
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
 	github.com/projectdiscovery/goflags v0.1.74
-	github.com/projectdiscovery/gologger v1.1.57
+	github.com/projectdiscovery/gologger v1.1.59
 	github.com/projectdiscovery/ipranger v0.0.53
-	github.com/projectdiscovery/mapcidr v1.1.95
-	github.com/projectdiscovery/networkpolicy v0.1.26
+	github.com/projectdiscovery/mapcidr v1.1.97
+	github.com/projectdiscovery/networkpolicy v0.1.27
 	github.com/projectdiscovery/ratelimit v0.0.82
-	github.com/projectdiscovery/retryablehttp-go v1.0.127
+	github.com/projectdiscovery/retryablehttp-go v1.0.130
 	github.com/projectdiscovery/uncover v1.1.0
 	github.com/projectdiscovery/utils v0.6.0
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -60,7 +60,7 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/dsnet/compress v0.0.2-0.20230904184137-39efe44ab707 // indirect
 	github.com/fatih/color v1.15.0 // indirect
-	github.com/gaissmai/bart v0.25.0 // indirect
+	github.com/gaissmai/bart v0.26.0 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-github/v30 v30.1.0 // indirect
@@ -86,12 +86,12 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/muesli/reflow v0.3.0 // indirect
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
-	github.com/nwaples/rardecode/v2 v2.0.0-beta.4.0.20241112120701-034e449c6e78 // indirect
+	github.com/nwaples/rardecode/v2 v2.2.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.21 // indirect
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20210106213030-5aafc221ea8c // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/fastdialer v0.4.12 // indirect
+	github.com/projectdiscovery/fastdialer v0.4.15 // indirect
 	github.com/projectdiscovery/hmap v0.0.95 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20240226150047-2e2c51e35983 // indirect
 	github.com/projectdiscovery/retryabledns v1.0.108 // indirect

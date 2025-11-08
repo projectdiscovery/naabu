@@ -1,5 +1,5 @@
 # Build
-FROM golang:1.25.1-alpine AS build-env
+FROM golang:1.25.3-alpine AS build-env
 RUN apk add --no-cache build-base libpcap-dev
 WORKDIR /app
 COPY . /app
@@ -7,7 +7,7 @@ RUN go mod download
 RUN go build ./cmd/naabu
 
 # Release
-FROM alpine:3.22.1
+FROM alpine:3.22.2
 RUN apk upgrade --no-cache \
     && apk add --no-cache nmap libpcap-dev bind-tools ca-certificates nmap-scripts
 COPY --from=build-env /app/naabu /usr/local/bin/

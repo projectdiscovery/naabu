@@ -627,9 +627,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.options.ResumeCfg.Unlock()
 		}
 
+		warmUpTime := 2 * time.Second
 		if r.options.WarmUpTime > 0 {
-			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+			warmUpTime = time.Duration(r.options.WarmUpTime) * time.Second
 		}
+
+		time.Sleep(warmUpTime)
 
 		r.scanner.ListenHandler.Phase.Set(scan.Done)
 

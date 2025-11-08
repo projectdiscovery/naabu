@@ -97,18 +97,18 @@ func buildListenHandler() (*ListenHandler, error) {
 	listenHandler.HostDiscoveryChan = make(chan *PkgResult, chanSize)
 
 	var err error
-	listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
+	listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP("0.0.0.0")})
 	if err != nil {
 		return nil, fmt.Errorf("could not setup ip4:tcp: %s", err)
 	}
-	listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf("0.0.0.0:%d", listenHandler.Port))})
+	listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP("0.0.0.0")})
 	if err != nil {
 		return nil, fmt.Errorf("could not setup ip4:udp: %s", err)
 	}
 
-	listenHandler.TcpConn6, _ = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
+	listenHandler.TcpConn6, _ = net.ListenIP("ip6:tcp", &net.IPAddr{IP: net.ParseIP("::")})
 
-	listenHandler.UdpConn6, _ = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP(fmt.Sprintf(":::%d", listenHandler.Port))})
+	listenHandler.UdpConn6, _ = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP("::")})
 
 	go listenHandler.ICMPReadWorker4()
 	go listenHandler.ICMPReadWorker6()
