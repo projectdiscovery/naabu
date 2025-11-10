@@ -1,7 +1,15 @@
 package result
 
 import (
+	"context"
+	"fmt"
+	"net"
+	"os/exec"
+	"runtime"
+	"strings"
 	"sync"
+	"time"
+	"unicode"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
@@ -24,6 +32,7 @@ type HostResult struct {
 	Ports      []*port.Port
 	Confidence confidence.ConfidenceLevel
 	OS         *OSFingerprint
+	MacAddress string
 }
 
 // Result of the scan
@@ -82,7 +91,17 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 			if r.HasSkipped(ip) {
 				confidenceLevel = confidence.Low
 			}
-			out <- &HostResult{IP: ip, Ports: maps.Values(ports), Confidence: confidenceLevel}
+
+			hostResult := &HostResult{IP: ip, Ports: maps.Values(ports), Confidence: confidenceLevel}
+
+			// Perform ARP lookup for private/local network IPs
+			if isPrivateIP(ip) {
+				if macAddr, err := GetMacAddress(ip); err == nil {
+					hostResult.MacAddress = macAddr
+				}
+			}
+
+			out <- hostResult
 		}
 	}()
 
@@ -199,4 +218,87 @@ func (r *Result) UpdateHostOS(ip string, osfp *OSFingerprint) {
 			return
 		}
 	}
+}
+
+// isPrivateIP checks if an IP address is in a private/local network range
+func isPrivateIP(ipStr string) bool {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return false
+	}
+	return ip.IsPrivate()
+}
+
+// GetMacAddress retrieves the MAC address for a given target (IP address or hostname).
+// It resolves hostnames to IP addresses first, then queries the ARP table.
+// Returns an empty string if the MAC address cannot be found.
+func GetMacAddress(target string) (string, error) {
+	// Resolve hostname to IP if needed
+	ip := target
+	if net.ParseIP(target) == nil {
+		// Not a valid IP, try to resolve as hostname
+		ips, err := net.LookupIP(target)
+		if err != nil || len(ips) == 0 {
+			return "", fmt.Errorf("failed to resolve hostname %s: %w", target, err)
+		}
+		// Use the first IPv4 address if available, otherwise use the first address
+		for _, addr := range ips {
+			if addr.To4() != nil {
+				ip = addr.String()
+				break
+			}
+		}
+		if ip == target {
+			ip = ips[0].String()
+		}
+	}
+
+	// Determine ARP command arguments based on OS
+	var arpArgs []string
+	switch runtime.GOOS {
+	case "linux", "darwin":
+		// Linux and macOS use the same command format
+		arpArgs = []string{"-n", ip}
+	case "windows":
+		// Windows uses different arguments
+		arpArgs = []string{"-a", ip}
+	default:
+		return "", fmt.Errorf("unsupported operating system: %s", runtime.GOOS)
+	}
+
+	// Query ARP table
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, "arp", arpArgs...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return "", fmt.Errorf("failed to execute arp command: %w", err)
+	}
+
+	// Parse ARP output to find MAC address
+	outputStr := string(output)
+
+	// Windows output is line-based, so check each line for the IP
+	if runtime.GOOS == "windows" {
+		lines := strings.Split(outputStr, "\n")
+		for _, line := range lines {
+			if strings.Contains(line, ip) {
+				for _, field := range strings.FieldsFunc(line, unicode.IsSpace) {
+					if mac, err := net.ParseMAC(field); err == nil {
+						return mac.String(), nil
+					}
+				}
+			}
+		}
+	} else {
+		// Linux and macOS: parse all fields in the output
+		for _, field := range strings.FieldsFunc(outputStr, unicode.IsSpace) {
+			if mac, err := net.ParseMAC(field); err == nil {
+				return mac.String(), nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("MAC address not found in ARP table for %s", ip)
 }

@@ -22,14 +22,15 @@ import (
 
 // Result contains the result for a host
 type Result struct {
-	Host      string    `json:"host,omitempty" csv:"host"`
-	IP        string    `json:"ip,omitempty" csv:"ip"`
-	Port      int       `json:"port,omitempty" csv:"port"`
-	Protocol  string    `json:"protocol,omitempty" csv:"protocol"`
-	TLS       bool      `json:"tls,omitempty" csv:"tls"`
-	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
-	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	Host       string    `json:"host,omitempty" csv:"host"`
+	IP         string    `json:"ip,omitempty" csv:"ip"`
+	Port       int       `json:"port,omitempty" csv:"port"`
+	Protocol   string    `json:"protocol,omitempty" csv:"protocol"`
+	TLS        bool      `json:"tls,omitempty" csv:"tls"`
+	IsCDNIP    bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
@@ -54,14 +55,15 @@ type Result struct {
 // - Many structures like the following one appears redundant and to complicate the codebase
 // - Dynamic fields filtering seems to be out of scope of the tool, complicating output handling
 type jsonResult struct {
-	Host      string    `json:"host,omitempty" csv:"host"`
-	IP        string    `json:"ip,omitempty" csv:"ip"`
-	IsCDNIP   bool      `json:"cdn,omitempty" csv:"cdn"`
-	CDNName   string    `json:"cdn-name,omitempty" csv:"cdn-name"`
-	TimeStamp time.Time `json:"timestamp,omitempty" csv:"timestamp"`
-	Port      int       `json:"port"`
-	Protocol  string    `json:"protocol"`
-	TLS       bool      `json:"tls"`
+	Host       string    `json:"host,omitempty" csv:"host"`
+	IP         string    `json:"ip,omitempty" csv:"ip"`
+	IsCDNIP    bool      `json:"cdn,omitempty" csv:"cdn"`
+	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
+	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
+	Port       int       `json:"port"`
+	Protocol   string    `json:"protocol"`
+	TLS        bool      `json:"tls"`
+	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
@@ -94,6 +96,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Port = r.Port
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
+	data.MacAddress = r.MacAddress
 
 	// copy the service fields
 	data.DeviceType = r.DeviceType
@@ -188,10 +191,16 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
 func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
+	return WriteJSONOutputWithMac(host, ip, "", ports, outputCDN, isCdn, cdnName, excludedFields, writer)
+}
+
+// WriteJSONOutputWithMac writes the output list of subdomain in JSON to an io.Writer with MAC address
+func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
 	result := &Result{
-		Host:      host,
-		IP:        ip,
-		TimeStamp: time.Now().UTC(),
+		Host:       host,
+		IP:         ip,
+		MacAddress: macAddress,
+		TimeStamp:  time.Now().UTC(),
 	}
 	if outputCDN {
 		result.IsCDNIP = isCdn
@@ -237,8 +246,13 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 
 // WriteCsvOutput writes the output list of subdomain in csv format to an io.Writer
 func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
+	return WriteCsvOutputWithMac(host, ip, "", ports, outputCDN, isCdn, cdnName, header, excludedFields, writer)
+}
+
+// WriteCsvOutputWithMac writes the output list of subdomain in csv format to an io.Writer with MAC address
+func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
-	data := &Result{IP: ip, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
+	data := &Result{IP: ip, MacAddress: macAddress, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
 	if host != ip {
 		data.Host = host
 	}
