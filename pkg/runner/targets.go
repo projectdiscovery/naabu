@@ -106,7 +106,7 @@ func (r *Runner) PreProcessTargets() error {
 	s := bufio.NewScanner(f)
 	for s.Scan() {
 		wg.Add()
-		func(target string) {
+		go func(target string) {
 			defer wg.Done()
 			if err := r.AddTarget(target); err != nil {
 				gologger.Warning().Msgf("%s\n", err)

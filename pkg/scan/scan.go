@@ -19,6 +19,8 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
+	envutil "github.com/projectdiscovery/utils/env"
+	netutil "github.com/projectdiscovery/utils/net"
 	"golang.org/x/net/proxy"
 )
 
@@ -111,8 +113,9 @@ type PkgResult struct {
 }
 
 var (
-	pingIcmpEchoRequestCallback      func(ip string, timeout time.Duration) bool //nolint
-	pingIcmpTimestampRequestCallback func(ip string, timeout time.Duration) bool //nolint
+	pingIcmpEchoRequestCallback      func(ip string, timeout time.Duration) bool              //nolint
+	pingIcmpTimestampRequestCallback func(ip string, timeout time.Duration) bool              //nolint
+	EnableTLSDetection               = envutil.GetEnvOrDefault("ENABLE_TLS_DETECTION", false) // Enable TLS detection for connect scans
 )
 
 // NewScanner creates a new full port scanner that scans all ports using SYN packets.
@@ -386,7 +389,7 @@ func GetInterfaceFromIP(ip net.IP) (*net.Interface, error) {
 }
 
 // ConnectPort a single host and port
-func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) (bool, error) {
+func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.Duration) (bool, error) {
 	hostport := net.JoinHostPort(host, fmt.Sprint(p.Port))
 	var (
 		err  error
@@ -427,7 +430,7 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return false, err
 		}
-		if _, err := conn.Write(nil); err != nil {
+		if _, err := conn.Write([]byte(payload)); err != nil {
 			return false, err
 		}
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {
@@ -439,6 +442,12 @@ func (s *Scanner) ConnectPort(host string, p *port.Port, timeout time.Duration) 
 			return false, err
 		}
 		return n > 0, nil
+	case protocol.TCP:
+		// Perform TLS detection for TCP connections if enabled
+		if EnableTLSDetection {
+			//nolint
+			p.TLS = netutil.DetectTLS(conn, host, timeout)
+		}
 	}
 
 	return true, err

@@ -2,7 +2,6 @@ package runner
 
 import (
 	"fmt"
-	"os"
 	"strconv"
 	"strings"
 
@@ -25,12 +24,8 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 	var portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList []*port.Port
 
 	// If the user has specfied a ports file, use it
-	if options.PortsFile != "" {
-		data, err := os.ReadFile(options.PortsFile)
-		if err != nil {
-			return nil, fmt.Errorf("could not read ports: %s", err)
-		}
-		ports, err := parsePortsList(string(data))
+	if len(options.PortsFile) > 0 {
+		ports, err := parsePortsSlice(options.PortsFile)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
 		}
@@ -114,14 +109,14 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 
 // excludePorts excludes the list of ports from the exclusion list
 func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
-	if options.ExcludePorts == "" {
+	if len(options.ExcludePorts) == 0 {
 		return ports, nil
 	}
 
 	var filteredPorts []*port.Port
 
 	// Exclude the ports specified by the user in exclusion list
-	excludedPortsCLI, err := parsePortsList(options.ExcludePorts)
+	excludedPortsCLI, err := parsePortsSlice(options.ExcludePorts)
 	if err != nil {
 		return nil, fmt.Errorf("could not read exclusion ports: %s", err)
 	}

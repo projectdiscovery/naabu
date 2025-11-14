@@ -202,6 +202,11 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
+	// Skip immediate JSON/CSV output if nmap CLI is specified to postpone until after nmap integration
+	if r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV) {
+		return
+	}
+
 	csvHeaderEnabled := true
 
 	buffer := bytes.Buffer{}
@@ -215,7 +220,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 		// console output
 		if r.options.JSON || r.options.CSV {
-			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC()}
+			data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress}
 			if r.options.OutputCDN {
 				data.IsCDNIP = isCDNIP
 				data.CDNName = cdnName
@@ -229,17 +234,17 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				//nolint
 				data.TLS = p.TLS
 				if r.options.JSON {
-					b, err := data.JSON(r.options.ExcludeОutputFields)
+					b, err := data.JSON(r.options.ExcludeOutputFields)
 					if err != nil {
 						continue
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
-						writeCSVHeaders(data, writer, r.options.ExcludeОutputFields)
+						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
 						csvHeaderEnabled = false
 					}
-					writeCSVRow(data, writer, r.options.ExcludeОutputFields)
+					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
 		}
@@ -322,7 +327,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				if r.excludedIpsNP != nil && r.excludedIpsNP.ValidateAddress(ip) {
+				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -345,7 +350,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return nil
 		}
 	}
-
+	payload := r.options.ConnectPayload
 	switch {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
@@ -365,7 +370,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.RawSocketEnumeration(ctx, target, port)
 			} else {
 				r.wgscan.Add()
-				go r.handleHostPort(ctx, target, port)
+				go r.handleHostPort(ctx, target, payload, port)
 			}
 			return true
 		}
@@ -462,10 +467,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		r.handleOutput(r.scanner.ScanResults)
+		// handle nmap first to integrate service information
+		if err := r.handleNmap(); err != nil {
+			return err
+		}
 
-		// handle nmap
-		return r.handleNmap()
+		// then handle output with enhanced service information
+		r.handleOutput(r.scanner.ScanResults)
+		return nil
 	default:
 		showNetworkCapabilities(r.options)
 
@@ -567,7 +576,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, port)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, port)
+					go r.handleHostPort(ctx, ip, payload, port)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -598,7 +607,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
 				} else {
 					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, &portWithMetadata)
+					go r.handleHostPort(ctx, ip, payload, &portWithMetadata)
 				}
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)
@@ -618,9 +627,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.options.ResumeCfg.Unlock()
 		}
 
+		warmUpTime := 2 * time.Second
 		if r.options.WarmUpTime > 0 {
-			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+			warmUpTime = time.Duration(r.options.WarmUpTime) * time.Second
 		}
+
+		time.Sleep(warmUpTime)
 
 		r.scanner.ListenHandler.Phase.Set(scan.Done)
 
@@ -629,10 +641,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		r.handleOutput(r.scanner.ScanResults)
+		// handle nmap first to integrate service information
+		if err := r.handleNmap(); err != nil {
+			return err
+		}
 
-		// handle nmap
-		return r.handleNmap()
+		// then handle output with enhanced service information
+		r.handleOutput(r.scanner.ScanResults)
+		return nil
 	}
 }
 
@@ -691,11 +707,13 @@ func (r *Runner) GetTargetIps(ipsCallback func() ([]*net.IPNet, []string)) (targ
 }
 
 func (r *Runner) ShowScanResultOnExit() {
-	r.handleOutput(r.scanner.ScanResults)
-	err := r.handleNmap()
-	if err != nil {
+	// handle nmap first to integrate service information
+	if err := r.handleNmap(); err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
+
+	// then handle output with enhanced service information
+	r.handleOutput(r.scanner.ScanResults)
 }
 
 // Close runner instance
@@ -833,7 +851,7 @@ func (r *Runner) canIScanIfCDN(host string, port *port.Port) bool {
 	return port.Port == 80 || port.Port == 443
 }
 
-func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) {
+func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *port.Port) {
 	defer r.wgscan.Done()
 
 	select {
@@ -851,7 +869,7 @@ func (r *Runner) handleHostPort(ctx context.Context, host string, p *port.Port) 
 		}
 
 		r.limiter.Take()
-		open, err := r.scanner.ConnectPort(host, p, r.options.GetTimeout())
+		open, err := r.scanner.ConnectPort(host, payload, p, r.options.GetTimeout())
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled
@@ -1021,12 +1039,72 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
 				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+
+				// console output
+				if r.options.JSON || r.options.CSV {
+					for _, p := range hostResult.Ports {
+						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress}
+						if r.options.OutputCDN {
+							data.IsCDNIP = isCDNIP
+							data.CDNName = cdnName
+						}
+						if host != hostResult.IP {
+							data.Host = host
+						}
+						data.Port = p.Port
+						data.Protocol = p.Protocol.String()
+						//nolint
+						data.TLS = p.TLS
+
+						// copy service information if available
+						if p.Service != nil {
+							data.DeviceType = p.Service.DeviceType
+							data.ExtraInfo = p.Service.ExtraInfo
+							data.HighVersion = p.Service.HighVersion
+							data.Hostname = p.Service.Hostname
+							data.LowVersion = p.Service.LowVersion
+							data.Method = p.Service.Method
+							data.Name = p.Service.Name
+							data.OSType = p.Service.OSType
+							data.Product = p.Service.Product
+							data.Proto = p.Service.Proto
+							data.RPCNum = p.Service.RPCNum
+							data.ServiceFP = p.Service.ServiceFP
+							data.Tunnel = p.Service.Tunnel
+							data.Version = p.Service.Version
+							data.Confidence = p.Service.Confidence
+						}
+						if r.options.JSON {
+							b, err := data.JSON(r.options.ExcludeOutputFields)
+							if err != nil {
+								continue
+							}
+							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+						} else if r.options.CSV {
+							writer := csv.NewWriter(&buffer)
+							if csvFileHeaderEnabled {
+								writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
+								csvFileHeaderEnabled = false
+							}
+							writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+						}
+					}
+				}
+
+				if r.options.JSON {
+					gologger.Silent().Msgf("%s", buffer.String())
+				} else if r.options.CSV {
+					writer := csv.NewWriter(&buffer)
+					writer.Flush()
+					gologger.Silent().Msgf("%s", buffer.String())
+				}
+
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostResult.IP, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1061,8 +1139,14 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostIP)
 				gologger.Info().Msgf("Found alive host %s (%s)\n", host, hostIP)
 				// console output
+				var macAddress string
+				if parsedIP := net.ParseIP(hostIP); parsedIP != nil && parsedIP.IsPrivate() {
+					if mac, err := result.GetMacAddress(hostIP); err == nil {
+						macAddress = mac
+					}
+				}
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC()}
+					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), MacAddress: macAddress}
 					if r.options.OutputCDN {
 						data.IsCDNIP = isCDNIP
 						data.CDNName = cdnName
@@ -1086,9 +1170,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, file)
+						err = WriteJSONOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutput(host, hostIP, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeОutputFields, file)
+						err = WriteCsvOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
