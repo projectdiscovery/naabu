@@ -12,20 +12,20 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.9
+	github.com/projectdiscovery/cdncheck v1.2.10
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.2
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
 	github.com/projectdiscovery/goflags v0.1.74
-	github.com/projectdiscovery/gologger v1.1.59
+	github.com/projectdiscovery/gologger v1.1.60
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.27
+	github.com/projectdiscovery/networkpolicy v0.1.28
 	github.com/projectdiscovery/ratelimit v0.0.82
 	github.com/projectdiscovery/retryablehttp-go v1.0.131
 	github.com/projectdiscovery/uncover v1.1.0
-	github.com/projectdiscovery/utils v0.6.1-0.20251108140049-ef99769ae3cb
+	github.com/projectdiscovery/utils v0.6.1
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/multierr v1.11.0
