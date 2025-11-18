@@ -12,7 +12,7 @@ jobs:
   release-test-mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install Dependences
@@ -27,7 +27,7 @@ jobs:
   release-test-linux:
     runs-on: ubuntu-latest-16-cores
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install Dependences
@@ -42,7 +42,7 @@ jobs:
   release-test-windows:
     runs-on: windows-latest-8-cores
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
       
       - name: release test

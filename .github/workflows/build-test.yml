@@ -12,7 +12,7 @@ jobs:
     name: "Lint"
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
       - name: Install libpcap-dev
         run: sudo apt install libpcap-dev
@@ -22,7 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: ["lint"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install libpcap-dev
@@ -58,7 +58,7 @@ jobs:
     runs-on: macos-latest
     needs: ["lint"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install libpcap-dev
@@ -94,7 +94,7 @@ jobs:
     runs-on: windows-latest
     needs: ["lint"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Build
