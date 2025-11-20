@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -77,7 +78,7 @@ func (r *Runner) handleNmap() error {
 		gologger.Info().Msgf("Running nmap scan on range %d: %s -p %s", rangeIndex, ipsStr, portsStr)
 
 		// Create scanner options
-		var scannerOptions []func(*nmap.Scanner)
+		var scannerOptions []nmap.Option
 
 		// Add targets and ports
 		scannerOptions = append(scannerOptions, nmap.WithTargets(ips...))
@@ -92,11 +93,11 @@ func (r *Runner) handleNmap() error {
 		}
 
 		// Add custom arguments
-		scannerOptions = append(scannerOptions, nmap.WithCustomArguments(args...))
+		scannerOptions = append(scannerOptions, nmap.WithCustomArguments(args...)) //nolint
 		gologger.Info().Msgf("Using custom nmap arguments: %s", strings.Join(args, " "))
 
 		// Create nmap scanner
-		scanner, err := nmap.NewScanner(scannerOptions...)
+		scanner, err := nmap.NewScanner(context.TODO(), scannerOptions...)
 		if err != nil {
 			gologger.Error().Msgf("Could not create nmap scanner: %s", err)
 			continue
@@ -110,8 +111,8 @@ func (r *Runner) handleNmap() error {
 		}
 
 		// Log warnings if any
-		if len(warnings) > 0 {
-			for _, warning := range warnings {
+		if warnings != nil && len(*warnings) > 0 {
+			for _, warning := range *warnings {
 				gologger.Warning().Msgf("Nmap warning: %s", warning)
 			}
 		}
