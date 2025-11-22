@@ -10,9 +10,9 @@ jobs:
   build-mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: projectdiscovery/actions/setup/go@v1
-      
+
       - name: Install Dependences
         run: brew install libpcap
       - name: Run GoReleaser
@@ -42,7 +42,11 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/linux-amd64.yml --clean
-          workdir: /
+        env:
+          GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
+          SLACK_WEBHOOK: "${{ secrets.RELEASE_SLACK_WEBHOOK }}"
+          DISCORD_WEBHOOK_ID: "${{ secrets.DISCORD_WEBHOOK_ID }}"
+          DISCORD_WEBHOOK_TOKEN: "${{ secrets.DISCORD_WEBHOOK_TOKEN }}"
 
   build-linux-arm64:
     runs-on: ubuntu-24.04-arm
@@ -63,12 +67,8 @@ jobs:
         with:
           version: latest
           args: release -f .goreleaser/linux-arm64.yml --clean
-          workdir: /
-        env: 
+        env:
           GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"
-          SLACK_WEBHOOK: "${{ secrets.RELEASE_SLACK_WEBHOOK }}"
-          DISCORD_WEBHOOK_ID: "${{ secrets.DISCORD_WEBHOOK_ID }}"
-          DISCORD_WEBHOOK_TOKEN: "${{ secrets.DISCORD_WEBHOOK_TOKEN }}"
 
   build-windows:
     runs-on: windows-latest-8-cores
