@@ -10,7 +10,7 @@ jobs:
   build-mac:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install Dependences
@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest-16-cores
     steps:
       - name: Code checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Go
@@ -52,7 +52,7 @@ jobs:
     runs-on: ubuntu-24.04-arm
     steps:
       - name: Code checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Go
@@ -74,7 +74,7 @@ jobs:
     runs-on: windows-latest-8-cores
     steps:
       - name: Code checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
       - name: Set up Go
