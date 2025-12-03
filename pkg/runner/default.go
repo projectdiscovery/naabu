@@ -15,4 +15,6 @@ const (
 	SynScan             = "s"
 	ConnectScan         = "c"
 	DefautStatsInterval = 5
+
+	DefaultThreadsNum = 25
 )
