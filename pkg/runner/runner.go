@@ -88,6 +88,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	if options.ResumeCfg == nil {
 		options.ResumeCfg = NewResumeCfg()
 	}
+	if options.Threads == 0 {
+		options.Threads = DefaultThreadsNum
+	}
 	runner := &Runner{
 		options: options,
 	}
