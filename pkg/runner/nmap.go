@@ -92,9 +92,34 @@ func (r *Runner) handleNmap() error {
 			args = args[1:]
 		}
 
-		// Add custom arguments
-		scannerOptions = append(scannerOptions, nmap.WithCustomArguments(args...)) //nolint
-		gologger.Info().Msgf("Using custom nmap arguments: %s", strings.Join(args, " "))
+		// Extract and remove -oX arguments since the library handles XML output internally
+		var outputFile string
+		filteredArgs := make([]string, 0, len(args))
+		for i := 0; i < len(args); i++ {
+			if args[i] == "-oX" {
+				// Check if there's a filename after -oX
+				if i+1 < len(args) {
+					nextArg := args[i+1]
+					// If next arg is "-", it means stdout (library handles this by default)
+					// Otherwise, it's a filename
+					if nextArg != "-" {
+						outputFile = nextArg
+						i++ // Skip the filename in the next iteration
+					} else {
+						i++ // Skip the "-" argument
+					}
+				}
+				// Skip -oX itself (and filename/stdout marker if present)
+				scannerOptions = append(scannerOptions,
+					nmap.WithNmapOutput(outputFile))
+				continue
+			}
+			filteredArgs = append(filteredArgs, args[i])
+		}
+
+		// Add custom arguments (without -oX)
+		scannerOptions = append(scannerOptions, nmap.WithCustomArguments(filteredArgs...)) //nolint
+		gologger.Info().Msgf("Using custom nmap arguments: %s", strings.Join(filteredArgs, " "))
 
 		// Create nmap scanner
 		scanner, err := nmap.NewScanner(context.TODO(), scannerOptions...)
