@@ -110,8 +110,6 @@ func (r *Runner) handleNmap() error {
 					}
 				}
 				// Skip -oX itself (and filename/stdout marker if present)
-				scannerOptions = append(scannerOptions,
-					nmap.WithNmapOutput(outputFile))
 				continue
 			}
 			filteredArgs = append(filteredArgs, args[i])
@@ -126,6 +124,10 @@ func (r *Runner) handleNmap() error {
 		if err != nil {
 			gologger.Error().Msgf("Could not create nmap scanner: %s", err)
 			continue
+		}
+
+		if outputFile != "" {
+			scanner.ToFile(outputFile)
 		}
 
 		// Run the scan
