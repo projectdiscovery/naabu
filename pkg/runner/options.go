@@ -28,7 +28,7 @@ var (
 
 // Options contains the configuration options for tuning
 // the port enumeration process.
-// nolint:maligned // just an option structure
+// nolint
 type Options struct {
 	Verbose        bool // Verbose flag indicates whether to show verbose output or not
 	NoColor        bool // No-Color disables the colored output
@@ -357,6 +357,7 @@ func (options *Options) shouldDiscoverHosts() bool {
 }
 
 func (options *Options) hasProbes() bool {
+	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
 		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
 		len(options.TcpAckPingProbes) > 0
