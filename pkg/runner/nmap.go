@@ -267,6 +267,12 @@ func (r *Runner) convertNmapPortToNaabuPort(nmapPort nmap.Port) *port.Port {
 
 	// Convert service information if available
 	if nmapPort.Service.Name != "" {
+		// Convert CPEs from nmap.CPE to []string
+		cpes := make([]string, 0, len(nmapPort.Service.CPEs))
+		for _, cpe := range nmapPort.Service.CPEs {
+			cpes = append(cpes, string(cpe))
+		}
+
 		naabuPort.Service = &port.Service{
 			Name:        nmapPort.Service.Name,
 			Product:     nmapPort.Service.Product,
@@ -282,6 +288,7 @@ func (r *Runner) convertNmapPortToNaabuPort(nmapPort nmap.Port) *port.Port {
 			Tunnel:      nmapPort.Service.Tunnel,
 			LowVersion:  nmapPort.Service.LowVersion,
 			HighVersion: nmapPort.Service.HighVersion,
+			CPEs:        cpes,
 		}
 	}
 
