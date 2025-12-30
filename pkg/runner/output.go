@@ -207,6 +207,15 @@ func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, out
 		result.CDNName = cdnName
 	}
 
+	if len(ports) == 0 {
+		b, err := result.JSON(excludedFields)
+		if err != nil {
+			return err
+		}
+		_, err = writer.Write(append(b, '\n'))
+		return err
+	}
+
 	for _, p := range ports {
 		result.Port = p.Port
 		result.Protocol = p.Protocol.String()
@@ -264,12 +273,16 @@ func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outp
 		writeCSVHeaders(data, encoder, excludedFields)
 	}
 
-	for _, p := range ports {
-		data.Port = p.Port
-		data.Protocol = p.Protocol.String()
-		//nolint
-		data.TLS = p.TLS
+	if len(ports) == 0 {
 		writeCSVRow(data, encoder, excludedFields)
+	} else {
+		for _, p := range ports {
+			data.Port = p.Port
+			data.Protocol = p.Protocol.String()
+			//nolint
+			data.TLS = p.TLS
+			writeCSVRow(data, encoder, excludedFields)
+		}
 	}
 	encoder.Flush()
 	return nil

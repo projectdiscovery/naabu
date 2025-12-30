@@ -1157,12 +1157,16 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if host != hostIP {
 						data.Host = host
 					}
-				}
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
+					if r.options.JSON {
+						b, _ := data.JSON(r.options.ExcludeOutputFields)
+						buffer.Write(b)
+						gologger.Silent().Msgf("%s", buffer.String())
+					} else {
+						data.CSVHeaders(r.options.ExcludeOutputFields)
+						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+						writer.Flush()
+						gologger.Silent().Msgf("%s", buffer.String())
+					}
 				} else {
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s [%s]\n", host, cdnName)
