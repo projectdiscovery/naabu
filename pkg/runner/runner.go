@@ -1158,11 +1158,17 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						data.Host = host
 					}
 					if r.options.JSON {
-						b, _ := data.JSON(r.options.ExcludeOutputFields)
-						buffer.Write(b)
+						b, err := data.JSON(r.options.ExcludeOutputFields)
+						if err != nil {
+							continue
+						}
+						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else {
-						data.CSVHeaders(r.options.ExcludeOutputFields)
+						if csvFileHeaderEnabled {
+							writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
+							csvFileHeaderEnabled = false
+						}
 						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						writer.Flush()
 						gologger.Silent().Msgf("%s", buffer.String())
