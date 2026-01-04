@@ -222,41 +222,8 @@ func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, out
 		//nolint
 		result.TLS = p.TLS
 
-		// copy the service fields
-		if p.Service != nil {
-			result.DeviceType = p.Service.DeviceType
-			result.ExtraInfo = p.Service.ExtraInfo
-			result.HighVersion = p.Service.HighVersion
-			result.Hostname = p.Service.Hostname
-			result.LowVersion = p.Service.LowVersion
-			result.Method = p.Service.Method
-			result.Name = p.Service.Name
-			result.OSType = p.Service.OSType
-			result.Product = p.Service.Product
-			result.Proto = p.Service.Proto
-			result.RPCNum = p.Service.RPCNum
-			result.ServiceFP = p.Service.ServiceFP
-			result.Tunnel = p.Service.Tunnel
-			result.Version = p.Service.Version
-			result.Confidence = p.Service.Confidence
-		} else {
-			// Clear service fields if no service information exists
-			result.DeviceType = ""
-			result.ExtraInfo = ""
-			result.HighVersion = ""
-			result.Hostname = ""
-			result.LowVersion = ""
-			result.Method = ""
-			result.Name = ""
-			result.OSType = ""
-			result.Product = ""
-			result.Proto = ""
-			result.RPCNum = ""
-			result.ServiceFP = ""
-			result.Tunnel = ""
-			result.Version = ""
-			result.Confidence = 0
-		}
+		// copy or clear the service fields
+		copyServiceFields(result, p.Service)
 
 		b, err := result.JSON(excludedFields)
 		if err != nil {
@@ -298,43 +265,10 @@ func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outp
 			data.Protocol = p.Protocol.String()
 			//nolint
 			data.TLS = p.TLS
-			
-			// copy the service fields
-			if p.Service != nil {
-				data.DeviceType = p.Service.DeviceType
-				data.ExtraInfo = p.Service.ExtraInfo
-				data.HighVersion = p.Service.HighVersion
-				data.Hostname = p.Service.Hostname
-				data.LowVersion = p.Service.LowVersion
-				data.Method = p.Service.Method
-				data.Name = p.Service.Name
-				data.OSType = p.Service.OSType
-				data.Product = p.Service.Product
-				data.Proto = p.Service.Proto
-				data.RPCNum = p.Service.RPCNum
-				data.ServiceFP = p.Service.ServiceFP
-				data.Tunnel = p.Service.Tunnel
-				data.Version = p.Service.Version
-				data.Confidence = p.Service.Confidence
-			} else {
-				// Clear service fields if no service information exists
-				data.DeviceType = ""
-				data.ExtraInfo = ""
-				data.HighVersion = ""
-				data.Hostname = ""
-				data.LowVersion = ""
-				data.Method = ""
-				data.Name = ""
-				data.OSType = ""
-				data.Product = ""
-				data.Proto = ""
-				data.RPCNum = ""
-				data.ServiceFP = ""
-				data.Tunnel = ""
-				data.Version = ""
-				data.Confidence = 0
-			}
-			
+
+			// copy or clear the service fields
+			copyServiceFields(data, p.Service)
+
 			writeCSVRow(data, encoder, excludedFields)
 		}
 	}
@@ -365,4 +299,31 @@ func writeCSVRow(data *Result, writer *csv.Writer, excludedFields []string) {
 		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msg(errMsg.Error())
 	}
+}
+
+// copyServiceFields copies all service fields from service to result, or clears them if service is nil.
+func copyServiceFields(result *Result, service *port.Service) {
+	var s *port.Service
+	if service != nil {
+		s = service
+	} else {
+		// empty service to clear fields
+		s = &port.Service{}
+	}
+
+	result.DeviceType = s.DeviceType
+	result.ExtraInfo = s.ExtraInfo
+	result.HighVersion = s.HighVersion
+	result.Hostname = s.Hostname
+	result.LowVersion = s.LowVersion
+	result.Method = s.Method
+	result.Name = s.Name
+	result.OSType = s.OSType
+	result.Product = s.Product
+	result.Proto = s.Proto
+	result.RPCNum = s.RPCNum
+	result.ServiceFP = s.ServiceFP
+	result.Tunnel = s.Tunnel
+	result.Version = s.Version
+	result.Confidence = s.Confidence
 }
