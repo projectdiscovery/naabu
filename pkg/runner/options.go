@@ -34,6 +34,7 @@ type Options struct {
 	NoColor        bool // No-Color disables the colored output
 	JSON           bool // JSON specifies whether to use json for output format or text file
 	Silent         bool // Silent suppresses any extra text and only writes found host:port to screen
+	DisableStdout  bool // DisableStdout suppresses stdout output (useful for SDK usage with OnResult callback)
 	Stdin          bool // Stdin specifies whether stdin input was given to the process
 	Verify         bool // Verify is used to check if the ports found were valid using CONNECT method
 	Version        bool // Version specifies if we should just show version and exit
@@ -299,6 +300,10 @@ func ParseOptions() *Options {
 	if options.HealthCheck {
 		gologger.Print().Msgf("%s\n", DoHealthCheck(options, flagSet))
 		os.Exit(0)
+	}
+
+	if env.GetEnvOrDefault("DISABLE_STDOUT", "") != "" {
+		options.DisableStdout = true
 	}
 
 	// Check if stdin pipe was given
