@@ -302,6 +302,10 @@ func ParseOptions() *Options {
 		os.Exit(0)
 	}
 
+	if env.GetEnvOrDefault("DISABLE_STDOUT", "") != "" {
+		options.DisableStdout = true
+	}
+
 	// Check if stdin pipe was given
 	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
