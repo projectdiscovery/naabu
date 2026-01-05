@@ -251,17 +251,19 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
-		if r.options.JSON {
-			gologger.Silent().Msgf("%s", buffer.String())
-		} else if r.options.CSV {
-			writer.Flush()
-			gologger.Silent().Msgf("%s", buffer.String())
-		} else {
-			for _, p := range hostResult.Ports {
-				if r.options.OutputCDN && isCDNIP {
-					gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
-				} else {
-					gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+		if !r.options.DisableStdout {
+			if r.options.JSON {
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else if r.options.CSV {
+				writer.Flush()
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else {
+				for _, p := range hostResult.Ports {
+					if r.options.OutputCDN && isCDNIP {
+						gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
+					} else {
+						gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+					}
 				}
 			}
 		}
@@ -1094,12 +1096,14 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					}
 				}
 
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer := csv.NewWriter(&buffer)
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
+				if !r.options.DisableStdout {
+					if r.options.JSON {
+						gologger.Silent().Msgf("%s", buffer.String())
+					} else if r.options.CSV {
+						writer := csv.NewWriter(&buffer)
+						writer.Flush()
+						gologger.Silent().Msgf("%s", buffer.String())
+					}
 				}
 
 				// file output
