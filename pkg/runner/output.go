@@ -222,7 +222,6 @@ func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, out
 		//nolint
 		result.TLS = p.TLS
 
-		// copy or clear the service fields
 		copyServiceFields(result, p.Service)
 
 		b, err := result.JSON(excludedFields)
@@ -266,7 +265,6 @@ func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outp
 			//nolint
 			data.TLS = p.TLS
 
-			// copy or clear the service fields
 			copyServiceFields(data, p.Service)
 
 			writeCSVRow(data, encoder, excludedFields)
@@ -307,7 +305,6 @@ func copyServiceFields(result *Result, service *port.Service) {
 	if service != nil {
 		s = service
 	} else {
-		// empty service to clear fields
 		s = &port.Service{}
 	}
 
