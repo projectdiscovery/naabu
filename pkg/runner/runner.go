@@ -77,9 +77,9 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	options.configureHostDiscovery(ports)
 
-	// default to ipv4 if no ipversion was specified
+	// default to ipv4 and ipv6 if no ipversion was specified
 	if len(options.IPVersion) == 0 {
-		options.IPVersion = []string{scan.IPv4}
+		options.IPVersion = []string{scan.IPv4, scan.IPv6}
 	}
 
 	if options.Retries == 0 {
@@ -98,7 +98,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
 	dnsOptions.Hostsfile = true
-	if sliceutil.Contains(options.IPVersion, "6") {
+	if sliceutil.Contains(options.IPVersion, scan.IPv6) {
 		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
 	}
 	if len(runner.options.baseResolvers) > 0 {

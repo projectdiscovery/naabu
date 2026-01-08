@@ -89,7 +89,7 @@ OUTPUT:
 CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
    -scan-all-ips, -sa               scan all the IP's associated with DNS record
-   -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4) (default ["4"])
+   -ip-version, -iv string[]        ip version to scan of hostname (4,6) - (default 4,6) (default ["4","6"])
    -scan-type, -s string            type of port scan (SYN/CONNECT) (default "c")
    -source-ip string                source ip and port (x.x.x.x:yyy - might not work on OSX) 
    -cp, -connect-payload string    payload to send in CONNECT scans (optional)
@@ -263,10 +263,10 @@ The speed can be controlled by changing the value of `rate` flag that represent 
 
 # IPv4 and IPv6
 
-Naabu supports both IPv4 and IPv6. Both ranges can be piped together as input. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
+Naabu supports both IPv4 and IPv6, and both are enabled by default. If IPv6 is used, connectivity must be correctly configured, and the network interface must have an IPv6 address assigned (`inet6`) and a default gateway.
 
 ```console
-echo hackerone.com | dnsx -resp-only -a -aaaa -silent | naabu -p 80 -silent
+echo hackerone.com | naabu -p 80 -silent
 
 104.16.99.52:80
 104.16.100.52:80
@@ -274,7 +274,7 @@ echo hackerone.com | dnsx -resp-only -a -aaaa -silent | naabu -p 80 -silent
 2606:4700::6810:6334:80
 ```
 
-The option `-ip-version 6` makes the tool use IPv6 addresses while resolving domain names.
+The option `-ip-version 6` makes the tool use only IPv6 addresses while resolving domain names.
 
 ```console
 echo hackerone.com | ./naabu -p 80 -ip-version 6
@@ -293,10 +293,10 @@ Developers assume no liability and are not responsible for any misuse or damage.
 hackerone.com:80
 ```
 
-To scan all the IPs of both version, `ip-version 4,6` can be used along with `-scan-all-ips` flag.
+To scan all the IPs of both versions, `-scan-all-ips` flag can be used.
 
 ```console
-echo hackerone.com | ./naabu -iv 4,6 -sa -p 80 -silent
+echo hackerone.com | ./naabu -sa -p 80 -silent
 
 [INF] Found 1 ports on host hackerone.com (104.16.100.52)
 hackerone.com:80
