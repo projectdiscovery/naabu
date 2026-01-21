@@ -28,12 +28,13 @@ var (
 
 // Options contains the configuration options for tuning
 // the port enumeration process.
-// nolint:maligned // just an option structure
+// nolint
 type Options struct {
 	Verbose        bool // Verbose flag indicates whether to show verbose output or not
 	NoColor        bool // No-Color disables the colored output
 	JSON           bool // JSON specifies whether to use json for output format or text file
 	Silent         bool // Silent suppresses any extra text and only writes found host:port to screen
+	DisableStdout  bool // DisableStdout suppresses stdout output (useful for SDK usage with OnResult callback)
 	Stdin          bool // Stdin specifies whether stdin input was given to the process
 	Verify         bool // Verify is used to check if the ports found were valid using CONNECT method
 	Version        bool // Version specifies if we should just show version and exit
@@ -161,7 +162,7 @@ func ParseOptions() *Options {
 	)
 
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
-		flagSet.IntVar(&options.Threads, "c", 25, "general internal worker threads"),
+		flagSet.IntVar(&options.Threads, "c", DefaultThreadsNum, "general internal worker threads"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
 	)
 
@@ -181,7 +182,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("config", "Configuration",
 		flagSet.StringVar(&cfgFile, "config", "", "path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)"),
 		flagSet.BoolVarP(&options.ScanAllIPS, "sa", "scan-all-ips", false, "scan all the IP's associated with DNS record"),
-		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4}, "ip version to scan of hostname (4,6) - (default 4)", goflags.NormalizedStringSliceOptions),
+		flagSet.StringSliceVarP(&options.IPVersion, "iv", "ip-version", []string{scan.IPv4, scan.IPv6}, "ip version to scan of hostname (4,6) - (default 4,6)", goflags.NormalizedStringSliceOptions),
 		flagSet.StringVarP(&options.ScanType, "s", "scan-type", ConnectScan, "type of port scan (SYN/CONNECT)"),
 		flagSet.StringVar(&options.SourceIP, "source-ip", "", "source ip and port (x.x.x.x:yyy - might not work on OSX) "),
 		flagSet.StringVarP(&options.ConnectPayload, "cp", "connect-payload", "", "payload to send in CONNECT scans (optional)"),
@@ -301,6 +302,10 @@ func ParseOptions() *Options {
 		os.Exit(0)
 	}
 
+	if env.GetEnvOrDefault("DISABLE_STDOUT", "") != "" {
+		options.DisableStdout = true
+	}
+
 	// Check if stdin pipe was given
 	options.Stdin = !options.DisableStdin && fileutil.HasStdin()
 
@@ -357,6 +362,7 @@ func (options *Options) shouldDiscoverHosts() bool {
 }
 
 func (options *Options) hasProbes() bool {
+	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
 		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
 		len(options.TcpAckPingProbes) > 0

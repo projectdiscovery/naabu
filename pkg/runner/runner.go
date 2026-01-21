@@ -77,9 +77,9 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	options.configureHostDiscovery(ports)
 
-	// default to ipv4 if no ipversion was specified
+	// default to ipv4 and ipv6 if no ipversion was specified
 	if len(options.IPVersion) == 0 {
-		options.IPVersion = []string{scan.IPv4}
+		options.IPVersion = []string{scan.IPv4, scan.IPv6}
 	}
 
 	if options.Retries == 0 {
@@ -88,6 +88,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	if options.ResumeCfg == nil {
 		options.ResumeCfg = NewResumeCfg()
 	}
+	if options.Threads == 0 {
+		options.Threads = DefaultThreadsNum
+	}
 	runner := &Runner{
 		options: options,
 	}
@@ -95,7 +98,7 @@ func NewRunner(options *Options) (*Runner, error) {
 	dnsOptions := dnsx.DefaultOptions
 	dnsOptions.MaxRetries = runner.options.Retries
 	dnsOptions.Hostsfile = true
-	if sliceutil.Contains(options.IPVersion, "6") {
+	if sliceutil.Contains(options.IPVersion, scan.IPv6) {
 		dnsOptions.QuestionTypes = append(dnsOptions.QuestionTypes, dns.TypeAAAA)
 	}
 	if len(runner.options.baseResolvers) > 0 {
@@ -248,17 +251,19 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
-		if r.options.JSON {
-			gologger.Silent().Msgf("%s", buffer.String())
-		} else if r.options.CSV {
-			writer.Flush()
-			gologger.Silent().Msgf("%s", buffer.String())
-		} else {
-			for _, p := range hostResult.Ports {
-				if r.options.OutputCDN && isCDNIP {
-					gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
-				} else {
-					gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+		if !r.options.DisableStdout {
+			if r.options.JSON {
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else if r.options.CSV {
+				writer.Flush()
+				gologger.Silent().Msgf("%s", buffer.String())
+			} else {
+				for _, p := range hostResult.Ports {
+					if r.options.OutputCDN && isCDNIP {
+						gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
+					} else {
+						gologger.Silent().Msgf("%s:%d\n", host, p.Port)
+					}
 				}
 			}
 		}
@@ -1091,12 +1096,14 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					}
 				}
 
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer := csv.NewWriter(&buffer)
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
+				if !r.options.DisableStdout {
+					if r.options.JSON {
+						gologger.Silent().Msgf("%s", buffer.String())
+					} else if r.options.CSV {
+						writer := csv.NewWriter(&buffer)
+						writer.Flush()
+						gologger.Silent().Msgf("%s", buffer.String())
+					}
 				}
 
 				// file output
@@ -1154,12 +1161,22 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if host != hostIP {
 						data.Host = host
 					}
-				}
-				if r.options.JSON {
-					gologger.Silent().Msgf("%s", buffer.String())
-				} else if r.options.CSV {
-					writer.Flush()
-					gologger.Silent().Msgf("%s", buffer.String())
+					if r.options.JSON {
+						b, err := data.JSON(r.options.ExcludeOutputFields)
+						if err != nil {
+							continue
+						}
+						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+						gologger.Silent().Msgf("%s", buffer.String())
+					} else {
+						if csvFileHeaderEnabled {
+							writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
+							csvFileHeaderEnabled = false
+						}
+						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+						writer.Flush()
+						gologger.Silent().Msgf("%s", buffer.String())
+					}
 				} else {
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s [%s]\n", host, cdnName)

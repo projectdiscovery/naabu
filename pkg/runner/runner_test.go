@@ -45,7 +45,7 @@ func TestNewRunner(t *testing.T) {
 			validate: func(t *testing.T, runner *Runner) {
 				assert.Equal(t, 2, len(runner.scanner.Ports))
 
-				expected := []string{"4"}
+				expected := []string{"4", "6"}
 				actual := []string(runner.options.IPVersion)
 				assert.Equal(t, expected, actual)
 				assert.NotNil(t, runner.dnsclient)

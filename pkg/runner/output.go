@@ -207,30 +207,22 @@ func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, out
 		result.CDNName = cdnName
 	}
 
+	if len(ports) == 0 {
+		b, err := result.JSON(excludedFields)
+		if err != nil {
+			return err
+		}
+		_, err = writer.Write(append(b, '\n'))
+		return err
+	}
+
 	for _, p := range ports {
 		result.Port = p.Port
 		result.Protocol = p.Protocol.String()
 		//nolint
 		result.TLS = p.TLS
 
-		// copy the service fields
-		if p.Service != nil {
-			result.DeviceType = p.Service.DeviceType
-			result.ExtraInfo = p.Service.ExtraInfo
-			result.HighVersion = p.Service.HighVersion
-			result.Hostname = p.Service.Hostname
-			result.LowVersion = p.Service.LowVersion
-			result.Method = p.Service.Method
-			result.Name = p.Service.Name
-			result.OSType = p.Service.OSType
-			result.Product = p.Service.Product
-			result.Proto = p.Service.Proto
-			result.RPCNum = p.Service.RPCNum
-			result.ServiceFP = p.Service.ServiceFP
-			result.Tunnel = p.Service.Tunnel
-			result.Version = p.Service.Version
-			result.Confidence = p.Service.Confidence
-		}
+		copyServiceFields(result, p.Service)
 
 		b, err := result.JSON(excludedFields)
 		if err != nil {
@@ -264,12 +256,19 @@ func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outp
 		writeCSVHeaders(data, encoder, excludedFields)
 	}
 
-	for _, p := range ports {
-		data.Port = p.Port
-		data.Protocol = p.Protocol.String()
-		//nolint
-		data.TLS = p.TLS
+	if len(ports) == 0 {
 		writeCSVRow(data, encoder, excludedFields)
+	} else {
+		for _, p := range ports {
+			data.Port = p.Port
+			data.Protocol = p.Protocol.String()
+			//nolint
+			data.TLS = p.TLS
+
+			copyServiceFields(data, p.Service)
+
+			writeCSVRow(data, encoder, excludedFields)
+		}
 	}
 	encoder.Flush()
 	return nil
@@ -298,4 +297,30 @@ func writeCSVRow(data *Result, writer *csv.Writer, excludedFields []string) {
 		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msg(errMsg.Error())
 	}
+}
+
+// copyServiceFields copies all service fields from service to result, or clears them if service is nil.
+func copyServiceFields(result *Result, service *port.Service) {
+	var s *port.Service
+	if service != nil {
+		s = service
+	} else {
+		s = &port.Service{}
+	}
+
+	result.DeviceType = s.DeviceType
+	result.ExtraInfo = s.ExtraInfo
+	result.HighVersion = s.HighVersion
+	result.Hostname = s.Hostname
+	result.LowVersion = s.LowVersion
+	result.Method = s.Method
+	result.Name = s.Name
+	result.OSType = s.OSType
+	result.Product = s.Product
+	result.Proto = s.Proto
+	result.RPCNum = s.RPCNum
+	result.ServiceFP = s.ServiceFP
+	result.Tunnel = s.Tunnel
+	result.Version = s.Version
+	result.Confidence = s.Confidence
 }
