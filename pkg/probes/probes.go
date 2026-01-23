@@ -11,7 +11,7 @@
 // probe is sent to elicit a response from the service, confirming the port
 // is open.
 //
-// Reference: https://nmap.org/book/nmap-probes.html
+// Reference: https://nmap.org/book/vscan-fileformat.html
 package probes
 
 import "sort"
