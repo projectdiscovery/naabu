@@ -26,6 +26,7 @@ import (
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
+	"github.com/projectdiscovery/naabu/v2/pkg/probes"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
@@ -53,6 +54,7 @@ type Runner struct {
 	stats         *clistats.Statistics
 	streamChannel chan Target
 	excludedIpsNP *networkpolicy.NetworkPolicy
+	probeDB       *probes.ProbeDB
 
 	unique gcache.Cache[string, struct{}]
 }
@@ -128,6 +130,9 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	uniqueCache := gcache.New[string, struct{}](1500).Build()
 	runner.unique = uniqueCache
+
+	// Load embedded UDP service probes
+	runner.probeDB = probes.LoadEmbeddedProbes()
 
 	scanOpts := &scan.Options{
 		Timeout:              options.GetTimeout(),
@@ -871,6 +876,27 @@ func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *po
 
 		if r.scanner.ScanResults.IPHasPort(host, p) {
 			return
+		}
+
+		// For UDP ports without custom payload, use embedded probes
+		if p.Protocol == protocol.UDP && payload == "" && r.probeDB != nil {
+			if udpProbes := r.probeDB.GetProbesForPort(p.Port); len(udpProbes) > 0 {
+				for _, probe := range udpProbes {
+					r.limiter.Take()
+					open, err := r.scanner.ConnectPort(host, probe.Payload, p, r.options.GetTimeout())
+					if open && err == nil {
+						r.scanner.ScanResults.AddPort(host, p)
+						if r.options.Verify {
+							return
+						}
+						if r.scanner.OnReceive != nil {
+							r.scanner.OnReceive(&result.HostResult{IP: host, Ports: []*port.Port{p}})
+						}
+						return
+					}
+				}
+				return
+			}
 		}
 
 		r.limiter.Take()
