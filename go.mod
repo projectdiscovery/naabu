@@ -12,7 +12,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.19
+	github.com/projectdiscovery/cdncheck v1.2.20
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -21,9 +21,9 @@ require (
 	github.com/projectdiscovery/gologger v1.1.67
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.33
+	github.com/projectdiscovery/networkpolicy v0.1.34
 	github.com/projectdiscovery/ratelimit v0.0.83
-	github.com/projectdiscovery/retryablehttp-go v1.3.4
+	github.com/projectdiscovery/retryablehttp-go v1.3.5
 	github.com/projectdiscovery/uncover v1.2.0
 	github.com/projectdiscovery/utils v0.9.0
 	github.com/remeh/sizedwaitgroup v1.0.0
@@ -96,7 +96,7 @@ require (
 	github.com/projectdiscovery/fastdialer v0.5.3 // indirect
 	github.com/projectdiscovery/hmap v0.0.99 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
-	github.com/projectdiscovery/retryabledns v1.0.112 // indirect
+	github.com/projectdiscovery/retryabledns v1.0.113 // indirect
 	github.com/refraction-networking/utls v1.7.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/saintfish/chardet v0.0.0-20230101081208-5e3ef4b5456d // indirect
