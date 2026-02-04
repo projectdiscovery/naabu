@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -51,12 +52,28 @@ func NewScanHistory(filePath, format, scope string, ttl time.Duration) (*ScanHis
 	return sh, nil
 }
 
+func (sh *ScanHistory) key(target, ip string) string {
+	key := strings.TrimSpace(target)
+	switch strings.ToLower(sh.scope) {
+	case "ip":
+		if ip != "" {
+			key = ip
+		}
+	case "domain", "host", "":
+		if host, _, err := net.SplitHostPort(target); err == nil {
+			key = host
+		}
+	}
+	return key
+}
+
 // IsScanned checks if a target was previously scanned
 func (sh *ScanHistory) IsScanned(target string) bool {
 	sh.mutex.RLock()
 	defer sh.mutex.RUnlock()
 
-	entry, exists := sh.entries[target]
+	key := sh.key(target, "")
+	entry, exists := sh.entries[key]
 	if !exists {
 		return false
 	}
@@ -75,12 +92,13 @@ func (sh *ScanHistory) Record(target, ip string) error {
 	defer sh.mutex.Unlock()
 
 	now := time.Now()
-	if entry, exists := sh.entries[target]; exists {
+	key := sh.key(target, ip)
+	if entry, exists := sh.entries[key]; exists {
 		entry.LastScan = now
 		entry.ScanCount++
 	} else {
 		sh.entries[target] = &ScanEntry{
-			Target:    target,
+			Target:    key,
 			IP:        ip,
 			FirstScan: now,
 			LastScan:  now,
@@ -229,7 +247,6 @@ func (sh *ScanHistory) loadTXT(file *os.File) error {
 // Format: target|ip|firstscan|lastscan|scancount
 func (sh *ScanHistory) saveTXT(file *os.File) error {
 	writer := bufio.NewWriter(file)
-	defer writer.Flush()
 
 	// Write header comment
 	if _, err := fmt.Fprintf(writer, "# Naabu Scan History\n"); err != nil {
@@ -250,6 +267,10 @@ func (sh *ScanHistory) saveTXT(file *os.File) error {
 		if _, err := writer.WriteString(line); err != nil {
 			return fmt.Errorf("could not write entry: %w", err)
 		}
+	}
+
+	if err := writer.Flush(); err != nil {
+		return fmt.Errorf("could not flush scan history: %w", err)
 	}
 
 	return nil

@@ -265,7 +265,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("scan-history", "Scan-History",
 		flagSet.StringVarP(&options.ScanLog, "scan-log", "sl", "", "path to scan log file for tracking scanned targets"),
 		flagSet.BoolVarP(&options.SkipScanned, "skip-scanned", "ss", false, "skip targets found in scan log"),
-		flagSet.StringVar(&options.LogFormat, "log-format", "txt", "scan log format (txt,json,db)"),
+		flagSet.StringVar(&options.LogFormat, "log-format", "txt", "scan log format (txt,json)"),
 		flagSet.StringVar(&options.LogScope, "log-scope", "host", "what to track (domain,ip,host)"),
 		flagSet.BoolVar(&options.ForceRescan, "force-rescan", false, "ignore scan history and rescan all targets"),
 		flagSet.DurationVar(&options.ScanLogTTL, "ttl", 0, "rescan targets after TTL expires (e.g., 24h, 7d)"),
