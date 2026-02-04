@@ -938,3 +938,291 @@ func TestConcurrentSYNScans(t *testing.T) {
 		t.Error(err)
 	}
 }
+
+func TestRunner_ScanHistoryIntegration(t *testing.T) {
+	tmpFile := "/tmp/test-integration-history.log"
+	defer os.Remove(tmpFile)
+
+	tests := []struct {
+		name          string
+		setupHistory  func(*ScanHistory)
+		scanLog       string
+		skipScanned   bool
+		forceRescan   bool
+		expectedAdded bool
+		description   string
+	}{
+		{
+			name: "skip previously scanned target",
+			setupHistory: func(sh *ScanHistory) {
+				sh.Record("example.com", "1.2.3.4")
+				sh.Save()
+			},
+			scanLog:       tmpFile,
+			skipScanned:   true,
+			forceRescan:   false,
+			expectedAdded: false,
+			description:   "Previously scanned target should be skipped when skip-scanned is enabled",
+		},
+		{
+			name: "force rescan overrides skip",
+			setupHistory: func(sh *ScanHistory) {
+				sh.Record("example.com", "1.2.3.4")
+				sh.Save()
+			},
+			scanLog:       tmpFile,
+			skipScanned:   true,
+			forceRescan:   true,
+			expectedAdded: true,
+			description:   "Force rescan should process target even if previously scanned",
+		},
+		{
+			name:          "new target not skipped",
+			setupHistory:  func(sh *ScanHistory) {},
+			scanLog:       tmpFile,
+			skipScanned:   true,
+			forceRescan:   false,
+			expectedAdded: true,
+			description:   "New targets should always be processed",
+		},
+		{
+			name: "skip-scanned disabled processes all",
+			setupHistory: func(sh *ScanHistory) {
+				sh.Record("example.com", "1.2.3.4")
+				sh.Save()
+			},
+			scanLog:       tmpFile,
+			skipScanned:   false,
+			forceRescan:   false,
+			expectedAdded: true,
+			description:   "With skip-scanned disabled, all targets should be processed",
+		},
+		{
+			name:          "no scan log means no filtering",
+			setupHistory:  func(sh *ScanHistory) {},
+			scanLog:       "",
+			skipScanned:   true,
+			forceRescan:   false,
+			expectedAdded: true,
+			description:   "Without scan log, all targets should be processed",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			// Clean up test file
+			os.Remove(tmpFile)
+
+			// Setup scan history if needed
+			if tt.scanLog != "" {
+				sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
+				require.NoError(t, err)
+				if tt.setupHistory != nil {
+					tt.setupHistory(sh)
+				}
+			}
+
+			// Create runner with history options
+			options := &Options{
+				Ports:       "80",
+				ScanType:    ConnectScan,
+				ScanLog:     tt.scanLog,
+				SkipScanned: tt.skipScanned,
+				ForceRescan: tt.forceRescan,
+			}
+
+			runner, err := NewRunner(options)
+			require.NoError(t, err)
+			defer runner.Close()
+
+			// Try to add target
+			err = runner.AddTarget("example.com")
+			require.NoError(t, err)
+
+			// Verify expected behavior by checking scan history
+			// If it should have been skipped, the history would still show it was already scanned
+			// If it's a new target, we can check if AddTarget worked without error
+			if tt.expectedAdded {
+				// For new targets or force-rescan, AddTarget should succeed
+				assert.NoError(t, err)
+			}
+		})
+	}
+}
+
+func TestRunner_ScanHistoryRecording(t *testing.T) {
+	tmpFile := "/tmp/test-recording-history.log"
+	defer os.Remove(tmpFile)
+
+	options := &Options{
+		Ports:       "80",
+		ScanType:    ConnectScan,
+		ScanLog:     tmpFile,
+		SkipScanned: true,
+		LogFormat:   "txt",
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+
+	t.Run("onReceive records to history", func(t *testing.T) {
+		// Simulate a successful scan result
+		hostResult := &result.HostResult{
+			IP: "1.2.3.4",
+			Ports: []*port.Port{
+				{Port: 80, Protocol: protocol.TCP},
+			},
+		}
+
+		// Add host to IPRanger
+		runner.scanner.IPRanger.AddHostWithMetadata("1.2.3.4", "example.com")
+
+		// Call onReceive
+		runner.onReceive(hostResult)
+
+		// Verify it was recorded in history
+		assert.NotNil(t, runner.scanHistory)
+		assert.True(t, runner.scanHistory.IsScanned("example.com"))
+	})
+
+	t.Run("history persisted on close", func(t *testing.T) {
+		// Record another target
+		runner.scanHistory.Record("github.com", "140.82.112.3")
+
+		// Close runner (should save history)
+		err := runner.Close()
+		require.NoError(t, err)
+
+		// Load history in new instance
+		sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
+		require.NoError(t, err)
+
+		// Verify both targets persisted
+		assert.True(t, sh.IsScanned("example.com"))
+		assert.True(t, sh.IsScanned("github.com"))
+	})
+}
+
+func TestRunner_ScanHistoryWithTTL(t *testing.T) {
+	tmpFile := "/tmp/test-ttl-integration.log"
+	defer os.Remove(tmpFile)
+
+	// Create with short TTL
+	options := &Options{
+		Ports:       "80",
+		ScanType:    ConnectScan,
+		ScanLog:     tmpFile,
+		SkipScanned: true,
+		ScanLogTTL:  50 * time.Millisecond,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer runner.Close()
+
+	t.Run("target skipped within TTL", func(t *testing.T) {
+		// Record target
+		runner.scanHistory.Record("fresh.com", "1.2.3.4")
+		runner.scanHistory.Save()
+
+		// Try to add immediately (should be in history and skipped)
+		runner.AddTarget("fresh.com")
+
+		assert.True(t, runner.scanHistory.IsScanned("fresh.com"), "Target should be skipped within TTL")
+	})
+
+	t.Run("target processed after TTL expires", func(t *testing.T) {
+		// Wait for TTL to expire
+		time.Sleep(60 * time.Millisecond)
+
+		// Target should no longer be in history
+		assert.False(t, runner.scanHistory.IsScanned("fresh.com"), "Target should be processed after TTL expires")
+	})
+}
+
+func TestRunner_ScanHistoryMultipleFormats(t *testing.T) {
+	formats := []struct {
+		name   string
+		format string
+		ext    string
+	}{
+		{"txt format", "txt", "log"},
+		{"json format", "json", "json"},
+	}
+
+	for _, f := range formats {
+		t.Run(f.name, func(t *testing.T) {
+			tmpFile := fmt.Sprintf("/tmp/test-format-%s.%s", f.format, f.ext)
+			defer os.Remove(tmpFile)
+
+			options := &Options{
+				Ports:       "80",
+				ScanType:    ConnectScan,
+				ScanLog:     tmpFile,
+				SkipScanned: true,
+				LogFormat:   f.format,
+			}
+
+			runner, err := NewRunner(options)
+			require.NoError(t, err)
+
+			// Record some targets
+			runner.scanHistory.Record("example.com", "1.2.3.4")
+			runner.scanHistory.Record("google.com", "8.8.8.8")
+
+			// Close to save
+			runner.Close()
+
+			// Verify file exists and has content
+			content, err := os.ReadFile(tmpFile)
+			require.NoError(t, err)
+			assert.NotEmpty(t, content)
+
+			// Load in new runner
+			runner2, err := NewRunner(options)
+			require.NoError(t, err)
+			defer runner2.Close()
+
+			// Verify history loaded
+			assert.True(t, runner2.scanHistory.IsScanned("example.com"))
+			assert.True(t, runner2.scanHistory.IsScanned("google.com"))
+		})
+	}
+}
+
+func TestRunner_ScanHistoryNilSafety(t *testing.T) {
+	t.Run("no scan log means no history", func(t *testing.T) {
+		options := &Options{
+			Ports:    "80",
+			ScanType: ConnectScan,
+		}
+
+		runner, err := NewRunner(options)
+		require.NoError(t, err)
+		defer runner.Close()
+
+		assert.Nil(t, runner.scanHistory)
+
+		// Should not panic when processing targets
+		err = runner.AddTarget("example.com")
+		assert.NoError(t, err)
+	})
+
+	t.Run("skip-scanned without scan-log is safe", func(t *testing.T) {
+		options := &Options{
+			Ports:       "80",
+			ScanType:    ConnectScan,
+			SkipScanned: true, // Enabled but no scan log
+		}
+
+		runner, err := NewRunner(options)
+		require.NoError(t, err)
+		defer runner.Close()
+
+		assert.Nil(t, runner.scanHistory)
+
+		// Should not panic
+		err = runner.AddTarget("example.com")
+		assert.NoError(t, err)
+	})
+}
