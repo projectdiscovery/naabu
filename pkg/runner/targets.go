@@ -128,7 +128,10 @@ func (r *Runner) AddTarget(target string) error {
 	if host, _, hasPort := getPort(target); hasPort {
 		lookupTarget = host
 	}
-	if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil {
+
+	// Early check for hostnames, ASNs, and CIDRs (non-IP targets)
+	// For IP targets, we'll check after normalization
+	if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil && !iputil.IsIP(lookupTarget) {
 		if r.scanHistory.IsScanned(lookupTarget) {
 			gologger.Debug().Msgf("Skipping previously scanned target: %s\n", lookupTarget)
 			return nil
@@ -164,6 +167,15 @@ func (r *Runner) AddTarget(target string) error {
 		if ip.To4() != nil {
 			target = ip.To4().String()
 		}
+
+		// Check scan history for IP targets
+		if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil {
+			if r.scanHistory.IsScanned(lookupTarget, target) {
+				gologger.Debug().Msgf("Skipping previously scanned IP: %s\n", target)
+				return nil
+			}
+		}
+
 		if r.options.Stream {
 			r.streamChannel <- Target{Cidr: iputil.ToCidr(target).String()}
 		} else {
@@ -196,6 +208,13 @@ func (r *Runner) AddTarget(target string) error {
 	}
 
 	for _, ip := range ips {
+		// Check scan history for this specific IP if ip-scope is used
+		if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil {
+			if r.scanHistory.IsScanned(lookupTarget, ip) {
+				gologger.Debug().Msgf("Skipping previously scanned target: %s (IP: %s)\n", lookupTarget, ip)
+				continue
+			}
+		}
 		if r.options.Stream {
 			if hasPort {
 				r.streamChannel <- Target{Ip: ip, Port: port}

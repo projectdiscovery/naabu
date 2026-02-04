@@ -1253,3 +1253,132 @@ func TestRunner_ScanHistoryNilSafety(t *testing.T) {
 		assert.NoError(t, err)
 	})
 }
+
+func TestRunner_ScanHistoryIPScope(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "test-runner-ip-scope.log")
+	defer os.Remove(tmpFile)
+
+	t.Run("skip by IP with ip scope", func(t *testing.T) {
+		os.Remove(tmpFile)
+
+		// Setup history with IP scope
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+		sh.Record("example.com", "93.184.216.34")
+		sh.Save()
+
+		// Create runner with IP scope
+		options := &Options{
+			Ports:       "80",
+			ScanType:    ConnectScan,
+			ScanLog:     tmpFile,
+			SkipScanned: true,
+			LogFormat:   "txt",
+			LogScope:    "ip",
+		}
+
+		runner, err := NewRunner(options)
+		require.NoError(t, err)
+		defer runner.Close()
+
+		// Mock the DNS resolution to return our test IP
+		// In real usage, example.com would resolve to this IP
+		// For testing, we'll directly check the IP
+		initialCount := runner.scanHistory.GetScanCount("example.com", "93.184.216.34")
+		assert.Greater(t, initialCount, 0, "IP should be in history")
+
+		// Add the IP directly
+		err = runner.AddTarget("93.184.216.34")
+		require.NoError(t, err)
+
+		// Verify the IP was skipped (count didn't increment)
+		finalCount := runner.scanHistory.GetScanCount("93.184.216.34", "93.184.216.34")
+		assert.Equal(t, initialCount, finalCount, "IP should have been skipped")
+	})
+
+	t.Run("different hostname same IP skipped with ip scope", func(t *testing.T) {
+		os.Remove(tmpFile)
+
+		// Setup history with IP scope
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+		sh.Record("example.com", "1.2.3.4")
+		sh.Save()
+
+		options := &Options{
+			Ports:       "80",
+			ScanType:    ConnectScan,
+			ScanLog:     tmpFile,
+			SkipScanned: true,
+			LogFormat:   "txt",
+			LogScope:    "ip",
+		}
+
+		runner, err := NewRunner(options)
+		require.NoError(t, err)
+		defer runner.Close()
+
+		// The IP should be marked as scanned regardless of hostname
+		assert.True(t, runner.scanHistory.IsScanned("other.com", "1.2.3.4"))
+		assert.True(t, runner.scanHistory.IsScanned("example.com", "1.2.3.4"))
+
+		// Add IP directly - should be skipped
+		initialCount := runner.scanHistory.GetScanCount("example.com", "1.2.3.4")
+		err = runner.AddTarget("1.2.3.4")
+		require.NoError(t, err)
+
+		finalCount := runner.scanHistory.GetScanCount("1.2.3.4", "1.2.3.4")
+		assert.Equal(t, initialCount, finalCount, "Same IP should be skipped even with different target")
+	})
+
+	t.Run("host scope vs ip scope behavior", func(t *testing.T) {
+		// Test with host scope
+		tmpFileHost := filepath.Join(t.TempDir(), "test-runner-host-scope.log")
+		shHost, err := NewScanHistory(tmpFileHost, "txt", "host", 0)
+		require.NoError(t, err)
+		shHost.Record("example.com", "1.2.3.4")
+		shHost.Save()
+
+		optionsHost := &Options{
+			Ports:       "80",
+			ScanType:    ConnectScan,
+			ScanLog:     tmpFileHost,
+			SkipScanned: true,
+			LogFormat:   "txt",
+			LogScope:    "host",
+		}
+
+		runnerHost, err := NewRunner(optionsHost)
+		require.NoError(t, err)
+		defer runnerHost.Close()
+
+		// Host scope: hostname is tracked
+		assert.True(t, runnerHost.scanHistory.IsScanned("example.com"))
+		assert.True(t, runnerHost.scanHistory.IsScanned("example.com", "9.9.9.9"), "Host scope ignores IP")
+
+		// Test with IP scope
+		tmpFileIP := filepath.Join(t.TempDir(), "test-runner-ip-scope2.log")
+		shIP, err := NewScanHistory(tmpFileIP, "txt", "ip", 0)
+		require.NoError(t, err)
+		shIP.Record("example.com", "1.2.3.4")
+		shIP.Save()
+
+		optionsIP := &Options{
+			Ports:       "80",
+			ScanType:    ConnectScan,
+			ScanLog:     tmpFileIP,
+			SkipScanned: true,
+			LogFormat:   "txt",
+			LogScope:    "ip",
+		}
+
+		runnerIP, err := NewRunner(optionsIP)
+		require.NoError(t, err)
+		defer runnerIP.Close()
+
+		// IP scope: only IP matters
+		assert.False(t, runnerIP.scanHistory.IsScanned("example.com"), "IP scope needs IP parameter")
+		assert.True(t, runnerIP.scanHistory.IsScanned("example.com", "1.2.3.4"), "IP scope finds by IP")
+		assert.False(t, runnerIP.scanHistory.IsScanned("example.com", "9.9.9.9"), "IP scope checks specific IP")
+	})
+}

@@ -554,3 +554,199 @@ func TestScanHistory_PersistenceRoundTrip(t *testing.T) {
 		})
 	}
 }
+
+func TestScanHistory_IPScope(t *testing.T) {
+	t.Run("ip scope stores by IP", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-ip-scope.log")
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		// Record with hostname and IP
+		err = sh.Record("example.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		// Should be found by IP, not hostname
+		assert.True(t, sh.IsScanned("example.com", "1.2.3.4"), "Should find by IP")
+		assert.False(t, sh.IsScanned("example.com"), "Should not find by hostname alone when scope is ip")
+		assert.True(t, sh.IsScanned("other.com", "1.2.3.4"), "Should find by IP regardless of hostname")
+	})
+
+	t.Run("ip scope with different hosts same IP", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-ip-scope-shared.log")
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		// Record same IP with different hostnames
+		err = sh.Record("example.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		err = sh.Record("another.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		// Both should be tracked as scanned (same IP)
+		assert.True(t, sh.IsScanned("example.com", "1.2.3.4"))
+		assert.True(t, sh.IsScanned("another.com", "1.2.3.4"))
+		assert.True(t, sh.IsScanned("yetanother.com", "1.2.3.4"), "Any hostname with this IP should be marked as scanned")
+
+		// Different IP should not be scanned
+		assert.False(t, sh.IsScanned("example.com", "5.6.7.8"))
+	})
+
+	t.Run("ip scope persistence", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-ip-scope-persist.log")
+
+		// First instance
+		sh1, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		err = sh1.Record("example.com", "192.168.1.1")
+		require.NoError(t, err)
+		err = sh1.Record("google.com", "8.8.8.8")
+		require.NoError(t, err)
+
+		err = sh1.Save()
+		require.NoError(t, err)
+
+		// Second instance: load and verify
+		sh2, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		assert.True(t, sh2.IsScanned("example.com", "192.168.1.1"))
+		assert.True(t, sh2.IsScanned("google.com", "8.8.8.8"))
+		assert.True(t, sh2.IsScanned("other.com", "192.168.1.1"), "Should find by IP")
+		assert.False(t, sh2.IsScanned("example.com", "10.0.0.1"), "Different IP should not be found")
+	})
+
+	t.Run("ip scope with scan count", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-ip-scope-count.log")
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		// Record same IP multiple times
+		sh.Record("example.com", "1.2.3.4")
+		sh.Record("example.com", "1.2.3.4")
+		sh.Record("another.com", "1.2.3.4") // Same IP, different host
+
+		// Scan count should increment for the IP
+		assert.Equal(t, 3, sh.GetScanCount("example.com", "1.2.3.4"))
+		assert.Equal(t, 3, sh.GetScanCount("another.com", "1.2.3.4"), "Same IP should have same count")
+		assert.Equal(t, 0, sh.GetScanCount("example.com"), "Without IP should return 0 for ip scope")
+	})
+
+	t.Run("ip scope with TTL", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-ip-scope-ttl.log")
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 100*time.Millisecond)
+		require.NoError(t, err)
+
+		err = sh.Record("example.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		// Should be found within TTL
+		assert.True(t, sh.IsScanned("example.com", "1.2.3.4"))
+
+		// Wait for TTL to expire
+		time.Sleep(150 * time.Millisecond)
+
+		// Should not be found after TTL
+		assert.False(t, sh.IsScanned("example.com", "1.2.3.4"))
+	})
+
+	t.Run("host scope vs ip scope comparison", func(t *testing.T) {
+		// Host scope
+		tmpFileHost := filepath.Join(t.TempDir(), "test-host-scope.log")
+		shHost, err := NewScanHistory(tmpFileHost, "txt", "host", 0)
+		require.NoError(t, err)
+
+		err = shHost.Record("example.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		// IP scope
+		tmpFileIP := filepath.Join(t.TempDir(), "test-ip-scope.log")
+		shIP, err := NewScanHistory(tmpFileIP, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		err = shIP.Record("example.com", "1.2.3.4")
+		require.NoError(t, err)
+
+		// Host scope: finds by hostname
+		assert.True(t, shHost.IsScanned("example.com"), "Host scope should find by hostname")
+		assert.True(t, shHost.IsScanned("example.com", "1.2.3.4"), "Host scope should find by hostname even with IP")
+		assert.True(t, shHost.IsScanned("example.com", "9.9.9.9"), "Host scope should find by hostname with any IP")
+
+		// IP scope: only finds by IP
+		assert.False(t, shIP.IsScanned("example.com"), "IP scope should not find by hostname alone")
+		assert.True(t, shIP.IsScanned("example.com", "1.2.3.4"), "IP scope should find by IP")
+		assert.False(t, shIP.IsScanned("example.com", "9.9.9.9"), "IP scope should not find with wrong IP")
+	})
+
+	t.Run("domain scope behavior", func(t *testing.T) {
+		tmpFile := filepath.Join(t.TempDir(), "test-domain-scope.log")
+		sh, err := NewScanHistory(tmpFile, "txt", "domain", 0)
+		require.NoError(t, err)
+
+		// Record with port in hostname
+		err = sh.Record("example.com:8080", "1.2.3.4")
+		require.NoError(t, err)
+
+		// Domain scope should strip port and match by domain
+		assert.True(t, sh.IsScanned("example.com:8080"))
+		assert.True(t, sh.IsScanned("example.com:443"), "Domain scope should match without port")
+		assert.True(t, sh.IsScanned("example.com"), "Domain scope should match domain only")
+	})
+}
+
+func TestScanHistory_IPScopeIntegration(t *testing.T) {
+	tmpFile := filepath.Join(t.TempDir(), "test-ip-scope-integration.log")
+
+	t.Run("multiple IPs for same host", func(t *testing.T) {
+		sh, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		// Record multiple IPs for same hostname (e.g., DNS round-robin)
+		ips := []string{"1.2.3.4", "1.2.3.5", "1.2.3.6"}
+		for _, ip := range ips {
+			err = sh.Record("example.com", ip)
+			require.NoError(t, err)
+		}
+
+		// Each IP should be tracked separately
+		for _, ip := range ips {
+			assert.True(t, sh.IsScanned("example.com", ip))
+			assert.Equal(t, 1, sh.GetScanCount("example.com", ip))
+		}
+
+		// Unrecorded IP should not be found
+		assert.False(t, sh.IsScanned("example.com", "9.9.9.9"))
+	})
+
+	t.Run("save and reload with multiple IPs", func(t *testing.T) {
+		sh1, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		testData := map[string][]string{
+			"example.com": {"1.2.3.4", "1.2.3.5"},
+			"google.com":  {"8.8.8.8", "8.8.4.4"},
+		}
+
+		for host, ips := range testData {
+			for _, ip := range ips {
+				err = sh1.Record(host, ip)
+				require.NoError(t, err)
+			}
+		}
+
+		err = sh1.Save()
+		require.NoError(t, err)
+
+		// Reload and verify
+		sh2, err := NewScanHistory(tmpFile, "txt", "ip", 0)
+		require.NoError(t, err)
+
+		for host, ips := range testData {
+			for _, ip := range ips {
+				assert.True(t, sh2.IsScanned(host, ip),
+					"Should find %s with IP %s", host, ip)
+			}
+		}
+	})
+}

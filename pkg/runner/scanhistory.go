@@ -68,11 +68,16 @@ func (sh *ScanHistory) key(target, ip string) string {
 }
 
 // IsScanned checks if a target was previously scanned
-func (sh *ScanHistory) IsScanned(target string) bool {
+// For ip-scope, pass the IP address to check against stored IPs
+func (sh *ScanHistory) IsScanned(target string, ip ...string) bool {
 	sh.mutex.RLock()
 	defer sh.mutex.RUnlock()
 
-	key := sh.key(target, "")
+	ipAddr := ""
+	if len(ip) > 0 {
+		ipAddr = ip[0]
+	}
+	key := sh.key(target, ipAddr)
 	entry, exists := sh.entries[key]
 	if !exists {
 		return false
@@ -87,11 +92,16 @@ func (sh *ScanHistory) IsScanned(target string) bool {
 }
 
 // GetScanCount returns the scan count for a target, or 0 if not found
-func (sh *ScanHistory) GetScanCount(target string) int {
+// For ip-scope, pass the IP address to check against stored IPs
+func (sh *ScanHistory) GetScanCount(target string, ip ...string) int {
 	sh.mutex.RLock()
 	defer sh.mutex.RUnlock()
 
-	key := sh.key(target, "")
+	ipAddr := ""
+	if len(ip) > 0 {
+		ipAddr = ip[0]
+	}
+	key := sh.key(target, ipAddr)
 	entry, exists := sh.entries[key]
 	if !exists {
 		return 0
