@@ -139,45 +139,50 @@ func excludePorts(options *Options, ports []*port.Port) ([]*port.Port, error) {
 func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 	var ports []*port.Port
 	for _, r := range ranges {
-		r = strings.TrimSpace(r)
-
-		portProtocol := protocol.TCP
-		if strings.HasPrefix(r, "u:") {
-			portProtocol = protocol.UDP
-			r = strings.TrimPrefix(r, "u:")
-		}
-
-		if strings.Contains(r, "-") {
-			parts := strings.Split(r, "-")
-			if len(parts) != portListStrParts {
-				return nil, fmt.Errorf("invalid port selection segment: '%s'", r)
+		for _, segment := range strings.Split(r, ",") {
+			segment = strings.TrimSpace(segment)
+			if segment == "" {
+				continue
 			}
 
-			p1, err := strconv.Atoi(parts[0])
-			if err != nil {
-				return nil, fmt.Errorf("invalid port number: '%s'", parts[0])
+			portProtocol := protocol.TCP
+			if strings.HasPrefix(segment, "u:") {
+				portProtocol = protocol.UDP
+				segment = strings.TrimPrefix(segment, "u:")
 			}
 
-			p2, err := strconv.Atoi(parts[1])
-			if err != nil {
-				return nil, fmt.Errorf("invalid port number: '%s'", parts[1])
-			}
+			if strings.Contains(segment, "-") {
+				parts := strings.Split(segment, "-")
+				if len(parts) != portListStrParts {
+					return nil, fmt.Errorf("invalid port selection segment: '%s'", segment)
+				}
 
-			if p1 > p2 || p2 > 65535 {
-				return nil, fmt.Errorf("invalid port range: %d-%d", p1, p2)
-			}
+				p1, err := strconv.Atoi(parts[0])
+				if err != nil {
+					return nil, fmt.Errorf("invalid port number: '%s'", parts[0])
+				}
 
-			for i := p1; i <= p2; i++ {
-				port := &port.Port{Port: i, Protocol: portProtocol}
+				p2, err := strconv.Atoi(parts[1])
+				if err != nil {
+					return nil, fmt.Errorf("invalid port number: '%s'", parts[1])
+				}
+
+				if p1 > p2 || p2 > 65535 {
+					return nil, fmt.Errorf("invalid port range: %d-%d", p1, p2)
+				}
+
+				for i := p1; i <= p2; i++ {
+					port := &port.Port{Port: i, Protocol: portProtocol}
+					ports = append(ports, port)
+				}
+			} else {
+				portNumber, err := strconv.Atoi(segment)
+				if err != nil || portNumber > 65535 {
+					return nil, fmt.Errorf("invalid port number: '%s'", segment)
+				}
+				port := &port.Port{Port: portNumber, Protocol: portProtocol}
 				ports = append(ports, port)
 			}
-		} else {
-			portNumber, err := strconv.Atoi(r)
-			if err != nil || portNumber > 65535 {
-				return nil, fmt.Errorf("invalid port number: '%s'", r)
-			}
-			port := &port.Port{Port: portNumber, Protocol: portProtocol}
-			ports = append(ports, port)
 		}
 	}
 
