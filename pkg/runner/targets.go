@@ -123,6 +123,14 @@ func (r *Runner) AddTarget(target string) error {
 	if target == "" {
 		return nil
 	}
+
+	if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil {
+		if r.scanHistory.IsScanned(target) {
+			gologger.Debug().Msgf("Skipping previously scanned target: %s\n", target)
+			return nil
+		}
+	}
+
 	if asn.IsASN(target) {
 		// Get CIDRs for ASN
 		cidrs, err := asn.GetCIDRsForASNNum(target)

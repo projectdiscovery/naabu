@@ -54,7 +54,8 @@ type Runner struct {
 	streamChannel chan Target
 	excludedIpsNP *networkpolicy.NetworkPolicy
 
-	unique gcache.Cache[string, struct{}]
+	unique      gcache.Cache[string, struct{}]
+	scanHistory *ScanHistory
 }
 
 type Target struct {
@@ -93,6 +94,20 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner := &Runner{
 		options: options,
+	}
+
+	if options.ScanLog != "" {
+		scanHistory, err := NewScanHistory(
+			options.ScanLog,
+			options.LogFormat,
+			options.LogScope,
+			options.ScanLogTTL,
+		)
+		if err != nil {
+			gologger.Warning().Msgf("Could not load scan history: %s\n", err)
+		} else {
+			runner.scanHistory = scanHistory
+		}
 	}
 
 	dnsOptions := dnsx.DefaultOptions
@@ -265,6 +280,13 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 						gologger.Silent().Msgf("%s:%d\n", host, p.Port)
 					}
 				}
+			}
+		}
+
+		// Record to scan history after successful scan
+		if r.scanHistory != nil {
+			if err := r.scanHistory.Record(host, hostResult.IP); err != nil {
+				gologger.Debug().Msgf("Could not record to scan history: %s\n", err)
 			}
 		}
 	}
@@ -741,6 +763,11 @@ func (r *Runner) Close() error {
 	}
 	if r.limiter != nil {
 		r.limiter.Stop()
+	}
+	if r.scanHistory != nil {
+		if err := r.scanHistory.Save(); err != nil {
+			gologger.Warning().Msgf("Could not save scan history: %s\n", err)
+		}
 	}
 	if r.options.OnClose != nil {
 		r.options.OnClose()

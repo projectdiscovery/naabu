@@ -134,6 +134,13 @@ type Options struct {
 	// OnClose adds a callback function that is invoked when naabu is closed
 	// to be exact at end of existing closures
 	OnClose func()
+	// Scan History / Deduplication fields
+	ScanLog     string        // Path to scan log file (--scan-log)
+	SkipScanned bool          // Skip previously scanned targets (--skip-scanned)
+	LogFormat   string        // Log format: txt, json, or db (--log-format)
+	LogScope    string        // What to log: domain, ip, or host (--log-scope)
+	ForceRescan bool          // Override skip behavior (--force-rescan)
+	ScanLogTTL  time.Duration // TTL for scan history (--ttl)
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -253,6 +260,15 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.AssetID, "asset-id", "aid", "", "upload new assets to existing asset id (optional)"),
 		flagSet.StringVarP(&options.AssetName, "asset-name", "aname", "", "assets group name to set (optional)"),
 		flagSet.StringVarP(&options.AssetFileUpload, "dashboard-upload", "pdu", "", "upload naabu output file (jsonl) in projectdiscovery cloud (pdcp) UI dashboard"),
+	)
+
+	flagSet.CreateGroup("scan-history", "Scan-History",
+		flagSet.StringVarP(&options.ScanLog, "scan-log", "sl", "", "path to scan log file for tracking scanned targets"),
+		flagSet.BoolVarP(&options.SkipScanned, "skip-scanned", "ss", false, "skip targets found in scan log"),
+		flagSet.StringVar(&options.LogFormat, "log-format", "txt", "scan log format (txt,json,db)"),
+		flagSet.StringVar(&options.LogScope, "log-scope", "host", "what to track (domain,ip,host)"),
+		flagSet.BoolVar(&options.ForceRescan, "force-rescan", false, "ignore scan history and rescan all targets"),
+		flagSet.DurationVar(&options.ScanLogTTL, "ttl", 0, "rescan targets after TTL expires (e.g., 24h, 7d)"),
 	)
 
 	_ = flagSet.Parse()
