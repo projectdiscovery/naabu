@@ -282,13 +282,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
-
-		// Record to scan history after successful scan
-		if r.scanHistory != nil {
-			if err := r.scanHistory.Record(host, hostResult.IP); err != nil {
-				gologger.Debug().Msgf("Could not record to scan history: %s\n", err)
-			}
-		}
 	}
 }
 
@@ -1230,6 +1223,33 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 			}
 			csvFileHeaderEnabled = false
+		}
+	}
+	if r.scanHistory != nil {
+		recordedHosts := make(map[string]string) // host -> IP mapping
+
+		for hostResult := range scanResults.GetIPsPorts() {
+			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+			if err != nil {
+				continue
+			}
+
+			for _, host := range dt {
+				if host == "ip" {
+					host = hostResult.IP
+				}
+				// Deduplicate: only record each host once
+				if _, exists := recordedHosts[host]; !exists {
+					recordedHosts[host] = hostResult.IP
+				}
+			}
+		}
+
+		// Record all unique hosts
+		for host, ip := range recordedHosts {
+			if err := r.scanHistory.Record(host, ip); err != nil {
+				gologger.Debug().Msgf("Could not record to scan history: %s\n", err)
+			}
 		}
 	}
 }

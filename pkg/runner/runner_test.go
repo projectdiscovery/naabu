@@ -1043,8 +1043,16 @@ func TestRunner_ScanHistoryIntegration(t *testing.T) {
 			// If it should have been skipped, the history would still show it was already scanned
 			// If it's a new target, we can check if AddTarget worked without error
 			if tt.expectedAdded {
-				// For new targets or force-rescan, AddTarget should succeed
-				assert.NoError(t, err)
+				// Target should be in IPRanger
+				hosts, err := runner.scanner.IPRanger.GetHostsByIP("example.com")
+				require.NoError(t, err)
+				assert.NotEmpty(t, hosts, "Expected target to be added to IPRanger")
+			} else {
+				// Target should NOT be in IPRanger (was skipped)
+				hosts, err := runner.scanner.IPRanger.GetHostsByIP("example.com")
+				if err == nil {
+					assert.Empty(t, hosts, "Expected target to be skipped (not in IPRanger)")
+				}
 			}
 		})
 	}

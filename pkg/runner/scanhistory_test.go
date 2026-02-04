@@ -3,6 +3,7 @@ package runner
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -22,7 +23,7 @@ func TestNewScanHistory(t *testing.T) {
 	}{
 		{
 			name:     "valid txt format",
-			filePath: "/tmp/test-scan-txt.log",
+			filePath: filepath.Join(t.TempDir(), "test-scan-txt.log"),
 			format:   "txt",
 			scope:    "host",
 			ttl:      0,
@@ -30,7 +31,7 @@ func TestNewScanHistory(t *testing.T) {
 		},
 		{
 			name:     "valid json format",
-			filePath: "/tmp/test-scan-json.json",
+			filePath: filepath.Join(t.TempDir(), "test-scan-json.json"),
 			format:   "json",
 			scope:    "host",
 			ttl:      time.Hour,
@@ -38,7 +39,7 @@ func TestNewScanHistory(t *testing.T) {
 		},
 		{
 			name:     "valid with TTL",
-			filePath: "/tmp/test-scan-ttl.log",
+			filePath: filepath.Join(t.TempDir(), "test-scan-ttl.log"),
 			format:   "txt",
 			scope:    "host",
 			ttl:      24 * time.Hour,
@@ -46,7 +47,7 @@ func TestNewScanHistory(t *testing.T) {
 		},
 		{
 			name:     "empty format defaults to txt",
-			filePath: "/tmp/test-scan-default.log",
+			filePath: filepath.Join(t.TempDir(), "test-scan-default.log"),
 			format:   "",
 			scope:    "host",
 			ttl:      0,
@@ -56,8 +57,6 @@ func TestNewScanHistory(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			defer os.Remove(tt.filePath)
-
 			sh, err := NewScanHistory(tt.filePath, tt.format, tt.scope, tt.ttl)
 			if tt.wantErr {
 				assert.Error(t, err)
@@ -73,8 +72,7 @@ func TestNewScanHistory(t *testing.T) {
 }
 
 func TestScanHistory_RecordAndIsScanned(t *testing.T) {
-	tmpFile := "/tmp/test-history-record.log"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-history-record.log")
 
 	sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 	require.NoError(t, err)
@@ -147,8 +145,7 @@ func TestScanHistory_RecordAndIsScanned(t *testing.T) {
 }
 
 func TestScanHistory_TTLExpiration(t *testing.T) {
-	tmpFile := "/tmp/test-ttl-expiration.log"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-ttl-expiration.log")
 
 	// Create with 100ms TTL
 	sh, err := NewScanHistory(tmpFile, "txt", "host", 100*time.Millisecond)
@@ -168,9 +165,8 @@ func TestScanHistory_TTLExpiration(t *testing.T) {
 	})
 
 	t.Run("no TTL means never expires", func(t *testing.T) {
-		sh2, err := NewScanHistory("/tmp/test-no-ttl.log", "txt", "host", 0)
+		sh2, err := NewScanHistory(filepath.Join(t.TempDir(), "test-no-ttl.log"), "txt", "host", 0)
 		require.NoError(t, err)
-		defer os.Remove("/tmp/test-no-ttl.log")
 
 		sh2.Record("permanent.com", "1.2.3.4")
 		time.Sleep(200 * time.Millisecond)
@@ -179,8 +175,7 @@ func TestScanHistory_TTLExpiration(t *testing.T) {
 }
 
 func TestScanHistory_TxtFormat(t *testing.T) {
-	tmpFile := "/tmp/test-txt-format.log"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-txt-format.log")
 
 	sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 	require.NoError(t, err)
@@ -232,8 +227,7 @@ func TestScanHistory_TxtFormat(t *testing.T) {
 }
 
 func TestScanHistory_JsonFormat(t *testing.T) {
-	tmpFile := "/tmp/test-json-format.json"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-json-format.json")
 
 	sh, err := NewScanHistory(tmpFile, "json", "host", 0)
 	require.NoError(t, err)
@@ -274,8 +268,7 @@ func TestScanHistory_JsonFormat(t *testing.T) {
 }
 
 func TestScanHistory_DirtyFlag(t *testing.T) {
-	tmpFile := "/tmp/test-dirty-flag.log"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-dirty-flag.log")
 
 	sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 	require.NoError(t, err)
@@ -336,8 +329,7 @@ func TestScanHistory_DirtyFlag(t *testing.T) {
 }
 
 func TestScanHistory_ConcurrentAccess(t *testing.T) {
-	tmpFile := "/tmp/test-concurrent-access.log"
-	defer os.Remove(tmpFile)
+	tmpFile := filepath.Join(t.TempDir(), "test-concurrent-access.log")
 
 	sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 	require.NoError(t, err)
@@ -379,8 +371,7 @@ func TestScanHistory_ConcurrentAccess(t *testing.T) {
 
 func TestScanHistory_EdgeCases(t *testing.T) {
 	t.Run("empty target", func(t *testing.T) {
-		tmpFile := "/tmp/test-empty-target.log"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-empty-target.log")
 
 		sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 		require.NoError(t, err)
@@ -388,8 +379,7 @@ func TestScanHistory_EdgeCases(t *testing.T) {
 	})
 
 	t.Run("malformed txt file", func(t *testing.T) {
-		tmpFile := "/tmp/test-malformed.log"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-malformed.log")
 
 		// Write malformed data
 		malformedContent := `# Naabu Scan History
@@ -411,8 +401,7 @@ example.com|1.2.3.4|2026-01-01T00:00:00Z|2026-01-01T00:00:00Z|1
 	})
 
 	t.Run("invalid json file", func(t *testing.T) {
-		tmpFile := "/tmp/test-invalid-json.json"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-invalid-json.json")
 
 		err := os.WriteFile(tmpFile, []byte("{invalid json}"), 0644)
 		require.NoError(t, err)
@@ -422,8 +411,7 @@ example.com|1.2.3.4|2026-01-01T00:00:00Z|2026-01-01T00:00:00Z|1
 	})
 
 	t.Run("comments and blank lines in txt", func(t *testing.T) {
-		tmpFile := "/tmp/test-comments.log"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-comments.log")
 
 		content := `# Header comment
 
@@ -446,8 +434,7 @@ google.com|8.8.8.8|2026-01-01T00:00:00Z|2026-01-01T00:00:00Z|2
 	})
 
 	t.Run("unsupported format returns error on save", func(t *testing.T) {
-		tmpFile := "/tmp/test-unsupported.db"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-unsupported.db")
 
 		sh, err := NewScanHistory(tmpFile, "unsupported", "host", 0)
 		require.NoError(t, err) // Creation succeeds
@@ -459,8 +446,7 @@ google.com|8.8.8.8|2026-01-01T00:00:00Z|2026-01-01T00:00:00Z|2
 	})
 
 	t.Run("directory creation on save", func(t *testing.T) {
-		tmpFile := "/tmp/nested/dir/test-scan.log"
-		defer os.RemoveAll("/tmp/nested")
+		tmpFile := filepath.Join(t.TempDir(), "nested", "dir", "test-scan.log")
 
 		sh, err := NewScanHistory(tmpFile, "txt", "host", 0)
 		require.NoError(t, err)
@@ -474,8 +460,7 @@ google.com|8.8.8.8|2026-01-01T00:00:00Z|2026-01-01T00:00:00Z|2
 	})
 
 	t.Run("special characters in targets", func(t *testing.T) {
-		tmpFile := "/tmp/test-special-chars.log"
-		defer os.Remove(tmpFile)
+		tmpFile := filepath.Join(t.TempDir(), "test-special-chars.log")
 
 		sh, _ := NewScanHistory(tmpFile, "txt", "host", 0)
 
@@ -513,8 +498,7 @@ func TestScanHistory_PersistenceRoundTrip(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tmpFile := fmt.Sprintf("/tmp/test-roundtrip-%s.%s", tt.format, tt.format)
-			defer os.Remove(tmpFile)
+			tmpFile := filepath.Join(t.TempDir(), fmt.Sprintf("test-roundtrip-%s.%s", tt.format, tt.format))
 
 			// First instance: write data
 			sh1, err := NewScanHistory(tmpFile, tt.format, "host", time.Hour)

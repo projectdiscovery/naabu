@@ -118,6 +118,8 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Tunnel = r.Tunnel
 	data.Version = r.Version
 	data.Confidence = r.Confidence
+	data.PreviouslySeen = r.PreviouslySeen
+	data.FirstSeenAt = r.FirstSeenAt
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)

@@ -124,9 +124,13 @@ func (r *Runner) AddTarget(target string) error {
 		return nil
 	}
 
+	lookupTarget := target
+	if host, _, hasPort := getPort(target); hasPort {
+		lookupTarget = host
+	}
 	if r.options.SkipScanned && !r.options.ForceRescan && r.scanHistory != nil {
-		if r.scanHistory.IsScanned(target) {
-			gologger.Debug().Msgf("Skipping previously scanned target: %s\n", target)
+		if r.scanHistory.IsScanned(lookupTarget) {
+			gologger.Debug().Msgf("Skipping previously scanned target: %s\n", lookupTarget)
 			return nil
 		}
 	}
