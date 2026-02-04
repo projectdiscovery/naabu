@@ -1228,19 +1228,35 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	if r.scanHistory != nil {
 		recordedHosts := make(map[string]string) // host -> IP mapping
 
-		for hostResult := range scanResults.GetIPsPorts() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
-			if err != nil {
-				continue
-			}
-
-			for _, host := range dt {
-				if host == "ip" {
-					host = hostResult.IP
+		if scanResults.HasIPsPorts() {
+			for hostResult := range scanResults.GetIPsPorts() {
+				dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+				if err != nil {
+					continue
 				}
-				// Deduplicate: only record each host once
-				if _, exists := recordedHosts[host]; !exists {
-					recordedHosts[host] = hostResult.IP
+				for _, host := range dt {
+					if host == "ip" {
+						host = hostResult.IP
+					}
+					// Deduplicate: only record each host once
+					if _, exists := recordedHosts[host]; !exists {
+						recordedHosts[host] = hostResult.IP
+					}
+				}
+			}
+		} else if scanResults.HasIPS() {
+			for hostIP := range scanResults.GetIPs() {
+				dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
+				if err != nil {
+					continue
+				}
+				for _, host := range dt {
+					if host == "ip" {
+						host = hostIP
+					}
+					if _, exists := recordedHosts[host]; !exists {
+						recordedHosts[host] = hostIP
+					}
 				}
 			}
 		}

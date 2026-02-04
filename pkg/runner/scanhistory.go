@@ -86,6 +86,19 @@ func (sh *ScanHistory) IsScanned(target string) bool {
 	return true
 }
 
+// GetScanCount returns the scan count for a target, or 0 if not found
+func (sh *ScanHistory) GetScanCount(target string) int {
+	sh.mutex.RLock()
+	defer sh.mutex.RUnlock()
+
+	key := sh.key(target, "")
+	entry, exists := sh.entries[key]
+	if !exists {
+		return 0
+	}
+	return entry.ScanCount
+}
+
 // Record adds a target to scan history (without immediate save)
 func (sh *ScanHistory) Record(target, ip string) error {
 	sh.mutex.Lock()
@@ -97,8 +110,8 @@ func (sh *ScanHistory) Record(target, ip string) error {
 		entry.LastScan = now
 		entry.ScanCount++
 	} else {
-		sh.entries[target] = &ScanEntry{
-			Target:    key,
+		sh.entries[key] = &ScanEntry{
+			Target:    target,
 			IP:        ip,
 			FirstScan: now,
 			LastScan:  now,
@@ -227,9 +240,12 @@ func (sh *ScanHistory) loadTXT(file *os.File) error {
 			continue
 		}
 
-		sh.entries[parts[0]] = &ScanEntry{
-			Target:    parts[0],
-			IP:        parts[1],
+		target := parts[0]
+		ip := parts[1]
+		key := sh.key(target, ip)
+		sh.entries[key] = &ScanEntry{
+			Target:    target,
+			IP:        ip,
 			FirstScan: firstScan,
 			LastScan:  lastScan,
 			ScanCount: scanCount,
