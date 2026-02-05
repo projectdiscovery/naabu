@@ -398,6 +398,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 		}
 		r.wgscan.Wait()
+
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
