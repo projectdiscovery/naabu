@@ -488,7 +488,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		ipsCallback := r.getPreprocessedIps
 		if shouldDiscoverHosts && shouldUseRawPackets {
-			ipsCallback = r.getHostDiscoveryIps
+			if r.scanner.HostDiscoveryResults.HasIPS() {
+				ipsCallback = r.getHostDiscoveryIps
+			} else {
+				gologger.Warning().Msgf("Host discovery found no live hosts, scanning all targets")
+			}
 		}
 
 		// shrinks the ips to the minimum amount of cidr
