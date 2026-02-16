@@ -63,16 +63,36 @@ func New() (Router, error) {
 			continue
 		}
 
+		var mask net.IPMask
+		if len(routeMsg.Addrs) > syscall.RTAX_NETMASK && routeMsg.Addrs[syscall.RTAX_NETMASK] != nil {
+			switch t := routeMsg.Addrs[syscall.RTAX_NETMASK].(type) {
+			case *route.Inet4Addr:
+				mask = net.IPv4Mask(t.IP[0], t.IP[1], t.IP[2], t.IP[3])
+			case *route.Inet6Addr:
+				mask = net.IPMask(t.IP[:])
+			}
+		}
+
 		switch t := dstAddr.(type) {
 		case *route.Inet4Addr:
 			r.Type = IPv4
 			dstIP := net.IP(t.IP[:])
-			r.Destination = dstIP.String()
+			if mask != nil {
+				ones, _ := mask.Size()
+				r.Destination = fmt.Sprintf("%s/%d", dstIP.String(), ones)
+			} else {
+				r.Destination = fmt.Sprintf("%s/32", dstIP.String())
+			}
 			r.Default = dstIP.Equal(net.IPv4(0, 0, 0, 0))
 		case *route.Inet6Addr:
 			r.Type = IPv6
 			dstIP := net.IP(t.IP[:])
-			r.Destination = dstIP.String()
+			if mask != nil {
+				ones, _ := mask.Size()
+				r.Destination = fmt.Sprintf("%s/%d", dstIP.String(), ones)
+			} else {
+				r.Destination = fmt.Sprintf("%s/128", dstIP.String())
+			}
 			r.Default = dstIP.Equal(net.ParseIP("::"))
 		default:
 			gologger.Debug().Msgf("unknown route type: '%T' (seq: %d)", dstAddr, routeMsg.Seq)
