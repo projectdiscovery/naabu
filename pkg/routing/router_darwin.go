@@ -3,119 +3,117 @@
 package routing
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
 	"net"
-	"os/exec"
-	"strings"
+	"syscall"
 
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
-	sliceutil "github.com/projectdiscovery/utils/slice"
-	stringsutil "github.com/projectdiscovery/utils/strings"
-	"go.uber.org/multierr"
+	"golang.org/x/net/route"
 )
 
 // New creates a routing engine for Darwin
 func New() (Router, error) {
-	var routes []*Route
-	netstatCmd := exec.Command("netstat", "-nr")
-	netstatOutput, err := netstatCmd.Output()
+	rib, err := route.FetchRIB(syscall.AF_UNSPEC, route.RIBTypeRoute, 0)
 	if err != nil {
-		var route4, route6 *Route
-		// create default routes with outgoing ips
-		ip4, ip6, errOutboundIps := GetOutboundIPs()
-		if ip4 != nil {
-			interface4, err := FindInterfaceByIp(ip4)
-			if err != nil {
-				return nil, err
-			}
-			route4 = &Route{
-				Type:             IPv4,
-				Default:          true,
-				DefaultSourceIP:  ip4,
-				NetworkInterface: interface4,
-			}
-			routes = append(routes, route4)
-		}
-
-		// try to find outbound route for ipv6
-		if ip6 != nil {
-			interface6, _ := FindInterfaceByIp(ip6)
-			route6 = &Route{
-				Type:             IPv6,
-				Default:          true,
-				DefaultSourceIP:  ip6,
-				NetworkInterface: interface6,
-			}
-			routes = append(routes, route6)
-		} else {
-			// if we fail, use the same network interface for ipv4
-			route6 = &Route{
-				Type:             IPv6,
-				Default:          true,
-				NetworkInterface: route4.NetworkInterface,
-			}
-			routes = append(routes, route6)
-		}
-		if len(routes) > 0 {
-			return &RouterDarwin{Routes: routes}, nil
-		}
-		return nil, multierr.Combine(err, errOutboundIps)
+		return nil, fmt.Errorf("failed to fetch routing table: %w", err)
 	}
 
-	var lastType RouteType
+	msgs, err := route.ParseRIB(route.RIBTypeRoute, rib)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse routing table: %w", err)
+	}
 
-	scanner := bufio.NewScanner(bytes.NewReader(netstatOutput))
-	for scanner.Scan() {
-		outputLine := strings.TrimSpace(scanner.Text())
-		if outputLine == "" {
+	var routes []*Route
+	for _, msg := range msgs {
+		routeMsg, ok := msg.(*route.RouteMessage)
+		if !ok {
+			gologger.Debug().Msgf("invalid route message: '%T'\n", msg)
 			continue
 		}
 
-		parts := stringsutil.SplitAny(outputLine, " \t")
-		if len(parts) >= 4 && !sliceutil.Contains(parts, "Destination") {
-			expire := "-1"
-			if len(parts) > 4 {
-				expire = parts[4]
-			}
-
-			route := &Route{
-				Default:     stringsutil.EqualFoldAny(parts[0], "default"),
-				Destination: parts[0],
-				Gateway:     parts[1],
-				Flags:       parts[2],
-				Expire:      expire,
-			}
-
-			if networkInterface, err := net.InterfaceByName(parts[3]); err == nil {
-				route.NetworkInterface = networkInterface
-			}
-
-			hasDots := stringsutil.ContainsAny(route.Destination, ".") || stringsutil.ContainsAny(route.Gateway, ".")
-			hasSemicolon := stringsutil.ContainsAny(route.Destination, ":") || stringsutil.ContainsAny(route.Gateway, ":")
-			switch {
-			case hasDots:
-				route.Type = IPv4
-			case hasSemicolon:
-				route.Type = IPv6
-			default:
-				// use last route type and print a warning
-				if lastType != "" {
-					gologger.Debug().Msgf("using '%s' for unknown route type: '%s'\n", lastType, outputLine)
-					route.Type = lastType
-				} else {
-					// we can't determine the route type
-					return nil, fmt.Errorf("could not determine route type for: '%s'", outputLine)
-				}
-			}
-			lastType = route.Type
-			routes = append(routes, route)
+		// Skip if route is down
+		if routeMsg.Flags&syscall.RTF_UP == 0 {
+			gologger.Debug().Msgf("route is down (seq: %d)", routeMsg.Seq)
+			continue
 		}
-	}
 
-	return &RouterDarwin{Routes: routes}, err
+		// Try to get destination address
+		if len(routeMsg.Addrs) <= syscall.RTAX_DST || routeMsg.Addrs[syscall.RTAX_DST] == nil {
+			gologger.Debug().Msgf("no destination address found (seq: %d)", routeMsg.Seq)
+			continue
+		}
+		dstAddr := routeMsg.Addrs[syscall.RTAX_DST]
+
+		// Try to get gateway address
+		if len(routeMsg.Addrs) <= syscall.RTAX_GATEWAY || routeMsg.Addrs[syscall.RTAX_GATEWAY] == nil {
+			gologger.Debug().Msgf("no gateway address found (seq: %d)", routeMsg.Seq)
+			continue
+		}
+		gwAddr := routeMsg.Addrs[syscall.RTAX_GATEWAY]
+
+		r := &Route{Expire: "-1"}
+		switch t := gwAddr.(type) {
+		case *route.Inet4Addr:
+			r.Gateway = net.IP(t.IP[:]).String()
+		case *route.Inet6Addr:
+			r.Gateway = net.IP(t.IP[:]).String()
+		default:
+			gologger.Debug().Msgf("unknown gateway type: '%T' (seq: %d)", gwAddr, routeMsg.Seq)
+			continue
+		}
+
+		switch t := dstAddr.(type) {
+		case *route.Inet4Addr:
+			r.Type = IPv4
+			dstIP := net.IP(t.IP[:])
+			r.Destination = dstIP.String()
+			r.Default = dstIP.Equal(net.IPv4(0, 0, 0, 0))
+		case *route.Inet6Addr:
+			r.Type = IPv6
+			dstIP := net.IP(t.IP[:])
+			r.Destination = dstIP.String()
+			r.Default = dstIP.Equal(net.ParseIP("::"))
+		default:
+			gologger.Debug().Msgf("unknown route type: '%T' (seq: %d)", dstAddr, routeMsg.Seq)
+			continue
+		}
+
+		// Try to get network interface
+		if routeMsg.Index > 0 {
+			if iface, err := net.InterfaceByIndex(routeMsg.Index); err == nil {
+				r.NetworkInterface = iface
+			}
+		}
+
+		// Handle flags string
+		flags := ""
+		if routeMsg.Flags&syscall.RTF_UP != 0 {
+			flags += "U"
+		}
+		if routeMsg.Flags&syscall.RTF_GATEWAY != 0 {
+			flags += "G"
+		}
+		if routeMsg.Flags&syscall.RTF_HOST != 0 {
+			flags += "H"
+		}
+		if routeMsg.Flags&syscall.RTF_REJECT != 0 {
+			flags += "R"
+		}
+		if routeMsg.Flags&syscall.RTF_DYNAMIC != 0 {
+			flags += "D"
+		}
+		if routeMsg.Flags&syscall.RTF_MODIFIED != 0 {
+			flags += "M"
+		}
+		if routeMsg.Flags&syscall.RTF_STATIC != 0 {
+			flags += "S"
+		}
+		r.Flags = flags
+
+		routes = append(routes, r)
+	}
+	return &RouterDarwin{Routes: routes}, nil
 }
 
 type RouterDarwin struct {
