@@ -71,7 +71,7 @@ func (r *baseRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferred
 	}
 
 	if route.NetworkInterface == nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find network interface")
+		return nil, nil, nil, errors.New("could not find network interface")
 	}
 	ip, err := FindSourceIpForIp(route, dst)
 	if err != nil {
@@ -82,9 +82,16 @@ func (r *baseRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferred
 }
 
 func (r *baseRouter) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	if input == nil && src == nil {
+		return r.Route(dst)
+	}
+
 	route, err := FindRouteWithHwAndIp(input, src, r.Routes)
 	if err != nil {
 		return nil, nil, nil, err
+	}
+	if route.NetworkInterface == nil {
+		return nil, nil, nil, errors.New("could not find network interface")
 	}
 	return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
 }
@@ -175,7 +182,15 @@ func GetOutboundIPs() (net.IP, net.IP, error) {
 }
 
 func FindRouteWithHwAndIp(hardwareAddr net.HardwareAddr, src net.IP, routes []*Route) (*Route, error) {
+	if len(hardwareAddr) == 0 {
+		return nil, errors.New("hardware address is empty")
+	}
+
 	for _, route := range routes {
+		if route == nil || route.NetworkInterface == nil {
+			continue
+		}
+
 		if bytes.EqualFold(route.NetworkInterface.HardwareAddr, hardwareAddr) {
 			if src != nil {
 				addresses, err := route.NetworkInterface.Addrs()
