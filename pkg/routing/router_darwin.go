@@ -58,6 +58,8 @@ func New() (Router, error) {
 			r.Gateway = net.IP(t.IP[:]).String()
 		case *route.Inet6Addr:
 			r.Gateway = net.IP(t.IP[:]).String()
+		case *route.LinkAddr:
+			r.Gateway = ""
 		default:
 			gologger.Debug().Msgf("unknown gateway type: '%T' (seq: %d)", gwAddr, routeMsg.Seq)
 			continue
