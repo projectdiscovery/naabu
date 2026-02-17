@@ -1,4 +1,4 @@
-//go:build darwin
+//go:build (darwin || dragonfly || freebsd || netbsd || openbsd) && !linux
 
 package routing
 
@@ -7,12 +7,11 @@ import (
 	"net"
 	"syscall"
 
-	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
 	"golang.org/x/net/route"
 )
 
-// New creates a routing engine for Darwin
+// New creates a routing engine for BSD (Darwin, FreeBSD, NetBSD, OpenBSD)
 func New() (Router, error) {
 	rib, err := route.FetchRIB(syscall.AF_UNSPEC, route.RIBTypeRoute, 0)
 	if err != nil {
@@ -135,38 +134,5 @@ func New() (Router, error) {
 
 		routes = append(routes, r)
 	}
-	return &RouterDarwin{Routes: routes}, nil
-}
-
-type RouterDarwin struct {
-	Routes []*Route
-}
-
-func (r *RouterDarwin) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	route, err := FindRouteForIp(dst, r.Routes)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find route")
-	}
-
-	if route.DefaultSourceIP != nil {
-		return nil, nil, route.DefaultSourceIP, nil
-	}
-
-	if route.NetworkInterface == nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find network interface")
-	}
-	ip, err := FindSourceIpForIp(route, dst)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find source ip")
-	}
-
-	return route.NetworkInterface, net.ParseIP(route.Gateway), ip, nil
-}
-
-func (r *RouterDarwin) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	route, err := FindRouteWithHwAndIp(input, src, r.Routes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
+	return &baseRouter{Routes: routes}, nil
 }

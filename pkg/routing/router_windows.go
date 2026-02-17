@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/asaskevich/govalidator"
-	"github.com/pkg/errors"
 	stringsutil "github.com/projectdiscovery/utils/strings"
 )
 
@@ -65,35 +64,5 @@ func New() (Router, error) {
 		}
 	}
 
-	return &RouterWindows{Routes: routes}, nil
-}
-
-type RouterWindows struct {
-	Routes []*Route
-}
-
-func (r *RouterWindows) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	route, err := FindRouteForIp(dst, r.Routes)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find route")
-	}
-
-	if route.NetworkInterface == nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find network interface")
-	}
-	ip, err := FindSourceIpForIp(route, dst)
-	if err != nil {
-		return nil, nil, nil, errors.Wrap(err, "could not find source ip")
-	}
-
-	return route.NetworkInterface, net.IP(route.Gateway), ip, nil
-}
-
-func (r *RouterWindows) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
-	route, err := FindRouteWithHwAndIp(input, src, r.Routes)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-
-	return route.NetworkInterface, net.IP(route.Gateway), src, nil
+	return &baseRouter{Routes: routes}, nil
 }
