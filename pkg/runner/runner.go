@@ -55,6 +55,8 @@ type Runner struct {
 	excludedIpsNP *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
+
+	csvStdoutHeaderOnce sync.Once
 }
 
 type Target struct {
@@ -210,7 +212,10 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		return
 	}
 
-	csvHeaderEnabled := true
+	portsToEmit := hostResult.Ports
+	if r.options.ServiceDiscovery || r.options.ServiceVersion {
+		portsToEmit = r.enrichHostResultPorts(hostResult)
+	}
 
 	buffer := bytes.Buffer{}
 	writer := csv.NewWriter(&buffer)
@@ -231,11 +236,12 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			if host != hostResult.IP {
 				data.Host = host
 			}
-			for _, p := range hostResult.Ports {
+			for _, p := range portsToEmit {
 				data.Port = p.Port
 				data.Protocol = p.Protocol.String()
 				//nolint
 				data.TLS = p.TLS
+				copyServiceFields(data, p.Service)
 				if r.options.JSON {
 					b, err := data.JSON(r.options.ExcludeOutputFields)
 					if err != nil {
@@ -243,10 +249,9 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					}
 					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
 				} else if r.options.CSV {
-					if csvHeaderEnabled {
+					r.csvStdoutHeaderOnce.Do(func() {
 						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-						csvHeaderEnabled = false
-					}
+					})
 					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
@@ -258,14 +263,14 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				writer.Flush()
 				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
-				for _, p := range hostResult.Ports {
-					if r.options.OutputCDN && isCDNIP {
-						gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
-					} else {
-						gologger.Silent().Msgf("%s:%d\n", host, p.Port)
-					}
+				for _, p := range portsToEmit {
+					gologger.Silent().Msgf("%s\n", formatOutput(host, p, r.options.OutputCDN, cdnName))
 				}
 			}
+		}
+
+		if r.options.OnResult != nil {
+			r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: portsToEmit, MacAddress: hostResult.MacAddress})
 		}
 	}
 }
@@ -401,6 +406,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
+		if err := r.handleFingerprinting(); err != nil {
+			return err
+		}
+
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -475,8 +484,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		// handle nmap first to integrate service information
-		if err := r.handleNmap(); err != nil {
+		if err := r.handleFingerprinting(); err != nil {
 			return err
 		}
 
@@ -649,8 +657,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			r.ConnectVerification()
 		}
 
-		// handle nmap first to integrate service information
-		if err := r.handleNmap(); err != nil {
+		// handle fingerprinting first to integrate service information
+		if err := r.handleFingerprinting(); err != nil {
 			return err
 		}
 
@@ -715,12 +723,8 @@ func (r *Runner) GetTargetIps(ipsCallback func() ([]*net.IPNet, []string)) (targ
 }
 
 func (r *Runner) ShowScanResultOnExit() {
-	// handle nmap first to integrate service information
-	if err := r.handleNmap(); err != nil {
-		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
-	}
-
-	// then handle output with enhanced service information
+	// On interrupt-driven exits, print what is already collected and avoid
+	// long-running enrichment (service fingerprinting / nmap) to keep shutdown responsive.
 	r.handleOutput(r.scanner.ScanResults)
 }
 
@@ -1101,11 +1105,19 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 				if !r.options.DisableStdout {
 					if r.options.JSON {
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !(r.options.ServiceDiscovery || r.options.ServiceVersion) {
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
 					} else if r.options.CSV {
-						writer := csv.NewWriter(&buffer)
-						writer.Flush()
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !(r.options.ServiceDiscovery || r.options.ServiceVersion) {
+							writer := csv.NewWriter(&buffer)
+							writer.Flush()
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
+					} else if !(r.options.ServiceDiscovery || r.options.ServiceVersion) {
+						for _, p := range hostResult.Ports {
+							gologger.Silent().Msgf("%s\n", formatOutput(host, p, r.options.OutputCDN, cdnName))
+						}
 					}
 				}
 
@@ -1123,7 +1135,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					}
 				}
 
-				if r.options.OnResult != nil {
+				if r.options.OnResult != nil && !(r.options.ServiceDiscovery || r.options.ServiceVersion) {
 					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports})
 				}
 			}
