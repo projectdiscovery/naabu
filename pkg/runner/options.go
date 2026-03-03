@@ -364,7 +364,7 @@ func (options *Options) shouldDiscoverHosts() bool {
 func (options *Options) hasProbes() bool {
 	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
-		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
+		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpSynPingProbes) > 0 ||
 		len(options.TcpAckPingProbes) > 0
 }
 

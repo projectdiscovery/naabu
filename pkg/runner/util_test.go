@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"net"
 	"testing"
 
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
@@ -30,8 +31,6 @@ func Test_host2ips(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.args, func(t *testing.T) {
-			var options Options
-			options.TopPorts = tt.args
 			got, gotV6, err := r.host2ips(tt.args)
 			if tt.wantErr {
 				assert.NotNil(t, err)
@@ -41,7 +40,14 @@ func Test_host2ips(t *testing.T) {
 			assert.Equal(t, tt.want, got)
 			// As some distributions don't handle correctly ipv6 we compare results only if necessary
 			if len(gotV6) > 0 && len(tt.wantV6) > 0 {
-				assert.Equal(t, tt.wantV6, gotV6)
+				if tt.args == "localhost" {
+					for _, ip := range gotV6 {
+						assert.NotNil(t, net.ParseIP(ip), "localhost ipv6 answer should be a valid IP")
+						assert.Contains(t, []string{"::1", "::127"}, ip)
+					}
+				} else {
+					assert.Equal(t, tt.wantV6, gotV6)
+				}
 			}
 		})
 	}

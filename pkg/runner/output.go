@@ -34,21 +34,21 @@ type Result struct {
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string `json:"device_type,omitempty"`
-	ExtraInfo   string `json:"extra_info,omitempty"`
-	HighVersion string `json:"high_version,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	LowVersion  string `json:"low_version,omitempty"`
-	Method      string `json:"method,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OSType      string `json:"os_type,omitempty"`
-	Product     string `json:"product,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	RPCNum      string `json:"rpc_num,omitempty"`
-	ServiceFP   string `json:"service_fp,omitempty"`
-	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	DeviceType  string `json:"device_type,omitempty" csv:"device_type"`
+	ExtraInfo   string `json:"extra_info,omitempty" csv:"extra_info"`
+	HighVersion string `json:"high_version,omitempty" csv:"high_version"`
+	Hostname    string `json:"hostname,omitempty" csv:"hostname"`
+	LowVersion  string `json:"low_version,omitempty" csv:"low_version"`
+	Method      string `json:"method,omitempty" csv:"method"`
+	Name        string `json:"name,omitempty" csv:"name"`
+	OSType      string `json:"os_type,omitempty" csv:"os_type"`
+	Product     string `json:"product,omitempty" csv:"product"`
+	Proto       string `json:"proto,omitempty" csv:"proto"`
+	RPCNum      string `json:"rpc_num,omitempty" csv:"rpc_num"`
+	ServiceFP   string `json:"service_fp,omitempty" csv:"service_fp"`
+	Tunnel      string `json:"tunnel,omitempty" csv:"tunnel"`
+	Version     string `json:"version,omitempty" csv:"version"`
+	Confidence  int    `json:"confidence,omitempty" csv:"confidence"`
 }
 
 // TODO:
@@ -137,6 +137,9 @@ func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
+		if csvTag == "" {
+			continue
+		}
 		if !slices.Contains(headers, csvTag) && !slices.Contains(excludedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
@@ -158,6 +161,9 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
+		if csvTag == "" {
+			continue
+		}
 		fieldValue := field.Interface()
 		if slices.Contains(headers, csvTag) {
 			fields = append(fields, fmt.Sprint(fieldValue))
@@ -169,24 +175,42 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 // WriteHostOutput writes the output list of host ports to an io.Writer
 func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
-	sb := &strings.Builder{}
-
 	for _, p := range ports {
-		sb.WriteString(host)
-		sb.WriteString(":")
-		sb.WriteString(strconv.Itoa(p.Port))
-		if outputCDN && cdnName != "" {
-			sb.WriteString(" [" + cdnName + "]")
-		}
-		sb.WriteString("\n")
-		_, err := bufwriter.WriteString(sb.String())
+		_, err := bufwriter.WriteString(formatOutput(host, p, outputCDN, cdnName) + "\n")
 		if err != nil {
 			_ = bufwriter.Flush()
 			return err
 		}
-		sb.Reset()
 	}
 	return bufwriter.Flush()
+}
+
+func formatOutput(host string, p *port.Port, outputCDN bool, cdnName string) string {
+	line := host + ":" + strconv.Itoa(p.Port)
+	if outputCDN && cdnName != "" {
+		line += " [" + cdnName + "]"
+	}
+
+	if p.Service == nil {
+		return line
+	}
+
+	var serviceDetails []string
+	if p.Service.Name != "" {
+		serviceDetails = append(serviceDetails, p.Service.Name)
+	}
+	if p.Service.Product != "" && !strings.EqualFold(p.Service.Product, p.Service.Name) {
+		serviceDetails = append(serviceDetails, p.Service.Product)
+	}
+	if p.Service.Version != "" {
+		serviceDetails = append(serviceDetails, p.Service.Version)
+	}
+
+	if len(serviceDetails) == 0 {
+		return line
+	}
+
+	return line + " [" + strings.Join(serviceDetails, " ") + "]"
 }
 
 // WriteJSONOutput writes the output list of subdomain in JSON to an io.Writer
