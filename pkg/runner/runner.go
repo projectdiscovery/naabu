@@ -54,7 +54,8 @@ type Runner struct {
 	streamChannel chan Target
 	excludedIpsNP *networkpolicy.NetworkPolicy
 
-	unique gcache.Cache[string, struct{}]
+	unique      gcache.Cache[string, struct{}]
+	scanHistory *ScanHistory
 }
 
 type Target struct {
@@ -93,6 +94,20 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner := &Runner{
 		options: options,
+	}
+
+	if options.ScanLog != "" {
+		scanHistory, err := NewScanHistory(
+			options.ScanLog,
+			options.LogFormat,
+			options.LogScope,
+			options.ScanLogTTL,
+		)
+		if err != nil {
+			gologger.Warning().Msgf("Could not load scan history: %s\n", err)
+		} else {
+			runner.scanHistory = scanHistory
+		}
 	}
 
 	dnsOptions := dnsx.DefaultOptions
@@ -745,6 +760,11 @@ func (r *Runner) Close() error {
 	if r.limiter != nil {
 		r.limiter.Stop()
 	}
+	if r.scanHistory != nil {
+		if err := r.scanHistory.Save(); err != nil {
+			gologger.Warning().Msgf("Could not save scan history: %s\n", err)
+		}
+	}
 	if r.options.OnClose != nil {
 		r.options.OnClose()
 	}
@@ -1206,6 +1226,49 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 			}
 			csvFileHeaderEnabled = false
+		}
+	}
+	if r.scanHistory != nil {
+		recordedHosts := make(map[string]string) // host -> IP mapping
+
+		if scanResults.HasIPsPorts() {
+			for hostResult := range scanResults.GetIPsPorts() {
+				dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+				if err != nil {
+					continue
+				}
+				for _, host := range dt {
+					if host == "ip" {
+						host = hostResult.IP
+					}
+					// Deduplicate: only record each host once
+					if _, exists := recordedHosts[host]; !exists {
+						recordedHosts[host] = hostResult.IP
+					}
+				}
+			}
+		} else if scanResults.HasIPS() {
+			for hostIP := range scanResults.GetIPs() {
+				dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
+				if err != nil {
+					continue
+				}
+				for _, host := range dt {
+					if host == "ip" {
+						host = hostIP
+					}
+					if _, exists := recordedHosts[host]; !exists {
+						recordedHosts[host] = hostIP
+					}
+				}
+			}
+		}
+
+		// Record all unique hosts
+		for host, ip := range recordedHosts {
+			if err := r.scanHistory.Record(host, ip); err != nil {
+				gologger.Debug().Msgf("Could not record to scan history: %s\n", err)
+			}
 		}
 	}
 }
