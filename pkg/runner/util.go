@@ -29,13 +29,18 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 			}
 		} else {
 			targetIPsV4 = append(targetIPsV4, dnsData.A...)
+			targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
 		}
 		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
 			return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
-		targetIPsV4 = append(targetIPsV6, target)
-		gologger.Debug().Msgf("Found %d addresses for %s\n", len(targetIPsV4), target)
+		if iputil.IsIPv4(target) {
+			targetIPsV4 = append(targetIPsV4, target)
+		} else if iputil.IsIPv6(target) {
+			targetIPsV6 = append(targetIPsV6, target)
+		}
+		gologger.Debug().Msgf("Found %d IPv4 and %d IPv6 addresses for %s\n", len(targetIPsV4), len(targetIPsV6), target)
 	}
 
 	return
