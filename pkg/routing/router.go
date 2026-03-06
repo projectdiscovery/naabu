@@ -32,7 +32,7 @@ type Route struct {
 	DefaultSourceIP  net.IP
 }
 
-// Router shares the same interface described in https://github.com/gopacket/gopacket
+// Router shares the same interface described in https://github.com/Mzack9999/gopacket
 type Router interface {
 	// Route returns where to route a packet based on the packet's source
 	// and destination IP address.
