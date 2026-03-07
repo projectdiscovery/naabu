@@ -1,15 +1,11 @@
 # Go parameters
 GOCMD=go
-GOBUILD=$(GOCMD) build
+GOBUILD=CGO_ENABLED=0 $(GOCMD) build
 GOMOD=$(GOCMD) mod
 GOTEST=$(GOCMD) test
 GOFLAGS := -v 
 LDFLAGS := -s -w
 
-ifneq ($(shell go env GOOS),darwin)
-LDFLAGS := -extldflags "-static"
-endif
-    
 all: build
 build:
 	$(GOBUILD) $(GOFLAGS) -ldflags '$(LDFLAGS)' -o "naabu" cmd/naabu/main.go
