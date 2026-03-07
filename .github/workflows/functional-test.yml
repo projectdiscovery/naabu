@@ -16,17 +16,11 @@ jobs:
         os: [ubuntu-latest] # Todo: windows-latest, macOS-latest
 
     steps:
-      - name: Set up Go
-        uses: actions/setup-go@v6
-        with:
-          go-version: 1.24.x
+      - uses: actions/checkout@v6
+      - uses: projectdiscovery/actions/setup/go@v1
 
-      - name: Check out code
-        uses: actions/checkout@v6
-
-      - name: Install required packages (libpcap-dev, nmap, simplehttpserver)
+      - name: Install required packages (nmap, simplehttpserver)
         run: |
-          sudo apt install libpcap-dev
           sudo apt install nmap
           go install -race github.com/projectdiscovery/simplehttpserver/cmd/simplehttpserver@latest
 
