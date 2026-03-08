@@ -145,6 +145,10 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("connect payload can only be used with connect scan")
 	}
 
+	if options.DnsOrder != "p" && options.DnsOrder != "l" && options.DnsOrder != "lp" && options.DnsOrder != "pl" {
+		return errors.New("dns-order must be one of p, l, lp, pl")
+	}
+
 	if options.ScanType == SynScan && scan.PkgRouter == nil {
 		gologger.Warning().Msgf("Routing could not be determined (are you using a VPN?).falling back to connect scan")
 		options.ScanType = ConnectScan

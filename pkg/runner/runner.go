@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -48,9 +49,10 @@ type Runner struct {
 	targetsFile   string
 	scanner       *scan.Scanner
 	limiter       *ratelimit.Limiter
-	wgscan        sizedwaitgroup.SizedWaitGroup
-	dnsclient     *dnsx.DNSX
-	stats         *clistats.Statistics
+	wgscan         sizedwaitgroup.SizedWaitGroup
+	dnsclient      *dnsx.DNSX
+	dnsclientProxy *dnsx.DNSX
+	stats          *clistats.Statistics
 	streamChannel chan Target
 	excludedIpsNP *networkpolicy.NetworkPolicy
 
@@ -109,6 +111,38 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 	runner.dnsclient = dnsclient
+
+	if options.Proxy != "" && strings.Contains(options.DnsOrder, "p") {
+		proxyDnsOptions := dnsx.DefaultOptions
+		proxyDnsOptions.MaxRetries = runner.options.Retries
+		proxyDnsOptions.Hostsfile = true
+		if sliceutil.Contains(options.IPVersion, scan.IPv6) {
+			proxyDnsOptions.QuestionTypes = append(proxyDnsOptions.QuestionTypes, dns.TypeAAAA)
+		}
+		if len(runner.options.baseResolvers) > 0 {
+			proxyDnsOptions.BaseResolvers = runner.options.baseResolvers
+		}
+
+		proxyURL := options.Proxy
+		if !strings.Contains(proxyURL, "://") {
+			proxyURL = "socks5://" + proxyURL
+		}
+		if options.ProxyAuth != "" {
+			if u, err := url.Parse(proxyURL); err == nil {
+				creds := strings.SplitN(options.ProxyAuth, ":", 2)
+				if len(creds) == 2 {
+					u.User = url.UserPassword(creds[0], creds[1])
+					proxyURL = u.String()
+				}
+			}
+		}
+		proxyDnsOptions.Proxy = proxyURL
+		dnsclientProxy, err := dnsx.New(proxyDnsOptions)
+		if err != nil {
+			return nil, err
+		}
+		runner.dnsclientProxy = dnsclientProxy
+	}
 
 	excludedIps, err := runner.parseExcludedIps(options)
 	if err != nil {
