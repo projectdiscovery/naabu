@@ -408,6 +408,8 @@ func main() {
 }
 ```
 
+> **`OnResult`** is called once after the scan completes with aggregated results. To process results **in real-time** as ports are discovered, use **`OnReceive`** instead. The `Stream` option only controls async target loading — it does not affect when callbacks fire.
+
 # Notes
 
 - Naabu allows arbitrary binary execution as a feature to support [nmap integration](https://github.com/projectdiscovery/naabu#nmap-integration).
