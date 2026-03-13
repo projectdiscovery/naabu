@@ -154,6 +154,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 	runner.scanner = scanner
+	runner.options.ScanType = scanOpts.ScanType
 
 	runner.scanner.Ports = ports
 
