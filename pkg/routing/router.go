@@ -55,8 +55,52 @@ type Router interface {
 	RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error)
 }
 
+// baseRouter implements the common logic for all platforms
+type baseRouter struct {
+	Routes []*Route
+}
+
+func (r *baseRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	route, err := FindRouteForIp(dst, r.Routes)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "could not find route")
+	}
+
+	if route.DefaultSourceIP != nil {
+		return nil, nil, route.DefaultSourceIP, nil
+	}
+
+	if route.NetworkInterface == nil {
+		return nil, nil, nil, errors.New("could not find network interface")
+	}
+	ip, err := FindSourceIpForIp(route, dst)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "could not find source ip")
+	}
+
+	return route.NetworkInterface, net.ParseIP(route.Gateway), ip, nil
+}
+
+func (r *baseRouter) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	if input == nil && src == nil {
+		return r.Route(dst)
+	}
+
+	route, err := FindRouteWithHwAndIp(input, src, r.Routes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if route.NetworkInterface == nil {
+		return nil, nil, nil, errors.New("could not find network interface")
+	}
+	return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
+}
+
 func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
 	var defaultRoute4, defaultRoute6 *Route
+	var bestRoute *Route
+	var bestMaskSize int = -1
+
 	// first we need to find the interface associated to the destination
 	for _, route := range routes {
 		if defaultRoute4 == nil && route.Default && route.Type == IPv4 {
@@ -75,9 +119,18 @@ func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
 		// if it's a cidr, verify that the destination ip is contained
 		if _, itfDrstCidr, err := net.ParseCIDR(route.Destination); err == nil {
 			if itfDrstCidr.Contains(ip) {
-				return route, nil
+				// Longest Prefix Match
+				ones, _ := itfDrstCidr.Mask.Size()
+				if ones > bestMaskSize {
+					bestMaskSize = ones
+					bestRoute = route
+				}
 			}
 		}
+	}
+
+	if bestRoute != nil {
+		return bestRoute, nil
 	}
 
 	switch {
@@ -129,7 +182,15 @@ func GetOutboundIPs() (net.IP, net.IP, error) {
 }
 
 func FindRouteWithHwAndIp(hardwareAddr net.HardwareAddr, src net.IP, routes []*Route) (*Route, error) {
+	if len(hardwareAddr) == 0 {
+		return nil, errors.New("hardware address is empty")
+	}
+
 	for _, route := range routes {
+		if route == nil || route.NetworkInterface == nil {
+			continue
+		}
+
 		if bytes.EqualFold(route.NetworkInterface.HardwareAddr, hardwareAddr) {
 			if src != nil {
 				addresses, err := route.NetworkInterface.Addrs()
