@@ -12,7 +12,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.26
+	github.com/projectdiscovery/cdncheck v1.2.27
 	github.com/projectdiscovery/clistats v0.1.1
 	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/fdmax v0.0.4
