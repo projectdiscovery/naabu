@@ -50,7 +50,7 @@ func Acquire(options *Options) (*ListenHandler, error) {
 	if PkgRouter == nil || !privileges.IsPrivileged || options.ScanType == "c" {
 		h := NewListenHandler()
 		h.Busy = true
-		return NewListenHandler(), nil
+		return h, nil
 	}
 
 	for _, listenHandler := range ListenHandlers {
@@ -60,6 +60,14 @@ func Acquire(options *Options) (*ListenHandler, error) {
 			return listenHandler, nil
 		}
 	}
+
+	// raw packet infrastructure failed to initialize (e.g. no npcap on Windows)
+	if len(ListenHandlers) == 0 {
+		h := NewListenHandler()
+		h.Busy = true
+		return h, nil
+	}
+
 	return nil, errors.New("no free handlers")
 }
 
