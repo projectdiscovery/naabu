@@ -155,7 +155,7 @@ Download the ready to run [binary](https://github.com/projectdiscovery/naabu/rel
 
 > **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-To install libcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`
+To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
 
 
 ## Installing Naabu
