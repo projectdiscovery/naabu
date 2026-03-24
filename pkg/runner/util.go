@@ -47,7 +47,7 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 }
 
 func isOSSupported() bool {
-	return osutil.IsLinux() || osutil.IsOSX()
+	return osutil.IsLinux() || osutil.IsOSX() || osutil.IsWindows()
 }
 
 func getPort(target string) (string, string, bool) {
