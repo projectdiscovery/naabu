@@ -82,6 +82,7 @@ func init() {
 	go TransportReadWorker()
 	go TransportWriteWorker()
 	go ICMPWriteWorker()
+	go EthernetWriteWorker()
 }
 
 func buildListenHandler() (*ListenHandler, error) {
