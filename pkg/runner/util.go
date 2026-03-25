@@ -17,8 +17,7 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 	// addresses for a given host. Else use that host for port scanning
 	if !iputil.IsIP(target) {
 		var dnsData *retryabledns.DNSData
-		var err error
-		
+
 		for _, order := range r.options.DnsOrder {
 			if order == 'l' && r.dnsclient != nil {
 				dnsData, err = r.dnsclient.QueryMultiple(target)
@@ -35,6 +34,9 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 
 		if err != nil || dnsData == nil {
 			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
+			if err == nil {
+				err = fmt.Errorf("could not resolve host: %s", target)
+			}
 			return nil, nil, err
 		}
 		if len(r.options.IPVersion) > 0 {

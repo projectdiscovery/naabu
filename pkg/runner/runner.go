@@ -49,10 +49,10 @@ type Runner struct {
 	targetsFile   string
 	scanner       *scan.Scanner
 	limiter       *ratelimit.Limiter
-	wgscan         sizedwaitgroup.SizedWaitGroup
-	dnsclient      *dnsx.DNSX
+	wgscan        sizedwaitgroup.SizedWaitGroup
+	dnsclient     *dnsx.DNSX
 	dnsclientProxy *dnsx.DNSX
-	stats          *clistats.Statistics
+	stats         *clistats.Statistics
 	streamChannel chan Target
 	excludedIpsNP *networkpolicy.NetworkPolicy
 
@@ -92,6 +92,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	if options.Threads == 0 {
 		options.Threads = DefaultThreadsNum
+	}
+	if options.DnsOrder == "" {
+		options.DnsOrder = "l"
 	}
 	runner := &Runner{
 		options: options,

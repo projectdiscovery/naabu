@@ -149,6 +149,10 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("dns-order must be one of p, l, lp, pl")
 	}
 
+	if strings.Contains(options.DnsOrder, "p") && options.Proxy == "" {
+		return errors.New("dns-order containing 'p' (proxy) requires --proxy to be set")
+	}
+
 	if options.ScanType == SynScan && scan.PkgRouter == nil {
 		gologger.Warning().Msgf("Routing could not be determined (are you using a VPN?).falling back to connect scan")
 		options.ScanType = ConnectScan
