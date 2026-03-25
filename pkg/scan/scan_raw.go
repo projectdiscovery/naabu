@@ -12,9 +12,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcap"
+	"github.com/Mzack9999/gopacket"
+	"github.com/Mzack9999/gopacket/layers"
+	"github.com/Mzack9999/gopacket/pcap"
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"

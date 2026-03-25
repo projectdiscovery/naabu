@@ -6,8 +6,8 @@ import (
 	"errors"
 	"net"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
+	"github.com/Mzack9999/gopacket"
+	"github.com/Mzack9999/gopacket/layers"
 	"github.com/projectdiscovery/gologger"
 )
 

@@ -1,3 +1,4 @@
+version: 2
 env:
   - GO111MODULE=on
 before:
@@ -5,26 +6,34 @@ before:
     - go mod tidy
 project_name: naabu
 builds:
-  - id: naabu-linux
+  - id: naabu
     ldflags:
       - -s -w
     binary: naabu
     env:
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
     main: ./cmd/naabu/main.go
     goos:
       - linux
+      - darwin
+      - windows
     goarch:
       - amd64
-      # - arm64
-      
+      - arm64
+      - 386
+    ignore:
+      - goos: darwin
+        goarch: 386
+      - goos: linux
+        goarch: 386
+
 archives:
-- formats:
-  - zip
-  name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
+  - formats:
+      - zip
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
 checksum:
-  name_template: "{{ .ProjectName }}-linux-checksums.txt"
+  name_template: "{{ .ProjectName }}-checksums.txt"
 
 announce:
   slack:
