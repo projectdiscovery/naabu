@@ -16,17 +16,17 @@ func TestEthernetWriteWorkerConsumesPackets(t *testing.T) {
 	ArpRequestAsync = func(ip string) {
 		called.Add(1)
 	}
+	defer func() {
+		ArpRequestAsync = origArp
+	}()
 
 	for i := 0; i < 5; i++ {
 		ch <- &PkgSend{ip: "192.168.1.1", flag: Arp}
 	}
 
-	oldChan := ethernetPacketSend
-	ethernetPacketSend = ch
-
 	done := make(chan struct{})
 	go func() {
-		EthernetWriteWorker()
+		EthernetWriteWorker(ch)
 		close(done)
 	}()
 
@@ -36,9 +36,6 @@ func TestEthernetWriteWorkerConsumesPackets(t *testing.T) {
 
 	close(ch)
 	<-done
-
-	ethernetPacketSend = oldChan
-	ArpRequestAsync = origArp
 }
 
 func TestEthernetWriteWorkerDoesNotBlock(t *testing.T) {
@@ -46,13 +43,13 @@ func TestEthernetWriteWorkerDoesNotBlock(t *testing.T) {
 
 	origArp := ArpRequestAsync
 	ArpRequestAsync = func(ip string) {}
-
-	oldChan := ethernetPacketSend
-	ethernetPacketSend = ch
+	defer func() {
+		ArpRequestAsync = origArp
+	}()
 
 	workerDone := make(chan struct{})
 	go func() {
-		EthernetWriteWorker()
+		EthernetWriteWorker(ch)
 		close(workerDone)
 	}()
 
@@ -72,7 +69,4 @@ func TestEthernetWriteWorkerDoesNotBlock(t *testing.T) {
 
 	close(ch)
 	<-workerDone
-
-	ethernetPacketSend = oldChan
-	ArpRequestAsync = origArp
 }
