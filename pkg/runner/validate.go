@@ -149,8 +149,8 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("dns-order must be one of p, l, lp, pl")
 	}
 
-	if strings.Contains(options.DnsOrder, "p") && options.Proxy == "" {
-		return errors.New("dns-order containing 'p' (proxy) requires --proxy to be set")
+	if options.DnsOrder == "p" && options.Proxy == "" {
+		return errors.New("dns-order 'p' (proxy-only) requires --proxy to be set")
 	}
 
 	if options.ScanType == SynScan && scan.PkgRouter == nil {

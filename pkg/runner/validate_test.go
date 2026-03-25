@@ -65,17 +65,24 @@ func TestDnsOrderValidation(t *testing.T) {
 		assert.EqualError(t, o.ValidateOptions(), "dns-order must be one of p, l, lp, pl")
 	})
 
-	t.Run("proxy dns-order without proxy flag", func(t *testing.T) {
+	t.Run("proxy-only dns-order without proxy flag", func(t *testing.T) {
 		o := base
 		o.DnsOrder = "p"
 		o.Proxy = ""
-		assert.EqualError(t, o.ValidateOptions(), "dns-order containing 'p' (proxy) requires --proxy to be set")
+		assert.EqualError(t, o.ValidateOptions(), "dns-order 'p' (proxy-only) requires --proxy to be set")
 	})
 
-	t.Run("lp dns-order without proxy flag", func(t *testing.T) {
+	t.Run("lp dns-order without proxy flag is valid", func(t *testing.T) {
 		o := base
 		o.DnsOrder = "lp"
 		o.Proxy = ""
-		assert.EqualError(t, o.ValidateOptions(), "dns-order containing 'p' (proxy) requires --proxy to be set")
+		assert.Nil(t, o.ValidateOptions())
+	})
+
+	t.Run("pl dns-order without proxy flag is valid", func(t *testing.T) {
+		o := base
+		o.DnsOrder = "pl"
+		o.Proxy = ""
+		assert.Nil(t, o.ValidateOptions())
 	})
 }
