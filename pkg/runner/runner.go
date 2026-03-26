@@ -25,6 +25,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -34,6 +35,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/ratelimit"
+	"golang.org/x/net/proxy"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
@@ -184,6 +186,10 @@ func NewRunner(options *Options) (*Runner, error) {
 
 	if scanOpts.OnReceive == nil {
 		scanOpts.OnReceive = runner.onReceive
+	}
+
+	if options.ServiceVersion {
+		scan.EnableTLSDetection = true
 	}
 
 	scanner, err := scan.NewScanner(scanOpts)
@@ -438,6 +444,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
+		r.handleServiceDetection(r.scanner.ScanResults)
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -516,6 +523,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		if err := r.handleNmap(); err != nil {
 			return err
 		}
+
+		r.handleServiceDetection(r.scanner.ScanResults)
 
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
@@ -691,6 +700,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
+		r.handleServiceDetection(r.scanner.ScanResults)
+
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
@@ -756,6 +767,8 @@ func (r *Runner) ShowScanResultOnExit() {
 	if err := r.handleNmap(); err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
+
+	r.handleServiceDetection(r.scanner.ScanResults)
 
 	// then handle output with enhanced service information
 	r.handleOutput(r.scanner.ScanResults)
@@ -1008,6 +1021,125 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	return nil
 }
 
+func (r *Runner) handleServiceDetection(scanResults *result.Result) {
+	if !r.options.ServiceVersion {
+		return
+	}
+
+	gologger.Info().Msgf("Running service version detection on discovered ports")
+
+	// Locate probe file
+	probeFile := r.options.ServiceProbesFile
+	if probeFile == "" {
+		probeFile = fingerprint.LocateNmapProbes()
+	}
+	if probeFile == "" {
+		gologger.Warning().Msgf("nmap-service-probes file not found. Install nmap or use --sV-probes to specify the path.")
+		return
+	}
+
+	db, err := fingerprint.ParseProbeFile(probeFile)
+	if err != nil {
+		gologger.Error().Msgf("Failed to parse service probes file %s: %v", probeFile, err)
+		return
+	}
+
+	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), probeFile)
+
+	var opts []fingerprint.Option
+	opts = append(opts, fingerprint.WithWorkers(r.options.ServiceVersionWorkers))
+	opts = append(opts, fingerprint.WithTimeout(r.options.ServiceVersionTimeout))
+	opts = append(opts, fingerprint.WithFastMode(r.options.ServiceVersionFast))
+
+	if r.options.Proxy != "" {
+		proxyURL := r.options.Proxy
+		if !strings.Contains(proxyURL, "://") {
+			proxyURL = "socks5://" + proxyURL
+		}
+		if r.options.ProxyAuth != "" {
+			if u, err := url.Parse(proxyURL); err == nil {
+				creds := strings.SplitN(r.options.ProxyAuth, ":", 2)
+				if len(creds) == 2 {
+					u.User = url.UserPassword(creds[0], creds[1])
+					proxyURL = u.String()
+				}
+			}
+		}
+		parsedURL, err := url.Parse(proxyURL)
+		if err == nil {
+			dialer, err := proxy.FromURL(parsedURL, proxy.Direct)
+			if err == nil {
+				opts = append(opts, fingerprint.WithDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
+					return dialer.Dial(network, address)
+				}))
+			}
+		}
+	}
+
+	engine := fingerprint.New(db, opts...)
+
+	// Use streaming fingerprinting: feed targets and collect results via
+	// channels so workers start immediately without waiting to build the
+	// full target list first.
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	targetCh := make(chan fingerprint.Target, r.options.ServiceVersionWorkers*2)
+	resultCh := engine.FingerprintStream(ctx, targetCh)
+
+	// Feed targets in a goroutine while collecting results concurrently.
+	var targetCount int
+	go func() {
+		for hostResult := range scanResults.GetIPsPorts() {
+			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+			if err != nil {
+				dt = []string{hostResult.IP}
+			}
+			hostname := hostResult.IP
+			for _, h := range dt {
+				if h != "ip" && h != hostResult.IP {
+					hostname = h
+					break
+				}
+			}
+			for _, p := range hostResult.Ports {
+				targetCh <- fingerprint.Target{
+					Host:        hostname,
+					IP:          hostResult.IP,
+					Port:        p.Port,
+					TLSDetected: p.TLS,
+					TLSChecked:  true,
+				}
+				targetCount++
+			}
+		}
+		close(targetCh)
+	}()
+
+	if targetCount == 0 {
+		gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
+	} else {
+		gologger.Info().Msgf("Fingerprinting %d open port(s) with %d workers", targetCount, r.options.ServiceVersionWorkers)
+	}
+
+	// Collect results as they arrive and attach to scan results.
+	services := make(map[string]*port.Service)
+	for sr := range resultCh {
+		key := net.JoinHostPort(sr.IP, strconv.Itoa(sr.Port))
+		services[key] = sr.Service
+		gologger.Verbose().Msgf("Identified %s on %s:%d (%s %s)", sr.Service.Name, sr.IP, sr.Port, sr.Service.Product, sr.Service.Version)
+	}
+
+	for hostResult := range scanResults.GetIPsPorts() {
+		for _, p := range hostResult.Ports {
+			key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
+			if svc, ok := services[key]; ok {
+				p.Service = svc
+			}
+		}
+	}
+}
+
 func (r *Runner) handleOutput(scanResults *result.Result) {
 	var (
 		file   *os.File
@@ -1101,24 +1233,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						//nolint
 						data.TLS = p.TLS
 
-						// copy service information if available
-						if p.Service != nil {
-							data.DeviceType = p.Service.DeviceType
-							data.ExtraInfo = p.Service.ExtraInfo
-							data.HighVersion = p.Service.HighVersion
-							data.Hostname = p.Service.Hostname
-							data.LowVersion = p.Service.LowVersion
-							data.Method = p.Service.Method
-							data.Name = p.Service.Name
-							data.OSType = p.Service.OSType
-							data.Product = p.Service.Product
-							data.Proto = p.Service.Proto
-							data.RPCNum = p.Service.RPCNum
-							data.ServiceFP = p.Service.ServiceFP
-							data.Tunnel = p.Service.Tunnel
-							data.Version = p.Service.Version
-							data.Confidence = p.Service.Confidence
-						}
+						copyServiceFields(data, p.Service)
 						if r.options.JSON {
 							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {

@@ -110,6 +110,14 @@ type Options struct {
 	ServiceDiscovery bool
 	// ServiceVersion attempts to discover service running on open ports with active/passive probes
 	ServiceVersion bool
+	// ServiceVersionFast only probes port-hinted services (skips fallback)
+	ServiceVersionFast bool
+	// ServiceVersionTimeout is the per-probe timeout for service version detection
+	ServiceVersionTimeout time.Duration
+	// ServiceVersionWorkers is the number of concurrent workers for service version detection
+	ServiceVersionWorkers int
+	// ServiceProbesFile is an optional path to a custom nmap-service-probes file
+	ServiceProbesFile string
 	// ReversePTR lookup for ips
 	ReversePTR bool
 	//DisableUpdateCheck disables automatic update check
@@ -225,6 +233,10 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("services-discovery", "Services-Discovery",
 		flagSet.BoolVarP(&options.ServiceDiscovery, "service-discovery", "sD", false, "Service Discovery"),
 		flagSet.BoolVarP(&options.ServiceVersion, "service-version", "sV", false, "Service Version"),
+		flagSet.BoolVar(&options.ServiceVersionFast, "sV-fast", false, "only probe port-hinted services (faster)"),
+		flagSet.DurationVar(&options.ServiceVersionTimeout, "sV-timeout", 5*time.Second, "timeout for service version probes"),
+		flagSet.IntVar(&options.ServiceVersionWorkers, "sV-workers", 25, "number of concurrent service version workers"),
+		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (auto-detected if empty)"),
 	)
 
 	flagSet.CreateGroup("optimization", "Optimization",
@@ -367,7 +379,7 @@ func (options *Options) hasProbes() bool {
 	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
 		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
-		len(options.TcpAckPingProbes) > 0
+		len(options.TcpSynPingProbes) > 0
 }
 
 func (options *Options) shouldUseRawPackets() bool {
