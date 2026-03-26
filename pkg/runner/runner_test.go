@@ -14,13 +14,17 @@ import (
 
 	"github.com/miekg/dns"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+type stubRouter struct{ routing.Router }
 
 // TestNewRunner tests the creation of a new Runner instance
 func TestNewRunner(t *testing.T) {
@@ -982,4 +986,68 @@ func TestConcurrentSYNScans(t *testing.T) {
 	for err := range errChan {
 		t.Error(err)
 	}
+}
+
+func TestNewRunner_ScanTypeSyncAfterFallback(t *testing.T) {
+	origRouter := scan.PkgRouter
+	origPriv := privileges.IsPrivileged
+	origHandlers := scan.ListenHandlers
+	defer func() {
+		scan.PkgRouter = origRouter
+		privileges.IsPrivileged = origPriv
+		scan.ListenHandlers = origHandlers
+	}()
+
+	// Force the fallback: router exists + privileged + all handlers busy
+	scan.PkgRouter = origRouter
+	if scan.PkgRouter == nil {
+		scan.PkgRouter = stubRouter{}
+	}
+	privileges.IsPrivileged = true
+	scan.ListenHandlers = []*scan.ListenHandler{{Busy: true, Phase: &scan.Phase{}}}
+
+	options := &Options{
+		Host:     []string{"127.0.0.1"},
+		Ports:    "80",
+		ScanType: SynScan,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer runner.Close()
+
+	assert.Equal(t, ConnectScan, runner.options.ScanType,
+		"runner options should reflect connect scan after fallback from syn")
+	assert.Equal(t, ConnectScan, runner.scanner.ScanType,
+		"scanner should reflect connect scan after fallback from syn")
+}
+
+func TestNewRunner_ConnectScanPreserved(t *testing.T) {
+	options := &Options{
+		Host:     []string{"127.0.0.1"},
+		Ports:    "80",
+		ScanType: ConnectScan,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer runner.Close()
+
+	assert.Equal(t, ConnectScan, runner.options.ScanType)
+	assert.Equal(t, ConnectScan, runner.scanner.ScanType)
+}
+
+func TestNewRunner_ScanTypeSyncMatchesScanner(t *testing.T) {
+	options := &Options{
+		Host:     []string{"127.0.0.1"},
+		Ports:    "80",
+		ScanType: ConnectScan,
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer runner.Close()
+
+	assert.Equal(t, runner.scanner.ScanType, runner.options.ScanType,
+		"runner options and scanner scan type should always match")
 }
