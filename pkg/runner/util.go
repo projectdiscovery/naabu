@@ -1,8 +1,10 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -32,25 +34,48 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 			}
 		}
 
-		if err != nil || dnsData == nil {
-			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-			if err == nil {
-				err = fmt.Errorf("could not resolve host: %s", target)
-			}
-			return nil, nil, err
-		}
-		if len(r.options.IPVersion) > 0 {
-			if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
+		if dnsData != nil {
+			if len(r.options.IPVersion) > 0 {
+				if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
+					targetIPsV4 = append(targetIPsV4, dnsData.A...)
+				}
+				if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
+					targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
+				}
+			} else {
 				targetIPsV4 = append(targetIPsV4, dnsData.A...)
-			}
-			if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
 				targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
 			}
-		} else {
-			targetIPsV4 = append(targetIPsV4, dnsData.A...)
-			targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
+		}
+
+		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 && r.options.SystemResolver {
+			gologger.Debug().Msgf("primary DNS failed for %s, trying system resolver", target)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ipAddrs, sysErr := net.DefaultResolver.LookupIPAddr(ctx, target)
+			cancel()
+			if sysErr == nil && len(ipAddrs) > 0 {
+				for _, ipAddr := range ipAddrs {
+					ip := ipAddr.IP
+					if ip == nil {
+						continue
+					}
+					if ip.To4() != nil {
+						if len(r.options.IPVersion) == 0 || sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
+							targetIPsV4 = append(targetIPsV4, ip.String())
+						}
+					} else if ip.To16() != nil {
+						if len(r.options.IPVersion) == 0 || sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
+							targetIPsV6 = append(targetIPsV6, ip.String())
+						}
+					}
+				}
+			}
 		}
 		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
+			if err != nil {
+				gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
+				return nil, nil, err
+			}
 			return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
