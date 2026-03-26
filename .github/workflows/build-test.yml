@@ -14,99 +14,49 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - uses: projectdiscovery/actions/setup/go@v1
-      - name: Install libpcap-dev
-        run: sudo apt install libpcap-dev
       - uses: projectdiscovery/actions/golangci-lint@v1
 
-  build-linux:
+  tests:
+    name: "Tests"
+    needs: ["lint"]
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: projectdiscovery/actions/setup/go@v1
+
+      - name: Build
+        run: go build .
+        working-directory: cmd/naabu/
+
+      - name: Test
+        run: go test -race ./...
+
+      - name: Integration Tests
+        if: ${{ matrix.os != 'windows-latest' }}
+        env:
+          GH_ACTION: true
+        run: bash run.sh
+        working-directory: integration_tests/
+
+      - name: Race Condition Tests - Standard User
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: go run -race . -host scanme.sh
+        working-directory: cmd/naabu/
+
+      - name: Race Condition Tests - Root User
+        if: ${{ matrix.os != 'windows-latest' }}
+        run: sudo go run -race . -host scanme.sh
+        working-directory: cmd/naabu/
+
+  release:
+    name: "Release test"
+    needs: ["tests"]
     runs-on: ubuntu-latest
-    needs: ["lint"]
     steps:
       - uses: actions/checkout@v6
       - uses: projectdiscovery/actions/setup/go@v1
-
-      - name: Install libpcap-dev
-        run: sudo apt install libpcap-dev
-
-      - name: Install nmap
-        run: sudo apt install nmap
-
-      - name: Build
-        run: go build .
-        working-directory: cmd/naabu/
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Integration Tests
-        env:
-          GH_ACTION: true
-        run: bash run.sh
-        working-directory: integration_tests/
-
-      - name: Race Condition Tests - Standard User
-        run: |
-          go run -race . -host scanme.sh
-        working-directory: cmd/naabu/
-
-      - name: Race Condition Tests - Root User
-        run: |
-          sudo go run -race . -host scanme.sh
-        working-directory: cmd/naabu/
-
-  build-mac:
-    runs-on: macos-latest
-    needs: ["lint"]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: projectdiscovery/actions/setup/go@v1
-
-      - name: Install libpcap-dev
-        run: brew install libpcap
-
-      - name: Install nmap
-        run: brew install nmap
-
-      - name: Build
-        run: go build .
-        working-directory: cmd/naabu/
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Integration Tests
-        env:
-          GH_ACTION: true
-        run: bash run.sh
-        working-directory: integration_tests/
-
-      - name: Race Condition Tests - Standard User
-        run: |
-          go run -race . -host scanme.sh
-        working-directory: cmd/naabu/
-
-      - name: Race Condition Tests - Root User
-        run: |
-          sudo go run -race . -host scanme.sh
-        working-directory: cmd/naabu/
-
-  build-windows:
-    runs-on: windows-latest
-    needs: ["lint"]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: projectdiscovery/actions/setup/go@v1
-
-      - name: Build
-        run: go build .
-        working-directory: cmd/naabu/
-
-      - name: Test
-        run: go test -race ./...
-
-      - name: Race Condition Tests
-        # Known issue: https://github.com/golang/go/issues/46099
-        run: |
-          # go run -race . -host scanme.sh
-          # sudo go run -race . -host scanme.sh
-        working-directory: cmd/naabu/
+      - uses: projectdiscovery/actions/goreleaser@v1

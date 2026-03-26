@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/retryabledns"
 	iputil "github.com/projectdiscovery/utils/ip"
 	osutil "github.com/projectdiscovery/utils/os"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -17,8 +18,23 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
 	if !iputil.IsIP(target) {
-		dnsData, dnsErr := r.dnsclient.QueryMultiple(target)
-		if dnsErr == nil && dnsData != nil {
+		var dnsData *retryabledns.DNSData
+
+		for _, order := range r.options.DnsOrder {
+			if order == 'l' && r.dnsclient != nil {
+				dnsData, err = r.dnsclient.QueryMultiple(target)
+				if err == nil && dnsData != nil {
+					break
+				}
+			} else if order == 'p' && r.dnsclientProxy != nil {
+				dnsData, err = r.dnsclientProxy.QueryMultiple(target)
+				if err == nil && dnsData != nil {
+					break
+				}
+			}
+		}
+
+		if dnsData != nil {
 			if len(r.options.IPVersion) > 0 {
 				if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
 					targetIPsV4 = append(targetIPsV4, dnsData.A...)
@@ -55,9 +71,9 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 				}
 			}
 			if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
-				if dnsErr != nil {
+				if err != nil {
 					gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-					return nil, nil, dnsErr
+					return nil, nil, err
 				}
 				return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 			}
@@ -75,7 +91,7 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 }
 
 func isOSSupported() bool {
-	return osutil.IsLinux() || osutil.IsOSX()
+	return osutil.IsLinux() || osutil.IsOSX() || osutil.IsWindows()
 }
 
 func getPort(target string) (string, string, bool) {

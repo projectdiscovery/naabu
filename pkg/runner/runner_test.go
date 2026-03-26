@@ -151,6 +151,51 @@ func TestNewRunner(t *testing.T) {
 			},
 		},
 		{
+			name: "dns-order defaults to l when empty",
+			options: &Options{
+				Host:     []string{"example.com"},
+				Ports:    "80",
+				ScanType: ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Equal(t, "l", runner.options.DnsOrder)
+				assert.Nil(t, runner.dnsclientProxy)
+			},
+		},
+		{
+			name: "dns-order lp creates proxy dns client",
+			options: &Options{
+				Host:     []string{"example.com"},
+				Ports:    "80",
+				DnsOrder: "lp",
+				Proxy:    "127.0.0.1:1080",
+				ScanType: ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Equal(t, "lp", runner.options.DnsOrder)
+				assert.NotNil(t, runner.dnsclient)
+				assert.NotNil(t, runner.dnsclientProxy)
+			},
+		},
+		{
+			name: "dns-order l with proxy does not create proxy dns client",
+			options: &Options{
+				Host:     []string{"example.com"},
+				Ports:    "80",
+				DnsOrder: "l",
+				Proxy:    "127.0.0.1:1080",
+				ScanType: ConnectScan,
+			},
+			wantErr: false,
+			validate: func(t *testing.T, runner *Runner) {
+				assert.Equal(t, "l", runner.options.DnsOrder)
+				assert.NotNil(t, runner.dnsclient)
+				assert.Nil(t, runner.dnsclientProxy)
+			},
+		},
+		{
 			name: "enable progress bar",
 			options: &Options{
 				Host:              []string{"example.com"},

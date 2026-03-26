@@ -30,8 +30,6 @@ func Test_host2ips(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.args, func(t *testing.T) {
-			var options Options
-			options.TopPorts = tt.args
 			got, gotV6, err := r.host2ips(tt.args)
 			if tt.wantErr {
 				assert.NotNil(t, err)
@@ -45,4 +43,35 @@ func Test_host2ips(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Test_host2ips_DnsOrder(t *testing.T) {
+	t.Run("default dns-order resolves via local client", func(t *testing.T) {
+		r, err := NewRunner(&Options{IPVersion: []string{scan.IPv4, scan.IPv6}, Retries: 1})
+		require.Nil(t, err)
+
+		assert.Equal(t, "l", r.options.DnsOrder)
+		got, _, err := r.host2ips("localhost")
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"127.0.0.1"}, got)
+	})
+
+	t.Run("explicit dns-order l resolves via local client", func(t *testing.T) {
+		r, err := NewRunner(&Options{IPVersion: []string{scan.IPv4, scan.IPv6}, Retries: 1, DnsOrder: "l"})
+		require.Nil(t, err)
+
+		got, _, err := r.host2ips("localhost")
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"127.0.0.1"}, got)
+	})
+
+	t.Run("dns-order lp falls back when no proxy client", func(t *testing.T) {
+		r, err := NewRunner(&Options{IPVersion: []string{scan.IPv4, scan.IPv6}, Retries: 1, DnsOrder: "lp"})
+		require.Nil(t, err)
+		assert.Nil(t, r.dnsclientProxy)
+
+		got, _, err := r.host2ips("localhost")
+		assert.Nil(t, err)
+		assert.Equal(t, []string{"127.0.0.1"}, got)
+	})
 }
