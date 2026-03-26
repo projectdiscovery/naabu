@@ -48,11 +48,11 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 			}
 		}
 
-		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
-			// Fallback to system resolver for split-DNS / VPN setups
+		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 && r.options.SystemResolver {
+			gologger.Debug().Msgf("primary DNS failed for %s, trying system resolver", target)
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-			defer cancel()
 			ipAddrs, sysErr := net.DefaultResolver.LookupIPAddr(ctx, target)
+			cancel()
 			if sysErr == nil && len(ipAddrs) > 0 {
 				for _, ipAddr := range ipAddrs {
 					ip := ipAddr.IP
@@ -70,13 +70,13 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 					}
 				}
 			}
-			if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
-				if err != nil {
-					gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-					return nil, nil, err
-				}
-				return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
+		}
+		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
+			if err != nil {
+				gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
+				return nil, nil, err
 			}
+			return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
 		if iputil.IsIPv4(target) {
