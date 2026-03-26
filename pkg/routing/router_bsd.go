@@ -3,16 +3,42 @@
 package routing
 
 import (
+	"bufio"
+	"bytes"
 	"fmt"
 	"net"
+	"os/exec"
+	"strings"
 	"syscall"
 
 	"github.com/projectdiscovery/gologger"
+	sliceutil "github.com/projectdiscovery/utils/slice"
+	stringsutil "github.com/projectdiscovery/utils/strings"
+	"go.uber.org/multierr"
 	"golang.org/x/net/route"
 )
 
-// New creates a routing engine for BSD (Darwin, FreeBSD, NetBSD, OpenBSD)
+// New creates a routing engine for BSD (Darwin, FreeBSD, NetBSD, OpenBSD, DragonFly).
+// It tries the native route API first, then falls back to netstat output parsing,
+// and finally to outbound IP detection.
 func New() (Router, error) {
+	routes, err := fetchRoutesNative()
+	if err != nil {
+		gologger.Debug().Msgf("native route API failed, falling back to netstat: %v", err)
+		routes, err = fetchRoutesNetstat()
+	}
+	if err != nil {
+		gologger.Debug().Msgf("netstat fallback failed, falling back to outbound IPs: %v", err)
+		return fallbackOutboundRoutes()
+	}
+	if len(routes) == 0 {
+		return fallbackOutboundRoutes()
+	}
+	return &baseRouter{Routes: routes}, nil
+}
+
+// fetchRoutesNative reads the kernel routing table via golang.org/x/net/route.
+func fetchRoutesNative() ([]*Route, error) {
 	rib, err := route.FetchRIB(syscall.AF_UNSPEC, route.RIBTypeRoute, 0)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch routing table: %w", err)
@@ -31,22 +57,19 @@ func New() (Router, error) {
 			continue
 		}
 
-		// Skip if route is down
 		if routeMsg.Flags&syscall.RTF_UP == 0 {
-			gologger.Debug().Msgf("route is down (seq: %d)", routeMsg.Seq)
+			continue
+		}
+		if routeMsg.Flags&syscall.RTF_REJECT != 0 {
 			continue
 		}
 
-		// Try to get destination address
 		if len(routeMsg.Addrs) <= syscall.RTAX_DST || routeMsg.Addrs[syscall.RTAX_DST] == nil {
-			gologger.Debug().Msgf("no destination address found (seq: %d)", routeMsg.Seq)
 			continue
 		}
 		dstAddr := routeMsg.Addrs[syscall.RTAX_DST]
 
-		// Try to get gateway address
 		if len(routeMsg.Addrs) <= syscall.RTAX_GATEWAY || routeMsg.Addrs[syscall.RTAX_GATEWAY] == nil {
-			gologger.Debug().Msgf("no gateway address found (seq: %d)", routeMsg.Seq)
 			continue
 		}
 		gwAddr := routeMsg.Addrs[syscall.RTAX_GATEWAY]
@@ -78,61 +101,166 @@ func New() (Router, error) {
 		case *route.Inet4Addr:
 			r.Type = IPv4
 			dstIP := net.IP(t.IP[:])
-			if mask != nil {
+			isDefault := dstIP.Equal(net.IPv4zero)
+			r.Default = isDefault
+			if isDefault && mask == nil {
+				r.Destination = "0.0.0.0/0"
+			} else if mask != nil {
 				ones, _ := mask.Size()
-				r.Destination = fmt.Sprintf("%s/%d", dstIP.String(), ones)
+				r.Destination = fmt.Sprintf("%s/%d", dstIP.Mask(mask).String(), ones)
 			} else {
 				r.Destination = fmt.Sprintf("%s/32", dstIP.String())
 			}
-			r.Default = dstIP.Equal(net.IPv4(0, 0, 0, 0))
 		case *route.Inet6Addr:
 			r.Type = IPv6
 			dstIP := net.IP(t.IP[:])
-			if mask != nil {
+			isDefault := dstIP.Equal(net.IPv6zero)
+			r.Default = isDefault
+			if isDefault && mask == nil {
+				r.Destination = "::/0"
+			} else if mask != nil {
 				ones, _ := mask.Size()
-				r.Destination = fmt.Sprintf("%s/%d", dstIP.String(), ones)
+				r.Destination = fmt.Sprintf("%s/%d", dstIP.Mask(mask).String(), ones)
 			} else {
 				r.Destination = fmt.Sprintf("%s/128", dstIP.String())
 			}
-			r.Default = dstIP.Equal(net.ParseIP("::"))
 		default:
 			gologger.Debug().Msgf("unknown route type: '%T' (seq: %d)", dstAddr, routeMsg.Seq)
 			continue
 		}
 
-		// Try to get network interface
 		if routeMsg.Index > 0 {
 			if iface, err := net.InterfaceByIndex(routeMsg.Index); err == nil {
 				r.NetworkInterface = iface
 			}
 		}
 
-		// Handle flags string
-		flags := ""
-		if routeMsg.Flags&syscall.RTF_UP != 0 {
-			flags += "U"
-		}
-		if routeMsg.Flags&syscall.RTF_GATEWAY != 0 {
-			flags += "G"
-		}
-		if routeMsg.Flags&syscall.RTF_HOST != 0 {
-			flags += "H"
-		}
-		if routeMsg.Flags&syscall.RTF_REJECT != 0 {
-			flags += "R"
-		}
-		if routeMsg.Flags&syscall.RTF_DYNAMIC != 0 {
-			flags += "D"
-		}
-		if routeMsg.Flags&syscall.RTF_MODIFIED != 0 {
-			flags += "M"
-		}
-		if routeMsg.Flags&syscall.RTF_STATIC != 0 {
-			flags += "S"
-		}
-		r.Flags = flags
-
+		r.Flags = buildFlagsString(routeMsg.Flags)
 		routes = append(routes, r)
 	}
-	return &baseRouter{Routes: routes}, nil
+	return routes, nil
+}
+
+func buildFlagsString(flags int) string {
+	var b strings.Builder
+	type flagEntry struct {
+		mask int
+		char byte
+	}
+	for _, f := range []flagEntry{
+		{syscall.RTF_UP, 'U'},
+		{syscall.RTF_GATEWAY, 'G'},
+		{syscall.RTF_HOST, 'H'},
+		{syscall.RTF_REJECT, 'R'},
+		{syscall.RTF_DYNAMIC, 'D'},
+		{syscall.RTF_MODIFIED, 'M'},
+		{syscall.RTF_STATIC, 'S'},
+	} {
+		if flags&f.mask != 0 {
+			b.WriteByte(f.char)
+		}
+	}
+	return b.String()
+}
+
+// fetchRoutesNetstat parses the output of `netstat -nr` as a fallback.
+func fetchRoutesNetstat() ([]*Route, error) {
+	netstatCmd := exec.Command("netstat", "-nr")
+	netstatOutput, err := netstatCmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("netstat command failed: %w", err)
+	}
+
+	var routes []*Route
+	var lastType RouteType
+
+	scanner := bufio.NewScanner(bytes.NewReader(netstatOutput))
+	for scanner.Scan() {
+		outputLine := strings.TrimSpace(scanner.Text())
+		if outputLine == "" {
+			continue
+		}
+
+		parts := stringsutil.SplitAny(outputLine, " \t")
+		if len(parts) < 4 || sliceutil.Contains(parts, "Destination") {
+			continue
+		}
+
+		expire := "-1"
+		if len(parts) > 4 {
+			expire = parts[4]
+		}
+
+		r := &Route{
+			Default:     stringsutil.EqualFoldAny(parts[0], "default"),
+			Destination: parts[0],
+			Gateway:     parts[1],
+			Flags:       parts[2],
+			Expire:      expire,
+		}
+
+		if networkInterface, ifErr := net.InterfaceByName(parts[3]); ifErr == nil {
+			r.NetworkInterface = networkInterface
+		}
+
+		hasDots := stringsutil.ContainsAny(r.Destination, ".") || stringsutil.ContainsAny(r.Gateway, ".")
+		hasColon := stringsutil.ContainsAny(r.Destination, ":") || stringsutil.ContainsAny(r.Gateway, ":")
+		switch {
+		case hasDots:
+			r.Type = IPv4
+		case hasColon:
+			r.Type = IPv6
+		default:
+			if lastType != "" {
+				gologger.Debug().Msgf("using '%s' for unknown route type: '%s'\n", lastType, outputLine)
+				r.Type = lastType
+			} else {
+				return nil, fmt.Errorf("could not determine route type for: '%s'", outputLine)
+			}
+		}
+		lastType = r.Type
+		routes = append(routes, r)
+	}
+
+	return routes, nil
+}
+
+// fallbackOutboundRoutes creates minimal default routes from outbound IP detection.
+func fallbackOutboundRoutes() (Router, error) {
+	var routes []*Route
+
+	ip4, ip6, errOutboundIps := GetOutboundIPs()
+	if ip4 != nil {
+		interface4, err := FindInterfaceByIp(ip4)
+		if err != nil {
+			return nil, err
+		}
+		routes = append(routes, &Route{
+			Type:             IPv4,
+			Default:          true,
+			DefaultSourceIP:  ip4,
+			NetworkInterface: interface4,
+		})
+	}
+
+	if ip6 != nil {
+		interface6, _ := FindInterfaceByIp(ip6)
+		routes = append(routes, &Route{
+			Type:             IPv6,
+			Default:          true,
+			DefaultSourceIP:  ip6,
+			NetworkInterface: interface6,
+		})
+	} else if len(routes) > 0 {
+		routes = append(routes, &Route{
+			Type:             IPv6,
+			Default:          true,
+			NetworkInterface: routes[0].NetworkInterface,
+		})
+	}
+
+	if len(routes) > 0 {
+		return &baseRouter{Routes: routes}, nil
+	}
+	return nil, multierr.Combine(fmt.Errorf("all routing methods failed"), errOutboundIps)
 }

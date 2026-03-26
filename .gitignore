@@ -8,4 +8,3 @@ cmd/functional-test/naabu
 cmd/functional-test/*.cfg
 .vscode
 dist
-.DS_Store
