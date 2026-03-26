@@ -48,7 +48,7 @@ func NewListenHandler() *ListenHandler {
 func Acquire(options *Options) (*ListenHandler, error) {
 	// Only attempt to use pooled raw-socket handlers for explicit SYN scans
 	// where the raw packet infrastructure is available and we have privileges.
-	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == "s" {
+	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == TypeSyn {
 		for _, listenHandler := range ListenHandlers {
 			if !listenHandler.Busy {
 				listenHandler.Phase = &Phase{}

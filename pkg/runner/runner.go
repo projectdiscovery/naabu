@@ -47,16 +47,16 @@ import (
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options       *Options
-	targetsFile   string
-	scanner       *scan.Scanner
-	limiter       *ratelimit.Limiter
-	wgscan        sizedwaitgroup.SizedWaitGroup
-	dnsclient     *dnsx.DNSX
+	options        *Options
+	targetsFile    string
+	scanner        *scan.Scanner
+	limiter        *ratelimit.Limiter
+	wgscan         sizedwaitgroup.SizedWaitGroup
+	dnsclient      *dnsx.DNSX
 	dnsclientProxy *dnsx.DNSX
-	stats         *clistats.Statistics
-	streamChannel chan Target
-	excludedIpsNP *networkpolicy.NetworkPolicy
+	stats          *clistats.Statistics
+	streamChannel  chan Target
+	excludedIpsNP  *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
 }
@@ -197,6 +197,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 	runner.scanner = scanner
+	runner.options.ScanType = scanner.ScanType
 
 	runner.scanner.Ports = ports
 
@@ -284,7 +285,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					if err != nil {
 						continue
 					}
-					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+					_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
 						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
@@ -1239,7 +1240,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							if err != nil {
 								continue
 							}
-							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+							_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						} else if r.options.CSV {
 							writer := csv.NewWriter(&buffer)
 							if csvFileHeaderEnabled {
@@ -1321,7 +1322,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						if err != nil {
 							continue
 						}
-						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+						_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else {
 						if csvFileHeaderEnabled {

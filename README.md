@@ -100,6 +100,8 @@ CONFIGURATION:
    -r string                        list of custom resolver dns resolution (comma separated or from file)
    -proxy string                    socks5 proxy (ip[:port] / fqdn[:port]
    -proxy-auth string               socks5 proxy authentication (username:password)
+   -dns-order string                dns resolution order (p/l/lp/pl) (default "l")
+   -sr, -system-resolver            use system DNS as fallback resolver
    -resume                          resume scan using resume.cfg
    -stream                          stream mode (disables resume, nmap, verify, retries, shuffling, etc)
    -passive                         display passive open ports using shodan internetdb api

@@ -55,29 +55,102 @@ type Router interface {
 	RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error)
 }
 
+// baseRouter implements the common logic for all platforms
+type baseRouter struct {
+	Routes []*Route
+}
+
+func (r *baseRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	route, err := FindRouteForIp(dst, r.Routes)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "could not find route")
+	}
+
+	if route.DefaultSourceIP != nil {
+		return nil, nil, route.DefaultSourceIP, nil
+	}
+
+	if route.NetworkInterface == nil {
+		return nil, nil, nil, errors.New("could not find network interface")
+	}
+	ip, err := FindSourceIpForIp(route, dst)
+	if err != nil {
+		return nil, nil, nil, errors.Wrap(err, "could not find source ip")
+	}
+
+	return route.NetworkInterface, net.ParseIP(route.Gateway), ip, nil
+}
+
+func (r *baseRouter) RouteWithSrc(input net.HardwareAddr, src, dst net.IP) (iface *net.Interface, gateway, preferredSrc net.IP, err error) {
+	if len(input) == 0 && src == nil {
+		return r.Route(dst)
+	}
+
+	if len(input) == 0 && src != nil {
+		route, routeErr := FindRouteForIp(dst, r.Routes)
+		if routeErr != nil {
+			return nil, nil, nil, errors.Wrap(routeErr, "could not find route")
+		}
+		if route.NetworkInterface == nil {
+			return nil, nil, nil, errors.New("could not find network interface")
+		}
+		return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
+	}
+
+	route, err := FindRouteWithHwAndIp(input, src, r.Routes)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if route.NetworkInterface == nil {
+		return nil, nil, nil, errors.New("could not find network interface")
+	}
+	return route.NetworkInterface, net.ParseIP(route.Gateway), src, nil
+}
+
 func FindRouteForIp(ip net.IP, routes []*Route) (*Route, error) {
 	var defaultRoute4, defaultRoute6 *Route
-	// first we need to find the interface associated to the destination
+	var bestRoute *Route
+	bestMaskSize := -1
+
 	for _, route := range routes {
+		if route == nil {
+			continue
+		}
 		if defaultRoute4 == nil && route.Default && route.Type == IPv4 {
 			defaultRoute4 = route
 		}
 		if defaultRoute6 == nil && route.Default && route.Type == IPv6 {
 			defaultRoute6 = route
 		}
-		// the destination can be an ip or cidr
+
+		// exact host IP match — treat as most-specific (/32 or /128)
 		if itfDestIP := net.ParseIP(route.Destination); itfDestIP != nil {
-			// if it's an ip compare it with our dest
 			if itfDestIP.Equal(ip) {
-				return route, nil
+				hostBits := 128
+				if iputil.IsIPv4(itfDestIP) {
+					hostBits = 32
+				}
+				if hostBits > bestMaskSize {
+					bestMaskSize = hostBits
+					bestRoute = route
+				}
 			}
+			continue
 		}
-		// if it's a cidr, verify that the destination ip is contained
+
 		if _, itfDrstCidr, err := net.ParseCIDR(route.Destination); err == nil {
 			if itfDrstCidr.Contains(ip) {
-				return route, nil
+				ones, _ := itfDrstCidr.Mask.Size()
+				if ones > bestMaskSize {
+					bestMaskSize = ones
+					bestRoute = route
+				}
 			}
 		}
+	}
+
+	if bestRoute != nil {
+		return bestRoute, nil
 	}
 
 	switch {
@@ -129,23 +202,34 @@ func GetOutboundIPs() (net.IP, net.IP, error) {
 }
 
 func FindRouteWithHwAndIp(hardwareAddr net.HardwareAddr, src net.IP, routes []*Route) (*Route, error) {
+	if len(hardwareAddr) == 0 && src == nil {
+		return nil, errors.New("hardware address and source ip are both empty")
+	}
+
 	for _, route := range routes {
-		if bytes.EqualFold(route.NetworkInterface.HardwareAddr, hardwareAddr) {
-			if src != nil {
-				addresses, err := route.NetworkInterface.Addrs()
-				if err != nil {
-					return nil, err
-				}
-				for _, address := range addresses {
-					if addressIP, ok := address.(*net.IPNet); ok {
-						if addressIP.IP.Equal(src) {
-							return route, nil
-						}
+		if route == nil || route.NetworkInterface == nil {
+			continue
+		}
+
+		hwMatch := len(hardwareAddr) > 0 && bytes.EqualFold(route.NetworkInterface.HardwareAddr, hardwareAddr)
+		if len(hardwareAddr) > 0 && !hwMatch {
+			continue
+		}
+
+		if src != nil {
+			addresses, err := route.NetworkInterface.Addrs()
+			if err != nil {
+				return nil, err
+			}
+			for _, address := range addresses {
+				if addressIP, ok := address.(*net.IPNet); ok {
+					if addressIP.IP.Equal(src) {
+						return route, nil
 					}
 				}
-			} else {
-				return route, nil
 			}
+		} else {
+			return route, nil
 		}
 	}
 
