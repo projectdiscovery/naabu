@@ -7,6 +7,11 @@ import (
 	"github.com/projectdiscovery/networkpolicy"
 )
 
+const (
+	TypeSyn     = "s"
+	TypeConnect = "c"
+)
+
 // Options of the scan
 type Options struct {
 	Timeout              time.Duration

@@ -92,6 +92,7 @@ type Scanner struct {
 	cdn                  *cdncheck.Client
 	tcpsequencer         *TCPSequencer
 	stream               bool
+	ScanType             string
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
 }
@@ -176,19 +177,22 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	scanner.stream = options.Stream
-acquire:
-	if handler, err := Acquire(options); err != nil {
-		// automatically fallback to connect scan
-		if options.ScanType == "s" {
-			gologger.Info().Msgf("syn scan is not possible, falling back to connect scan")
-			options.ScanType = "c"
-			goto acquire
+
+	for {
+		handler, acquireErr := Acquire(options)
+		if acquireErr == nil {
+			scanner.ListenHandler = handler
+			break
 		}
-		return scanner, err
-	} else {
-		scanner.ListenHandler = handler
+		if options.ScanType == TypeSyn {
+			gologger.Info().Msgf("syn scan is not possible, falling back to connect scan")
+			options.ScanType = TypeConnect
+			continue
+		}
+		return scanner, acquireErr
 	}
 
+	scanner.ScanType = options.ScanType
 	return scanner, err
 }
 
