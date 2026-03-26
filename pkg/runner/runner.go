@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -44,15 +45,16 @@ import (
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
-	options       *Options
-	targetsFile   string
-	scanner       *scan.Scanner
-	limiter       *ratelimit.Limiter
-	wgscan        sizedwaitgroup.SizedWaitGroup
-	dnsclient     *dnsx.DNSX
-	stats         *clistats.Statistics
-	streamChannel chan Target
-	excludedIpsNP *networkpolicy.NetworkPolicy
+	options        *Options
+	targetsFile    string
+	scanner        *scan.Scanner
+	limiter        *ratelimit.Limiter
+	wgscan         sizedwaitgroup.SizedWaitGroup
+	dnsclient      *dnsx.DNSX
+	dnsclientProxy *dnsx.DNSX
+	stats          *clistats.Statistics
+	streamChannel  chan Target
+	excludedIpsNP  *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
 }
@@ -91,6 +93,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	if options.Threads == 0 {
 		options.Threads = DefaultThreadsNum
 	}
+	if options.DnsOrder == "" {
+		options.DnsOrder = "l"
+	}
 	runner := &Runner{
 		options: options,
 	}
@@ -109,6 +114,38 @@ func NewRunner(options *Options) (*Runner, error) {
 		return nil, err
 	}
 	runner.dnsclient = dnsclient
+
+	if options.Proxy != "" && strings.Contains(options.DnsOrder, "p") {
+		proxyDnsOptions := dnsx.DefaultOptions
+		proxyDnsOptions.MaxRetries = runner.options.Retries
+		proxyDnsOptions.Hostsfile = true
+		if sliceutil.Contains(options.IPVersion, scan.IPv6) {
+			proxyDnsOptions.QuestionTypes = append(proxyDnsOptions.QuestionTypes, dns.TypeAAAA)
+		}
+		if len(runner.options.baseResolvers) > 0 {
+			proxyDnsOptions.BaseResolvers = runner.options.baseResolvers
+		}
+
+		proxyURL := options.Proxy
+		if !strings.Contains(proxyURL, "://") {
+			proxyURL = "socks5://" + proxyURL
+		}
+		if options.ProxyAuth != "" {
+			if u, err := url.Parse(proxyURL); err == nil {
+				creds := strings.SplitN(options.ProxyAuth, ":", 2)
+				if len(creds) == 2 {
+					u.User = url.UserPassword(creds[0], creds[1])
+					proxyURL = u.String()
+				}
+			}
+		}
+		proxyDnsOptions.Proxy = proxyURL
+		dnsclientProxy, err := dnsx.New(proxyDnsOptions)
+		if err != nil {
+			return nil, err
+		}
+		runner.dnsclientProxy = dnsclientProxy
+	}
 
 	excludedIps, err := runner.parseExcludedIps(options)
 	if err != nil {
@@ -242,7 +279,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					if err != nil {
 						continue
 					}
-					buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+					_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 				} else if r.options.CSV {
 					if csvHeaderEnabled {
 						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
@@ -399,6 +436,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 		}
 		r.wgscan.Wait()
+
+		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -1085,7 +1125,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							if err != nil {
 								continue
 							}
-							buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+							_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						} else if r.options.CSV {
 							writer := csv.NewWriter(&buffer)
 							if csvFileHeaderEnabled {
@@ -1167,7 +1207,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						if err != nil {
 							continue
 						}
-						buffer.Write([]byte(fmt.Sprintf("%s\n", b)))
+						_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else {
 						if csvFileHeaderEnabled {

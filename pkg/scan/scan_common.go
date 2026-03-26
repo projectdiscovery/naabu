@@ -46,21 +46,22 @@ func NewListenHandler() *ListenHandler {
 }
 
 func Acquire(options *Options) (*ListenHandler, error) {
-	// always grant to unprivileged scans or connect scan
-	if PkgRouter == nil || !privileges.IsPrivileged || options.ScanType == TypeConnect {
-		h := NewListenHandler()
-		h.Busy = true
-		return h, nil
+	// Only attempt to use pooled raw-socket handlers for explicit SYN scans
+	// where the raw packet infrastructure is available and we have privileges.
+	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == TypeSyn {
+		for _, listenHandler := range ListenHandlers {
+			if !listenHandler.Busy {
+				listenHandler.Phase = &Phase{}
+				listenHandler.Busy = true
+				return listenHandler, nil
+			}
+		}
+		return nil, errors.New("no free handlers")
 	}
 
-	for _, listenHandler := range ListenHandlers {
-		if !listenHandler.Busy {
-			listenHandler.Phase = &Phase{}
-			listenHandler.Busy = true
-			return listenHandler, nil
-		}
-	}
-	return nil, errors.New("no free handlers")
+	h := NewListenHandler()
+	h.Busy = true
+	return h, nil
 }
 
 func (l *ListenHandler) Release() {

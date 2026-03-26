@@ -20,7 +20,7 @@ const banner = `
 `
 
 // Version is the current Version of naabu
-const Version = `2.4.0`
+const Version = `2.5.0`
 
 // showBanner is used to show the banner to the user
 func showBanner() {

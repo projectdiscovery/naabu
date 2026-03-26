@@ -95,6 +95,7 @@ type Scanner struct {
 	ScanType             string
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
+	workersWg            sync.WaitGroup
 }
 
 // PkgSend is a TCP package
@@ -198,6 +199,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() error {
+	s.workersWg.Wait()
 	s.ListenHandler.Busy = false
 	s.ListenHandler = nil
 
@@ -206,9 +208,19 @@ func (s *Scanner) Close() error {
 
 // StartWorkers of the scanner
 func (s *Scanner) StartWorkers(ctx context.Context) {
-	go s.ICMPResultWorker(ctx)
-	go s.TCPResultWorker(ctx)
-	go s.UDPResultWorker(ctx)
+	s.workersWg.Add(3)
+	go func() {
+		defer s.workersWg.Done()
+		s.ICMPResultWorker(ctx)
+	}()
+	go func() {
+		defer s.workersWg.Done()
+		s.TCPResultWorker(ctx)
+	}()
+	go func() {
+		defer s.workersWg.Done()
+		s.UDPResultWorker(ctx)
+	}()
 }
 
 // EnqueueICMP outgoing ICMP packets

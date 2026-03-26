@@ -100,6 +100,8 @@ CONFIGURATION:
    -r string                        list of custom resolver dns resolution (comma separated or from file)
    -proxy string                    socks5 proxy (ip[:port] / fqdn[:port]
    -proxy-auth string               socks5 proxy authentication (username:password)
+   -dns-order string                dns resolution order (p/l/lp/pl) (default "l")
+   -sr, -system-resolver            use system DNS as fallback resolver
    -resume                          resume scan using resume.cfg
    -stream                          stream mode (disables resume, nmap, verify, retries, shuffling, etc)
    -passive                         display passive open ports using shodan internetdb api
@@ -155,7 +157,7 @@ Download the ready to run [binary](https://github.com/projectdiscovery/naabu/rel
 
 > **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-To install libcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`
+To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
 
 
 ## Installing Naabu
@@ -407,6 +409,8 @@ func main() {
 	naabuRunner.RunEnumeration(context.Background())
 }
 ```
+
+> **`OnResult`** is called once after the scan completes with aggregated results. To process results **in real-time** as ports are discovered, use **`OnReceive`** instead. The `Stream` option only controls async target loading — it does not affect when callbacks fire.
 
 # Notes
 
