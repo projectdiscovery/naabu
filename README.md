@@ -122,11 +122,13 @@ HOST-DISCOVERY:
    -rev-ptr                       Reverse PTR lookup for input ips
 
 OPTIMIZATION:
-   -retries int       number of retries for the port scan (default 3)
-   -timeout int       millisecond to wait before timing out (default 1000)
-   -warm-up-time int  time in seconds between scan phases (default 2)
-   -ping              ping probes for verification of host
-   -verify            validate the ports again with TCP verification
+   -retries int                    number of retries for the port scan (default 3)
+   -timeout int                    millisecond to wait before timing out (default 1000)
+   -warm-up-time int               time in seconds between scan phases (default 2)
+   -ping                           ping probes for verification of host
+   -verify                         validate the ports again with TCP verification
+   -ss, -smart-scan                predictive port scanning using port correlation model
+   -pt, -prediction-threshold int  minimum confidence for port predictions (0-100%) (default 20)
 
 DEBUG:
    -health-check, -hc        run diagnostic check up
