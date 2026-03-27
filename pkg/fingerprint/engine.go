@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unsafe"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 )
@@ -542,10 +543,19 @@ func (e *Engine) tryMatches(matches []*Match, response []byte) *MatchResult {
 func responseHash(matches []*Match, response []byte) uint64 {
 	h := fnv.New64a()
 	var buf [8]byte
-	buf[0] = byte(len(matches))
-	buf[1] = byte(len(matches) >> 8)
-	h.Write(buf[:2])
-	h.Write(response)
+	for _, m := range matches {
+		p := uintptr(unsafe.Pointer(m))
+		buf[0] = byte(p)
+		buf[1] = byte(p >> 8)
+		buf[2] = byte(p >> 16)
+		buf[3] = byte(p >> 24)
+		buf[4] = byte(p >> 32)
+		buf[5] = byte(p >> 40)
+		buf[6] = byte(p >> 48)
+		buf[7] = byte(p >> 56)
+		_, _ = h.Write(buf[:])
+	}
+	_, _ = h.Write(response)
 	return h.Sum64()
 }
 
