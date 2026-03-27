@@ -140,28 +140,24 @@ func startMockServer(t *testing.T, svc mockService) (int, func()) {
 				defer c.Close()
 
 				if svc.banner != "" {
-					c.Write([]byte(svc.banner))
+					_, _ = c.Write([]byte(svc.banner))
 				}
 
 				if svc.respond != nil {
-					// Handle multiple probe connections by reading/responding
 					buf := make([]byte, 65535)
-					c.SetReadDeadline(time.Now().Add(10 * time.Second))
+					_ = c.SetReadDeadline(time.Now().Add(10 * time.Second))
 					n, err := c.Read(buf)
 					if err != nil || n == 0 {
-						// No data received; keep connection open briefly
-						// to avoid false tcpwrapped detection
 						time.Sleep(4 * time.Second)
 						return
 					}
 					if resp := svc.respond(buf[:n]); resp != nil {
-						c.Write(resp)
+						_, _ = c.Write(resp)
 					}
 				} else if svc.banner != "" {
-					// Banner-only: keep connection open for reads
 					buf := make([]byte, 1024)
-					c.SetReadDeadline(time.Now().Add(10 * time.Second))
-					c.Read(buf)
+					_ = c.SetReadDeadline(time.Now().Add(10 * time.Second))
+					_, _ = c.Read(buf)
 				}
 			}(conn)
 		}

@@ -1108,7 +1108,7 @@ func (r *Runner) handleServiceDetection(scanResults *result.Result) {
 					Host:        hostname,
 					IP:          hostResult.IP,
 					Port:        p.Port,
-					TLSDetected: p.TLS,
+					TLSDetected: p.TLS, //nolint:staticcheck
 					TLSChecked:  true,
 				}
 				targetCount++

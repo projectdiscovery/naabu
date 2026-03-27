@@ -32,22 +32,22 @@ func startCountingServer(banner string, respond func([]byte) []byte) (int, *conn
 			go func(c net.Conn) {
 				defer c.Close()
 				if banner != "" {
-					c.Write([]byte(banner))
+					_, _ = c.Write([]byte(banner))
 				}
 				if respond != nil {
 					buf := make([]byte, 65535)
-					c.SetReadDeadline(time.Now().Add(5 * time.Second))
+					_ = c.SetReadDeadline(time.Now().Add(5 * time.Second))
 					n, _ := c.Read(buf)
 					if n > 0 {
 						if resp := respond(buf[:n]); resp != nil {
-							c.Write(resp)
+							_, _ = c.Write(resp)
 						}
 					}
 					time.Sleep(3 * time.Second)
 				} else if banner != "" {
 					buf := make([]byte, 1024)
-					c.SetReadDeadline(time.Now().Add(3 * time.Second))
-					c.Read(buf)
+					_ = c.SetReadDeadline(time.Now().Add(3 * time.Second))
+					_, _ = c.Read(buf)
 				}
 			}(conn)
 		}

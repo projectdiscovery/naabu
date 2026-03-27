@@ -43,16 +43,16 @@ match ssh m|^SSH-([\d.]+)-OpenSSH[_-]([\w._-]+)| p/OpenSSH/ v/$2/ i/protocol $1/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
+		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
 		// drain any incoming data
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(3*time.Second), WithWorkers(1))
@@ -91,14 +91,14 @@ match http m|^HTTP/1\.[01] (\d+).*Server: ([\w/._-]+)|s p/$2/ v/$1/
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 && strings.HasPrefix(string(buf[:n]), "GET") {
-			conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.25.3\r\nContent-Length: 0\r\n\r\n"))
+			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.25.3\r\nContent-Length: 0\r\n\r\n"))
 		}
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(3*time.Second), WithWorkers(1))
@@ -136,14 +136,14 @@ fallback GetRequest
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 {
-			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 		}
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(3*time.Second), WithWorkers(1))
@@ -177,14 +177,14 @@ match http m|^HTTP| p/HTTP/
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 && strings.HasPrefix(string(buf[:n]), "GET") {
-			conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
 		}
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	// Fast mode: only port-hinted probes run
@@ -217,7 +217,7 @@ match test m|^hello| p/Test/
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(2*time.Second), WithWorkers(1))
@@ -247,15 +247,15 @@ softmatch ssh m|^SSH-| p/SSH/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("SSH-2.0-CustomSSH\r\n"))
+		_, _ = conn.Write([]byte("SSH-2.0-CustomSSH\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(3*time.Second), WithWorkers(1))
@@ -281,15 +281,15 @@ match http m|^HTTP| p/HTTP/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("SOME-RANDOM-PROTOCOL v1.0\r\n"))
+		_, _ = conn.Write([]byte("SOME-RANDOM-PROTOCOL v1.0\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(2*time.Second), WithWorkers(1))
@@ -313,18 +313,18 @@ match ftp m|^220[ -]| p/FTP/
 	// SSH server
 	sshAddr, cleanupSSH := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
+		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanupSSH()
 
 	// FTP server
 	ftpAddr, cleanupFTP := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("220 FTP server ready\r\n"))
+		_, _ = conn.Write([]byte("220 FTP server ready\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanupFTP()
 
@@ -333,11 +333,11 @@ match ftp m|^220[ -]| p/FTP/
 
 	sshHost, sshPortStr, _ := net.SplitHostPort(sshAddr)
 	sshPort := 0
-	fmt.Sscanf(sshPortStr, "%d", &sshPort)
+	_, _ = fmt.Sscanf(sshPortStr, "%d", &sshPort)
 
 	ftpHost, ftpPortStr, _ := net.SplitHostPort(ftpAddr)
 	ftpPort := 0
-	fmt.Sscanf(ftpPortStr, "%d", &ftpPort)
+	_, _ = fmt.Sscanf(ftpPortStr, "%d", &ftpPort)
 
 	targets := []Target{
 		{Host: sshHost, IP: sshHost, Port: sshPort},
@@ -437,15 +437,15 @@ func TestEngineWithRealProbes(t *testing.T) {
 	// Start a simple SSH server
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5\r\n"))
+		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	engine := New(db, WithTimeout(5*time.Second), WithWorkers(1))
 	targets := []Target{{Host: host, IP: host, Port: port}}
@@ -477,15 +477,15 @@ func TestEngineWithRealProbesFTP(t *testing.T) {
 
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
-		conn.Write([]byte("220 ProFTPD 1.3.8b Server ready.\r\n"))
+		_, _ = conn.Write([]byte("220 ProFTPD 1.3.8b Server ready.\r\n"))
 		buf := make([]byte, 1024)
-		conn.Read(buf)
+		_, _ = conn.Read(buf)
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	engine := New(db, WithTimeout(5*time.Second), WithWorkers(1))
 	targets := []Target{{Host: host, IP: host, Port: port}}
@@ -520,21 +520,19 @@ func TestEngineWithRealProbesHTTP(t *testing.T) {
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
 		defer conn.Close()
 		buf := make([]byte, 4096)
-		conn.SetReadDeadline(time.Now().Add(2 * time.Second))
+		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 		n, err := conn.Read(buf)
 		if err != nil || n == 0 {
-			// NULL probe: no data sent, respond with HTTP anyway
-			conn.Write([]byte(httpResponse))
+			_, _ = conn.Write([]byte(httpResponse))
 			return
 		}
-		// Any probe that sends data: respond with HTTP
-		conn.Write([]byte(httpResponse))
+		_, _ = conn.Write([]byte(httpResponse))
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	engine := New(db, WithTimeout(5*time.Second), WithWorkers(1))
 	targets := []Target{{Host: host, IP: host, Port: port}}
