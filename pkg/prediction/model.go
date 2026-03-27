@@ -80,7 +80,10 @@ func (m *Model) Predict(openPorts []int, threshold float64) []PortPrediction {
 	}
 
 	sort.Slice(predictions, func(i, j int) bool {
-		return predictions[i].Confidence > predictions[j].Confidence
+		if predictions[i].Confidence != predictions[j].Confidence {
+			return predictions[i].Confidence > predictions[j].Confidence
+		}
+		return predictions[i].Port < predictions[j].Port
 	})
 
 	return predictions
@@ -131,14 +134,24 @@ func (m *Model) Train(hostPorts map[string][]int) {
 
 // Merge adds correlations from another model, keeping the higher
 // probability when both models have data for the same pair.
+// Safe against cross-merge deadlocks: the source is snapshot-copied
+// before acquiring the destination lock.
 func (m *Model) Merge(other *Model) {
 	other.mu.RLock()
-	defer other.mu.RUnlock()
+	snapshot := make(map[int]map[int]float64, len(other.correlations))
+	for given, targets := range other.correlations {
+		cp := make(map[int]float64, len(targets))
+		for k, v := range targets {
+			cp[k] = v
+		}
+		snapshot[given] = cp
+	}
+	other.mu.RUnlock()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	for given, targets := range other.correlations {
+	for given, targets := range snapshot {
 		if _, ok := m.correlations[given]; !ok {
 			m.correlations[given] = make(map[int]float64)
 		}

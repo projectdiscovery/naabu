@@ -416,14 +416,20 @@ func buildPopularityRank() map[int]int {
 		segment = strings.TrimSpace(segment)
 		if strings.Contains(segment, "-") {
 			parts := strings.Split(segment, "-")
-			start, _ := strconv.Atoi(parts[0])
-			end, _ := strconv.Atoi(parts[1])
+			start, err1 := strconv.Atoi(parts[0])
+			end, err2 := strconv.Atoi(parts[1])
+			if err1 != nil || err2 != nil {
+				continue
+			}
 			for p := start; p <= end; p++ {
 				rank[p] = idx
 				idx++
 			}
 		} else {
-			p, _ := strconv.Atoi(segment)
+			p, err := strconv.Atoi(segment)
+			if err != nil {
+				continue
+			}
 			rank[p] = idx
 			idx++
 		}

@@ -3,6 +3,7 @@ package runner
 import (
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"net"
 
 	"github.com/Mzack9999/gopacket/rawsend"
@@ -44,7 +45,11 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	if handler.SourceIp4 != nil {
 		srcIP = handler.SourceIp4
 	} else if scan.PkgRouter != nil {
-		_, _, srcIP, _ = scan.PkgRouter.Route(net.IPv4(1, 1, 1, 1))
+		var routeErr error
+		_, _, srcIP, routeErr = scan.PkgRouter.Route(net.IPv4(1, 1, 1, 1))
+		if routeErr != nil {
+			return nil, fmt.Errorf("route lookup failed: %w", routeErr)
+		}
 	}
 	if srcIP == nil {
 		return nil, errNoSourceIP

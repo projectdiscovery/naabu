@@ -378,7 +378,7 @@ func (options *Options) hasProbes() bool {
 	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
 		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
-		len(options.TcpAckPingProbes) > 0
+		len(options.TcpSynPingProbes) > 0
 }
 
 func (options *Options) shouldUseRawPackets() bool {
