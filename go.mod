@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057
-	github.com/Mzack9999/gopacket v0.0.0-20260327204334-d21006e2d4a9
+	github.com/Mzack9999/gopacket v0.0.0-20260327205553-79da638732fe
 	github.com/Ullaakut/nmap/v3 v3.0.6
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
