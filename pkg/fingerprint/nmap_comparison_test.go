@@ -477,14 +477,14 @@ fallback GetRequest,HTTPOptions
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 {
-			conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.25\r\n\r\n"))
+			_, _ = conn.Write([]byte("HTTP/1.1 200 OK\r\nServer: nginx/1.25\r\n\r\n"))
 		}
 	})
 	defer cleanup()
 
 	host, portStr, _ := net.SplitHostPort(addr)
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(3*time.Second), WithWorkers(1), WithIntensity(9))
@@ -530,7 +530,7 @@ match ssh m|^SSH-| p/SSH/
 
 	host, portStr, _ := net.SplitHostPort(ln.Addr().String())
 	port := 0
-	fmt.Sscanf(portStr, "%d", &port)
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
 
 	db := buildTestDB(probes)
 	engine := New(db, WithTimeout(5*time.Second), WithWorkers(1))
