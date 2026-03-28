@@ -47,8 +47,9 @@ type Result struct {
 	RPCNum      string `json:"rpc_num,omitempty"`
 	ServiceFP   string `json:"service_fp,omitempty"`
 	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
 }
 
 // TODO:
@@ -80,8 +81,9 @@ type jsonResult struct {
 	RPCNum      string `json:"rpc_num,omitempty"`
 	ServiceFP   string `json:"service_fp,omitempty"`
 	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -114,6 +116,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Tunnel = r.Tunnel
 	data.Version = r.Version
 	data.Confidence = r.Confidence
+	data.CPEs = r.CPEs
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -323,4 +326,5 @@ func copyServiceFields(result *Result, service *port.Service) {
 	result.Tunnel = s.Tunnel
 	result.Version = s.Version
 	result.Confidence = s.Confidence
+	result.CPEs = s.CPEs
 }
