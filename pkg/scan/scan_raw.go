@@ -82,6 +82,7 @@ func init() {
 	go TransportReadWorker()
 	go TransportWriteWorker()
 	go ICMPWriteWorker()
+	go EthernetWriteWorker(ethernetPacketSend)
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -136,8 +137,8 @@ func ICMPWriteWorker() {
 }
 
 // EthernetWriteWorker writes packet to the network layer
-func EthernetWriteWorker() {
-	for pkg := range ethernetPacketSend {
+func EthernetWriteWorker(ch <-chan *PkgSend) {
+	for pkg := range ch {
 		switch pkg.flag {
 		case Arp:
 			ArpRequestAsync(pkg.ip)
