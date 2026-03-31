@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"sync"
@@ -740,14 +739,10 @@ func TransportReadWorker() {
 			)
 
 			decoded := []gopacket.LayerType{}
-			for {
-				data, _, err := handler.ReadPacketData()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					continue
-				}
 
+			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			for packet := range packetSource.Packets() {
+				data := packet.Data()
 				for _, parser := range parsers {
 					err := parser.DecodeLayers(data, &decoded)
 					if err != nil {
@@ -783,14 +778,9 @@ func TransportReadWorker() {
 
 			decoded := []gopacket.LayerType{}
 
-			for {
-				data, _, err := handler.ReadPacketData()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					continue
-				}
-
+			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			for packet := range packetSource.Packets() {
+				data := packet.Data()
 				for _, parser := range parsers {
 					err := parser.DecodeLayers(data, &decoded)
 					if err != nil {
