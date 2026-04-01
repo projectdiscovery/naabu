@@ -549,132 +549,139 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		targetsWithPortCount = uint64(len(targetsWithPort))
 
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
-		Range := targetsCount * portsCount
-		if r.options.EnableProgressBar {
-			r.stats.AddStatic("ports", portsCount)
-			r.stats.AddStatic("hosts", targetsCount)
-			r.stats.AddStatic("retries", r.options.Retries)
-			r.stats.AddStatic("startedAt", time.Now())
-			r.stats.AddCounter("packets", uint64(0))
-			r.stats.AddCounter("errors", uint64(0))
-			r.stats.AddCounter("total", Range*uint64(r.options.Retries)+targetsWithPortCount)
-			r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
-			if err := r.stats.Start(); err != nil {
-				gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
+
+		if r.options.SmartScan {
+			// Predictive scan: two-phase priority-ordered scan of the
+			// user's port list, reordered by the correlation model.
+			r.runPredictiveScan(ctx, targets, targetsWithPort, shouldUseRawPackets)
+		} else {
+			Range := targetsCount * portsCount
+			if r.options.EnableProgressBar {
+				r.stats.AddStatic("ports", portsCount)
+				r.stats.AddStatic("hosts", targetsCount)
+				r.stats.AddStatic("retries", r.options.Retries)
+				r.stats.AddStatic("startedAt", time.Now())
+				r.stats.AddCounter("packets", uint64(0))
+				r.stats.AddCounter("errors", uint64(0))
+				r.stats.AddCounter("total", Range*uint64(r.options.Retries)+targetsWithPortCount)
+				r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
+				if err := r.stats.Start(); err != nil {
+					gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
+				}
 			}
-		}
 
-		// Retries are performed regardless of the previous scan results due to network unreliability
-		for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
-			if currentRetry < r.options.ResumeCfg.Retry {
-				gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
-				continue
-			}
-
-			// Use current time as seed
-			currentSeed := time.Now().UnixNano()
-			r.options.ResumeCfg.RLock()
-			if r.options.ResumeCfg.Seed > 0 {
-				currentSeed = r.options.ResumeCfg.Seed
-			}
-			r.options.ResumeCfg.RUnlock()
-
-			// keep track of current retry and seed for resume
-			r.options.ResumeCfg.Lock()
-			r.options.ResumeCfg.Retry = currentRetry
-			r.options.ResumeCfg.Seed = currentSeed
-			r.options.ResumeCfg.Unlock()
-
-			b := blackrock.New(int64(Range), currentSeed)
-			for index := int64(0); index < int64(Range); index++ {
-				xxx := b.Shuffle(index)
-				ipIndex := xxx / int64(portsCount)
-				portIndex := int(xxx % int64(portsCount))
-				ip := r.PickIP(targets, ipIndex)
-
-				if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+			// Retries are performed regardless of the previous scan results due to network unreliability
+			for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+				if currentRetry < r.options.ResumeCfg.Retry {
+					gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
 					continue
 				}
 
-				port := r.PickPort(portIndex)
-
+				// Use current time as seed
+				currentSeed := time.Now().UnixNano()
 				r.options.ResumeCfg.RLock()
-				resumeCfgIndex := r.options.ResumeCfg.Index
-				r.options.ResumeCfg.RUnlock()
-				if index < resumeCfgIndex {
-					gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
-					continue
+				if r.options.ResumeCfg.Seed > 0 {
+					currentSeed = r.options.ResumeCfg.Seed
 				}
+				r.options.ResumeCfg.RUnlock()
 
-				// resume cfg logic
+				// keep track of current retry and seed for resume
 				r.options.ResumeCfg.Lock()
-				r.options.ResumeCfg.Index = index
+				r.options.ResumeCfg.Retry = currentRetry
+				r.options.ResumeCfg.Seed = currentSeed
 				r.options.ResumeCfg.Unlock()
 
-				if r.scanner.ScanResults.HasSkipped(ip) {
-					continue
-				}
-				if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
-					hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
-					gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
-					r.scanner.ScanResults.AddSkipped(ip)
-					continue
+				b := blackrock.New(int64(Range), currentSeed)
+				for index := int64(0); index < int64(Range); index++ {
+					xxx := b.Shuffle(index)
+					ipIndex := xxx / int64(portsCount)
+					portIndex := int(xxx % int64(portsCount))
+					ip := r.PickIP(targets, ipIndex)
+
+					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+						continue
+					}
+
+					port := r.PickPort(portIndex)
+
+					r.options.ResumeCfg.RLock()
+					resumeCfgIndex := r.options.ResumeCfg.Index
+					r.options.ResumeCfg.RUnlock()
+					if index < resumeCfgIndex {
+						gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
+						continue
+					}
+
+					// resume cfg logic
+					r.options.ResumeCfg.Lock()
+					r.options.ResumeCfg.Index = index
+					r.options.ResumeCfg.Unlock()
+
+					if r.scanner.ScanResults.HasSkipped(ip) {
+						continue
+					}
+					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+						r.scanner.ScanResults.AddSkipped(ip)
+						continue
+					}
+
+					// connect scan
+					if shouldUseRawPackets {
+						r.RawSocketEnumeration(ctx, ip, port)
+					} else {
+						r.wgscan.Add()
+						go r.handleHostPort(ctx, ip, payload, port)
+					}
+					if r.options.EnableProgressBar {
+						r.stats.IncrementCounter("packets", 1)
+					}
 				}
 
-				// connect scan
-				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ctx, ip, port)
-				} else {
-					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, payload, port)
+				// handle the ip:port combination
+				for _, targetWithPort := range targetsWithPort {
+					ip, p, err := net.SplitHostPort(targetWithPort)
+					if err != nil {
+						gologger.Debug().Msgf("Skipping %s: %v\n", targetWithPort, err)
+						continue
+					}
+
+					// naive port find
+					pp, err := strconv.Atoi(p)
+					if err != nil {
+						gologger.Debug().Msgf("Skipping %s, could not cast port %s: %v\n", targetWithPort, p, err)
+						continue
+					}
+					var portWithMetadata = port.Port{
+						Port:     pp,
+						Protocol: protocol.TCP,
+					}
+
+					// connect scan
+					if shouldUseRawPackets {
+						r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
+					} else {
+						r.wgscan.Add()
+						go r.handleHostPort(ctx, ip, payload, &portWithMetadata)
+					}
+					if r.options.EnableProgressBar {
+						r.stats.IncrementCounter("packets", 1)
+					}
 				}
-				if r.options.EnableProgressBar {
-					r.stats.IncrementCounter("packets", 1)
+
+				r.wgscan.Wait()
+
+				r.options.ResumeCfg.Lock()
+				if r.options.ResumeCfg.Seed > 0 {
+					r.options.ResumeCfg.Seed = 0
 				}
+				if r.options.ResumeCfg.Index > 0 {
+					// zero also the current index as we are restarting the scan
+					r.options.ResumeCfg.Index = 0
+				}
+				r.options.ResumeCfg.Unlock()
 			}
-
-			// handle the ip:port combination
-			for _, targetWithPort := range targetsWithPort {
-				ip, p, err := net.SplitHostPort(targetWithPort)
-				if err != nil {
-					gologger.Debug().Msgf("Skipping %s: %v\n", targetWithPort, err)
-					continue
-				}
-
-				// naive port find
-				pp, err := strconv.Atoi(p)
-				if err != nil {
-					gologger.Debug().Msgf("Skipping %s, could not cast port %s: %v\n", targetWithPort, p, err)
-					continue
-				}
-				var portWithMetadata = port.Port{
-					Port:     pp,
-					Protocol: protocol.TCP,
-				}
-
-				// connect scan
-				if shouldUseRawPackets {
-					r.RawSocketEnumeration(ctx, ip, &portWithMetadata)
-				} else {
-					r.wgscan.Add()
-					go r.handleHostPort(ctx, ip, payload, &portWithMetadata)
-				}
-				if r.options.EnableProgressBar {
-					r.stats.IncrementCounter("packets", 1)
-				}
-			}
-
-			r.wgscan.Wait()
-
-			r.options.ResumeCfg.Lock()
-			if r.options.ResumeCfg.Seed > 0 {
-				r.options.ResumeCfg.Seed = 0
-			}
-			if r.options.ResumeCfg.Index > 0 {
-				// zero also the current index as we are restarting the scan
-				r.options.ResumeCfg.Index = 0
-			}
-			r.options.ResumeCfg.Unlock()
 		}
 
 		warmUpTime := 2 * time.Second

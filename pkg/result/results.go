@@ -185,6 +185,43 @@ func (r *Result) Len() int {
 	return len(r.ips)
 }
 
+// GetOpenPortNumbers returns the deduplicated set of port numbers that
+// have been found open across all hosts. It acquires a single RLock
+// and releases it before returning. Safe to call while writers
+// (ex. AddPort from TCPResultWorker) are active.
+func (r *Result) GetOpenPortNumbers() []int {
+	r.RLock()
+	defer r.RUnlock()
+
+	seen := make(map[int]struct{})
+	for _, ports := range r.ipPorts {
+		for _, p := range ports {
+			seen[p.Port] = struct{}{}
+		}
+	}
+	out := make([]int, 0, len(seen))
+	for p := range seen {
+		out = append(out, p)
+	}
+	return out
+}
+
+// GetHostCountForPort returns the number of unique hosts that have a
+// specific port open. Uses a single RLock, safe during concurrent writes.
+func (r *Result) GetHostCountForPort(portNum int) int {
+	r.RLock()
+	defer r.RUnlock()
+
+	key := fmt.Sprintf("%d", portNum)
+	count := 0
+	for _, ports := range r.ipPorts {
+		if _, ok := ports[key]; ok {
+			count++
+		}
+	}
+	return count
+}
+
 // GetPortCount returns the number of ports discovered for an ip
 func (r *Result) GetPortCount(host string) int {
 	r.RLock()

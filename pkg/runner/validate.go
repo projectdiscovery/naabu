@@ -167,6 +167,16 @@ func (options *Options) ValidateOptions() error {
 		options.WarmUpTime = 2
 	}
 
+	if options.SmartScan && options.Stream {
+		return errors.New("smart scan is not supported in stream mode")
+	}
+	if options.SmartScan && options.Passive {
+		return errors.New("smart scan is not supported in passive mode")
+	}
+	if options.PredictionThreshold < 0 || options.PredictionThreshold > 100 {
+		return errors.New("prediction threshold must be between 0 and 100")
+	}
+
 	return nil
 }
 
