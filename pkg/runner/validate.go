@@ -1,12 +1,12 @@
 package runner
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"strings"
-
-	"errors"
+	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -158,8 +158,11 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
-	if options.ServiceDiscovery || options.ServiceVersion {
-		return errors.New("service discovery feature is not implemented")
+	if options.ServiceVersion && options.ServiceVersionWorkers <= 0 {
+		options.ServiceVersionWorkers = 25
+	}
+	if options.ServiceVersion && options.ServiceVersionTimeout <= 0 {
+		options.ServiceVersionTimeout = 5 * time.Second
 	}
 
 	if options.WarmUpTime <= 0 {

@@ -25,6 +25,7 @@ import (
 	"github.com/projectdiscovery/dnsx/libs/dnsx"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
+	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -34,6 +35,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/ratelimit"
+	"golang.org/x/net/proxy"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
@@ -57,6 +59,12 @@ type Runner struct {
 	excludedIpsNP  *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
+
+	fpTargetCh chan fingerprint.Target
+	fpDone     chan struct{}
+	fpServices map[string]*port.Service
+	fpMu       sync.Mutex
+	fpCancel   context.CancelFunc
 }
 
 type Target struct {
@@ -186,6 +194,10 @@ func NewRunner(options *Options) (*Runner, error) {
 		scanOpts.OnReceive = runner.onReceive
 	}
 
+	if options.ServiceVersion {
+		scan.EnableTLSDetection = true
+	}
+
 	scanner, err := scan.NewScanner(scanOpts)
 	if err != nil {
 		return nil, err
@@ -243,6 +255,31 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
+	// Feed on-the-fly service detection
+	if r.fpTargetCh != nil {
+		hostname := hostResult.IP
+		for _, h := range dt {
+			if h != "ip" && h != hostResult.IP {
+				hostname = h
+				break
+			}
+		}
+		for _, p := range hostResult.Ports {
+			r.fpTargetCh <- fingerprint.Target{
+				Host:        hostname,
+				IP:          hostResult.IP,
+				Port:        p.Port,
+				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
+				TLSChecked:  true,
+			}
+		}
+	}
+
+	// Skip live output for -sV (enriched output in handleOutput)
+	if r.options.ServiceVersion {
+		return
+	}
+
 	// Skip immediate JSON/CSV output if nmap CLI is specified to postpone until after nmap integration
 	if r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV) {
 		return
@@ -297,6 +334,13 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
 				for _, p := range hostResult.Ports {
+					if host != hostResult.IP {
+						hostPort := net.JoinHostPort(host, fmt.Sprint(p.Port))
+						if r.unique.Has(hostPort) {
+							continue
+						}
+						_ = r.unique.Set(hostPort, struct{}{})
+					}
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
 					} else {
@@ -335,6 +379,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		}
 		r.BackgroundWorkers(ctx)
 	}
+
+	r.initServiceDetection()
 
 	if r.options.Stream {
 		go r.Load() //nolint
@@ -439,6 +485,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
+		r.waitServiceDetection(r.scanner.ScanResults)
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -517,6 +564,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		if err := r.handleNmap(); err != nil {
 			return err
 		}
+
+		r.waitServiceDetection(r.scanner.ScanResults)
 
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
@@ -703,6 +752,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
+		r.waitServiceDetection(r.scanner.ScanResults)
+
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
@@ -768,6 +819,8 @@ func (r *Runner) ShowScanResultOnExit() {
 	if err := r.handleNmap(); err != nil {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
+
+	r.waitServiceDetection(r.scanner.ScanResults)
 
 	// then handle output with enhanced service information
 	r.handleOutput(r.scanner.ScanResults)
@@ -1020,6 +1073,107 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	return nil
 }
 
+func (r *Runner) initServiceDetection() {
+	if !r.options.ServiceVersion {
+		return
+	}
+
+	probeFile := r.options.ServiceProbesFile
+	if probeFile == "" {
+		probeFile = fingerprint.LocateNmapProbes()
+	}
+	if probeFile == "" {
+		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, skipping -sV. Install nmap or specify the path with --sV-probes")
+		r.options.ServiceVersion = false
+		scan.EnableTLSDetection = false
+		return
+	}
+
+	db, err := fingerprint.ParseProbeFile(probeFile)
+	if err != nil {
+		gologger.Info().Label("WRN").Msgf("could not load service probes from %s, skipping -sV", probeFile)
+		r.options.ServiceVersion = false
+		scan.EnableTLSDetection = false
+		return
+	}
+
+	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), probeFile)
+
+	var opts []fingerprint.Option
+	opts = append(opts, fingerprint.WithWorkers(r.options.ServiceVersionWorkers))
+	opts = append(opts, fingerprint.WithTimeout(r.options.ServiceVersionTimeout))
+	opts = append(opts, fingerprint.WithFastMode(r.options.ServiceVersionFast))
+
+	if r.options.Proxy != "" {
+		proxyURL := r.options.Proxy
+		if !strings.Contains(proxyURL, "://") {
+			proxyURL = "socks5://" + proxyURL
+		}
+		if r.options.ProxyAuth != "" {
+			if u, err := url.Parse(proxyURL); err == nil {
+				creds := strings.SplitN(r.options.ProxyAuth, ":", 2)
+				if len(creds) == 2 {
+					u.User = url.UserPassword(creds[0], creds[1])
+					proxyURL = u.String()
+				}
+			}
+		}
+		parsedURL, err := url.Parse(proxyURL)
+		if err == nil {
+			dialer, err := proxy.FromURL(parsedURL, proxy.Direct)
+			if err == nil {
+				opts = append(opts, fingerprint.WithDialer(func(ctx context.Context, network, address string) (net.Conn, error) {
+					return dialer.Dial(network, address)
+				}))
+			}
+		}
+	}
+
+	engine := fingerprint.New(db, opts...)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	r.fpCancel = cancel
+	r.fpTargetCh = make(chan fingerprint.Target, 1000)
+	r.fpDone = make(chan struct{})
+	r.fpServices = make(map[string]*port.Service)
+
+	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
+
+	gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
+
+	go func() {
+		defer close(r.fpDone)
+		for sr := range resultCh {
+			key := net.JoinHostPort(sr.IP, strconv.Itoa(sr.Port))
+			r.fpMu.Lock()
+			r.fpServices[key] = sr.Service
+			r.fpMu.Unlock()
+			gologger.Verbose().Msgf("Identified %s on %s:%d (%s %s)", sr.Service.Name, sr.IP, sr.Port, sr.Service.Product, sr.Service.Version)
+		}
+	}()
+}
+
+func (r *Runner) waitServiceDetection(scanResults *result.Result) {
+	if r.fpTargetCh == nil {
+		return
+	}
+	close(r.fpTargetCh)
+	<-r.fpDone
+
+	for hostResult := range scanResults.GetIPsPorts() {
+		for _, p := range hostResult.Ports {
+			key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
+			if svc, ok := r.fpServices[key]; ok {
+				p.Service = svc
+			}
+		}
+	}
+
+	if r.fpCancel != nil {
+		r.fpCancel()
+	}
+}
+
 func (r *Runner) handleOutput(scanResults *result.Result) {
 	var (
 		file   *os.File
@@ -1060,6 +1214,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}()
 	}
 	csvFileHeaderEnabled := true
+	hostPortPrinted := make(map[string]struct{})
 
 	switch {
 	case scanResults.HasIPsPorts():
@@ -1095,7 +1250,37 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					host = hostResult.IP
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
-				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+
+				// Print enriched plain text for -sV mode (before summary)
+				if r.options.ServiceVersion && !r.options.JSON && !r.options.CSV && !r.options.DisableStdout {
+					for _, p := range hostResult.Ports {
+						hostPort := fmt.Sprintf("%s:%d", host, p.Port)
+						if _, seen := hostPortPrinted[hostPort]; seen {
+							continue
+						}
+						hostPortPrinted[hostPort] = struct{}{}
+						line := hostPort
+						if serviceInfo := formatServiceInfo(p.Service); serviceInfo != "" {
+							line += " [" + serviceInfo + "]"
+						}
+						if r.options.OutputCDN && isCDNIP {
+							line += " [" + cdnName + "]"
+						}
+						gologger.Silent().Msgf("%s\n", line)
+					}
+				}
+
+				serviceCount := 0
+				for _, p := range hostResult.Ports {
+					if p.Service != nil && p.Service.Name != "" {
+						serviceCount++
+					}
+				}
+				if serviceCount > 0 {
+					gologger.Info().Msgf("Found %d ports %d services on host %s (%s)\n", len(hostResult.Ports), serviceCount, host, hostResult.IP)
+				} else {
+					gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+				}
 
 				// console output
 				if r.options.JSON || r.options.CSV {
@@ -1113,24 +1298,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						//nolint
 						data.TLS = p.TLS
 
-						// copy service information if available
-						if p.Service != nil {
-							data.DeviceType = p.Service.DeviceType
-							data.ExtraInfo = p.Service.ExtraInfo
-							data.HighVersion = p.Service.HighVersion
-							data.Hostname = p.Service.Hostname
-							data.LowVersion = p.Service.LowVersion
-							data.Method = p.Service.Method
-							data.Name = p.Service.Name
-							data.OSType = p.Service.OSType
-							data.Product = p.Service.Product
-							data.Proto = p.Service.Proto
-							data.RPCNum = p.Service.RPCNum
-							data.ServiceFP = p.Service.ServiceFP
-							data.Tunnel = p.Service.Tunnel
-							data.Version = p.Service.Version
-							data.Confidence = p.Service.Confidence
-						}
+						copyServiceFields(data, p.Service)
 						if r.options.JSON {
 							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {

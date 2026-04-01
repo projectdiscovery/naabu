@@ -47,8 +47,9 @@ type Result struct {
 	RPCNum      string `json:"rpc_num,omitempty"`
 	ServiceFP   string `json:"service_fp,omitempty"`
 	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
 }
 
 // TODO:
@@ -80,8 +81,9 @@ type jsonResult struct {
 	RPCNum      string `json:"rpc_num,omitempty"`
 	ServiceFP   string `json:"service_fp,omitempty"`
 	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -114,6 +116,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Tunnel = r.Tunnel
 	data.Version = r.Version
 	data.Confidence = r.Confidence
+	data.CPEs = r.CPEs
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -158,9 +161,14 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		fieldValue := field.Interface()
 		if slices.Contains(headers, csvTag) {
-			fields = append(fields, fmt.Sprint(fieldValue))
+			var fieldStr string
+			if ty.Field(i).Name == "CPEs" {
+				fieldStr = strings.Join(data.CPEs, ";")
+			} else {
+				fieldStr = fmt.Sprint(field.Interface())
+			}
+			fields = append(fields, fieldStr)
 		}
 	}
 	return fields, nil
@@ -323,4 +331,20 @@ func copyServiceFields(result *Result, service *port.Service) {
 	result.Tunnel = s.Tunnel
 	result.Version = s.Version
 	result.Confidence = s.Confidence
+	result.CPEs = s.CPEs
+}
+
+func formatServiceInfo(svc *port.Service) string {
+	if svc == nil || svc.Name == "" {
+		return ""
+	}
+	parts := []string{svc.Name}
+	if svc.Product != "" {
+		if svc.Version != "" {
+			parts = append(parts, svc.Product+"/"+svc.Version)
+		} else {
+			parts = append(parts, svc.Product)
+		}
+	}
+	return strings.Join(parts, " ")
 }

@@ -30,6 +30,7 @@ import (
 // and the single-writer channel, sending packets directly via WriteTo.
 func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, targetsWithPort []string, shouldUseRawPackets bool) {
 	model := prediction.DefaultModel()
+	threshold := float64(r.options.PredictionThreshold) / 100.0
 
 	var targetsCount uint64
 	for _, t := range targets {
@@ -37,7 +38,8 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 	}
 
 	srcPorts, totalCorrelations := model.Stats()
-	gologger.Info().Msgf("Smart scan: model loaded (%d source ports, %d correlations)", srcPorts, totalCorrelations)
+	gologger.Info().Msgf("Smart scan: model loaded (%d source ports, %d correlations, threshold %.0f%%)",
+		srcPorts, totalCorrelations, threshold*100)
 
 	// Fast SYN sender: bypasses gopacket + channel + single writer.
 	// Falls back to standard path for Ethernet framing or IPv6.
@@ -61,7 +63,7 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 	wrappedOnReceive := func(hr *result.HostResult) {
 		if q := queuePtr.Load(); q != nil {
 			for _, p := range hr.Ports {
-				q.boostCorrelated(p.Port, model)
+				q.boostCorrelated(p.Port, model, threshold)
 			}
 		}
 		if origOnReceive != nil {
@@ -89,8 +91,22 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 	timeout := r.options.GetTimeout()
 
 	for retry := 0; retry < r.options.Retries; retry++ {
+		// Refine the model with observed scan results between retries.
+		// MergeNew adds only newly discovered correlations (port pairs
+		// not in the default model) to avoid overwriting data-backed
+		// probabilities with scan-biased ones.
+		if retry > 0 {
+			hostPorts := r.scanner.ScanResults.GetHostPortsMap()
+			if len(hostPorts) > 0 {
+				learned := prediction.NewModel()
+				learned.Train(hostPorts)
+				model.MergeNew(learned)
+				gologger.Debug().Msgf("Smart scan: model refined with %d multi-port hosts", len(hostPorts))
+			}
+		}
+
 		knownOpen := r.collectOpenPorts()
-		pq := newPortQueue(r.scanner.Ports, model, knownOpen)
+		pq := newPortQueue(r.scanner.Ports, model, knownOpen, threshold)
 		queuePtr.Store(pq)
 
 		if retry == 0 {
@@ -108,7 +124,7 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 			brSeed++
 			r.scanSinglePortOnTargets(ctx, targets, tgtIdx, p, targetsCount, shouldUseRawPackets, sender, brSeed)
 			if sender != nil {
-				sender.flush()
+				_ = sender.flush()
 			}
 		}
 
@@ -339,7 +355,7 @@ func (pq *portQueue) Pop() interface{} {
 	return item
 }
 
-func newPortQueue(ports []*port.Port, model *prediction.Model, knownOpen []int) *portQueue {
+func newPortQueue(ports []*port.Port, model *prediction.Model, knownOpen []int, threshold float64) *portQueue {
 	rank := buildPopularityRank()
 
 	pq := &portQueue{
@@ -357,7 +373,7 @@ func newPortQueue(ports []*port.Port, model *prediction.Model, knownOpen []int) 
 		// Boost from correlations with already-known open ports
 		for _, open := range knownOpen {
 			if corr := model.GetCorrelations(open); corr != nil {
-				if prob, ok := corr[p.Port]; ok && prob > pri {
+				if prob, ok := corr[p.Port]; ok && prob >= threshold && prob > pri {
 					pri = prob
 				}
 			}
@@ -382,7 +398,7 @@ func (pq *portQueue) pop() (*port.Port, bool) {
 // boostCorrelated is called from OnReceive when a port is found open.
 // It increases the priority of every port correlated with the newly
 // discovered open port, causing the heap to surface them sooner.
-func (pq *portQueue) boostCorrelated(openPort int, model *prediction.Model) {
+func (pq *portQueue) boostCorrelated(openPort int, model *prediction.Model, threshold float64) {
 	corr := model.GetCorrelations(openPort)
 	if len(corr) == 0 {
 		return
@@ -392,6 +408,9 @@ func (pq *portQueue) boostCorrelated(openPort int, model *prediction.Model) {
 	defer pq.mu.Unlock()
 
 	for targetPort, prob := range corr {
+		if prob < threshold {
+			continue
+		}
 		idx, ok := pq.index[targetPort]
 		if !ok {
 			continue // already scanned / not in user's list
