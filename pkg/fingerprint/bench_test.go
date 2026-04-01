@@ -30,7 +30,7 @@ func startCountingServer(banner string, respond func([]byte) []byte) (int, *conn
 			}
 			counter.count.Add(1)
 			go func(c net.Conn) {
-				defer c.Close()
+				defer c.Close() //nolint:errcheck
 				if banner != "" {
 					_, _ = c.Write([]byte(banner))
 				}
@@ -53,7 +53,7 @@ func startCountingServer(banner string, respond func([]byte) []byte) (int, *conn
 		}
 	}()
 
-	return port, counter, func() { ln.Close() }
+	return port, counter, func() { ln.Close() } //nolint:errcheck
 }
 
 func loadRealDB(tb testing.TB) *ProbeDB {
@@ -146,9 +146,9 @@ func TestPerformanceProfile(t *testing.T) {
 	}
 
 	type scenario struct {
-		name    string
-		banner  string
-		respond func([]byte) []byte
+		name     string
+		banner   string
+		respond  func([]byte) []byte
 		customDB *ProbeDB // nil = use real probes
 	}
 

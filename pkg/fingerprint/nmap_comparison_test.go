@@ -13,9 +13,9 @@ import (
 
 // mockService defines a mock service for comparison testing.
 type mockService struct {
-	name     string
-	banner   string     // sent immediately (NULL probe banner)
-	respond  func([]byte) []byte // optional: respond to probe data
+	name          string
+	banner        string              // sent immediately (NULL probe banner)
+	respond       func([]byte) []byte // optional: respond to probe data
 	expectService string
 	expectProduct string
 	expectVersion string
@@ -79,9 +79,9 @@ var comparisonServices = []mockService{
 					// thread id + auth plugin data + filler + capability flags (enough for match)
 					[]byte{0x01, 0x00, 0x00, 0x00,
 						0x41, 0x42, 0x43, 0x44, 0x45, 0x46, 0x47, 0x48, // scramble
-						0x00, // filler
+						0x00,       // filler
 						0xff, 0xff, // capability flags lower
-						0x21, // charset
+						0x21,       // charset
 						0x02, 0x00, // status flags
 						0x3f, 0x40, // capability flags upper
 					}...,
@@ -137,7 +137,7 @@ func startMockServer(t *testing.T, svc mockService) (int, func()) {
 				return
 			}
 			go func(c net.Conn) {
-				defer c.Close()
+				defer c.Close() //nolint:errcheck
 
 				if svc.banner != "" {
 					_, _ = c.Write([]byte(svc.banner))
@@ -163,7 +163,7 @@ func startMockServer(t *testing.T, svc mockService) (int, func()) {
 		}
 	}()
 
-	return port, func() { ln.Close() }
+	return port, func() { ln.Close() } //nolint:errcheck
 }
 
 // TestNmapComparison starts mock services and compares naabu vs nmap detection.
@@ -473,7 +473,7 @@ ports 80
 fallback GetRequest,HTTPOptions
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 {
@@ -516,7 +516,7 @@ match ssh m|^SSH-| p/SSH/
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer ln.Close()
+	defer ln.Close() //nolint:errcheck
 
 	go func() {
 		for {
@@ -524,7 +524,7 @@ match ssh m|^SSH-| p/SSH/
 			if err != nil {
 				return
 			}
-			conn.Close() // close immediately = tcpwrapped
+			_ = conn.Close() // close immediately = tcpwrapped //nolint:errcheck
 		}
 	}()
 

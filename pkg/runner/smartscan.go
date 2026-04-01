@@ -124,7 +124,7 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 			brSeed++
 			r.scanSinglePortOnTargets(ctx, targets, tgtIdx, p, targetsCount, shouldUseRawPackets, sender, brSeed)
 			if sender != nil {
-				sender.flush()
+				_ = sender.flush()
 			}
 		}
 

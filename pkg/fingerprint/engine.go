@@ -353,13 +353,13 @@ func (e *Engine) runProbe(ctx context.Context, sp *ServiceProbe, t Target, addr 
 			ServerName:         t.Host,
 		})
 		if err := tlsConn.HandshakeContext(probeCtx); err != nil {
-			conn.Close()
+			conn.Close() //nolint:errcheck
 			return nil, nil
 		}
 		conn = tlsConn
 	}
 
-	defer conn.Close()
+	defer conn.Close() //nolint:errcheck
 
 	// Close the connection when context is cancelled so blocking reads
 	// return immediately instead of waiting for their full timeout.
@@ -368,7 +368,7 @@ func (e *Engine) runProbe(ctx context.Context, sp *ServiceProbe, t Target, addr 
 	go func() {
 		select {
 		case <-probeCtx.Done():
-			conn.Close()
+			conn.Close() //nolint:errcheck
 		case <-done:
 		}
 	}()
@@ -587,7 +587,7 @@ func (e *Engine) detectTLS(ctx context.Context, t Target) bool {
 
 	_ = conn.SetDeadline(time.Now().Add(tlsTimeout))
 	err = tlsConn.Handshake()
-	conn.Close()
+	conn.Close() //nolint:errcheck
 
 	return err == nil
 }
@@ -706,7 +706,7 @@ func (e *Engine) fingerprintUDPOne(ctx context.Context, t Target) *Result {
 			_ = conn.SetWriteDeadline(time.Now().Add(e.timeout))
 			_, err = conn.Write(sp.Data)
 			if err != nil {
-				conn.Close()
+				conn.Close() //nolint:errcheck
 				continue
 			}
 		}
@@ -714,7 +714,7 @@ func (e *Engine) fingerprintUDPOne(ctx context.Context, t Target) *Result {
 		_ = conn.SetReadDeadline(time.Now().Add(waitTimeout))
 		buf := make([]byte, 65535)
 		n, readErr := conn.Read(buf)
-		conn.Close()
+		conn.Close() //nolint:errcheck
 
 		if n == 0 || readErr != nil {
 			continue

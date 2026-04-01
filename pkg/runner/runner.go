@@ -269,7 +269,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
-				TLSDetected: p.TLS,
+				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
 				TLSChecked:  true,
 			}
 		}

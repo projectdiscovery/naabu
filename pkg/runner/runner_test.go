@@ -1014,7 +1014,7 @@ func TestNewRunner_ScanTypeSyncAfterFallback(t *testing.T) {
 
 	runner, err := NewRunner(options)
 	require.NoError(t, err)
-	defer runner.Close()
+	defer runner.Close() //nolint:errcheck
 
 	assert.Equal(t, ConnectScan, runner.options.ScanType,
 		"runner options should reflect connect scan after fallback from syn")
@@ -1031,7 +1031,10 @@ func TestNewRunner_ConnectScanPreserved(t *testing.T) {
 
 	runner, err := NewRunner(options)
 	require.NoError(t, err)
-	defer runner.Close()
+	defer func() {
+		err := runner.Close()
+		require.NoError(t, err)
+	}()
 
 	assert.Equal(t, ConnectScan, runner.options.ScanType)
 	assert.Equal(t, ConnectScan, runner.scanner.ScanType)
@@ -1046,7 +1049,7 @@ func TestNewRunner_ScanTypeSyncMatchesScanner(t *testing.T) {
 
 	runner, err := NewRunner(options)
 	require.NoError(t, err)
-	defer runner.Close()
+	defer runner.Close() //nolint:errcheck
 
 	assert.Equal(t, runner.scanner.ScanType, runner.options.ScanType,
 		"runner options and scanner scan type should always match")

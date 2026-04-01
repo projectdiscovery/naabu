@@ -154,7 +154,7 @@ func ParseProbeFile(path string) (*ProbeDB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("opening probe file: %w", err)
 	}
-	defer f.Close()
+	defer f.Close() //nolint:errcheck
 	return ParseProbes(f)
 }
 

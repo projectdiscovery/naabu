@@ -32,7 +32,7 @@ func startTCPServer(t *testing.T, handler func(net.Conn)) (string, func()) {
 			go handler(conn)
 		}
 	}()
-	return ln.Addr().String(), func() { ln.Close() }
+	return ln.Addr().String(), func() { ln.Close() } //nolint:errcheck
 }
 
 func TestEngineSSHFingerprint(t *testing.T) {
@@ -42,7 +42,7 @@ totalwaitms 3000
 match ssh m|^SSH-([\d.]+)-OpenSSH[_-]([\w._-]+)| p/OpenSSH/ v/$2/ i/protocol $1/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
 		// drain any incoming data
 		buf := make([]byte, 1024)
@@ -87,7 +87,7 @@ ports 80,8080
 match http m|^HTTP/1\.[01] (\d+).*Server: ([\w/._-]+)|s p/$2/ v/$1/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 && strings.HasPrefix(string(buf[:n]), "GET") {
@@ -132,7 +132,7 @@ ports 80
 fallback GetRequest
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 {
@@ -173,7 +173,7 @@ ports 80
 match http m|^HTTP| p/HTTP/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		buf := make([]byte, 4096)
 		n, _ := conn.Read(buf)
 		if n > 0 && strings.HasPrefix(string(buf[:n]), "GET") {
@@ -210,7 +210,7 @@ totalwaitms 5000
 match test m|^hello| p/Test/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		time.Sleep(10 * time.Second) // hang forever
 	})
 	defer cleanup()
@@ -246,7 +246,7 @@ totalwaitms 2000
 softmatch ssh m|^SSH-| p/SSH/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("SSH-2.0-CustomSSH\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -280,7 +280,7 @@ totalwaitms 1000
 match http m|^HTTP| p/HTTP/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("SOME-RANDOM-PROTOCOL v1.0\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -312,7 +312,7 @@ match ftp m|^220[ -]| p/FTP/
 `
 	// SSH server
 	sshAddr, cleanupSSH := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -321,7 +321,7 @@ match ftp m|^220[ -]| p/FTP/
 
 	// FTP server
 	ftpAddr, cleanupFTP := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("220 FTP server ready\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -436,7 +436,7 @@ func TestEngineWithRealProbes(t *testing.T) {
 
 	// Start a simple SSH server
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("SSH-2.0-OpenSSH_9.6p1 Ubuntu-3ubuntu13.5\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -476,7 +476,7 @@ func TestEngineWithRealProbesFTP(t *testing.T) {
 	}
 
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		_, _ = conn.Write([]byte("220 ProFTPD 1.3.8b Server ready.\r\n"))
 		buf := make([]byte, 1024)
 		_, _ = conn.Read(buf)
@@ -518,7 +518,7 @@ func TestEngineWithRealProbesHTTP(t *testing.T) {
 	httpResponse := "HTTP/1.1 200 OK\r\nServer: Apache/2.4.58 (Ubuntu)\r\nContent-Length: 13\r\n\r\nHello, World!"
 
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close()
+		defer conn.Close() //nolint:errcheck
 		buf := make([]byte, 4096)
 		_ = conn.SetReadDeadline(time.Now().Add(2 * time.Second))
 		n, err := conn.Read(buf)
