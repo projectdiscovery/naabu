@@ -328,3 +328,18 @@ func copyServiceFields(result *Result, service *port.Service) {
 	result.Confidence = s.Confidence
 	result.CPEs = s.CPEs
 }
+
+func formatServiceInfo(svc *port.Service) string {
+	if svc == nil || svc.Name == "" {
+		return ""
+	}
+	parts := []string{svc.Name}
+	if svc.Product != "" {
+		if svc.Version != "" {
+			parts = append(parts, svc.Product+"/"+svc.Version)
+		} else {
+			parts = append(parts, svc.Product)
+		}
+	}
+	return strings.Join(parts, " ")
+}

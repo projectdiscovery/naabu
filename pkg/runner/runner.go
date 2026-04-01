@@ -59,6 +59,12 @@ type Runner struct {
 	excludedIpsNP  *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
+
+	fpTargetCh chan fingerprint.Target
+	fpDone     chan struct{}
+	fpServices map[string]*port.Service
+	fpMu       sync.Mutex
+	fpCancel   context.CancelFunc
 }
 
 type Target struct {
@@ -249,6 +255,31 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
+	// Feed on-the-fly service detection
+	if r.fpTargetCh != nil {
+		hostname := hostResult.IP
+		for _, h := range dt {
+			if h != "ip" && h != hostResult.IP {
+				hostname = h
+				break
+			}
+		}
+		for _, p := range hostResult.Ports {
+			r.fpTargetCh <- fingerprint.Target{
+				Host:        hostname,
+				IP:          hostResult.IP,
+				Port:        p.Port,
+				TLSDetected: p.TLS,
+				TLSChecked:  true,
+			}
+		}
+	}
+
+	// Skip live output for -sV (enriched output in handleOutput)
+	if r.options.ServiceVersion {
+		return
+	}
+
 	// Skip immediate JSON/CSV output if nmap CLI is specified to postpone until after nmap integration
 	if r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV) {
 		return
@@ -303,6 +334,13 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				gologger.Silent().Msgf("%s", buffer.String())
 			} else {
 				for _, p := range hostResult.Ports {
+					if host != hostResult.IP {
+						hostPort := net.JoinHostPort(host, fmt.Sprint(p.Port))
+						if r.unique.Has(hostPort) {
+							continue
+						}
+						_ = r.unique.Set(hostPort, struct{}{})
+					}
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s:%d [%s]\n", host, p.Port, cdnName)
 					} else {
@@ -341,6 +379,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		}
 		r.BackgroundWorkers(ctx)
 	}
+
+	r.initServiceDetection()
 
 	if r.options.Stream {
 		go r.Load() //nolint
@@ -445,7 +485,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
-		r.handleServiceDetection(r.scanner.ScanResults)
+		r.waitServiceDetection(r.scanner.ScanResults)
 		r.handleOutput(r.scanner.ScanResults)
 		return nil
 	case r.options.Stream && r.options.Passive: // stream passive
@@ -525,7 +565,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
-		r.handleServiceDetection(r.scanner.ScanResults)
+		r.waitServiceDetection(r.scanner.ScanResults)
 
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
@@ -712,7 +752,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
-		r.handleServiceDetection(r.scanner.ScanResults)
+		r.waitServiceDetection(r.scanner.ScanResults)
 
 		// then handle output with enhanced service information
 		r.handleOutput(r.scanner.ScanResults)
@@ -780,7 +820,7 @@ func (r *Runner) ShowScanResultOnExit() {
 		gologger.Fatal().Msgf("Could not run enumeration: %s\n", err)
 	}
 
-	r.handleServiceDetection(r.scanner.ScanResults)
+	r.waitServiceDetection(r.scanner.ScanResults)
 
 	// then handle output with enhanced service information
 	r.handleOutput(r.scanner.ScanResults)
@@ -1033,26 +1073,27 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	return nil
 }
 
-func (r *Runner) handleServiceDetection(scanResults *result.Result) {
+func (r *Runner) initServiceDetection() {
 	if !r.options.ServiceVersion {
 		return
 	}
 
-	gologger.Info().Msgf("Running service version detection on discovered ports")
-
-	// Locate probe file
 	probeFile := r.options.ServiceProbesFile
 	if probeFile == "" {
 		probeFile = fingerprint.LocateNmapProbes()
 	}
 	if probeFile == "" {
-		gologger.Warning().Msgf("nmap-service-probes file not found. Install nmap or use --sV-probes to specify the path.")
+		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, skipping -sV. Install nmap or specify the path with --sV-probes")
+		r.options.ServiceVersion = false
+		scan.EnableTLSDetection = false
 		return
 	}
 
 	db, err := fingerprint.ParseProbeFile(probeFile)
 	if err != nil {
-		gologger.Error().Msgf("Failed to parse service probes file %s: %v", probeFile, err)
+		gologger.Info().Label("WRN").Msgf("could not load service probes from %s, skipping -sV", probeFile)
+		r.options.ServiceVersion = false
+		scan.EnableTLSDetection = false
 		return
 	}
 
@@ -1090,65 +1131,46 @@ func (r *Runner) handleServiceDetection(scanResults *result.Result) {
 
 	engine := fingerprint.New(db, opts...)
 
-	// Use streaming fingerprinting: feed targets and collect results via
-	// channels so workers start immediately without waiting to build the
-	// full target list first.
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
+	r.fpCancel = cancel
+	r.fpTargetCh = make(chan fingerprint.Target, 1000)
+	r.fpDone = make(chan struct{})
+	r.fpServices = make(map[string]*port.Service)
 
-	targetCh := make(chan fingerprint.Target, r.options.ServiceVersionWorkers*2)
-	resultCh := engine.FingerprintStream(ctx, targetCh)
+	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
 
-	// Feed targets in a goroutine while collecting results concurrently.
-	var targetCount int
+	gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
+
 	go func() {
-		for hostResult := range scanResults.GetIPsPorts() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
-			if err != nil {
-				dt = []string{hostResult.IP}
-			}
-			hostname := hostResult.IP
-			for _, h := range dt {
-				if h != "ip" && h != hostResult.IP {
-					hostname = h
-					break
-				}
-			}
-			for _, p := range hostResult.Ports {
-				targetCh <- fingerprint.Target{
-					Host:        hostname,
-					IP:          hostResult.IP,
-					Port:        p.Port,
-					TLSDetected: p.TLS, //nolint:staticcheck
-					TLSChecked:  true,
-				}
-				targetCount++
-			}
+		defer close(r.fpDone)
+		for sr := range resultCh {
+			key := net.JoinHostPort(sr.IP, strconv.Itoa(sr.Port))
+			r.fpMu.Lock()
+			r.fpServices[key] = sr.Service
+			r.fpMu.Unlock()
+			gologger.Verbose().Msgf("Identified %s on %s:%d (%s %s)", sr.Service.Name, sr.IP, sr.Port, sr.Service.Product, sr.Service.Version)
 		}
-		close(targetCh)
 	}()
+}
 
-	if targetCount == 0 {
-		gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
-	} else {
-		gologger.Info().Msgf("Fingerprinting %d open port(s) with %d workers", targetCount, r.options.ServiceVersionWorkers)
+func (r *Runner) waitServiceDetection(scanResults *result.Result) {
+	if r.fpTargetCh == nil {
+		return
 	}
-
-	// Collect results as they arrive and attach to scan results.
-	services := make(map[string]*port.Service)
-	for sr := range resultCh {
-		key := net.JoinHostPort(sr.IP, strconv.Itoa(sr.Port))
-		services[key] = sr.Service
-		gologger.Verbose().Msgf("Identified %s on %s:%d (%s %s)", sr.Service.Name, sr.IP, sr.Port, sr.Service.Product, sr.Service.Version)
-	}
+	close(r.fpTargetCh)
+	<-r.fpDone
 
 	for hostResult := range scanResults.GetIPsPorts() {
 		for _, p := range hostResult.Ports {
 			key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
-			if svc, ok := services[key]; ok {
+			if svc, ok := r.fpServices[key]; ok {
 				p.Service = svc
 			}
 		}
+	}
+
+	if r.fpCancel != nil {
+		r.fpCancel()
 	}
 }
 
@@ -1192,6 +1214,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}()
 	}
 	csvFileHeaderEnabled := true
+	hostPortPrinted := make(map[string]struct{})
 
 	switch {
 	case scanResults.HasIPsPorts():
@@ -1227,7 +1250,37 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					host = hostResult.IP
 				}
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostResult.IP)
-				gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+
+				// Print enriched plain text for -sV mode (before summary)
+				if r.options.ServiceVersion && !r.options.JSON && !r.options.CSV && !r.options.DisableStdout {
+					for _, p := range hostResult.Ports {
+						hostPort := fmt.Sprintf("%s:%d", host, p.Port)
+						if _, seen := hostPortPrinted[hostPort]; seen {
+							continue
+						}
+						hostPortPrinted[hostPort] = struct{}{}
+						line := hostPort
+						if serviceInfo := formatServiceInfo(p.Service); serviceInfo != "" {
+							line += " [" + serviceInfo + "]"
+						}
+						if r.options.OutputCDN && isCDNIP {
+							line += " [" + cdnName + "]"
+						}
+						gologger.Silent().Msgf("%s\n", line)
+					}
+				}
+
+				serviceCount := 0
+				for _, p := range hostResult.Ports {
+					if p.Service != nil && p.Service.Name != "" {
+						serviceCount++
+					}
+				}
+				if serviceCount > 0 {
+					gologger.Info().Msgf("Found %d ports %d services on host %s (%s)\n", len(hostResult.Ports), serviceCount, host, hostResult.IP)
+				} else {
+					gologger.Info().Msgf("Found %d ports on host %s (%s)\n", len(hostResult.Ports), host, hostResult.IP)
+				}
 
 				// console output
 				if r.options.JSON || r.options.CSV {
