@@ -161,9 +161,14 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		fieldValue := field.Interface()
 		if slices.Contains(headers, csvTag) {
-			fields = append(fields, fmt.Sprint(fieldValue))
+			var fieldStr string
+			if ty.Field(i).Name == "CPEs" {
+				fieldStr = strings.Join(data.CPEs, ";")
+			} else {
+				fieldStr = fmt.Sprint(field.Interface())
+			}
+			fields = append(fields, fieldStr)
 		}
 	}
 	return fields, nil

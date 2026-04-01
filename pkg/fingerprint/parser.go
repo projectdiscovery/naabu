@@ -547,7 +547,11 @@ func substituteGroups(template string, submatches []string) string {
 		return template
 	}
 	result := template
-	for i := 1; i < len(submatches) && i <= 9; i++ {
+	upper := len(submatches) - 1
+	if upper > 9 {
+		upper = 9
+	}
+	for i := upper; i >= 1; i-- {
 		result = strings.ReplaceAll(result, "$"+strconv.Itoa(i), submatches[i])
 	}
 	return result

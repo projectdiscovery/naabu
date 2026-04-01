@@ -126,10 +126,15 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 				}
 				r := e.fingerprintOne(ctx, t)
 				if r != nil {
-					results <- StreamResult{
+					sr := StreamResult{
 						IP:      t.IP,
 						Port:    t.Port,
 						Service: r.ToService(),
+					}
+					select {
+					case results <- sr:
+					case <-ctx.Done():
+						return
 					}
 				}
 			}
@@ -444,6 +449,7 @@ func (e *Engine) readResponseWithEarlyMatch(conn net.Conn, waitTimeout time.Dura
 	deadline := time.Now().Add(waitTimeout)
 	buf := make([]byte, 65535)
 
+	gotData := false
 	for {
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
@@ -454,25 +460,20 @@ func (e *Engine) readResponseWithEarlyMatch(conn net.Conn, waitTimeout time.Dura
 		n, err := conn.Read(buf)
 		if n > 0 {
 			response = append(response, buf[:n]...)
+			gotData = true
 
 			for _, matches := range matchSets {
 				if e.tryMatches(matches, response) != nil {
 					return response, false
 				}
 			}
-
-			if remaining > 200*time.Millisecond {
-				_ = conn.SetReadDeadline(time.Now().Add(200 * time.Millisecond))
-				n2, _ := conn.Read(buf)
-				if n2 > 0 {
-					response = append(response, buf[:n2]...)
-				}
-			}
-			return response, false
 		}
 
 		if err != nil {
 			if isConnectionClosed(err) {
+				if gotData {
+					return response, false
+				}
 				return nil, true
 			}
 			break
@@ -684,6 +685,8 @@ func (e *Engine) FingerprintUDP(ctx context.Context, targets []Target) map[strin
 func (e *Engine) fingerprintUDPOne(ctx context.Context, t Target) *Result {
 	addr := net.JoinHostPort(t.IP, strconv.Itoa(t.Port))
 
+	var softResult *MatchResult
+
 	probes := e.orderUDPProbes(t.Port)
 	for _, sp := range probes {
 		if ctx.Err() != nil {
@@ -717,9 +720,18 @@ func (e *Engine) fingerprintUDPOne(ctx context.Context, t Target) *Result {
 			continue
 		}
 
-		if result := e.tryMatches(sp.Matches, buf[:n]); result != nil {
-			return matchResultToResult(result, false, "")
+		allMatches := e.collectMatchSets(sp)
+		hard, soft := e.matchResponse(sp, allMatches, buf[:n])
+		if hard != nil {
+			return matchResultToResult(hard, false, "")
 		}
+		if soft != nil && softResult == nil {
+			softResult = soft
+		}
+	}
+
+	if softResult != nil {
+		return matchResultToResult(softResult, false, "")
 	}
 	return nil
 }

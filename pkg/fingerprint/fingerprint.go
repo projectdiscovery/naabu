@@ -33,13 +33,14 @@ type Result struct {
 // ToService converts a fingerprint Result into a port.Service.
 func (r *Result) ToService() *port.Service {
 	return &port.Service{
-		Name:      r.Name,
-		Product:   r.Product,
-		Version:   r.Version,
-		ExtraInfo: r.ExtraInfo,
-		OSType:    r.OSType,
-		ServiceFP: r.Banner,
-		Method:    "probes",
-		CPEs:      r.CPEs,
+		Name:       r.Name,
+		Product:    r.Product,
+		Version:    r.Version,
+		ExtraInfo:  r.ExtraInfo,
+		OSType:     r.OSType,
+		DeviceType: r.DeviceType,
+		ServiceFP:  r.Banner,
+		Method:     "probes",
+		CPEs:       r.CPEs,
 	}
 }
