@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"strconv"
 	"strings"
@@ -204,6 +205,7 @@ func ParseProbes(r io.Reader) (*ProbeDB, error) {
 		case strings.HasPrefix(line, "match "):
 			m, err := parseMatch(line[6:])
 			if err != nil {
+				log.Printf("fingerprint: skipping match in probe %s: %v", current.Name, err)
 				continue
 			}
 			current.Matches = append(current.Matches, m)
@@ -211,6 +213,7 @@ func ParseProbes(r io.Reader) (*ProbeDB, error) {
 		case strings.HasPrefix(line, "softmatch "):
 			m, err := parseMatch(line[10:])
 			if err != nil {
+				log.Printf("fingerprint: skipping softmatch in probe %s: %v", current.Name, err)
 				continue
 			}
 			current.SoftMatches = append(current.SoftMatches, m)
@@ -324,6 +327,10 @@ func decodeNmapEscapes(s string) []byte {
 				continue
 			case '\\':
 				buf = append(buf, '\\')
+				i += 2
+				continue
+			default:
+				buf = append(buf, s[i+1])
 				i += 2
 				continue
 			}

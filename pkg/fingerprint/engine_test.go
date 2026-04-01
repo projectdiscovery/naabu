@@ -195,11 +195,8 @@ match http m|^HTTP| p/HTTP/
 	results := engine.Fingerprint(context.Background(), targets)
 
 	key := fmt.Sprintf("%s:%d", host, port)
-	// NULL probe sends nothing, server sends nothing back (waiting for GET),
-	// so no match expected in fast mode
 	if _, ok := results[key]; ok {
-		// It's ok if NULL probe somehow matches, but GetRequest shouldn't have run
-		t.Log("got result in fast mode (from NULL probe)")
+		t.Fatalf("expected no result in fast mode on non-hinted port %s", key)
 	}
 }
 

@@ -163,6 +163,9 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	if e.db == nil || len(e.db.Probes) == 0 {
 		return nil
 	}
+	if e.db.ExcludeTCP != nil && e.db.ExcludeTCP.Contains(t.Port) {
+		return nil
+	}
 
 	addr := net.JoinHostPort(t.IP, strconv.Itoa(t.Port))
 
@@ -683,6 +686,10 @@ func (e *Engine) FingerprintUDP(ctx context.Context, targets []Target) map[strin
 }
 
 func (e *Engine) fingerprintUDPOne(ctx context.Context, t Target) *Result {
+	if e.db != nil && e.db.ExcludeUDP != nil && e.db.ExcludeUDP.Contains(t.Port) {
+		return nil
+	}
+
 	addr := net.JoinHostPort(t.IP, strconv.Itoa(t.Port))
 
 	var softResult *MatchResult
