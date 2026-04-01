@@ -103,7 +103,7 @@ func TestNewScanner_FallbackFromSynToConnect(t *testing.T) {
 		ListenHandlers = origHandlers
 	}()
 
-	// Set up: router exists, privileged, but all handlers busy → Acquire fails for SYN
+	// Set up: router exists, privileged, but all handlers busy -> Acquire fails for SYN
 	PkgRouter = &stubRouter{}
 	privileges.IsPrivileged = true
 	ListenHandlers = []*ListenHandler{{Busy: true, Phase: &Phase{}}}

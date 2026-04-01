@@ -82,6 +82,7 @@ func init() {
 	go TransportReadWorker()
 	go TransportWriteWorker()
 	go ICMPWriteWorker()
+	go EthernetWriteWorker(ethernetPacketSend)
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -136,8 +137,8 @@ func ICMPWriteWorker() {
 }
 
 // EthernetWriteWorker writes packet to the network layer
-func EthernetWriteWorker() {
-	for pkg := range ethernetPacketSend {
+func EthernetWriteWorker(ch <-chan *PkgSend) {
+	for pkg := range ch {
 		switch pkg.flag {
 		case Arp:
 			ArpRequestAsync(pkg.ip)
@@ -753,13 +754,27 @@ func TransportReadWorker() {
 					if err != nil {
 						continue
 					}
+					hasTransport := false
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
-							srcIP4 := ToString(ip4.SrcIP)
-							srcIP6 := ToString(ip6.SrcIP)
-							transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+							hasTransport = true
+							break
 						}
 					}
+					if !hasTransport {
+						continue
+					}
+					var srcIP4, srcIP6 string
+					for _, layerType := range decoded {
+						switch layerType {
+						case layers.LayerTypeIPv4:
+							srcIP4 = ToString(ip4.SrcIP)
+						case layers.LayerTypeIPv6:
+							srcIP6 = ToString(ip6.SrcIP)
+						}
+					}
+					transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+					break
 				}
 			}
 		}(handler)
