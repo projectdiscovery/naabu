@@ -86,6 +86,14 @@ OUTPUT:
    -j, -json           write output in JSON lines format
    -csv                write output in csv format
 
+SERVICES-DISCOVERY:
+   -sD, -service-discovery           identify services by port number
+   -sV, -service-version             detect service versions using nmap-service-probes
+   -sV-fast                          only probe port-hinted services (faster, skips fallback)
+   -sV-timeout duration              timeout for service version probes (default 5s)
+   -sV-workers int                   number of concurrent service version workers (default 25)
+   -sV-probes string                 custom nmap-service-probes file path (auto-detected if empty)
+
 CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
    -scan-all-ips, -sa               scan all the IP's associated with DNS record

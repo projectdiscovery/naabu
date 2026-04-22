@@ -185,6 +185,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 
 	var softResult *MatchResult
 	var softTLS bool
+	var wrappedResult *MatchResult
 
 	if len(hinted) > 0 {
 		probeCtx, probeCancel := context.WithCancel(ctx)
@@ -209,6 +210,14 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 		for i := 0; i < len(hinted); i++ {
 			r := <-ch
 			if r.hard != nil {
+				if r.hard.Service == "tcpwrapped" {
+					// Don't let tcpwrapped pre-empt real matches from
+					// active hinted probes that may still be running.
+					if wrappedResult == nil {
+						wrappedResult = r.hard
+					}
+					continue
+				}
 				probeCancel()
 				return matchResultToResult(r.hard, r.tls, "")
 			}
@@ -288,6 +297,10 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 
 	if softResult != nil {
 		return matchResultToResult(softResult, softTLS, "")
+	}
+
+	if wrappedResult != nil {
+		return matchResultToResult(wrappedResult, false, "")
 	}
 
 	return nil

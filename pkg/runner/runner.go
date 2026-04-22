@@ -60,11 +60,12 @@ type Runner struct {
 
 	unique gcache.Cache[string, struct{}]
 
-	fpTargetCh chan fingerprint.Target
-	fpDone     chan struct{}
-	fpServices map[string]*port.Service
-	fpMu       sync.Mutex
-	fpCancel   context.CancelFunc
+	fpTargetCh   chan fingerprint.Target
+	fpDone       chan struct{}
+	fpServices   map[string]*port.Service
+	fpMu         sync.Mutex
+	fpCancel     context.CancelFunc
+	fpCloseOnce  sync.Once
 }
 
 type Target struct {
@@ -255,7 +256,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
-	// Feed on-the-fly service detection
+	// Feed on-the-fly service detection (non-blocking to avoid stalling the scan path).
 	if r.fpTargetCh != nil {
 		hostname := hostResult.IP
 		for _, h := range dt {
@@ -265,12 +266,16 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			}
 		}
 		for _, p := range hostResult.Ports {
-			r.fpTargetCh <- fingerprint.Target{
+			t := fingerprint.Target{
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
 				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
 				TLSChecked:  true,
+			}
+			select {
+			case r.fpTargetCh <- t:
+			default:
 			}
 		}
 	}
@@ -380,7 +385,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.BackgroundWorkers(ctx)
 	}
 
-	r.initServiceDetection()
+	r.initServiceDetection(ctx)
 
 	if r.options.Stream {
 		go r.Load() //nolint
@@ -1073,7 +1078,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	return nil
 }
 
-func (r *Runner) initServiceDetection() {
+func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	if !r.options.ServiceVersion {
 		return
 	}
@@ -1131,7 +1136,7 @@ func (r *Runner) initServiceDetection() {
 
 	engine := fingerprint.New(db, opts...)
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(parentCtx)
 	r.fpCancel = cancel
 	r.fpTargetCh = make(chan fingerprint.Target, 1000)
 	r.fpDone = make(chan struct{})
@@ -1157,7 +1162,7 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 	if r.fpTargetCh == nil {
 		return
 	}
-	close(r.fpTargetCh)
+	r.fpCloseOnce.Do(func() { close(r.fpTargetCh) })
 	<-r.fpDone
 
 	for hostResult := range scanResults.GetIPsPorts() {

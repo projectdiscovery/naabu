@@ -174,7 +174,8 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	return fields, nil
 }
 
-// WriteHostOutput writes the output list of host ports to an io.Writer
+// WriteHostOutput writes the output list of host ports to an io.Writer.
+// When a port has service information, it is appended in brackets.
 func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
@@ -183,6 +184,11 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(p.Port))
+		if serviceInfo := formatServiceInfo(p.Service); serviceInfo != "" {
+			sb.WriteString(" [")
+			sb.WriteString(serviceInfo)
+			sb.WriteString("]")
+		}
 		if outputCDN && cdnName != "" {
 			sb.WriteString(" [" + cdnName + "]")
 		}
