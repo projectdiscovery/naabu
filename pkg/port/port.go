@@ -22,13 +22,11 @@ func (p *Port) String() string {
 
 func (p *Port) StringWithDetails() string {
 	var builder strings.Builder
-	builder.WriteString(fmt.Sprintf("%d", p.Port))
-	builder.WriteString(" [")
-	builder.WriteString(p.Protocol.String())
+	_, _ = fmt.Fprintf(&builder, "%d[%s", p.Port, p.Protocol.String())
 	if p.TLS {
-		builder.WriteString("/tls")
+		_, _ = fmt.Fprintf(&builder, "/tls")
 	}
-	builder.WriteString("]")
+	_, _ = fmt.Fprintf(&builder, "]")
 	return builder.String()
 }
 

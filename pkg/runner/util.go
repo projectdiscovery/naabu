@@ -1,11 +1,14 @@
 package runner
 
 import (
+	"context"
 	"fmt"
 	"net"
+	"time"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/projectdiscovery/retryabledns"
 	iputil "github.com/projectdiscovery/utils/ip"
 	osutil "github.com/projectdiscovery/utils/os"
 	sliceutil "github.com/projectdiscovery/utils/slice"
@@ -15,23 +18,64 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 	// If the host is a Domain, then perform resolution and discover all IP
 	// addresses for a given host. Else use that host for port scanning
 	if !iputil.IsIP(target) {
-		dnsData, err := r.dnsclient.QueryMultiple(target)
-		if err != nil || dnsData == nil {
-			gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
-			return nil, nil, err
-		}
-		if len(r.options.IPVersion) > 0 {
-			if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
-				targetIPsV4 = append(targetIPsV4, dnsData.A...)
+		var dnsData *retryabledns.DNSData
+
+		for _, order := range r.options.DnsOrder {
+			if order == 'l' && r.dnsclient != nil {
+				dnsData, err = r.dnsclient.QueryMultiple(target)
+				if err == nil && dnsData != nil {
+					break
+				}
+			} else if order == 'p' && r.dnsclientProxy != nil {
+				dnsData, err = r.dnsclientProxy.QueryMultiple(target)
+				if err == nil && dnsData != nil {
+					break
+				}
 			}
-			if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
+		}
+
+		if dnsData != nil {
+			if len(r.options.IPVersion) > 0 {
+				if sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
+					targetIPsV4 = append(targetIPsV4, dnsData.A...)
+				}
+				if sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
+					targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
+				}
+			} else {
+				targetIPsV4 = append(targetIPsV4, dnsData.A...)
 				targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
 			}
-		} else {
-			targetIPsV4 = append(targetIPsV4, dnsData.A...)
-			targetIPsV6 = append(targetIPsV6, dnsData.AAAA...)
+		}
+
+		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 && r.options.SystemResolver {
+			gologger.Debug().Msgf("primary DNS failed for %s, trying system resolver", target)
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			ipAddrs, sysErr := net.DefaultResolver.LookupIPAddr(ctx, target)
+			cancel()
+			if sysErr == nil && len(ipAddrs) > 0 {
+				for _, ipAddr := range ipAddrs {
+					ip := ipAddr.IP
+					if ip == nil {
+						continue
+					}
+					if ip.To4() != nil {
+						if len(r.options.IPVersion) == 0 || sliceutil.Contains(r.options.IPVersion, scan.IPv4) {
+							targetIPsV4 = append(targetIPsV4, ip.String())
+						}
+					} else if ip.To16() != nil {
+						if len(r.options.IPVersion) == 0 || sliceutil.Contains(r.options.IPVersion, scan.IPv6) {
+							targetIPsV6 = append(targetIPsV6, ip.String())
+						}
+					}
+				}
+			}
 		}
 		if len(targetIPsV4) == 0 && len(targetIPsV6) == 0 {
+			if err != nil {
+				gologger.Warning().Msgf("Could not get IP for host: %s\n", target)
+				return nil, nil, err
+			}
 			return targetIPsV4, targetIPsV6, fmt.Errorf("no IP addresses found for host: %s", target)
 		}
 	} else {
@@ -47,7 +91,7 @@ func (r *Runner) host2ips(target string) (targetIPsV4 []string, targetIPsV6 []st
 }
 
 func isOSSupported() bool {
-	return osutil.IsLinux() || osutil.IsOSX()
+	return osutil.IsLinux() || osutil.IsOSX() || osutil.IsWindows()
 }
 
 func getPort(target string) (string, string, bool) {
