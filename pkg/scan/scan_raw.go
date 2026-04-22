@@ -742,6 +742,10 @@ func TransportReadWorker() {
 			decoded := []gopacket.LayerType{}
 
 			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			packetSource.DecodeOptions = gopacket.DecodeOptions{
+				Lazy:   true,
+				NoCopy: true,
+			}
 			for packet := range packetSource.Packets() {
 				data := packet.Data()
 				for _, parser := range parsers {
@@ -794,6 +798,10 @@ func TransportReadWorker() {
 			decoded := []gopacket.LayerType{}
 
 			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			packetSource.DecodeOptions = gopacket.DecodeOptions{
+				Lazy:   true,
+				NoCopy: true,
+			}
 			for packet := range packetSource.Packets() {
 				data := packet.Data()
 				for _, parser := range parsers {
