@@ -79,6 +79,8 @@ type Options struct {
 	ProxyAuth         string              // Socks5 proxy authentication (username:password)
 	Resolvers         string              // Resolvers (comma separated or file)
 	baseResolvers     []string
+	DnsOrder          string              // DNS resolution order (p/l/lp/pl)
+	SystemResolver    bool                // Use system DNS resolver as fallback
 	OnResult          result.ResultFn // callback on final host result
 	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
@@ -134,6 +136,13 @@ type Options struct {
 	// OnClose adds a callback function that is invoked when naabu is closed
 	// to be exact at end of existing closures
 	OnClose func()
+
+	// SmartScan enables predictive port scanning: after the initial scan,
+	// a correlation model predicts additional likely-open ports per host.
+	SmartScan bool
+	// PredictionThreshold is the minimum confidence percentage (0–100) to
+	// act on a port prediction (default 20, meaning 20%).
+	PredictionThreshold int
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -193,6 +202,8 @@ func ParseOptions() *Options {
 		flagSet.StringVar(&options.Resolvers, "r", "", "list of custom resolver dns resolution (comma separated or from file)"),
 		flagSet.StringVar(&options.Proxy, "proxy", "", "socks5 proxy (ip[:port] / fqdn[:port]"),
 		flagSet.StringVar(&options.ProxyAuth, "proxy-auth", "", "socks5 proxy authentication (username:password)"),
+		flagSet.StringVar(&options.DnsOrder, "dns-order", "l", "dns resolution order (p/l/lp/pl)"),
+		flagSet.BoolVarP(&options.SystemResolver, "system-resolver", "sr", false, "use system DNS as fallback resolver"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
 		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
@@ -231,6 +242,8 @@ func ParseOptions() *Options {
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
+		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model"),
+		flagSet.IntVarP(&options.PredictionThreshold, "prediction-threshold", "pt", 20, "minimum confidence for port predictions (0-100%)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
@@ -365,7 +378,7 @@ func (options *Options) hasProbes() bool {
 	//nolint
 	return options.ArpPing || options.IPv6NeighborDiscoveryPing || options.IcmpAddressMaskRequestProbe ||
 		options.IcmpEchoRequestProbe || options.IcmpTimestampRequestProbe || len(options.TcpAckPingProbes) > 0 ||
-		len(options.TcpAckPingProbes) > 0
+		len(options.TcpSynPingProbes) > 0
 }
 
 func (options *Options) shouldUseRawPackets() bool {

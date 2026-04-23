@@ -1,4 +1,4 @@
-//go:build linux || darwin
+//go:build linux || darwin || windows
 
 package scan
 
@@ -6,15 +6,14 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"io"
 	"net"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
-	"github.com/gopacket/gopacket/pcap"
+	"github.com/Mzack9999/gopacket"
+	"github.com/Mzack9999/gopacket/layers"
+	"github.com/Mzack9999/gopacket/pcap"
 	"github.com/projectdiscovery/freeport"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -82,6 +81,7 @@ func init() {
 	go TransportReadWorker()
 	go TransportWriteWorker()
 	go ICMPWriteWorker()
+	go EthernetWriteWorker(ethernetPacketSend)
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -136,8 +136,8 @@ func ICMPWriteWorker() {
 }
 
 // EthernetWriteWorker writes packet to the network layer
-func EthernetWriteWorker() {
-	for pkg := range ethernetPacketSend {
+func EthernetWriteWorker(ch <-chan *PkgSend) {
+	for pkg := range ch {
 		switch pkg.flag {
 		case Arp:
 			ArpRequestAsync(pkg.ip)
@@ -740,26 +740,40 @@ func TransportReadWorker() {
 			)
 
 			decoded := []gopacket.LayerType{}
-			for {
-				data, _, err := handler.ReadPacketData()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					continue
-				}
 
+			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			packetSource.DecodeOptions = gopacket.DecodeOptions{
+				Lazy:   true,
+				NoCopy: true,
+			}
+			for packet := range packetSource.Packets() {
+				data := packet.Data()
 				for _, parser := range parsers {
 					err := parser.DecodeLayers(data, &decoded)
 					if err != nil {
 						continue
 					}
+					hasTransport := false
 					for _, layerType := range decoded {
 						if layerType == layers.LayerTypeTCP || layerType == layers.LayerTypeUDP {
-							srcIP4 := ToString(ip4.SrcIP)
-							srcIP6 := ToString(ip6.SrcIP)
-							transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+							hasTransport = true
+							break
 						}
 					}
+					if !hasTransport {
+						continue
+					}
+					var srcIP4, srcIP6 string
+					for _, layerType := range decoded {
+						switch layerType {
+						case layers.LayerTypeIPv4:
+							srcIP4 = ToString(ip4.SrcIP)
+						case layers.LayerTypeIPv6:
+							srcIP6 = ToString(ip6.SrcIP)
+						}
+					}
+					transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+					break
 				}
 			}
 		}(handler)
@@ -783,14 +797,13 @@ func TransportReadWorker() {
 
 			decoded := []gopacket.LayerType{}
 
-			for {
-				data, _, err := handler.ReadPacketData()
-				if err == io.EOF {
-					break
-				} else if err != nil {
-					continue
-				}
-
+			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
+			packetSource.DecodeOptions = gopacket.DecodeOptions{
+				Lazy:   true,
+				NoCopy: true,
+			}
+			for packet := range packetSource.Packets() {
+				data := packet.Data()
 				for _, parser := range parsers {
 					err := parser.DecodeLayers(data, &decoded)
 					if err != nil {

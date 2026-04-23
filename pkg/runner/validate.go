@@ -145,6 +145,14 @@ func (options *Options) ValidateOptions() error {
 		return errors.New("connect payload can only be used with connect scan")
 	}
 
+	if options.DnsOrder != "p" && options.DnsOrder != "l" && options.DnsOrder != "lp" && options.DnsOrder != "pl" {
+		return errors.New("dns-order must be one of p, l, lp, pl")
+	}
+
+	if options.DnsOrder == "p" && options.Proxy == "" {
+		return errors.New("dns-order 'p' (proxy-only) requires --proxy to be set")
+	}
+
 	if options.ScanType == SynScan && scan.PkgRouter == nil {
 		gologger.Warning().Msgf("Routing could not be determined (are you using a VPN?).falling back to connect scan")
 		options.ScanType = ConnectScan
@@ -157,6 +165,16 @@ func (options *Options) ValidateOptions() error {
 	if options.WarmUpTime <= 0 {
 		gologger.Debug().Msgf("Warm up time must be greater than 0, setting to 2")
 		options.WarmUpTime = 2
+	}
+
+	if options.SmartScan && options.Stream {
+		return errors.New("smart scan is not supported in stream mode")
+	}
+	if options.SmartScan && options.Passive {
+		return errors.New("smart scan is not supported in passive mode")
+	}
+	if options.PredictionThreshold < 0 || options.PredictionThreshold > 100 {
+		return errors.New("prediction threshold must be between 0 and 100")
 	}
 
 	return nil
