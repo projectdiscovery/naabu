@@ -86,6 +86,14 @@ OUTPUT:
    -j, -json           write output in JSON lines format
    -csv                write output in csv format
 
+SERVICES-DISCOVERY:
+   -sD, -service-discovery           identify services by port number
+   -sV, -service-version             detect service versions using nmap-service-probes
+   -sV-fast                          only probe port-hinted services (faster, skips fallback)
+   -sV-timeout duration              timeout for service version probes (default 5s)
+   -sV-workers int                   number of concurrent service version workers (default 25)
+   -sV-probes string                 custom nmap-service-probes file path (auto-detected if empty)
+
 CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
    -scan-all-ips, -sa               scan all the IP's associated with DNS record
@@ -367,6 +375,35 @@ PORT     STATE SERVICE       VERSION
 8080/tcp open  http-proxy    cloudflare
 8443/tcp open  ssl/https-alt cloudflare
 ```
+
+# Service Version Detection
+
+Naabu has built-in service version detection using nmap's service probes database. This runs in parallel with port scanning for maximum performance.
+
+```sh
+naabu -host scanme.sh -sV
+```
+
+```console
+scanme.sh:22 [ssh OpenSSH/6.6.1p1]
+scanme.sh:80 [http Apache httpd/2.4.7]
+scanme.sh:9929 [nping-echo Nping echo]
+
+[INF] Found 3 ports on host scanme.sh (45.33.32.156) with 3 services identified
+```
+
+Available flags:
+
+| Flag | Description |
+|------|-------------|
+| `-sV` | Enable service version detection |
+| `-sV-fast` | Only probe port-hinted services (faster, skips fallback probes) |
+| `-sV-timeout duration` | Timeout for service version probes (default 5s) |
+| `-sV-workers int` | Number of concurrent service version workers (default 25) |
+| `-sV-probes string` | Custom nmap-service-probes file path (auto-detected if empty) |
+| `-sD` | Service discovery (match port number to service name, no active probing) |
+
+The `-sV` flag requires the `nmap-service-probes` database file. Naabu automatically looks for it in standard nmap installation paths. To use a custom file, specify the path with `-sV-probes`.
 
 # CDN/WAF Exclusion
 

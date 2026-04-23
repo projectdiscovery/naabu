@@ -163,6 +163,38 @@ func (m *Model) Merge(other *Model) {
 	}
 }
 
+// MergeNew adds correlations from another model only for port pairs
+// that don't already exist in this model. This prevents scan-biased
+// probabilities from overwriting pre-computed data-backed values.
+func (m *Model) MergeNew(other *Model) {
+	other.mu.RLock()
+	snapshot := make(map[int]map[int]float64, len(other.correlations))
+	for given, targets := range other.correlations {
+		cp := make(map[int]float64, len(targets))
+		for k, v := range targets {
+			cp[k] = v
+		}
+		snapshot[given] = cp
+	}
+	other.mu.RUnlock()
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for given, targets := range snapshot {
+		existing, hasGiven := m.correlations[given]
+		if !hasGiven {
+			m.correlations[given] = targets
+			continue
+		}
+		for target, prob := range targets {
+			if _, exists := existing[target]; !exists {
+				existing[target] = prob
+			}
+		}
+	}
+}
+
 // Prioritize ranks candidate ports by their likelihood of being open,
 // given a set of known open ports. For each candidate, the maximum
 // conditional probability across all known open ports is used.

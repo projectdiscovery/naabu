@@ -2,6 +2,7 @@ package runner
 
 import (
 	"testing"
+	"time"
 
 	"github.com/projectdiscovery/utils/errkit"
 	"github.com/stretchr/testify/assert"
@@ -84,5 +85,66 @@ func TestDnsOrderValidation(t *testing.T) {
 		o.DnsOrder = "pl"
 		o.Proxy = ""
 		assert.Nil(t, o.ValidateOptions())
+	})
+}
+
+func TestServiceVersionValidation(t *testing.T) {
+	base := Options{
+		Host:     []string{"example.com"},
+		Rate:     1000,
+		DnsOrder: "l",
+		ScanType: ConnectScan,
+	}
+
+	t.Run("service version enabled with defaults", func(t *testing.T) {
+		o := base
+		o.ServiceVersion = true
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+		assert.Equal(t, 25, o.ServiceVersionWorkers)
+		assert.Equal(t, 5*time.Second, o.ServiceVersionTimeout)
+	})
+
+	t.Run("service version with custom workers", func(t *testing.T) {
+		o := base
+		o.ServiceVersion = true
+		o.ServiceVersionWorkers = 50
+		o.ServiceVersionTimeout = 10 * time.Second
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+		assert.Equal(t, 50, o.ServiceVersionWorkers)
+		assert.Equal(t, 10*time.Second, o.ServiceVersionTimeout)
+	})
+
+	t.Run("service version with zero workers gets default", func(t *testing.T) {
+		o := base
+		o.ServiceVersion = true
+		o.ServiceVersionWorkers = 0
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+		assert.Equal(t, 25, o.ServiceVersionWorkers)
+	})
+
+	t.Run("service version with zero timeout gets default", func(t *testing.T) {
+		o := base
+		o.ServiceVersion = true
+		o.ServiceVersionTimeout = 0
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+		assert.Equal(t, 5*time.Second, o.ServiceVersionTimeout)
+	})
+
+	t.Run("service discovery without service version is valid", func(t *testing.T) {
+		o := base
+		o.ServiceDiscovery = true
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+	})
+
+	t.Run("service version not enabled does not set defaults", func(t *testing.T) {
+		o := base
+		err := o.ValidateOptions()
+		assert.Nil(t, err)
+		assert.Equal(t, 0, o.ServiceVersionWorkers)
 	})
 }
