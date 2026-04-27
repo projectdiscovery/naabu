@@ -12,8 +12,8 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.32
-	github.com/projectdiscovery/clistats v0.1.1
+	github.com/projectdiscovery/cdncheck v1.2.33
+	github.com/projectdiscovery/clistats v0.1.2
 	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/fdmax v0.0.4
 	github.com/projectdiscovery/freeport v0.0.7
@@ -21,10 +21,10 @@ require (
 	github.com/projectdiscovery/gologger v1.1.68
 	github.com/projectdiscovery/ipranger v0.0.53
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.36
-	github.com/projectdiscovery/ratelimit v0.0.85
+	github.com/projectdiscovery/networkpolicy v0.1.37
+	github.com/projectdiscovery/ratelimit v0.0.86
 	github.com/projectdiscovery/retryabledns v1.0.114
-	github.com/projectdiscovery/retryablehttp-go v1.3.8
+	github.com/projectdiscovery/retryablehttp-go v1.3.9
 	github.com/projectdiscovery/uncover v1.2.0
 	github.com/projectdiscovery/utils v0.10.1
 	github.com/remeh/sizedwaitgroup v1.0.0
