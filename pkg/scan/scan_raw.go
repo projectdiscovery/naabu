@@ -80,7 +80,12 @@ func init() {
 	}
 	go TransportReadWorker()
 	go TransportWriteWorker()
-	go ICMPWriteWorker()
+	// Spawn multiple ICMP write workers — channel reads are concurrency-safe
+	// and the per-host retry-sleep inside PingIcmp*RequestAsync would
+	// otherwise serialise the whole scan through one goroutine. See #1672.
+	for i := 0; i < icmpWriteWorkers; i++ {
+		go ICMPWriteWorker()
+	}
 	go EthernetWriteWorker(ethernetPacketSend)
 }
 
