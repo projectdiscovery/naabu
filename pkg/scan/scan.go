@@ -34,6 +34,15 @@ const (
 	packetSendSize = 2500  //nolint
 	snaplen        = 65536 //nolint
 	readtimeout    = 1500  //nolint
+
+	// icmpWriteWorkers controls how many goroutines drain icmpPacketSend.
+	// A single worker serialises every WriteTo retry-sleep and made
+	// ICMP host discovery O(n) slow for large CIDRs (issue #1672). The
+	// shared icmpConn4/icmpConn6 PacketConns are safe for concurrent
+	// WriteTo (net.PacketConn guarantee), so the workers fan out without
+	// new file descriptors. 8 is a conservative default that lets retry
+	// sleeps overlap while keeping goroutine overhead negligible.
+	icmpWriteWorkers = 8
 )
 
 const (
