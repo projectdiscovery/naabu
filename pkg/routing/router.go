@@ -67,7 +67,7 @@ func (r *baseRouter) Route(dst net.IP) (iface *net.Interface, gateway, preferred
 	}
 
 	if route.DefaultSourceIP != nil {
-		return nil, nil, route.DefaultSourceIP, nil
+		return route.NetworkInterface, net.ParseIP(route.Gateway), route.DefaultSourceIP, nil
 	}
 
 	if route.NetworkInterface == nil {

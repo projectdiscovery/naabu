@@ -222,6 +222,27 @@ func (r *Result) GetHostCountForPort(portNum int) int {
 	return count
 }
 
+// GetHostPortsMap returns a snapshot of all discovered host->port mappings
+// suitable for training prediction models. Only hosts with at least 2 ports
+// are included (single-port hosts don't provide correlation signal).
+func (r *Result) GetHostPortsMap() map[string][]int {
+	r.RLock()
+	defer r.RUnlock()
+
+	out := make(map[string][]int, len(r.ipPorts))
+	for ip, ports := range r.ipPorts {
+		if len(ports) < 2 {
+			continue
+		}
+		portList := make([]int, 0, len(ports))
+		for _, p := range ports {
+			portList = append(portList, p.Port)
+		}
+		out[ip] = portList
+	}
+	return out
+}
+
 // GetPortCount returns the number of ports discovered for an ip
 func (r *Result) GetPortCount(host string) int {
 	r.RLock()
