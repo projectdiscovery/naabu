@@ -13,7 +13,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.34
+	github.com/projectdiscovery/cdncheck v1.2.35
 	github.com/projectdiscovery/clistats v0.1.2
 	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -27,7 +27,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.114
 	github.com/projectdiscovery/retryablehttp-go v1.3.10
 	github.com/projectdiscovery/uncover v1.2.0
-	github.com/projectdiscovery/utils v0.10.1
+	github.com/projectdiscovery/utils v0.11.0
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/multierr v1.11.0
@@ -94,7 +94,7 @@ require (
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2 // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/fastdialer v0.5.6 // indirect
+	github.com/projectdiscovery/fastdialer v0.5.7 // indirect
 	github.com/projectdiscovery/hmap v0.0.100 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/refraction-networking/utls v1.8.2 // indirect
