@@ -29,29 +29,52 @@ func (s stubProvider) UDPProbe(p int) []byte {
 	return nil
 }
 
-// withProvider installs a provider for the duration of t and restores
-// the previous one on cleanup. Tests that touch the global provider
-// must use this helper so the state never leaks across tests.
-func withProvider(t *testing.T, p UDPProbeProvider) {
-	t.Helper()
-	prev := GetUDPProbeProvider()
-	SetUDPProbeProvider(p)
-	t.Cleanup(func() { SetUDPProbeProvider(prev) })
+// newScannerWithProvider builds a Scanner backed by a synthetic
+// ListenHandler (no raw sockets) and installs the given provider on
+// both. Using a synthetic handler keeps the unit tests deterministic
+// on hosts where Acquire would otherwise need privileges, and the
+// integration tests below upgrade to NewScanner where they need the
+// full stack.
+func newScannerWithProvider(p UDPProbeProvider) *Scanner {
+	s := &Scanner{ListenHandler: NewListenHandler()}
+	s.SetUDPProbeProvider(p)
+	return s
 }
 
-// TestDefaultProviderIsNoop documents the at-rest behavior: with no
-// SetUDPProbeProvider call the global accessor returns the no-op
-// provider, which always yields nil.
-func TestDefaultProviderIsNoop(t *testing.T) {
-	if got := udpProbePayload(53); got != nil {
+// TestNilProviderIsNoop documents the at-rest behavior: a Scanner
+// with no provider installed reports nil for any port, which keeps
+// the legacy zero-length-datagram path active.
+func TestNilProviderIsNoop(t *testing.T) {
+	s := &Scanner{ListenHandler: NewListenHandler()}
+	if got := s.udpProbePayload(53); got != nil {
 		t.Fatalf("expected nil payload from default provider, got %x", got)
+	}
+	if got := s.ListenHandler.udpProbePayload(53); got != nil {
+		t.Fatalf("expected nil payload from default handler, got %x", got)
 	}
 }
 
-// TestSetUDPProbeProviderRoundTrips confirms a provider can be
-// installed and retrieved across goroutines (atomic.Value semantics).
-func TestSetUDPProbeProviderRoundTrips(t *testing.T) {
-	withProvider(t, stubProvider{wantPort: 53, payload: []byte{0xAA, 0xBB}})
+// TestSetUDPProbeProviderPropagates confirms the provider set on the
+// Scanner is also visible on its ListenHandler, which is the surface
+// the raw send path consults.
+func TestSetUDPProbeProviderPropagates(t *testing.T) {
+	s := newScannerWithProvider(stubProvider{wantPort: 53, payload: []byte{0xAA, 0xBB}})
+
+	if got := s.udpProbePayload(53); !bytes.Equal(got, []byte{0xAA, 0xBB}) {
+		t.Fatalf("scanner got %x, want AABB", got)
+	}
+	if got := s.ListenHandler.udpProbePayload(53); !bytes.Equal(got, []byte{0xAA, 0xBB}) {
+		t.Fatalf("handler got %x, want AABB", got)
+	}
+}
+
+// TestSetUDPProbeProviderConcurrentReads confirms repeated reads from
+// many goroutines see a consistent provider. The atomic story is gone
+// (the provider lives in plain struct fields), so this guards the
+// invariant that we install the provider once before the scan starts
+// rather than mutating it mid-flight.
+func TestSetUDPProbeProviderConcurrentReads(t *testing.T) {
+	s := newScannerWithProvider(stubProvider{wantPort: 53, payload: []byte{0xAA, 0xBB}})
 
 	var wg sync.WaitGroup
 	results := make([][]byte, 8)
@@ -59,7 +82,7 @@ func TestSetUDPProbeProviderRoundTrips(t *testing.T) {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
-			results[i] = udpProbePayload(53)
+			results[i] = s.udpProbePayload(53)
 		}(i)
 	}
 	wg.Wait()
@@ -70,23 +93,27 @@ func TestSetUDPProbeProviderRoundTrips(t *testing.T) {
 	}
 }
 
-// TestSetNilRestoresNoop guarantees that passing nil reverts to the
-// no-op provider instead of panicking on a nil receiver later.
-func TestSetNilRestoresNoop(t *testing.T) {
-	withProvider(t, stubProvider{wantPort: 53, payload: []byte{0x01}})
-	SetUDPProbeProvider(nil)
-	if got := udpProbePayload(53); got != nil {
-		t.Fatalf("expected nil after SetUDPProbeProvider(nil), got %x", got)
+// TestSetUDPProbeProviderNilDisables guarantees that passing nil
+// clears the provider on both the scanner and its handler, returning
+// to the legacy zero-length-datagram behavior.
+func TestSetUDPProbeProviderNilDisables(t *testing.T) {
+	s := newScannerWithProvider(stubProvider{wantPort: 53, payload: []byte{0x01}})
+	s.SetUDPProbeProvider(nil)
+	if got := s.udpProbePayload(53); got != nil {
+		t.Fatalf("scanner expected nil after SetUDPProbeProvider(nil), got %x", got)
+	}
+	if got := s.ListenHandler.udpProbePayload(53); got != nil {
+		t.Fatalf("handler expected nil after SetUDPProbeProvider(nil), got %x", got)
 	}
 }
 
 // TestUDPLayersWithProbeAppendsPayload pins the wire format: when the
-// provider returns bytes for the destination port, those bytes appear
-// as the UDP payload in the serialized packet. This is the contract
-// that the raw scan path relies on.
+// handler's provider returns bytes for the destination port, those
+// bytes appear as the UDP payload in the serialized packet. This is
+// the contract that the raw scan path relies on.
 func TestUDPLayersWithProbeAppendsPayload(t *testing.T) {
 	probe := []byte{0xDE, 0xAD, 0xBE, 0xEF}
-	withProvider(t, stubProvider{wantPort: 53, payload: probe})
+	s := newScannerWithProvider(stubProvider{wantPort: 53, payload: probe})
 
 	udp := &layers.UDP{
 		SrcPort: layers.UDPPort(12345),
@@ -105,7 +132,7 @@ func TestUDPLayersWithProbeAppendsPayload(t *testing.T) {
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
-	if err := gopacket.SerializeLayers(buf, opts, udpLayersWithProbe(udp, 53)...); err != nil {
+	if err := gopacket.SerializeLayers(buf, opts, s.ListenHandler.udpLayersWithProbe(udp, 53)...); err != nil {
 		t.Fatalf("SerializeLayers: %v", err)
 	}
 	if !bytes.HasSuffix(buf.Bytes(), probe) {
@@ -118,7 +145,7 @@ func TestUDPLayersWithProbeAppendsPayload(t *testing.T) {
 // matches the pre-feature shape (just the UDP header), preserving the
 // historical wire behavior for callers who don't opt in.
 func TestUDPLayersWithProbeEmptyKeepsLegacyShape(t *testing.T) {
-	withProvider(t, stubProvider{wantPort: 999})
+	s := newScannerWithProvider(stubProvider{wantPort: 999})
 
 	udp := &layers.UDP{
 		SrcPort: layers.UDPPort(12345),
@@ -137,7 +164,7 @@ func TestUDPLayersWithProbeEmptyKeepsLegacyShape(t *testing.T) {
 
 	buf := gopacket.NewSerializeBuffer()
 	opts := gopacket.SerializeOptions{ComputeChecksums: true, FixLengths: true}
-	if err := gopacket.SerializeLayers(buf, opts, udpLayersWithProbe(udp, 53)...); err != nil {
+	if err := gopacket.SerializeLayers(buf, opts, s.ListenHandler.udpLayersWithProbe(udp, 53)...); err != nil {
 		t.Fatalf("SerializeLayers: %v", err)
 	}
 	if got := len(buf.Bytes()); got != 8 {
@@ -270,15 +297,15 @@ func TestUDPProbesAgainstRealServers(t *testing.T) {
 	ntpPort, ntpCleanup := startNTPServer(t)
 	defer ntpCleanup()
 
-	withProvider(t, remapProvider{
-		db:    db,
-		remap: map[int]int{dnsPort: 53, ntpPort: 123},
-	})
-
 	scanner, err := NewScanner(&Options{})
 	if err != nil {
 		t.Fatalf("NewScanner: %v", err)
 	}
+	t.Cleanup(func() { _ = scanner.Close() })
+	scanner.SetUDPProbeProvider(remapProvider{
+		db:    db,
+		remap: map[int]int{dnsPort: 53, ntpPort: 123},
+	})
 
 	cases := []struct {
 		name   string
@@ -311,9 +338,9 @@ func TestUDPProbesAgainstRealServers(t *testing.T) {
 	// port comes back as not-open. This locks in the legacy behavior
 	// users get without -uP.
 	t.Run("NoProviderNoOpen", func(t *testing.T) {
-		SetUDPProbeProvider(nil)
+		scanner.SetUDPProbeProvider(nil)
 		t.Cleanup(func() {
-			SetUDPProbeProvider(remapProvider{db: db, remap: map[int]int{dnsPort: 53}})
+			scanner.SetUDPProbeProvider(remapProvider{db: db, remap: map[int]int{dnsPort: 53}})
 		})
 		open, err := scanner.ConnectPort("127.0.0.1", "",
 			&port.Port{Port: dnsPort, Protocol: protocol.UDP}, 500*time.Millisecond)
@@ -350,12 +377,12 @@ func TestUDPProbesCallerPayloadWinsAgainstRealServer(t *testing.T) {
 	dnsPort, cleanup := startDNSServer(t)
 	defer cleanup()
 
-	withProvider(t, stubProvider{wantPort: dnsPort, payload: []byte{0xDE, 0xAD}})
-
 	scanner, err := NewScanner(&Options{})
 	if err != nil {
 		t.Fatalf("NewScanner: %v", err)
 	}
+	t.Cleanup(func() { _ = scanner.Close() })
+	scanner.SetUDPProbeProvider(stubProvider{wantPort: dnsPort, payload: []byte{0xDE, 0xAD}})
 	open, err := scanner.ConnectPort("127.0.0.1", string(dnsProbe),
 		&port.Port{Port: dnsPort, Protocol: protocol.UDP}, 2*time.Second)
 	if err != nil {

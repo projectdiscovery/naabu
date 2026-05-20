@@ -105,6 +105,13 @@ type Scanner struct {
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
 	workersWg            sync.WaitGroup
+	// UDPProbeProvider supplies per-port UDP payloads when the
+	// scanner runs in -uP mode. Keeping it on the Scanner (rather
+	// than as a package-global) lets independent runners coexist in
+	// the same process without clobbering each other; SetUDPProbeProvider
+	// also pushes the value into the ListenHandler so the raw send
+	// path sees it.
+	UDPProbeProvider UDPProbeProvider
 }
 
 // PkgSend is a TCP package
@@ -456,12 +463,12 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 			return false, err
 		}
 		// When the caller did not pass a custom payload (-cp), let the
-		// configured UDPProbeProvider produce one for the destination
-		// port. With the no-op provider the bytes stay empty and the
-		// legacy behavior is preserved.
+		// configured per-scanner UDPProbeProvider produce one for the
+		// destination port. With no provider the bytes stay empty
+		// and the legacy behavior is preserved.
 		body := []byte(payload)
 		if len(body) == 0 {
-			body = udpProbePayload(p.Port)
+			body = s.udpProbePayload(p.Port)
 		}
 		if _, err := conn.Write(body); err != nil {
 			return false, err
