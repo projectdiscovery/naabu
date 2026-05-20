@@ -68,11 +68,10 @@ func (options *Options) ValidateOptions() error {
 	}
 
 	if fileutil.FileExists(options.Resolvers) {
-		chanResolvers, err := fileutil.ReadFile(options.Resolvers)
-		if err != nil {
-			return err
-		}
-		for resolver := range chanResolvers {
+		for resolver, err := range fileutil.Lines(options.Resolvers) {
+			if err != nil {
+				return err
+			}
 			options.baseResolvers = append(options.baseResolvers, resolver)
 		}
 	} else if options.Resolvers != "" {
