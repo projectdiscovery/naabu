@@ -39,6 +39,12 @@ type ListenHandler struct {
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult
+	// UDPProbeProvider is the per-handler probe source used by the
+	// raw UDP send path. It is copied here from the owning Scanner so
+	// sendAsyncUDP4/6 do not need a Scanner reference; nil means "no
+	// probing", which preserves the legacy zero-length-datagram
+	// behavior for callers that have not opted in to -uP.
+	UDPProbeProvider UDPProbeProvider
 }
 
 func NewListenHandler() *ListenHandler {

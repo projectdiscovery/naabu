@@ -20,11 +20,10 @@ func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	}
 
 	if options.ExcludeIpsFile != "" {
-		cdata, err := fileutil.ReadFile(options.ExcludeIpsFile)
-		if err != nil {
-			return excludedIps, err
-		}
-		for host := range cdata {
+		for host, err := range fileutil.Lines(options.ExcludeIpsFile) {
+			if err != nil {
+				return excludedIps, err
+			}
 			ips, err := r.getExcludeItems(host)
 			if err != nil {
 				return nil, err
