@@ -1,0 +1,63 @@
+package runner
+
+import (
+	"bytes"
+	"testing"
+
+	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
+)
+
+func makeUDPProbe(name string, rarity int, payload []byte, ports ...int) *fingerprint.ServiceProbe {
+	ps := fingerprint.NewPortSet()
+	for _, p := range ports {
+		ps.Add(p)
+	}
+	return &fingerprint.ServiceProbe{
+		Protocol: "UDP",
+		Name:     name,
+		Data:     payload,
+		Ports:    ps,
+		Rarity:   rarity,
+	}
+}
+
+// TestUDPProbeAdapterReturnsBytes is the happy-path contract: a probe
+// DB containing a UDP probe for a port produces that probe's payload
+// when the scan package asks for it.
+func TestUDPProbeAdapterReturnsBytes(t *testing.T) {
+	db := &fingerprint.ProbeDB{
+		Probes: []*fingerprint.ServiceProbe{
+			makeUDPProbe("DNS", 1, []byte{0x00, 0x06, 0x01}, 53),
+		},
+	}
+	a := udpProbeAdapter{db: db}
+	got := a.UDPProbe(53)
+	if !bytes.Equal(got, []byte{0x00, 0x06, 0x01}) {
+		t.Fatalf("UDPProbe(53) = %x, want 000601", got)
+	}
+}
+
+// TestUDPProbeAdapterUnknownPort documents that ports without a probe
+// produce nil, which is the signal the scan layer uses to keep its
+// empty-payload behavior.
+func TestUDPProbeAdapterUnknownPort(t *testing.T) {
+	db := &fingerprint.ProbeDB{
+		Probes: []*fingerprint.ServiceProbe{
+			makeUDPProbe("DNS", 1, []byte{0xAA}, 53),
+		},
+	}
+	a := udpProbeAdapter{db: db}
+	if got := a.UDPProbe(8080); got != nil {
+		t.Fatalf("UDPProbe(8080) = %x, want nil", got)
+	}
+}
+
+// TestUDPProbeAdapterNilDB confirms the nil-receiver contract: the
+// adapter must work even when the probe file could not be loaded, so
+// the scan path never panics on a misconfigured runner.
+func TestUDPProbeAdapterNilDB(t *testing.T) {
+	a := udpProbeAdapter{db: nil}
+	if got := a.UDPProbe(53); got != nil {
+		t.Fatalf("UDPProbe(53) with nil DB = %x, want nil", got)
+	}
+}

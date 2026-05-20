@@ -455,7 +455,15 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 		if err := conn.SetWriteDeadline(time.Now().Add(timeout)); err != nil {
 			return false, err
 		}
-		if _, err := conn.Write([]byte(payload)); err != nil {
+		// When the caller did not pass a custom payload (-cp), let the
+		// configured UDPProbeProvider produce one for the destination
+		// port. With the no-op provider the bytes stay empty and the
+		// legacy behavior is preserved.
+		body := []byte(payload)
+		if len(body) == 0 {
+			body = udpProbePayload(p.Port)
+		}
+		if _, err := conn.Write(body); err != nil {
 			return false, err
 		}
 		if err := conn.SetReadDeadline(time.Now().Add(timeout)); err != nil {

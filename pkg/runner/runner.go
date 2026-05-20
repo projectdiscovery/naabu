@@ -66,6 +66,11 @@ type Runner struct {
 	fpMu         sync.Mutex
 	fpCancel     context.CancelFunc
 	fpCloseOnce  sync.Once
+	// probeDB is the parsed nmap-service-probes database, shared
+	// between service version detection (-sV) and the UDP probe
+	// injection path (-uP). It is nil until one of those features
+	// triggers a successful load.
+	probeDB *fingerprint.ProbeDB
 }
 
 type Target struct {
@@ -386,6 +391,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	}
 
 	r.initServiceDetection(ctx)
+	r.initUDPProbes()
 
 	if r.options.Stream {
 		go r.Load() //nolint
@@ -1094,15 +1100,13 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 		return
 	}
 
-	db, err := fingerprint.ParseProbeFile(probeFile)
+	db, err := r.loadProbeDB(probeFile)
 	if err != nil {
 		gologger.Info().Label("WRN").Msgf("could not load service probes from %s, skipping -sV", probeFile)
 		r.options.ServiceVersion = false
 		scan.EnableTLSDetection = false
 		return
 	}
-
-	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), probeFile)
 
 	var opts []fingerprint.Option
 	opts = append(opts, fingerprint.WithWorkers(r.options.ServiceVersionWorkers))

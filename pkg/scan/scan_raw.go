@@ -307,7 +307,7 @@ func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.UdpConn4, &udp)
+		err = sendWithConn(ip, listenHandler.UdpConn4, udpLayersWithProbe(&udp, p.Port)...)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
@@ -413,7 +413,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.UdpConn6, &udp)
+		err = sendWithConn(ip, listenHandler.UdpConn6, udpLayersWithProbe(&udp, p.Port)...)
 		if err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
