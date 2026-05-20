@@ -42,6 +42,7 @@ all ports that return a reply.
  - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
  - **Custom UDP payloads** for CONNECT scans
+ - **Native UDP service probes** powered by nmap-service-probes
  - Multiple input support - **STDIN/HOST/IP/CIDR/ASN**
  - Multiple output format support - **JSON/TXT/STDOUT**
 
@@ -93,6 +94,7 @@ SERVICES-DISCOVERY:
    -sV-timeout duration              timeout for service version probes (default 5s)
    -sV-workers int                   number of concurrent service version workers (default 25)
    -sV-probes string                 custom nmap-service-probes file path (auto-detected if empty)
+   -uP, -udp-probes                  send protocol-specific payloads on UDP scans using nmap-service-probes
 
 CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
@@ -404,6 +406,21 @@ Available flags:
 | `-sD` | Service discovery (match port number to service name, no active probing) |
 
 The `-sV` flag requires the `nmap-service-probes` database file. Naabu automatically looks for it in standard nmap installation paths. To use a custom file, specify the path with `-sV-probes`.
+
+# UDP Service Probes
+
+UDP services typically stay silent when they receive an empty datagram, so a blind UDP port scan misses most of them. With `-uP` (`-udp-probes`) naabu picks a protocol-specific payload from the `nmap-service-probes` database for each UDP port being scanned (DNS query for 53, NTP request for 123, SNMPv1 GetRequest for 161, and so on), so real services have something to reply to and naabu can report them as open.
+
+```sh
+naabu -host scanme.sh -p u:53,u:123,u:161 -uP
+```
+
+Notes:
+
+- `-uP` is opt-in and additive. When disabled (the default) UDP scans keep their historical zero-length-datagram behavior.
+- The selected probe is the highest-priority (lowest-rarity) match for the destination port; if no probe is registered for a port the scan falls back to the empty datagram.
+- A user-supplied payload via `-cp` always wins over the automatic probe for that port.
+- `-uP` reuses the same probe database as `-sV`, so you can combine the two without paying the parse cost twice. The probe file is auto-located from standard nmap install paths; use `-sV-probes` to point at a custom file. If no database can be found `-uP` logs a warning and is silently disabled.
 
 # CDN/WAF Exclusion
 

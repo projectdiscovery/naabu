@@ -42,7 +42,13 @@ func (a udpProbeAdapter) UDPProbe(port int) []byte {
 // scan package's UDP send path. The feature is opt-in via -uP; when
 // disabled or when no probe file is available the call is a no-op and
 // UDP scanning keeps its historical empty-payload behavior.
+//
+// The global provider is reset up-front so a stale adapter from a
+// previous Runner (when naabu is used as a library) cannot leak into
+// the current scan; the real adapter is installed only after the
+// probe database is parsed successfully.
 func (r *Runner) initUDPProbes() {
+	scan.SetUDPProbeProvider(nil)
 	if !r.options.UDPProbes {
 		return
 	}

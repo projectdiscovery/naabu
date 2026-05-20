@@ -5,7 +5,12 @@ import (
 	"testing"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 )
+
+type stubProvider struct{ payload []byte }
+
+func (s stubProvider) UDPProbe(int) []byte { return s.payload }
 
 func makeUDPProbe(name string, rarity int, payload []byte, ports ...int) *fingerprint.ServiceProbe {
 	ps := fingerprint.NewPortSet()
@@ -59,5 +64,39 @@ func TestUDPProbeAdapterNilDB(t *testing.T) {
 	a := udpProbeAdapter{db: nil}
 	if got := a.UDPProbe(53); got != nil {
 		t.Fatalf("UDPProbe(53) with nil DB = %x, want nil", got)
+	}
+}
+
+// TestInitUDPProbesDisabledClearsStaleProvider guards the library use
+// case where two runners share a process: a previous run that turned
+// -uP on must not leak its provider into a follow-up run that has
+// -uP off. initUDPProbes restores the no-op provider before doing
+// anything else, so the global is clean regardless of which path is
+// taken.
+func TestInitUDPProbesDisabledClearsStaleProvider(t *testing.T) {
+	scan.SetUDPProbeProvider(stubProvider{payload: []byte{0xDE, 0xAD}})
+	t.Cleanup(func() { scan.SetUDPProbeProvider(nil) })
+
+	r := &Runner{options: &Options{UDPProbes: false}}
+	r.initUDPProbes()
+
+	if got := scan.GetUDPProbeProvider().UDPProbe(53); got != nil {
+		t.Fatalf("stale provider leaked: UDPProbe(53) = %x, want nil", got)
+	}
+}
+
+// TestInitUDPProbesMissingFileClearsStaleProvider documents the same
+// invariant for the failure path: enabling -uP without a discoverable
+// nmap-service-probes file must not silently keep a previous run's
+// adapter active.
+func TestInitUDPProbesMissingFileClearsStaleProvider(t *testing.T) {
+	scan.SetUDPProbeProvider(stubProvider{payload: []byte{0xBE, 0xEF}})
+	t.Cleanup(func() { scan.SetUDPProbeProvider(nil) })
+
+	r := &Runner{options: &Options{UDPProbes: true, ServiceProbesFile: "/does/not/exist/nmap-service-probes"}}
+	r.initUDPProbes()
+
+	if got := scan.GetUDPProbeProvider().UDPProbe(53); got != nil {
+		t.Fatalf("stale provider leaked on load failure: UDPProbe(53) = %x, want nil", got)
 	}
 }
