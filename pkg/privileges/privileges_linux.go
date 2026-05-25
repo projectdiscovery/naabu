@@ -23,11 +23,7 @@ func isPrivileged() bool {
 		defer runtime.UnlockOSThread()
 
 		if err := unix.Capget(&header, &data); err == nil {
-			data.Inheritable = (1 << unix.CAP_NET_RAW)
-
-			if err := unix.Capset(&header, &data); err == nil {
-				return true
-			}
+			return (data.Effective & (1 << unix.CAP_NET_RAW)) != 0
 		}
 	}
 	return os.Geteuid() == 0
