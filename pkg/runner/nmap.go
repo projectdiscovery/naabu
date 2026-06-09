@@ -283,6 +283,7 @@ func (r *Runner) convertNmapPortToNaabuPort(nmapPort nmap.Port) *port.Port {
 			Method:      nmapPort.Service.Method,
 			Proto:       nmapPort.Service.Proto,
 			RPCNum:      nmapPort.Service.RPCNum,
+			Banner:      nmapPort.Service.ServiceFP,
 			ServiceFP:   nmapPort.Service.ServiceFP,
 			Tunnel:      nmapPort.Service.Tunnel,
 			LowVersion:  nmapPort.Service.LowVersion,

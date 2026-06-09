@@ -421,40 +421,70 @@ func (e *Engine) runProbe(ctx context.Context, sp *ServiceProbe, t Target, addr 
 // collectMatchSets gathers all match lists (probe + fallbacks) for early-match.
 func (e *Engine) collectMatchSets(sp *ServiceProbe) [][]*Match {
 	sets := [][]*Match{sp.Matches}
+	for _, fbProbe := range e.matchFallbackProbes(sp) {
+		sets = append(sets, fbProbe.Matches)
+	}
+	return sets
+}
+
+func (e *Engine) matchFallbackProbes(sp *ServiceProbe) []*ServiceProbe {
+	var probes []*ServiceProbe
+	seen := make(map[string]struct{})
+
 	if sp.Fallback != "" {
 		for _, fbName := range strings.Split(sp.Fallback, ",") {
 			fbName = strings.TrimSpace(fbName)
+			if fbName == "" {
+				continue
+			}
 			if fbProbe := e.findProbe(fbName); fbProbe != nil {
-				sets = append(sets, fbProbe.Matches)
+				probes = append(probes, fbProbe)
+				seen[strings.ToLower(fbProbe.Name)] = struct{}{}
 			}
 		}
 	}
-	return sets
+
+	// Nmap treats the tail of the NULL probe as a global fallback bucket:
+	// responses from probes such as GenericLines can match softmatches stored
+	// under NULL, including Golang net/http's generic 400 response.
+	if sp.Name != "NULL" {
+		if _, ok := seen["null"]; !ok {
+			if nullProbe := e.findProbe("NULL"); nullProbe != nil {
+				probes = append(probes, nullProbe)
+			}
+		}
+	}
+
+	return probes
 }
 
 // matchResponse tries all hard matches, then all soft matches including fallbacks.
 func (e *Engine) matchResponse(sp *ServiceProbe, hardSets [][]*Match, response []byte) (*MatchResult, *MatchResult) {
 	for _, matches := range hardSets {
 		if result := e.tryMatches(matches, response); result != nil {
-			return result, nil
+			return result.withBanner(response), nil
 		}
 	}
 
 	if soft := e.tryMatches(sp.SoftMatches, response); soft != nil {
-		return nil, soft
+		return nil, soft.withBanner(response)
 	}
-	if sp.Fallback != "" {
-		for _, fbName := range strings.Split(sp.Fallback, ",") {
-			fbName = strings.TrimSpace(fbName)
-			if fbProbe := e.findProbe(fbName); fbProbe != nil {
-				if soft := e.tryMatches(fbProbe.SoftMatches, response); soft != nil {
-					return nil, soft
-				}
-			}
+	for _, fbProbe := range e.matchFallbackProbes(sp) {
+		if soft := e.tryMatches(fbProbe.SoftMatches, response); soft != nil {
+			return nil, soft.withBanner(response)
 		}
 	}
 
 	return nil, nil
+}
+
+func (mr *MatchResult) withBanner(response []byte) *MatchResult {
+	if mr == nil {
+		return nil
+	}
+	cp := *mr
+	cp.Banner = bytesToLatin1(response)
+	return &cp
 }
 
 // readResponseWithEarlyMatch accumulates data from the connection, trying
@@ -790,6 +820,9 @@ func (e *Engine) findProbe(name string) *ServiceProbe {
 }
 
 func matchResultToResult(mr *MatchResult, isTLS bool, banner string) *Result {
+	if banner == "" {
+		banner = mr.Banner
+	}
 	return &Result{
 		Name:       mr.Service,
 		Product:    mr.Product,

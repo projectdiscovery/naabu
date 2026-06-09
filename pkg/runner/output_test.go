@@ -45,6 +45,7 @@ func TestCopyServiceFieldsWithService(t *testing.T) {
 		Version:   "8.9",
 		ExtraInfo: "protocol 2.0",
 		OSType:    "Linux",
+		Banner:    "SSH-2.0-OpenSSH_8.9",
 		ServiceFP: "SSH-2.0-OpenSSH_8.9",
 		Method:    "probe",
 		CPEs:      []string{"cpe:/a:openbsd:openssh:8.9"},
@@ -58,6 +59,7 @@ func TestCopyServiceFieldsWithService(t *testing.T) {
 	assert.Equal(t, "8.9", result.Version)
 	assert.Equal(t, "protocol 2.0", result.ExtraInfo)
 	assert.Equal(t, "Linux", result.OSType)
+	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", result.Banner)
 	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", result.ServiceFP)
 	assert.Equal(t, "probe", result.Method)
 	assert.Equal(t, []string{"cpe:/a:openbsd:openssh:8.9"}, result.CPEs)
@@ -108,6 +110,7 @@ func TestWriteJSONOutputWithServiceInfo(t *testing.T) {
 				Product:   "OpenSSH",
 				Version:   "8.9",
 				Method:    "probe",
+				Banner:    "SSH-2.0-OpenSSH_8.9",
 				ServiceFP: "SSH-2.0-OpenSSH_8.9",
 				CPEs:      []string{"cpe:/a:openbsd:openssh:8.9"},
 			},
@@ -126,6 +129,7 @@ func TestWriteJSONOutputWithServiceInfo(t *testing.T) {
 	assert.Equal(t, "OpenSSH", parsed["product"])
 	assert.Equal(t, "8.9", parsed["version"])
 	assert.Equal(t, "probe", parsed["method"])
+	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", parsed["banner"])
 	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", parsed["service_fp"])
 
 	cpesRaw, ok := parsed["cpes"]

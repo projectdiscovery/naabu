@@ -276,8 +276,8 @@ func (r remapProvider) UDPProbe(p int) []byte {
 }
 
 // TestUDPProbesAgainstRealServers is the headline end-to-end test:
-// it loads the real nmap-service-probes file installed on the host,
-// stands up real DNS and NTP responders in-process, and drives
+// it loads the embedded nmap-service-probes snapshot, stands up real
+// DNS and NTP responders in-process, and drives
 // ConnectPort. A port is reported as open only when the actual probe
 // bytes nmap ships for that service elicit a real protocol response,
 // which is the user-visible behavior naabu#1633 is asking for. The

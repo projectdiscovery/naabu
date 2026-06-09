@@ -93,7 +93,8 @@ SERVICES-DISCOVERY:
    -sV-fast                          only probe port-hinted services (faster, skips fallback)
    -sV-timeout duration              timeout for service version probes (default 5s)
    -sV-workers int                   number of concurrent service version workers (default 25)
-   -sV-probes string                 custom nmap-service-probes file path (auto-detected if empty)
+   -sV-probes string                 custom nmap-service-probes file path (uses managed cache or embedded probes if empty)
+   -sV-update-probes                 update managed nmap-service-probes cache and exit
    -uP, -udp-probes                  send protocol-specific payloads on UDP scans using nmap-service-probes
 
 CONFIGURATION:
@@ -402,10 +403,11 @@ Available flags:
 | `-sV-fast` | Only probe port-hinted services (faster, skips fallback probes) |
 | `-sV-timeout duration` | Timeout for service version probes (default 5s) |
 | `-sV-workers int` | Number of concurrent service version workers (default 25) |
-| `-sV-probes string` | Custom nmap-service-probes file path (auto-detected if empty) |
+| `-sV-probes string` | Custom nmap-service-probes file path (uses managed cache or embedded probes if empty) |
+| `-sV-update-probes` | Update the managed nmap-service-probes cache and exit |
 | `-sD` | Service discovery (match port number to service name, no active probing) |
 
-The `-sV` flag requires the `nmap-service-probes` database file. Naabu automatically looks for it in standard nmap installation paths. To use a custom file, specify the path with `-sV-probes`.
+Naabu ships with an embedded `nmap-service-probes` snapshot, so `-sV` works without a local nmap installation. To refresh the managed user cache from the official Nmap source, run `naabu -sV-update-probes`. To use a custom local probe file, specify the path with `-sV-probes`.
 
 # UDP Service Probes
 
@@ -420,7 +422,7 @@ Notes:
 - `-uP` is opt-in and additive. When disabled (the default) UDP scans keep their historical zero-length-datagram behavior.
 - The selected probe is the highest-priority (lowest-rarity) match for the destination port; if no probe is registered for a port the scan falls back to the empty datagram.
 - A user-supplied payload via `-cp` always wins over the automatic probe for that port.
-- `-uP` reuses the same probe database as `-sV`, so you can combine the two without paying the parse cost twice. The probe file is auto-located from standard nmap install paths; use `-sV-probes` to point at a custom file. If no database can be found `-uP` logs a warning and is silently disabled.
+- `-uP` reuses the same probe database as `-sV`, so you can combine the two without paying the parse cost twice. The managed cache is used first, then the embedded snapshot; use `-sV-probes` to point at a custom local file.
 
 # CDN/WAF Exclusion
 
