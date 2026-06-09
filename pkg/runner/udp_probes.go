@@ -5,19 +5,19 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 )
 
-// loadProbeDB parses the nmap-service-probes file at path the first
-// time it is asked and memoises the result on the runner, so a follow
-// up call from a different feature (e.g. -uP after -sV) reuses the
-// already-parsed database instead of paying the parse cost twice.
+// loadProbeDB parses the nmap-service-probes database the first time it is
+// asked and memoises the result on the runner, so a follow up call from a
+// different feature (e.g. -uP after -sV) reuses the already-parsed database
+// instead of paying the parse cost twice.
 func (r *Runner) loadProbeDB(path string) (*fingerprint.ProbeDB, error) {
 	if r.probeDB != nil {
 		return r.probeDB, nil
 	}
-	db, err := fingerprint.ParseProbeFile(path)
+	db, source, err := fingerprint.ParseProbeSource(path)
 	if err != nil {
 		return nil, err
 	}
-	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), path)
+	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), source)
 	r.probeDB = db
 	return db, nil
 }
@@ -54,18 +54,9 @@ func (r *Runner) initUDPProbes() {
 	if !r.options.UDPProbes {
 		return
 	}
-	probeFile := r.options.ServiceProbesFile
-	if probeFile == "" {
-		probeFile = fingerprint.LocateNmapProbes()
-	}
-	if probeFile == "" {
-		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, -uP has nothing to send. Install nmap or specify the path with --sV-probes")
-		r.options.UDPProbes = false
-		return
-	}
-	db, err := r.loadProbeDB(probeFile)
+	db, err := r.loadProbeDB(r.options.ServiceProbesFile)
 	if err != nil {
-		gologger.Info().Label("WRN").Msgf("could not load service probes from %s for -uP: %s", probeFile, err)
+		gologger.Info().Label("WRN").Msgf("could not load service probes for -uP: %s", err)
 		r.options.UDPProbes = false
 		return
 	}

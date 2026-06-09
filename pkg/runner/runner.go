@@ -35,13 +35,13 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/ratelimit"
-	"golang.org/x/net/proxy"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 	"github.com/remeh/sizedwaitgroup"
+	"golang.org/x/net/proxy"
 )
 
 // Runner is an instance of the port enumeration
@@ -60,12 +60,12 @@ type Runner struct {
 
 	unique gcache.Cache[string, struct{}]
 
-	fpTargetCh   chan fingerprint.Target
-	fpDone       chan struct{}
-	fpServices   map[string]*port.Service
-	fpMu         sync.Mutex
-	fpCancel     context.CancelFunc
-	fpCloseOnce  sync.Once
+	fpTargetCh  chan fingerprint.Target
+	fpDone      chan struct{}
+	fpServices  map[string]*port.Service
+	fpMu        sync.Mutex
+	fpCancel    context.CancelFunc
+	fpCloseOnce sync.Once
 	// probeDB is the parsed nmap-service-probes database, shared
 	// between service version detection (-sV) and the UDP probe
 	// injection path (-uP). It is nil until one of those features
@@ -1089,20 +1089,9 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 		return
 	}
 
-	probeFile := r.options.ServiceProbesFile
-	if probeFile == "" {
-		probeFile = fingerprint.LocateNmapProbes()
-	}
-	if probeFile == "" {
-		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, skipping -sV. Install nmap or specify the path with --sV-probes")
-		r.options.ServiceVersion = false
-		scan.EnableTLSDetection = false
-		return
-	}
-
-	db, err := r.loadProbeDB(probeFile)
+	db, err := r.loadProbeDB(r.options.ServiceProbesFile)
 	if err != nil {
-		gologger.Info().Label("WRN").Msgf("could not load service probes from %s, skipping -sV", probeFile)
+		gologger.Info().Label("WRN").Msgf("could not load service probes, skipping -sV: %s", err)
 		r.options.ServiceVersion = false
 		scan.EnableTLSDetection = false
 		return

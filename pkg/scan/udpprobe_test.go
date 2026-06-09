@@ -281,13 +281,9 @@ func (r remapProvider) UDPProbe(p int) []byte {
 // ConnectPort. A port is reported as open only when the actual probe
 // bytes nmap ships for that service elicit a real protocol response,
 // which is the user-visible behavior naabu#1633 is asking for. The
-// test skips cleanly on hosts without nmap installed.
+// test uses the embedded nmap-service-probes snapshot.
 func TestUDPProbesAgainstRealServers(t *testing.T) {
-	probesPath := fingerprint.LocateNmapProbes()
-	if probesPath == "" {
-		t.Skip("nmap-service-probes not found on system")
-	}
-	db, err := fingerprint.ParseProbeFile(probesPath)
+	db, err := fingerprint.ParseEmbeddedProbes()
 	if err != nil {
 		t.Fatalf("parse nmap-service-probes: %v", err)
 	}
@@ -361,11 +357,7 @@ func TestUDPProbesAgainstRealServers(t *testing.T) {
 // proving the bytes actually came from the caller and not from the
 // provider.
 func TestUDPProbesCallerPayloadWinsAgainstRealServer(t *testing.T) {
-	probesPath := fingerprint.LocateNmapProbes()
-	if probesPath == "" {
-		t.Skip("nmap-service-probes not found on system")
-	}
-	db, err := fingerprint.ParseProbeFile(probesPath)
+	db, err := fingerprint.ParseEmbeddedProbes()
 	if err != nil {
 		t.Fatalf("parse nmap-service-probes: %v", err)
 	}

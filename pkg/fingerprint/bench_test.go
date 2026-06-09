@@ -57,11 +57,7 @@ func startCountingServer(banner string, respond func([]byte) []byte) (int, *conn
 }
 
 func loadRealDB(tb testing.TB) *ProbeDB {
-	path := LocateNmapProbes()
-	if path == "" {
-		tb.Skip("nmap-service-probes not found")
-	}
-	db, err := ParseProbeFile(path)
+	db, err := ParseEmbeddedProbes()
 	if err != nil {
 		tb.Fatal(err)
 	}
@@ -86,15 +82,11 @@ func BenchmarkFingerprintSSH(b *testing.B) {
 	}
 }
 
-// BenchmarkParseProbeFile measures nmap-service-probes file parsing time.
+// BenchmarkParseProbeFile measures embedded nmap-service-probes parsing time.
 func BenchmarkParseProbeFile(b *testing.B) {
-	path := LocateNmapProbes()
-	if path == "" {
-		b.Skip("nmap-service-probes not found")
-	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		db, err := ParseProbeFile(path)
+		db, err := ParseEmbeddedProbes()
 		if err != nil {
 			b.Fatal(err)
 		}

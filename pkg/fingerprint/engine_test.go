@@ -207,7 +207,7 @@ totalwaitms 5000
 match test m|^hello| p/Test/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close() //nolint:errcheck
+		defer conn.Close()           //nolint:errcheck
 		time.Sleep(10 * time.Second) // hang forever
 	})
 	defer cleanup()
@@ -421,12 +421,7 @@ ports 80
 }
 
 func TestEngineWithRealProbes(t *testing.T) {
-	path := LocateNmapProbes()
-	if path == "" {
-		t.Skip("nmap-service-probes not found on system")
-	}
-
-	db, err := ParseProbeFile(path)
+	db, err := ParseEmbeddedProbes()
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
@@ -462,12 +457,7 @@ func TestEngineWithRealProbes(t *testing.T) {
 }
 
 func TestEngineWithRealProbesFTP(t *testing.T) {
-	path := LocateNmapProbes()
-	if path == "" {
-		t.Skip("nmap-service-probes not found on system")
-	}
-
-	db, err := ParseProbeFile(path)
+	db, err := ParseEmbeddedProbes()
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
@@ -502,12 +492,7 @@ func TestEngineWithRealProbesFTP(t *testing.T) {
 }
 
 func TestEngineWithRealProbesHTTP(t *testing.T) {
-	path := LocateNmapProbes()
-	if path == "" {
-		t.Skip("nmap-service-probes not found on system")
-	}
-
-	db, err := ParseProbeFile(path)
+	db, err := ParseEmbeddedProbes()
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
