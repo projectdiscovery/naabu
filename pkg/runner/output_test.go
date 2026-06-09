@@ -106,13 +106,12 @@ func TestWriteJSONOutputWithServiceInfo(t *testing.T) {
 			Port:     22,
 			Protocol: protocol.TCP,
 			Service: &port.Service{
-				Name:      "ssh",
-				Product:   "OpenSSH",
-				Version:   "8.9",
-				Method:    "probe",
-				Banner:    "SSH-2.0-OpenSSH_8.9",
-				ServiceFP: "SSH-2.0-OpenSSH_8.9",
-				CPEs:      []string{"cpe:/a:openbsd:openssh:8.9"},
+				Name:    "ssh",
+				Product: "OpenSSH",
+				Version: "8.9",
+				Method:  "probe",
+				Banner:  "SSH-2.0-OpenSSH_8.9",
+				CPEs:    []string{"cpe:/a:openbsd:openssh:8.9"},
 			},
 		},
 	}
@@ -130,7 +129,7 @@ func TestWriteJSONOutputWithServiceInfo(t *testing.T) {
 	assert.Equal(t, "8.9", parsed["version"])
 	assert.Equal(t, "probe", parsed["method"])
 	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", parsed["banner"])
-	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", parsed["service_fp"])
+	assert.NotContains(t, parsed, "service_fp")
 
 	cpesRaw, ok := parsed["cpes"]
 	require.True(t, ok, "JSON output should include cpes field")
