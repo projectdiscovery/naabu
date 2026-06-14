@@ -220,7 +220,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVarP(&options.SystemResolver, "system-resolver", "sr", false, "use system DNS as fallback resolver"),
 		flagSet.BoolVar(&options.Resume, "resume", false, "resume scan using resume.cfg"),
 		flagSet.BoolVar(&options.Stream, "stream", false, "stream mode (disables resume, nmap, verify, retries, shuffling, etc)"),
-		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api"),
+		flagSet.BoolVar(&options.Passive, "passive", false, "display passive open ports using shodan internetdb api (automatically enables stream mode)"),
 		flagSet.DurationVarP(&options.InputReadTimeout, "input-read-timeout", "irt", time.Duration(3*time.Minute), "timeout on input read"),
 		flagSet.BoolVar(&options.DisableStdin, "no-stdin", false, "Disable Stdin processing"),
 	)
@@ -261,7 +261,7 @@ func ParseOptions() *Options {
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
-		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model"),
+		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model (not compatible with stream mode)"),
 		flagSet.IntVarP(&options.PredictionThreshold, "prediction-threshold", "pt", 20, "minimum confidence for port predictions (0-100%)"),
 	)
 
