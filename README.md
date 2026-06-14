@@ -114,7 +114,7 @@ CONFIGURATION:
    -sr, -system-resolver            use system DNS as fallback resolver
    -resume                          resume scan using resume.cfg
    -stream                          stream mode (disables resume, nmap, verify, retries, shuffling, etc)
-   -passive                         display passive open ports using shodan internetdb api
+   -passive                         display passive open ports using shodan internetdb api (automatically enables stream mode)
    -irt, -input-read-timeout value  timeout on input read (default 3m0s)
    -no-stdin                        Disable Stdin processing
 
@@ -137,7 +137,7 @@ OPTIMIZATION:
    -warm-up-time int               time in seconds between scan phases (default 2)
    -ping                           ping probes for verification of host
    -verify                         validate the ports again with TCP verification
-   -ss, -smart-scan                predictive port scanning using port correlation model
+   -ss, -smart-scan                predictive port scanning using port correlation model (not compatible with stream mode)
    -pt, -prediction-threshold int  minimum confidence for port predictions (0-100%) (default 20)
 
 DEBUG:
