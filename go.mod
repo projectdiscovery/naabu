@@ -13,7 +13,7 @@ require (
 	github.com/miekg/dns v1.1.62
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.1
-	github.com/projectdiscovery/cdncheck v1.2.39
+	github.com/projectdiscovery/cdncheck v1.2.40
 	github.com/projectdiscovery/clistats v0.1.4
 	github.com/projectdiscovery/dnsx v1.2.3
 	github.com/projectdiscovery/fdmax v0.0.4
@@ -25,7 +25,7 @@ require (
 	github.com/projectdiscovery/networkpolicy v0.1.40
 	github.com/projectdiscovery/ratelimit v0.0.88
 	github.com/projectdiscovery/retryabledns v1.0.115
-	github.com/projectdiscovery/retryablehttp-go v1.3.14
+	github.com/projectdiscovery/retryablehttp-go v1.3.15
 	github.com/projectdiscovery/uncover v1.2.1
 	github.com/projectdiscovery/utils v0.11.1
 	github.com/remeh/sizedwaitgroup v1.0.0
