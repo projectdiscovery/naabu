@@ -70,3 +70,28 @@ func TestHasIP(t *testing.T) {
 	assert.True(t, res.HasIP(targetIP))
 	assert.False(t, res.HasIP("1.2.3.4"))
 }
+
+func TestDeadHosts(t *testing.T) {
+	res := NewResult()
+	assert.False(t, res.HasDeadHosts())
+
+	res.AddDeadHost("10.0.0.1")
+	res.AddDeadHost("10.0.0.2")
+	// adding the same host again must not duplicate it
+	res.AddDeadHost("10.0.0.1")
+
+	assert.True(t, res.HasDeadHosts())
+	assert.ElementsMatch(t, []string{"10.0.0.1", "10.0.0.2"}, res.GetDeadHosts())
+}
+
+func TestMACAddress(t *testing.T) {
+	res := NewResult()
+	assert.Empty(t, res.GetMACAddress("10.0.0.1"))
+
+	res.SetMACAddress("10.0.0.1", "aa:bb:cc:dd:ee:ff")
+	assert.Equal(t, "aa:bb:cc:dd:ee:ff", res.GetMACAddress("10.0.0.1"))
+
+	// empty MAC values are ignored and never overwrite an existing entry
+	res.SetMACAddress("10.0.0.1", "")
+	assert.Equal(t, "aa:bb:cc:dd:ee:ff", res.GetMACAddress("10.0.0.1"))
+}

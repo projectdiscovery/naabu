@@ -33,22 +33,29 @@ type HostResult struct {
 	Confidence confidence.ConfidenceLevel
 	OS         *OSFingerprint
 	MacAddress string
+	MacVendor  string
+	IsDeadHost bool
 }
 
 // Result of the scan
 type Result struct {
 	sync.RWMutex
-	ipPorts map[string]map[string]*port.Port
-	ips     map[string]struct{}
-	skipped map[string]struct{}
+	ipPorts   map[string]map[string]*port.Port
+	ips       map[string]struct{}
+	skipped   map[string]struct{}
+	deadHosts map[string]struct{}
+	macs      map[string]string
 }
 
 // NewResult structure
 func NewResult() *Result {
-	ipPorts := make(map[string]map[string]*port.Port)
-	ips := make(map[string]struct{})
-	skipped := make(map[string]struct{})
-	return &Result{ipPorts: ipPorts, ips: ips, skipped: skipped}
+	return &Result{
+		ipPorts:   make(map[string]map[string]*port.Port),
+		ips:       make(map[string]struct{}),
+		skipped:   make(map[string]struct{}),
+		deadHosts: make(map[string]struct{}),
+		macs:      make(map[string]string),
+	}
 }
 
 // AddPort to a specific ip
@@ -163,6 +170,56 @@ func (r *Result) AddIp(ip string) {
 	defer r.Unlock()
 
 	r.ips[ip] = struct{}{}
+}
+
+// AddDeadHost records an ip that was probed during host discovery but did
+// not respond. Storage is a set, so repeated calls for the same ip are
+// idempotent and never inflate counts.
+func (r *Result) AddDeadHost(ip string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.deadHosts[ip] = struct{}{}
+}
+
+// HasDeadHosts reports whether any dead host has been recorded.
+func (r *Result) HasDeadHosts() bool {
+	r.RLock()
+	defer r.RUnlock()
+
+	return len(r.deadHosts) > 0
+}
+
+// GetDeadHosts returns the list of recorded dead hosts.
+func (r *Result) GetDeadHosts() []string {
+	r.RLock()
+	defer r.RUnlock()
+
+	dead := make([]string, 0, len(r.deadHosts))
+	for ip := range r.deadHosts {
+		dead = append(dead, ip)
+	}
+	return dead
+}
+
+// SetMACAddress associates a hardware address with an ip discovered during
+// host discovery (e.g. captured from an ARP reply).
+func (r *Result) SetMACAddress(ip, mac string) {
+	if mac == "" {
+		return
+	}
+	r.Lock()
+	defer r.Unlock()
+
+	r.macs[ip] = mac
+}
+
+// GetMACAddress returns the hardware address recorded for an ip, if any.
+func (r *Result) GetMACAddress(ip string) string {
+	r.RLock()
+	defer r.RUnlock()
+
+	return r.macs[ip]
 }
 
 // HasIP checks if an ip has been seen

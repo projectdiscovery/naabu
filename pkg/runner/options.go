@@ -91,6 +91,7 @@ type Options struct {
 	OutputCDN         bool // display cdn in use
 	HealthCheck       bool
 	OnlyHostDiscovery bool // Perform only host discovery
+	ShowDeadHosts     bool // Report hosts that did not respond to discovery
 	// Deprecated: use WithHostDiscovery instead
 	SkipHostDiscovery bool // Skip Host discovery
 	WithHostDiscovery bool // Enable Host discovery
@@ -227,6 +228,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("host-discovery", "Host-Discovery",
 		flagSet.BoolVarP(&options.OnlyHostDiscovery, "host-discovery", "sn", false, "Perform Only Host Discovery"),
+		flagSet.BoolVar(&options.ShowDeadHosts, "show-dead", false, "show hosts that did not respond to host discovery (requires host discovery)"),
 		// Deprecated: use WithHostDiscovery instead
 		flagSet.BoolVarP(&options.SkipHostDiscovery, "skip-host-discovery", "Pn", false, "Skip Host discovery"),
 		flagSet.BoolVarP(&options.WithHostDiscovery, "with-host-discovery", "wn", false, "Enable Host discovery"),

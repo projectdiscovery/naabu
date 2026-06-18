@@ -201,3 +201,43 @@ func TestResultJSONOmitsCPEsWhenEmpty(t *testing.T) {
 	_, hasCPEs := parsed["cpes"]
 	assert.False(t, hasCPEs, "cpes should be omitted when empty")
 }
+
+func TestResultJSONDeadHostAndMacVendor(t *testing.T) {
+	r := &Result{
+		IP:         "192.168.1.10",
+		MacAddress: "00:00:0c:11:22:33",
+		MacVendor:  "Cisco Systems, Inc",
+		IsDeadHost: true,
+	}
+
+	b, err := r.JSON(nil)
+	require.NoError(t, err)
+
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(b, &parsed))
+
+	assert.Equal(t, true, parsed["is_dead_host"])
+	assert.Equal(t, "00:00:0c:11:22:33", parsed["mac_address"])
+	assert.Equal(t, "Cisco Systems, Inc", parsed["mac_vendor"])
+}
+
+func TestResultJSONOmitsDeadHostWhenAlive(t *testing.T) {
+	r := &Result{IP: "192.168.1.10", Port: 80, Protocol: "tcp"}
+
+	b, err := r.JSON(nil)
+	require.NoError(t, err)
+
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(b, &parsed))
+
+	_, hasDead := parsed["is_dead_host"]
+	assert.False(t, hasDead, "is_dead_host should be omitted for alive hosts")
+	_, hasVendor := parsed["mac_vendor"]
+	assert.False(t, hasVendor, "mac_vendor should be omitted when empty")
+}
+
+func TestVendorFromMAC(t *testing.T) {
+	assert.Empty(t, vendorFromMAC(""))
+	// 00:00:0C is a well-known IEEE OUI assigned to Cisco
+	assert.Contains(t, vendorFromMAC("00:00:0c:aa:bb:cc"), "Cisco")
+}
