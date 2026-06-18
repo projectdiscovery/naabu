@@ -1,13 +1,11 @@
 package runner
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
 
-	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -121,10 +119,8 @@ type Options struct {
 	ServiceVersionWorkers int
 	// ServiceProbesFile is an optional path to a custom nmap-service-probes file
 	ServiceProbesFile string
-	// ServiceProbesUpdate updates the managed nmap-service-probes cache and exits.
-	ServiceProbesUpdate bool
 	// UDPProbes enables port-scan-time UDP probing using the
-	// nmap-service-probes data already shipped with naabu. When set,
+	// nmap-service-probes data from a locally installed nmap. When set,
 	// each UDP packet's payload is replaced with the highest-priority
 	// probe known for the destination port, instead of an empty
 	// datagram. A caller-supplied connect payload (-cp) still wins.
@@ -255,8 +251,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.ServiceVersionFast, "sV-fast", false, "only probe port-hinted services (faster)"),
 		flagSet.DurationVar(&options.ServiceVersionTimeout, "sV-timeout", 5*time.Second, "timeout for service version probes"),
 		flagSet.IntVar(&options.ServiceVersionWorkers, "sV-workers", 25, "number of concurrent service version workers"),
-		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (uses managed cache or local nmap install if empty)"),
-		flagSet.BoolVar(&options.ServiceProbesUpdate, "sV-update-probes", false, "update managed nmap-service-probes cache and exit"),
+		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (auto-detected from local nmap install if empty)"),
 		flagSet.BoolVarP(&options.UDPProbes, "udp-probes", "uP", false, "send protocol-specific payloads on UDP scans using nmap-service-probes"),
 	)
 
@@ -339,10 +334,6 @@ func ParseOptions() *Options {
 		os.Exit(0)
 	}
 
-	if options.ServiceProbesUpdate {
-		options.updateServiceProbesAndExit()
-	}
-
 	if env.GetEnvOrDefault("DISABLE_STDOUT", "") != "" {
 		options.DisableStdout = true
 	}
@@ -391,19 +382,6 @@ func ParseOptions() *Options {
 	}
 
 	return options
-}
-
-func (options *Options) updateServiceProbesAndExit() {
-	path, updated, err := fingerprint.UpdateDefaultProbes(context.Background())
-	if err != nil {
-		gologger.Fatal().Msgf("Could not update service probes: %s\n", err)
-	}
-	if updated {
-		gologger.Info().Msgf("Updated service probes cache: %s\n", path)
-	} else {
-		gologger.Info().Msgf("Service probes cache is already current: %s\n", path)
-	}
-	os.Exit(0)
 }
 
 // ShouldLoadResume resume file
