@@ -79,8 +79,8 @@ type Options struct {
 	ProxyAuth         string              // Socks5 proxy authentication (username:password)
 	Resolvers         string              // Resolvers (comma separated or file)
 	baseResolvers     []string
-	DnsOrder          string              // DNS resolution order (p/l/lp/pl)
-	SystemResolver    bool                // Use system DNS resolver as fallback
+	DnsOrder          string          // DNS resolution order (p/l/lp/pl)
+	SystemResolver    bool            // Use system DNS resolver as fallback
 	OnResult          result.ResultFn // callback on final host result
 	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
@@ -120,7 +120,7 @@ type Options struct {
 	// ServiceProbesFile is an optional path to a custom nmap-service-probes file
 	ServiceProbesFile string
 	// UDPProbes enables port-scan-time UDP probing using the
-	// nmap-service-probes data already shipped with naabu. When set,
+	// nmap-service-probes data from a locally installed nmap. When set,
 	// each UDP packet's payload is replaced with the highest-priority
 	// probe known for the destination port, instead of an empty
 	// datagram. A caller-supplied connect payload (-cp) still wins.
@@ -251,7 +251,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.ServiceVersionFast, "sV-fast", false, "only probe port-hinted services (faster)"),
 		flagSet.DurationVar(&options.ServiceVersionTimeout, "sV-timeout", 5*time.Second, "timeout for service version probes"),
 		flagSet.IntVar(&options.ServiceVersionWorkers, "sV-workers", 25, "number of concurrent service version workers"),
-		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (auto-detected if empty)"),
+		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (auto-detected from local nmap install if empty)"),
 		flagSet.BoolVarP(&options.UDPProbes, "udp-probes", "uP", false, "send protocol-specific payloads on UDP scans using nmap-service-probes"),
 	)
 

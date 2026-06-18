@@ -74,6 +74,9 @@ match ssh m|^SSH-([\d.]+)-OpenSSH[_-]([\w._-]+)| p/OpenSSH/ v/$2/ i/protocol $1/
 	if svc.Version != "9.6" {
 		t.Errorf("expected version '9.6', got %q", svc.Version)
 	}
+	if svc.Banner != "SSH-2.0-OpenSSH_9.6\r\n" {
+		t.Errorf("expected banner to contain SSH response, got %q", svc.Banner)
+	}
 }
 
 func TestEngineHTTPFingerprint(t *testing.T) {
@@ -161,6 +164,51 @@ fallback GetRequest
 	}
 }
 
+func TestEngineGenericLinesUsesNullFallbackSoftmatch(t *testing.T) {
+	probes := `
+Probe TCP NULL q||
+totalwaitms 100
+softmatch http m|^HTTP/1\.1 400 Bad Request\r\nContent-Type: text/plain(?:; charset=utf-8)?\r\nConnection: close\r\n\r\n400 Bad Request| p|Golang net/http server|
+
+Probe TCP GenericLines q|\r\n\r\n|
+rarity 1
+`
+	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
+		defer conn.Close() //nolint:errcheck
+		buf := make([]byte, 4096)
+		n, _ := conn.Read(buf)
+		if n > 0 && string(buf[:n]) == "\r\n\r\n" {
+			_, _ = conn.Write([]byte("HTTP/1.1 400 Bad Request\r\nContent-Type: text/plain; charset=utf-8\r\nConnection: close\r\n\r\n400 Bad Request"))
+		}
+	})
+	defer cleanup()
+
+	host, portStr, _ := net.SplitHostPort(addr)
+	port := 0
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
+
+	db := buildTestDB(probes)
+	engine := New(db, WithTimeout(2*time.Second), WithWorkers(1))
+
+	targets := []Target{{Host: host, IP: host, Port: port}}
+	results := engine.Fingerprint(context.Background(), targets)
+
+	key := fmt.Sprintf("%s:%d", host, port)
+	svc, ok := results[key]
+	if !ok {
+		t.Fatal("expected service detection via NULL fallback softmatch")
+	}
+	if svc.Name != "http" {
+		t.Errorf("expected service 'http', got %q", svc.Name)
+	}
+	if svc.Product != "Golang net/http server" {
+		t.Errorf("expected product 'Golang net/http server', got %q", svc.Product)
+	}
+	if svc.Banner == "" {
+		t.Fatal("expected banner to be captured")
+	}
+}
+
 func TestEngineFastMode(t *testing.T) {
 	probes := `
 Probe TCP NULL q||
@@ -207,7 +255,7 @@ totalwaitms 5000
 match test m|^hello| p/Test/
 `
 	addr, cleanup := startTCPServer(t, func(conn net.Conn) {
-		defer conn.Close() //nolint:errcheck
+		defer conn.Close()           //nolint:errcheck
 		time.Sleep(10 * time.Second) // hang forever
 	})
 	defer cleanup()

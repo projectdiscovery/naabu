@@ -53,6 +53,7 @@ func main() {
 				Product:     r.Product,
 				Proto:       r.Proto,
 				RPCNum:      r.RPCNum,
+				Banner:      r.Banner,
 				ServiceFP:   r.ServiceFP,
 				Tunnel:      r.Tunnel,
 				Version:     r.Version,

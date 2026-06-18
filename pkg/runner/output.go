@@ -34,19 +34,20 @@ type Result struct {
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string `json:"device_type,omitempty"`
-	ExtraInfo   string `json:"extra_info,omitempty"`
-	HighVersion string `json:"high_version,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	LowVersion  string `json:"low_version,omitempty"`
-	Method      string `json:"method,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OSType      string `json:"os_type,omitempty"`
-	Product     string `json:"product,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	RPCNum      string `json:"rpc_num,omitempty"`
-	ServiceFP   string `json:"service_fp,omitempty"`
-	Tunnel      string `json:"tunnel,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty"`
+	ExtraInfo   string   `json:"extra_info,omitempty"`
+	HighVersion string   `json:"high_version,omitempty"`
+	Hostname    string   `json:"hostname,omitempty"`
+	LowVersion  string   `json:"low_version,omitempty"`
+	Method      string   `json:"method,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	OSType      string   `json:"os_type,omitempty"`
+	Product     string   `json:"product,omitempty"`
+	Proto       string   `json:"proto,omitempty"`
+	RPCNum      string   `json:"rpc_num,omitempty"`
+	Banner      string   `json:"banner,omitempty" csv:"banner"`
+	ServiceFP   string   `json:"service_fp,omitempty"`
+	Tunnel      string   `json:"tunnel,omitempty"`
 	Version     string   `json:"version,omitempty"`
 	Confidence  int      `json:"confidence,omitempty"`
 	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
@@ -68,19 +69,20 @@ type jsonResult struct {
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string `json:"device_type,omitempty"`
-	ExtraInfo   string `json:"extra_info,omitempty"`
-	HighVersion string `json:"high_version,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	LowVersion  string `json:"low_version,omitempty"`
-	Method      string `json:"method,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OSType      string `json:"os_type,omitempty"`
-	Product     string `json:"product,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	RPCNum      string `json:"rpc_num,omitempty"`
-	ServiceFP   string `json:"service_fp,omitempty"`
-	Tunnel      string `json:"tunnel,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty"`
+	ExtraInfo   string   `json:"extra_info,omitempty"`
+	HighVersion string   `json:"high_version,omitempty"`
+	Hostname    string   `json:"hostname,omitempty"`
+	LowVersion  string   `json:"low_version,omitempty"`
+	Method      string   `json:"method,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	OSType      string   `json:"os_type,omitempty"`
+	Product     string   `json:"product,omitempty"`
+	Proto       string   `json:"proto,omitempty"`
+	RPCNum      string   `json:"rpc_num,omitempty"`
+	Banner      string   `json:"banner,omitempty"`
+	ServiceFP   string   `json:"service_fp,omitempty"`
+	Tunnel      string   `json:"tunnel,omitempty"`
 	Version     string   `json:"version,omitempty"`
 	Confidence  int      `json:"confidence,omitempty"`
 	CPEs        []string `json:"cpes,omitempty"`
@@ -112,6 +114,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Product = r.Product
 	data.Proto = r.Proto
 	data.RPCNum = r.RPCNum
+	data.Banner = r.Banner
 	data.ServiceFP = r.ServiceFP
 	data.Tunnel = r.Tunnel
 	data.Version = r.Version
@@ -333,6 +336,7 @@ func copyServiceFields(result *Result, service *port.Service) {
 	result.Product = s.Product
 	result.Proto = s.Proto
 	result.RPCNum = s.RPCNum
+	result.Banner = s.Banner
 	result.ServiceFP = s.ServiceFP
 	result.Tunnel = s.Tunnel
 	result.Version = s.Version

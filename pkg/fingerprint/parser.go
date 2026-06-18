@@ -53,9 +53,9 @@ type Match struct {
 	// literalPrefix is the longest literal byte sequence at the start of the
 	// pattern (after ^), converted to Latin-1. Patterns whose prefix doesn't
 	// appear in the response are skipped without running the regex engine.
-	literalPrefix   string
-	prefixAnchored  bool // true if pattern starts with ^
-	prefixFoldCase  bool // true if pattern has 'i' flag
+	literalPrefix  string
+	prefixAnchored bool // true if pattern starts with ^
+	prefixFoldCase bool // true if pattern has 'i' flag
 }
 
 // prefixMatches checks whether the literal prefix extracted from the regex
@@ -118,6 +118,7 @@ type MatchResult struct {
 	Hostname   string
 	OS         string
 	DeviceType string
+	Banner     string
 	CPEs       []string
 }
 
@@ -428,8 +429,10 @@ func parseMatchFields(s string, m *Match) {
 		}
 
 		var key byte
-		if len(s) >= 2 && s[1] == '/' {
+		var delim string
+		if len(s) >= 2 && strings.ContainsRune("/|=", rune(s[1])) {
 			key = s[0]
+			delim = string(s[1])
 			s = s[2:]
 		} else if strings.HasPrefix(s, "cpe:") {
 			cpe, rest := extractCPE(s)
@@ -447,7 +450,7 @@ func parseMatchFields(s string, m *Match) {
 			continue
 		}
 
-		val, rest := extractDelimitedField(s, "/")
+		val, rest := extractDelimitedField(s, delim)
 		s = rest
 
 		switch key {

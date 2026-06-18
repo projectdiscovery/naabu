@@ -39,7 +39,7 @@ func (r *Result) ToService() *port.Service {
 		ExtraInfo:  r.ExtraInfo,
 		OSType:     r.OSType,
 		DeviceType: r.DeviceType,
-		ServiceFP:  r.Banner,
+		Banner:     r.Banner,
 		Method:     "probes",
 		CPEs:       r.CPEs,
 	}

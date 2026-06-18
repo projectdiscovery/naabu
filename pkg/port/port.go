@@ -42,6 +42,7 @@ type Service struct {
 	Product     string   `json:"product,omitempty"`
 	Proto       string   `json:"proto,omitempty"`
 	RPCNum      string   `json:"rpc_num,omitempty"`
+	Banner      string   `json:"banner,omitempty"`
 	ServiceFP   string   `json:"service_fp,omitempty"`
 	Tunnel      string   `json:"tunnel,omitempty"`
 	Version     string   `json:"version,omitempty"`
