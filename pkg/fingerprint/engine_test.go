@@ -469,7 +469,12 @@ ports 80
 }
 
 func TestEngineWithRealProbes(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	path := LocateNmapProbes()
+	if path == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(path)
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
@@ -505,7 +510,12 @@ func TestEngineWithRealProbes(t *testing.T) {
 }
 
 func TestEngineWithRealProbesFTP(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	path := LocateNmapProbes()
+	if path == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(path)
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
@@ -540,7 +550,12 @@ func TestEngineWithRealProbesFTP(t *testing.T) {
 }
 
 func TestEngineWithRealProbesHTTP(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	path := LocateNmapProbes()
+	if path == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(path)
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}

@@ -38,19 +38,6 @@ func withProbeUpdateURL(t *testing.T, url string) {
 	})
 }
 
-func TestParseEmbeddedProbes(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
-	if err != nil {
-		t.Fatalf("ParseEmbeddedProbes() error = %v", err)
-	}
-	if len(db.Probes) == 0 {
-		t.Fatal("ParseEmbeddedProbes() returned no probes")
-	}
-	if db.Probes[0].Name != "NULL" {
-		t.Fatalf("first embedded probe = %q, want NULL", db.Probes[0].Name)
-	}
-}
-
 func TestParseDefaultProbeDBUsesCacheFirst(t *testing.T) {
 	cachePath := filepath.Join(t.TempDir(), probeFileName)
 	withProbeCachePath(t, cachePath)
@@ -104,7 +91,9 @@ func TestUpdateDefaultProbesValidatesAndWritesCache(t *testing.T) {
 	withProbeCachePath(t, cachePath)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, tinyProbeDB)
+		if _, err := fmt.Fprint(w, tinyProbeDB); err != nil {
+			t.Errorf("failed writing probe payload: %v", err)
+		}
 	}))
 	defer server.Close()
 	withProbeUpdateURL(t, server.URL)
@@ -129,7 +118,9 @@ func TestUpdateDefaultProbesRejectsInvalidContent(t *testing.T) {
 	withProbeCachePath(t, cachePath)
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "not a probe file")
+		if _, err := fmt.Fprint(w, "not a probe file"); err != nil {
+			t.Errorf("failed writing invalid payload: %v", err)
+		}
 	}))
 	defer server.Close()
 	withProbeUpdateURL(t, server.URL)

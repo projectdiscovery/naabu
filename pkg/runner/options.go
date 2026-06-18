@@ -255,7 +255,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.ServiceVersionFast, "sV-fast", false, "only probe port-hinted services (faster)"),
 		flagSet.DurationVar(&options.ServiceVersionTimeout, "sV-timeout", 5*time.Second, "timeout for service version probes"),
 		flagSet.IntVar(&options.ServiceVersionWorkers, "sV-workers", 25, "number of concurrent service version workers"),
-		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (uses managed cache or embedded probes if empty)"),
+		flagSet.StringVar(&options.ServiceProbesFile, "sV-probes", "", "custom nmap-service-probes file path (uses managed cache or local nmap install if empty)"),
 		flagSet.BoolVar(&options.ServiceProbesUpdate, "sV-update-probes", false, "update managed nmap-service-probes cache and exit"),
 		flagSet.BoolVarP(&options.UDPProbes, "udp-probes", "uP", false, "send protocol-specific payloads on UDP scans using nmap-service-probes"),
 	)

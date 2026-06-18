@@ -253,7 +253,12 @@ match test m|^hello.*world$|si p/Test Service/
 }
 
 func TestParseRealProbeFile(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	path := LocateNmapProbes()
+	if path == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(path)
 	if err != nil {
 		t.Fatalf("failed to parse real probe file: %v", err)
 	}

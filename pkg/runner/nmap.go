@@ -273,17 +273,19 @@ func (r *Runner) convertNmapPortToNaabuPort(nmapPort nmap.Port) *port.Port {
 		}
 
 		naabuPort.Service = &port.Service{
-			Name:        nmapPort.Service.Name,
-			Product:     nmapPort.Service.Product,
-			Version:     nmapPort.Service.Version,
-			ExtraInfo:   nmapPort.Service.ExtraInfo,
-			Hostname:    nmapPort.Service.Hostname,
-			OSType:      nmapPort.Service.OSType,
-			DeviceType:  nmapPort.Service.DeviceType,
-			Method:      nmapPort.Service.Method,
-			Proto:       nmapPort.Service.Proto,
-			RPCNum:      nmapPort.Service.RPCNum,
-			Banner:      nmapPort.Service.ServiceFP,
+			Name:       nmapPort.Service.Name,
+			Product:    nmapPort.Service.Product,
+			Version:    nmapPort.Service.Version,
+			ExtraInfo:  nmapPort.Service.ExtraInfo,
+			Hostname:   nmapPort.Service.Hostname,
+			OSType:     nmapPort.Service.OSType,
+			DeviceType: nmapPort.Service.DeviceType,
+			Method:     nmapPort.Service.Method,
+			Proto:      nmapPort.Service.Proto,
+			RPCNum:     nmapPort.Service.RPCNum,
+			// nmap exposes only the encoded service fingerprint, not a raw
+			// response banner, so leave Banner empty here to avoid duplicating
+			// ServiceFP (the native -sV path populates Banner with the raw response).
 			ServiceFP:   nmapPort.Service.ServiceFP,
 			Tunnel:      nmapPort.Service.Tunnel,
 			LowVersion:  nmapPort.Service.LowVersion,

@@ -2,9 +2,7 @@ package fingerprint
 
 import (
 	"bytes"
-	"compress/gzip"
 	"context"
-	_ "embed"
 	"errors"
 	"fmt"
 	"io"
@@ -15,30 +13,25 @@ import (
 )
 
 const (
-	probeFileName = "nmap-service-probes"
-
 	// DefaultProbeUpdateURL is the upstream source used to refresh the managed
 	// local probe cache.
 	DefaultProbeUpdateURL = "https://raw.githubusercontent.com/nmap/nmap/master/nmap-service-probes"
-
-	// EmbeddedProbeSource is the source label returned when the built-in copy is used.
-	EmbeddedProbeSource = "embedded:nmap-service-probes"
 
 	maxProbeDownloadSize = 16 << 20
 )
 
 var (
-	//go:embed assets/nmap-service-probes.gz
-	embeddedNmapServiceProbesGzip []byte
-
 	errProbeDownloadTooLarge = errors.New("probe download exceeded maximum size")
 	probeCachePathOverride   string
 	probeUpdateURLOverride   string
 )
 
 // ParseProbeSource parses a custom nmap-service-probes path when one is
-// supplied. With an empty path it falls back to the managed cache, the embedded
-// database, and finally any local nmap installation discovered on disk.
+// supplied. With an empty path it falls back to the managed cache and then to
+// any local nmap installation discovered on disk. naabu intentionally does not
+// embed or redistribute the nmap-service-probes database, as it is licensed
+// under the copyleft Nmap Public Source License which is incompatible with
+// naabu's MIT license.
 func ParseProbeSource(path string) (*ProbeDB, string, error) {
 	if path != "" {
 		db, err := ParseProbeFile(path)
@@ -47,7 +40,10 @@ func ParseProbeSource(path string) (*ProbeDB, string, error) {
 	return ParseDefaultProbeDB()
 }
 
-// ParseDefaultProbeDB parses the best available default probe database.
+// ParseDefaultProbeDB parses the best available default probe database, trying
+// the managed user cache first and falling back to a locally installed nmap
+// copy. It never ships its own probe data, so service detection requires either
+// a managed cache (populated via UpdateDefaultProbes) or a local nmap install.
 func ParseDefaultProbeDB() (*ProbeDB, string, error) {
 	if cachePath, err := DefaultProbeCachePath(); err == nil {
 		if _, statErr := os.Stat(cachePath); statErr == nil {
@@ -57,35 +53,13 @@ func ParseDefaultProbeDB() (*ProbeDB, string, error) {
 		}
 	}
 
-	if db, err := ParseEmbeddedProbes(); err == nil {
-		return db, EmbeddedProbeSource, nil
+	if localPath := LocateNmapProbes(); localPath != "" {
+		if db, err := ParseProbeFile(localPath); err == nil {
+			return db, localPath, nil
+		}
 	}
 
-	return nil, "", errors.New("no usable nmap-service-probes database found")
-}
-
-// EmbeddedProbeData returns the decompressed built-in nmap-service-probes data.
-func EmbeddedProbeData() ([]byte, error) {
-	zr, err := gzip.NewReader(bytes.NewReader(embeddedNmapServiceProbesGzip))
-	if err != nil {
-		return nil, err
-	}
-	defer zr.Close() //nolint:errcheck
-
-	data, err := io.ReadAll(zr)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
-}
-
-// ParseEmbeddedProbes parses the built-in nmap-service-probes database.
-func ParseEmbeddedProbes() (*ProbeDB, error) {
-	data, err := EmbeddedProbeData()
-	if err != nil {
-		return nil, err
-	}
-	return ParseProbes(bytes.NewReader(data))
+	return nil, "", errors.New("no usable nmap-service-probes database found; install nmap, run -sV-update-probes, or pass --sV-probes")
 }
 
 // DefaultProbeCachePath returns the managed user-writable cache path used for

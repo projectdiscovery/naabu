@@ -168,7 +168,12 @@ func startMockServer(t *testing.T, svc mockService) (int, func()) {
 
 // TestNmapComparison starts mock services and compares naabu vs nmap detection.
 func TestNmapComparison(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	probesPath := LocateNmapProbes()
+	if probesPath == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(probesPath)
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
@@ -405,7 +410,12 @@ func extractXMLAttr(tag, attr string) string {
 // TestNmapComparisonJSON runs naabu detection and outputs results in a format
 // that can be compared with nmap's JSON output.
 func TestNmapComparisonJSON(t *testing.T) {
-	db, err := ParseEmbeddedProbes()
+	probesPath := LocateNmapProbes()
+	if probesPath == "" {
+		t.Skip("nmap-service-probes not found on system")
+	}
+
+	db, err := ParseProbeFile(probesPath)
 	if err != nil {
 		t.Fatalf("failed to parse probes: %v", err)
 	}
