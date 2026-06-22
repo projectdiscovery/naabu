@@ -16,7 +16,7 @@ jobs:
         os: [ubuntu-latest] # Todo: windows-latest, macOS-latest
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Install required packages (nmap, simplehttpserver)
