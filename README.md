@@ -120,6 +120,7 @@ CONFIGURATION:
 
 HOST-DISCOVERY:
    -sn, -host-discovery           Perform Only Host Discovery
+   -show-dead                     show hosts that did not respond to host discovery (requires host discovery)
    -Pn, -skip-host-discovery      Skip Host discovery (Deprecated: use -wn/-with-host-discovery instead)
    -wn, -with-host-discovery      Enable Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)

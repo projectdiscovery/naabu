@@ -1,0 +1,40 @@
+name: 🔄 Update OUI Database
+
+on:
+  release:
+    types: [published]
+  schedule:
+    # refresh monthly so the embedded vendor data does not drift
+    - cron: "0 4 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-oui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: projectdiscovery/actions/setup/go@v1
+
+      - name: Regenerate embedded OUI dataset
+        run: go generate ./pkg/macvendor/...
+
+      - name: Verify dataset still loads
+        run: go test ./pkg/macvendor/...
+
+      - name: Open pull request with refreshed dataset
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: "${{ secrets.GITHUB_TOKEN }}"
+          commit-message: "chore: refresh embedded OUI vendor database"
+          title: "chore: refresh embedded OUI vendor database"
+          body: |
+            Automated refresh of the IEEE OUI registry embedded in `pkg/macvendor`.
+
+            Regenerated with `go generate ./pkg/macvendor/...`.
+          branch: chore/update-oui-db
+          add-paths: pkg/macvendor/oui.dat.gz
+          delete-branch: true

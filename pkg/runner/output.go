@@ -31,6 +31,8 @@ type Result struct {
 	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
 	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
 	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
+	MacVendor  string    `json:"mac_vendor,omitempty" csv:"mac_vendor"`
+	IsDeadHost bool      `json:"is_dead_host,omitempty" csv:"is_dead_host"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
@@ -66,6 +68,8 @@ type jsonResult struct {
 	Protocol   string    `json:"protocol"`
 	TLS        bool      `json:"tls"`
 	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
+	MacVendor  string    `json:"mac_vendor,omitempty" csv:"mac_vendor"`
+	IsDeadHost bool      `json:"is_dead_host,omitempty" csv:"is_dead_host"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
@@ -101,6 +105,8 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 	data.MacAddress = r.MacAddress
+	data.MacVendor = r.MacVendor
+	data.IsDeadHost = r.IsDeadHost
 
 	// copy the service fields
 	data.DeviceType = r.DeviceType

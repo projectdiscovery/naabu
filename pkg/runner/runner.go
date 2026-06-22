@@ -26,6 +26,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/mapcidr"
 	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
+	"github.com/projectdiscovery/naabu/v2/pkg/macvendor"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -35,13 +36,13 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	"github.com/projectdiscovery/ratelimit"
-	"golang.org/x/net/proxy"
 	"github.com/projectdiscovery/retryablehttp-go"
 	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	fileutil "github.com/projectdiscovery/utils/file"
 	iputil "github.com/projectdiscovery/utils/ip"
 	sliceutil "github.com/projectdiscovery/utils/slice"
 	"github.com/remeh/sizedwaitgroup"
+	"golang.org/x/net/proxy"
 )
 
 // Runner is an instance of the port enumeration
@@ -60,12 +61,12 @@ type Runner struct {
 
 	unique gcache.Cache[string, struct{}]
 
-	fpTargetCh   chan fingerprint.Target
-	fpDone       chan struct{}
-	fpServices   map[string]*port.Service
-	fpMu         sync.Mutex
-	fpCancel     context.CancelFunc
-	fpCloseOnce  sync.Once
+	fpTargetCh  chan fingerprint.Target
+	fpDone      chan struct{}
+	fpServices  map[string]*port.Service
+	fpMu        sync.Mutex
+	fpCancel    context.CancelFunc
+	fpCloseOnce sync.Once
 	// probeDB is the parsed nmap-service-probes database, shared
 	// between service version detection (-sV) and the UDP probe
 	// injection path (-uP). It is nil until one of those features
@@ -424,10 +425,21 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
+		// when -show-dead is set we keep track of every probed target so that,
+		// once discovery settles, we can diff it against the responsive hosts
+		// and report the ones that never replied.
+		var discoveryTargets map[string]struct{}
+		if r.options.ShowDeadHosts {
+			discoveryTargets = make(map[string]struct{})
+		}
+
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
+					if discoveryTargets != nil {
+						discoveryTargets[ip] = struct{}{}
+					}
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -442,6 +454,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 		if r.options.WarmUpTime > 0 {
 			time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
+		}
+
+		if r.options.ShowDeadHosts {
+			r.calculateDeadHosts(discoveryTargets)
 		}
 
 		// check if we should stop here or continue with full scan
@@ -1039,6 +1055,41 @@ func (r *Runner) handleHostDiscovery(host string) {
 	}
 }
 
+// vendorFromMAC resolves the hardware vendor for a MAC address using the
+// embedded IEEE OUI registry (pkg/macvendor). Returns an empty string when
+// the address is empty or the OUI prefix is unknown.
+func vendorFromMAC(mac string) string {
+	if mac == "" {
+		return ""
+	}
+	return macvendor.Lookup(mac)
+}
+
+// calculateDeadHosts diffs the set of probed discovery targets against the
+// hosts that responded and records the difference as dead hosts. It must be
+// called after host discovery has settled (i.e. post warm-up) so that late
+// responses are accounted for.
+func (r *Runner) calculateDeadHosts(targets map[string]struct{}) {
+	if len(targets) == 0 {
+		return
+	}
+
+	alive := make(map[string]struct{})
+	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
+		alive[ip] = struct{}{}
+	}
+
+	for ip := range targets {
+		if _, ok := alive[ip]; !ok {
+			r.scanner.HostDiscoveryResults.AddDeadHost(ip)
+		}
+	}
+
+	if deadCount := len(r.scanner.HostDiscoveryResults.GetDeadHosts()); deadCount > 0 {
+		gologger.Info().Msgf("%d of %d discovery targets did not respond\n", deadCount, len(targets))
+	}
+}
+
 func (r *Runner) SetSourceIP(sourceIP string) error {
 	ip := net.ParseIP(sourceIP)
 	if ip == nil {
@@ -1294,7 +1345,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// console output
 				if r.options.JSON || r.options.CSV {
 					for _, p := range hostResult.Ports {
-						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress}
+						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress, MacVendor: vendorFromMAC(hostResult.MacAddress)}
 						if r.options.OutputCDN {
 							data.IsCDNIP = isCDNIP
 							data.CDNName = cdnName
@@ -1375,14 +1426,19 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				isCDNIP, cdnName, _ := r.scanner.CdnCheck(hostIP)
 				gologger.Info().Msgf("Found alive host %s (%s)\n", host, hostIP)
 				// console output
-				var macAddress string
-				if parsedIP := net.ParseIP(hostIP); parsedIP != nil && parsedIP.IsPrivate() {
-					if mac, err := result.GetMacAddress(hostIP); err == nil {
-						macAddress = mac
+				// prefer the MAC captured during discovery (e.g. from an ARP
+				// reply); fall back to the local ARP table for private IPs.
+				macAddress := r.scanner.HostDiscoveryResults.GetMACAddress(hostIP)
+				if macAddress == "" {
+					if parsedIP := net.ParseIP(hostIP); parsedIP != nil && parsedIP.IsPrivate() {
+						if mac, err := result.GetMacAddress(hostIP); err == nil {
+							macAddress = mac
+						}
 					}
 				}
+				macVendor := vendorFromMAC(macAddress)
 				if r.options.JSON || r.options.CSV {
-					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), MacAddress: macAddress}
+					data := &Result{IP: hostIP, TimeStamp: time.Now().UTC(), MacAddress: macAddress, MacVendor: macVendor}
 					if r.options.OutputCDN {
 						data.IsCDNIP = isCDNIP
 						data.CDNName = cdnName
@@ -1432,6 +1488,73 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 			}
 			csvFileHeaderEnabled = false
+		}
+	}
+
+	r.outputDeadHosts(file, &csvFileHeaderEnabled)
+}
+
+// outputDeadHosts reports the hosts that were probed during host discovery but
+// never responded, when -show-dead is enabled. Dead hosts are only ever
+// recorded in the discovery result set, so this is a no-op for plain port
+// scans. In plain-text mode it logs an informational line only (keeping the
+// machine-readable stdout/file streams limited to alive hosts); JSON and CSV
+// modes emit a dedicated record flagged with is_dead_host.
+func (r *Runner) outputDeadHosts(file *os.File, csvFileHeaderEnabled *bool) {
+	if !r.options.ShowDeadHosts || !r.scanner.HostDiscoveryResults.HasDeadHosts() {
+		return
+	}
+
+	for _, deadIP := range r.scanner.HostDiscoveryResults.GetDeadHosts() {
+		if !ipMatchesIpVersions(deadIP, r.options.IPVersion...) {
+			continue
+		}
+
+		hosts, _ := r.scanner.IPRanger.GetHostsByIP(deadIP)
+		if len(hosts) == 0 {
+			hosts = []string{deadIP}
+		}
+
+		for _, host := range hosts {
+			if host == "ip" {
+				host = deadIP
+			}
+			gologger.Info().Msgf("Found dead host %s (%s)\n", host, deadIP)
+
+			if !r.options.JSON && !r.options.CSV {
+				continue
+			}
+
+			data := &Result{IP: deadIP, TimeStamp: time.Now().UTC(), IsDeadHost: true}
+			if host != deadIP {
+				data.Host = host
+			}
+
+			buffer := bytes.Buffer{}
+			if r.options.JSON {
+				b, err := data.JSON(r.options.ExcludeOutputFields)
+				if err != nil {
+					continue
+				}
+				_, _ = fmt.Fprintf(&buffer, "%s\n", b)
+			} else {
+				writer := csv.NewWriter(&buffer)
+				if *csvFileHeaderEnabled {
+					writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
+					*csvFileHeaderEnabled = false
+				}
+				writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+				writer.Flush()
+			}
+
+			if !r.options.DisableStdout {
+				gologger.Silent().Msgf("%s", buffer.String())
+			}
+			if file != nil {
+				if _, err := file.WriteString(buffer.String()); err != nil {
+					gologger.Error().Msgf("Could not write dead host %s to file: %s\n", deadIP, err)
+				}
+			}
 		}
 	}
 }

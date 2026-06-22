@@ -128,6 +128,7 @@ type PkgResult struct {
 	ipv4 string
 	ipv6 string
 	port *port.Port
+	mac  string
 }
 
 var (
@@ -291,9 +292,11 @@ func (s *Scanner) ICMPResultWorker(ctx context.Context) {
 				gologger.Debug().Msgf("Received ICMP response from %s\n", ip.ipv4)
 				if ip.ipv4 != "" {
 					s.HostDiscoveryResults.AddIp(ip.ipv4)
+					s.HostDiscoveryResults.SetMACAddress(ip.ipv4, ip.mac)
 				}
 				if ip.ipv6 != "" {
 					s.HostDiscoveryResults.AddIp(ip.ipv6)
+					s.HostDiscoveryResults.SetMACAddress(ip.ipv6, ip.mac)
 				}
 			}
 		}

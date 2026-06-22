@@ -829,9 +829,10 @@ func TransportReadWorker() {
 								continue
 							}
 							srcIP4 := net.IP(arp.SourceProtAddress)
+							srcMAC := net.HardwareAddr(arp.SourceHwAddress).String()
 
 							for _, listenHandler := range ListenHandlers {
-								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: ToString(srcIP4)}
+								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: ToString(srcIP4), mac: srcMAC}
 							}
 						}
 					}
