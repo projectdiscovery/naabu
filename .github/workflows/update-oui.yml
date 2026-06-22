@@ -16,7 +16,7 @@ jobs:
   update-oui:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Regenerate embedded OUI dataset
@@ -26,7 +26,7 @@ jobs:
         run: go test ./pkg/macvendor/...
 
       - name: Open pull request with refreshed dataset
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v8
         with:
           token: "${{ secrets.GITHUB_TOKEN }}"
           commit-message: "chore: refresh embedded OUI vendor database"
