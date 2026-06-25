@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -839,6 +840,34 @@ func TestRunnerHostDiscovery(t *testing.T) {
 	}
 	err = runner.Close()
 	require.NoError(t, err)
+}
+
+func TestWaitServiceDetectionReusableAcrossRuns(t *testing.T) {
+	r := &Runner{}
+	// Two consecutive scans on the same Runner (SDK reuse). Each run sets up a
+	// fresh fpTargetCh + drain goroutine the way initServiceDetection does; the
+	// second run must not deadlock waiting on fpDone.
+	for i := 0; i < 2; i++ {
+		r.fpTargetCh = make(chan fingerprint.Target, 1)
+		r.fpDone = make(chan struct{})
+		go func(ch chan fingerprint.Target, done chan struct{}) {
+			for range ch {
+			}
+			close(done)
+		}(r.fpTargetCh, r.fpDone)
+
+		got := make(chan struct{})
+		go func() {
+			r.waitServiceDetection(result.NewResult())
+			close(got)
+		}()
+		select {
+		case <-got:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("run %d: waitServiceDetection deadlocked on reuse", i)
+		}
+		require.Nil(t, r.fpTargetCh, "fpTargetCh must be cleared so the next run can recreate it")
+	}
 }
 
 func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {

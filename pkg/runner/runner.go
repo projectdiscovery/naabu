@@ -80,12 +80,11 @@ type Runner struct {
 	// XML/greppable output timestamps and elapsed time.
 	scanStartTime time.Time
 
-	fpTargetCh  chan fingerprint.Target
-	fpDone      chan struct{}
-	fpServices  map[string]*port.Service
-	fpMu        sync.Mutex
-	fpCancel    context.CancelFunc
-	fpCloseOnce sync.Once
+	fpTargetCh chan fingerprint.Target
+	fpDone     chan struct{}
+	fpServices map[string]*port.Service
+	fpMu       sync.Mutex
+	fpCancel   context.CancelFunc
 	// probeDB is the parsed nmap-service-probes database, shared
 	// between service version detection (-sV) and the UDP probe
 	// injection path (-uP). It is nil until one of those features
@@ -1360,7 +1359,10 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 	if r.fpTargetCh == nil {
 		return
 	}
-	r.fpCloseOnce.Do(func() { close(r.fpTargetCh) })
+	// Close and nil out so the repeated call sites are idempotent within a run
+	// and a reused Runner (SDK) can start a fresh detection cycle next scan.
+	close(r.fpTargetCh)
+	r.fpTargetCh = nil
 	<-r.fpDone
 
 	for hostResult := range scanResults.GetIPsPorts() {
