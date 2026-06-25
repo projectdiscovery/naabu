@@ -829,6 +829,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 								}
 								synPacer.wait()
 								if err := synSender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
+									if isCongestion(err) {
+										synPacer.onCongestion()
+									}
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
 							} else {

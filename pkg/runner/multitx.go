@@ -132,6 +132,9 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 			}
 			pace.wait()
 			if err := sender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
+				if isCongestion(err) {
+					pace.onCongestion()
+				}
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 			}
 		} else {
