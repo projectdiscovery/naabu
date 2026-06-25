@@ -623,6 +623,21 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			// user's port list, reordered by the correlation model.
 			r.runPredictiveScan(ctx, targets, targetsWithPort, shouldUseRawPackets)
 		} else {
+			// Fast SYN sender: bypasses gopacket serialization, per-packet route
+			// lookups and the single-writer channel. Falls back to the standard
+			// path for connect scans, IPv6 targets and ethernet framing.
+			var synSender *SYNSender
+			var tgtIdx *targetIndex
+			if shouldUseRawPackets {
+				tgtIdx = buildTargetIndex(targets)
+				if s, err := newSYNSender(r.scanner.ListenHandler); err != nil {
+					gologger.Debug().Msgf("fast SYN sender unavailable (%s), using standard path\n", err)
+				} else {
+					synSender = s
+					gologger.Info().Msgf("fast SYN sender active (direct raw socket)")
+				}
+			}
+
 			Range := targetsCount * portsCount
 			if r.options.EnableProgressBar {
 				r.stats.AddStatic("ports", portsCount)
@@ -664,7 +679,20 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					xxx := b.Shuffle(index)
 					ipIndex := xxx / int64(portsCount)
 					portIndex := int(xxx % int64(portsCount))
-					ip := r.PickIP(targets, ipIndex)
+
+					// fast IPv4 generation (uint32 math) when the fast sender is
+					// active; otherwise fall back to the big.Int-based PickIP.
+					var (
+						dstIP4 [4]byte
+						isV4   bool
+						ip     string
+					)
+					if synSender != nil {
+						dstIP4, ip, isV4 = tgtIdx.pickIPv4(ipIndex)
+					}
+					if ip == "" {
+						ip = r.PickIP(targets, ipIndex)
+					}
 
 					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
 						continue
@@ -695,9 +723,21 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						continue
 					}
 
-					// connect scan
 					if shouldUseRawPackets {
-						r.RawSocketEnumeration(ctx, ip, port)
+						if synSender != nil && isV4 && port.Protocol == protocol.TCP {
+							if r.scanner.ScanResults.IPHasPort(ip, port) {
+								continue
+							}
+							if !r.canIScanIfCDN(ip, port) {
+								continue
+							}
+							r.limiter.Take()
+							if err := synSender.send(dstIP4, uint16(port.Port)); err != nil {
+								gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
+							}
+						} else {
+							r.RawSocketEnumeration(ctx, ip, port)
+						}
 					} else {
 						r.wgscan.Add()
 						go r.handleHostPort(ctx, ip, payload, port)
@@ -736,6 +776,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					if r.options.EnableProgressBar {
 						r.stats.IncrementCounter("packets", 1)
 					}
+				}
+
+				// flush any SYN packets still queued in the batch sender
+				if synSender != nil {
+					_ = synSender.flush()
 				}
 
 				r.wgscan.Wait()
