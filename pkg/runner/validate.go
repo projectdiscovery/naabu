@@ -60,7 +60,7 @@ func (options *Options) ValidateOptions() error {
 	}
 
 	if options.TxWorkers < 0 || options.TxWorkers > 256 {
-		return fmt.Errorf("invalid tx-workers %d (valid range 1-256)", options.TxWorkers)
+		return fmt.Errorf("invalid tx-workers %d (valid range 0-256, 0 = default)", options.TxWorkers)
 	}
 
 	if options.Rate == 0 {
