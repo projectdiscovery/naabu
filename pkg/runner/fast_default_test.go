@@ -24,7 +24,7 @@ func TestFastSenderIPMatchesPickIP(t *testing.T) {
 	require.Greater(t, idx.total, int64(0))
 
 	for i := int64(0); i < idx.total; i++ {
-		dstIP, fastIP, isV4 := idx.pickIPv4(i)
+		dstIP, fastIP, _, isV4 := idx.pickIPv4(i)
 		require.True(t, isV4, "index %d should be IPv4", i)
 		require.Equal(t, r.PickIP(targets, i), fastIP, "string IP mismatch at index %d", i)
 		require.Equal(t, fastIP, net.IPv4(dstIP[0], dstIP[1], dstIP[2], dstIP[3]).To4().String(), "byte IP mismatch at index %d", i)

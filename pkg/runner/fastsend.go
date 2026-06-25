@@ -23,7 +23,11 @@ type SYNSender struct {
 	batch   *rawsend.Batch
 	srcPort uint16
 	baseSum uint32
-	pkt     [24]byte
+	// defaultSrcSum is the checksum contribution of the default-route source
+	// IP, used as a fallback when a destination has no resolvable per-route
+	// source (see send).
+	defaultSrcSum uint32
+	pkt           [24]byte
 }
 
 const (
@@ -78,8 +82,9 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 		// Batch up to UIO_MAXIOV (1024) packets per sendmmsg call. At high
 		// packet rates this is the dominant syscall-amortisation lever: a 32
 		// packet batch issued ~32x more sendmmsg calls for the same throughput.
-		batch:   rawsend.NewBatch(sender.FD(), synBatchSize, synPacketLen),
-		srcPort: uint16(handler.Port),
+		batch:         rawsend.NewBatch(sender.FD(), synBatchSize, synPacketLen),
+		srcPort:       uint16(handler.Port),
+		defaultSrcSum: ipChecksumSum(src4),
 	}
 
 	binary.BigEndian.PutUint16(s.pkt[0:2], s.srcPort)
@@ -90,9 +95,11 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	s.pkt[21] = 4 // MSS option length
 	binary.BigEndian.PutUint16(s.pkt[22:24], 1460)
 
+	// The source IP is intentionally NOT folded into baseSum here: the kernel
+	// picks the source address per destination route (e.g. 127.0.0.1 for a
+	// loopback target, a different NIC for another subnet), so the pseudo-header
+	// source term is added per packet in send() from the destination's route.
 	var sum uint32
-	sum += uint32(binary.BigEndian.Uint16(src4[0:2]))
-	sum += uint32(binary.BigEndian.Uint16(src4[2:4]))
 	sum += 6  // zero + protocol (TCP)
 	sum += 24 // TCP segment length
 	sum += uint32(s.srcPort)
@@ -105,7 +112,23 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	return s, nil
 }
 
-func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
+// ipChecksumSum returns the two 16-bit words of an IPv4 address added together,
+// i.e. its contribution to a TCP pseudo-header checksum (not yet folded).
+func ipChecksumSum(ip4 net.IP) uint32 {
+	if len(ip4) != 4 {
+		return 0
+	}
+	return uint32(binary.BigEndian.Uint16(ip4[0:2])) + uint32(binary.BigEndian.Uint16(ip4[2:4]))
+}
+
+// send transmits a SYN to dstIP:dstPort. srcSum is the pseudo-header checksum
+// contribution of the source IP the kernel will use for this destination (as
+// returned by targetIndex.pickIPv4); a zero srcSum falls back to the default
+// route source so the checksum still matches a single-homed setup.
+func (s *SYNSender) send(dstIP [4]byte, srcSum uint32, dstPort uint16) error {
+	if srcSum == 0 {
+		srcSum = s.defaultSrcSum
+	}
 	// Encode a SYN cookie into the sequence number so the receive path can
 	// verify the returning SYN-ACK (Ack == seq+1) is genuinely ours.
 	seq := scan.SynCookie4(dstIP, dstPort, s.srcPort)
@@ -113,7 +136,19 @@ func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
 	binary.BigEndian.PutUint16(s.pkt[2:4], dstPort)
 	binary.BigEndian.PutUint32(s.pkt[4:8], seq)
 
-	sum := s.baseSum +
+	binary.BigEndian.PutUint16(s.pkt[16:18], synTCPChecksum(s.baseSum, srcSum, dstIP, dstPort, seq))
+
+	if s.batch != nil {
+		return s.batch.Add(s.pkt[:], dstIP)
+	}
+	return s.sender.SendTo(s.pkt[:], dstIP)
+}
+
+// synTCPChecksum folds the precomputed constant terms (baseSum) with the
+// per-packet source pseudo-header term (srcSum), destination IP, destination
+// port and sequence number into the final TCP checksum for the SYN template.
+func synTCPChecksum(baseSum, srcSum uint32, dstIP [4]byte, dstPort uint16, seq uint32) uint16 {
+	sum := baseSum + srcSum +
 		uint32(binary.BigEndian.Uint16(dstIP[0:2])) +
 		uint32(binary.BigEndian.Uint16(dstIP[2:4])) +
 		uint32(dstPort) +
@@ -121,12 +156,7 @@ func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
 		uint32(seq&0xffff)
 	sum = (sum >> 16) + (sum & 0xffff)
 	sum += sum >> 16
-	binary.BigEndian.PutUint16(s.pkt[16:18], ^uint16(sum))
-
-	if s.batch != nil {
-		return s.batch.Add(s.pkt[:], dstIP)
-	}
-	return s.sender.SendTo(s.pkt[:], dstIP)
+	return ^uint16(sum)
 }
 
 func (s *SYNSender) flush() error {
@@ -177,6 +207,11 @@ type indexEntry struct {
 	baseIPv4 uint32     // network base as uint32 (IPv4 only)
 	count    int64      // number of addresses in this CIDR
 	network  *net.IPNet // original, kept for IPv6 fallback
+	// srcSum is the pseudo-header checksum contribution of the source IP the
+	// kernel uses to reach this CIDR (resolved once at build time). Targets on
+	// different routes (loopback, other NICs) need different source IPs for a
+	// correct TCP checksum.
+	srcSum uint32
 }
 
 // targetIndex is a pre-computed lookup table that converts a linear
@@ -189,6 +224,7 @@ type targetIndex struct {
 
 func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 	idx := &targetIndex{}
+	defaultSrcSum := routeSrcSum(net.IPv4(1, 1, 1, 1))
 	for _, t := range targets {
 		count := int64(mapcidr.AddressCountIpnet(t))
 		e := indexEntry{
@@ -198,11 +234,31 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 		if ip4 := t.IP.To4(); ip4 != nil {
 			e.isV4 = true
 			e.baseIPv4 = binary.BigEndian.Uint32(ip4)
+			// Resolve the source IP for this CIDR's route so the fast sender's
+			// TCP checksum matches the source the kernel actually emits with.
+			e.srcSum = routeSrcSum(t.IP)
+			if e.srcSum == 0 {
+				e.srcSum = defaultSrcSum
+			}
 		}
 		idx.entries = append(idx.entries, e)
 		idx.total += count
 	}
 	return idx
+}
+
+// routeSrcSum resolves the source IP the kernel would use to reach dst and
+// returns its pseudo-header checksum contribution, or 0 if it cannot be
+// resolved (no router, route error, or IPv6 source).
+func routeSrcSum(dst net.IP) uint32 {
+	if scan.PkgRouter == nil {
+		return 0
+	}
+	_, _, src, err := scan.PkgRouter.Route(dst)
+	if err != nil || src == nil {
+		return 0
+	}
+	return ipChecksumSum(src.To4())
 }
 
 // pickIPv4 converts a global index to an IPv4 address. Returns the
@@ -214,12 +270,12 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 //
 // Cost: ~10ns + ~25ns string format = ~35ns total, zero heap allocs
 // for the [4]byte path. (The string return does one small alloc.)
-func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, isV4 bool) {
+func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, srcSum uint32, isV4 bool) {
 	for i := range t.entries {
 		e := &t.entries[i]
 		if index < e.count {
 			if !e.isV4 {
-				return ip, "", false
+				return ip, "", 0, false
 			}
 			val := e.baseIPv4 + uint32(index)
 			ip[0] = byte(val >> 24)
@@ -227,11 +283,11 @@ func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, isV4 bool
 			ip[2] = byte(val >> 8)
 			ip[3] = byte(val)
 			ipStr = formatIPv4(ip)
-			return ip, ipStr, true
+			return ip, ipStr, e.srcSum, true
 		}
 		index -= e.count
 	}
-	return ip, "", false
+	return ip, "", 0, false
 }
 
 // formatIPv4 converts a [4]byte IPv4 address to its dotted-decimal

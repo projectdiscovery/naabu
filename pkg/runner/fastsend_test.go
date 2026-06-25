@@ -4,6 +4,8 @@ import (
 	"encoding/binary"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestParseIPv4Fast(t *testing.T) {
@@ -126,32 +128,100 @@ func TestTargetIndex(t *testing.T) {
 	idx := buildTargetIndex([]*net.IPNet{cidr24, cidr16})
 
 	// First CIDR: 192.168.1.0/24 -> 256 addresses
-	ip, ipStr, ok := idx.pickIPv4(0)
+	ip, ipStr, _, ok := idx.pickIPv4(0)
 	if !ok || ip != [4]byte{192, 168, 1, 0} || ipStr != "192.168.1.0" {
 		t.Errorf("index 0: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
-	ip, ipStr, ok = idx.pickIPv4(255)
+	ip, ipStr, _, ok = idx.pickIPv4(255)
 	if !ok || ip != [4]byte{192, 168, 1, 255} || ipStr != "192.168.1.255" {
 		t.Errorf("index 255: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
 	// Second CIDR starts at index 256: 10.0.0.0/16
-	ip, ipStr, ok = idx.pickIPv4(256)
+	ip, ipStr, _, ok = idx.pickIPv4(256)
 	if !ok || ip != [4]byte{10, 0, 0, 0} || ipStr != "10.0.0.0" {
 		t.Errorf("index 256: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
-	ip, ipStr, ok = idx.pickIPv4(256 + 65535)
+	ip, ipStr, _, ok = idx.pickIPv4(256 + 65535)
 	if !ok || ip != [4]byte{10, 0, 255, 255} || ipStr != "10.0.255.255" {
 		t.Errorf("index 256+65535: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
 	// Out of range
-	_, _, ok = idx.pickIPv4(256 + 65536)
+	_, _, _, ok = idx.pickIPv4(256 + 65536)
 	if ok {
 		t.Error("expected ok=false for out-of-range index")
 	}
+}
+
+// referenceTCPChecksum independently computes the TCP checksum over the
+// pseudo-header + segment using the textbook one's-complement sum, so we can
+// assert synTCPChecksum (which folds precomputed terms) produces the same value
+// for the source IP the kernel will actually use.
+func referenceTCPChecksum(src, dst [4]byte, seg []byte) uint16 {
+	pseudo := []byte{
+		src[0], src[1], src[2], src[3],
+		dst[0], dst[1], dst[2], dst[3],
+		0, 6,
+		byte(len(seg) >> 8), byte(len(seg)),
+	}
+	var sum uint32
+	add := func(b []byte) {
+		for i := 0; i+1 < len(b); i += 2 {
+			sum += uint32(b[i])<<8 | uint32(b[i+1])
+		}
+		if len(b)%2 == 1 {
+			sum += uint32(b[len(b)-1]) << 8
+		}
+	}
+	add(pseudo)
+	add(seg)
+	for sum>>16 != 0 {
+		sum = (sum & 0xffff) + (sum >> 16)
+	}
+	return ^uint16(sum)
+}
+
+func TestSynTCPChecksumUsesPerTargetSource(t *testing.T) {
+	const srcPort = uint16(54321)
+	srcIP := [4]byte{10, 0, 0, 5}
+	dstIP := [4]byte{93, 184, 216, 34}
+	const dstPort = uint16(443)
+	const seq = uint32(0xDEADBEEF)
+
+	// Build the 24-byte SYN segment exactly as newSYNSender/send do (checksum
+	// field left zero for the reference computation).
+	var pkt [24]byte
+	binary.BigEndian.PutUint16(pkt[0:2], srcPort)
+	binary.BigEndian.PutUint16(pkt[2:4], dstPort)
+	binary.BigEndian.PutUint32(pkt[4:8], seq)
+	pkt[12] = 0x60
+	pkt[13] = 0x02
+	binary.BigEndian.PutUint16(pkt[14:16], 1024)
+	pkt[20] = 2
+	pkt[21] = 4
+	binary.BigEndian.PutUint16(pkt[22:24], 1460)
+
+	// baseSum mirrors newSYNSender (constant terms, no source IP).
+	var baseSum uint32
+	baseSum += 6
+	baseSum += 24
+	baseSum += uint32(srcPort)
+	baseSum += 0x6002
+	baseSum += 0x0400
+	baseSum += 0x0204
+	baseSum += 0x05B4
+
+	want := referenceTCPChecksum(srcIP, dstIP, pkt[:])
+	got := synTCPChecksum(baseSum, ipChecksumSum(net.IP(srcIP[:])), dstIP, dstPort, seq)
+	require.Equal(t, want, got, "checksum must match a real packet from %v", srcIP)
+
+	// Using the wrong source IP (the old always-default-route bug) yields a
+	// checksum the target stack would reject.
+	wrong := synTCPChecksum(baseSum, ipChecksumSum(net.IPv4(127, 0, 0, 1).To4()), dstIP, dstPort, seq)
+	require.NotEqual(t, want, wrong, "a mismatched source must change the checksum")
 }
 
 func TestFormatIPv4RoundTrip(t *testing.T) {

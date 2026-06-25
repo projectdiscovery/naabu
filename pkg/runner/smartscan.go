@@ -181,7 +181,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 
 		// fast IPv4 path: uint32 arithmetic, no big.Int
 		if useFastPath {
-			dstIP, ip, isV4 := tgtIdx.pickIPv4(ipIndex)
+			dstIP, ip, srcSum, isV4 := tgtIdx.pickIPv4(ipIndex)
 			if !isV4 {
 				// IPv6: fall back to standard path for this target.
 				ipStr := r.PickIP(targets, ipIndex)
@@ -216,7 +216,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 			}
 
 			r.limiter.Take()
-			if err := sender.send(dstIP, uint16(p.Port)); err != nil {
+			if err := sender.send(dstIP, srcSum, uint16(p.Port)); err != nil {
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, p.Port, err)
 			}
 			if r.options.EnableProgressBar {

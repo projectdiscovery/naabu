@@ -768,9 +768,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 							dstIP4 [4]byte
 							isV4   bool
 							ip     string
+							srcSum uint32
 						)
 						if synSender != nil {
-							dstIP4, ip, isV4 = tgtIdx.pickIPv4(ipIndex)
+							dstIP4, ip, srcSum, isV4 = tgtIdx.pickIPv4(ipIndex)
 						}
 						if ip == "" {
 							ip = r.PickIP(targets, ipIndex)
@@ -814,7 +815,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 									continue
 								}
 								synPacer.wait()
-								if err := synSender.send(dstIP4, uint16(port.Port)); err != nil {
+								if err := synSender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
 							} else {
