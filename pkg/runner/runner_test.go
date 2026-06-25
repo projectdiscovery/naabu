@@ -1125,6 +1125,13 @@ func TestConcurrentSYNScans(t *testing.T) {
 }
 
 func TestNewRunner_ScanTypeSyncAfterFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The fallback is triggered by raw capture failing on a bogus interface.
+		// Windows CI has npcap and resolves capture independently of the given
+		// name, so raw infra comes up and no fallback happens. The fallback
+		// propagation itself is platform independent and covered on linux/macos.
+		t.Skip("raw capture availability and interface handling differ on windows")
+	}
 	origRouter := scan.PkgRouter
 	origPriv := privileges.IsPrivileged
 	origIface := scan.NetworkInterface
