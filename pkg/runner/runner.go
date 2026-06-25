@@ -716,8 +716,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					continue
 				}
 
-				// Use current time as seed
-				currentSeed := time.Now().UnixNano()
+				// Use current time as seed, unless an explicit/shard seed applies.
+				// Sharded nodes must share a seed so their slices are disjoint.
+				currentSeed := r.options.shardSeed(time.Now().UnixNano())
 				r.options.ResumeCfg.RLock()
 				if r.options.ResumeCfg.Seed > 0 {
 					currentSeed = r.options.ResumeCfg.Seed
@@ -732,6 +733,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 				b := blackrock.New(int64(Range), currentSeed)
 				for index := int64(0); index < int64(Range); index++ {
+					// Distributed sharding: each node only handles its slice of
+					// the index space. The shared seed makes the slices disjoint.
+					if !r.options.inShard(index) {
+						continue
+					}
 					xxx := b.Shuffle(index)
 					ipIndex := xxx / int64(portsCount)
 					portIndex := int(xxx % int64(portsCount))
@@ -804,7 +810,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				}
 
 				// handle the ip:port combination
-				for _, targetWithPort := range targetsWithPort {
+				for twpIndex, targetWithPort := range targetsWithPort {
+					// shard the explicit ip:port targets the same way as the
+					// generated (host, port) space.
+					if !r.options.inShard(int64(twpIndex)) {
+						continue
+					}
 					ip, p, err := net.SplitHostPort(targetWithPort)
 					if err != nil {
 						gologger.Debug().Msgf("Skipping %s: %v\n", targetWithPort, err)

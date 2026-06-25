@@ -167,12 +167,25 @@ type Options struct {
 	// that presets rate/retries/timeout/warm-up/threads. T3 is the default and
 	// matches naabu's historical behaviour.
 	TimingTemplate int
+
+	// Shard / ShardTotal split the scan space across distributed nodes
+	// (masscan-style "X/Y", 1-based): node Shard of ShardTotal scans only its
+	// slice of the (host, port) space. ShardTotal == 0 disables sharding.
+	Shard      int
+	ShardTotal int
+
+	// Seed fixes the blackrock shuffle seed for reproducible scans. It must be
+	// identical across nodes when sharding so the slices are disjoint and
+	// complete. 0 means a random per-run seed.
+	Seed int64
 }
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{}
 	var cfgFile string
+	var shardArg string
+	var seedArg int
 
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
@@ -277,6 +290,8 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model (not compatible with stream mode)"),
 		flagSet.IntVarP(&options.PredictionThreshold, "prediction-threshold", "pt", 20, "minimum confidence for port predictions (0-100%)"),
+		flagSet.StringVar(&shardArg, "shard", "", "distributed scan slice as index/total, 1-based (e.g. 1/4)"),
+		flagSet.IntVar(&seedArg, "seed", 0, "seed for scan randomization, must match across shards (default random)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
@@ -386,6 +401,15 @@ func ParseOptions() *Options {
 			gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 		}
 		os.Exit(0)
+	}
+
+	options.Seed = int64(seedArg)
+	if shardArg != "" {
+		idx, total, err := parseShard(shardArg)
+		if err != nil {
+			gologger.Fatal().Msgf("Program exiting: %s\n", err)
+		}
+		options.Shard, options.ShardTotal = idx, total
 	}
 
 	// Apply the timing template before validation so the connect-scan rate

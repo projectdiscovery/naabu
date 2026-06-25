@@ -55,6 +55,10 @@ func (options *Options) ValidateOptions() error {
 		return fmt.Errorf("invalid timing template %d (valid range 0-5)", options.TimingTemplate)
 	}
 
+	if options.ShardTotal != 0 && (options.ShardTotal < 1 || options.Shard < 1 || options.Shard > options.ShardTotal) {
+		return fmt.Errorf("invalid shard %d/%d (require 1 <= index <= total)", options.Shard, options.ShardTotal)
+	}
+
 	if options.Rate == 0 {
 		return errkit.Wrap(errZeroValue, "rate")
 	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
