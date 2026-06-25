@@ -67,9 +67,19 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 			defer wg.Done()
 			pace := newPacer(perWorkerRate)
 			forEachWorkerIndex(worker, n, rng, func(index int64) {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
 				r.fastScanIndex(ctx, b, index, portsCount, targets, tgtIdx, sender, pace, payload, raw)
 			})
-			_ = sender.flush()
+			if err := sender.flush(); err != nil {
+				if isCongestion(err) {
+					pace.onCongestion()
+				}
+				gologger.Debug().Msgf("tx worker %d final flush failed: %s\n", worker, err)
+			}
 		}(w, senders[w])
 	}
 	wg.Wait()
