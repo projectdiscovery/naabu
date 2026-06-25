@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"sync"
 	"testing"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -87,6 +88,50 @@ func TestAcquire_SynScan_FreeHandler_Succeeds(t *testing.T) {
 	assert.True(t, handler.Busy)
 }
 
+func TestAcquireSynScanIsConcurrencySafe(t *testing.T) {
+	origRouter := PkgRouter
+	origPriv := privileges.IsPrivileged
+	origHandlers := ListenHandlers
+	defer func() {
+		PkgRouter = origRouter
+		privileges.IsPrivileged = origPriv
+		ListenHandlers = origHandlers
+	}()
+
+	PkgRouter = &stubRouter{}
+	privileges.IsPrivileged = true
+
+	const n = 50
+	pool := make([]*ListenHandler, n)
+	for i := range pool {
+		pool[i] = &ListenHandler{}
+	}
+	ListenHandlers = pool
+
+	var wg sync.WaitGroup
+	var mu sync.Mutex
+	seen := map[*ListenHandler]int{}
+	for i := 0; i < n; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			h, err := Acquire(&Options{ScanType: TypeSyn})
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			seen[h]++
+			mu.Unlock()
+		}()
+	}
+	wg.Wait()
+
+	assert.Len(t, seen, n, "every handler should be claimed exactly once")
+	for h, c := range seen {
+		assert.Equalf(t, 1, c, "handler %p handed out more than once", h)
+	}
+}
+
 func TestNewScanner_SetsConnectScanType(t *testing.T) {
 	scanner, err := NewScanner(&Options{ScanType: TypeConnect})
 	require.NoError(t, err)
@@ -165,7 +210,10 @@ func TestListenHandler_Release(t *testing.T) {
 	h.Busy = true
 	h.Release()
 	assert.False(t, h.Busy)
-	assert.Nil(t, h.Phase)
+	// Release keeps a valid idle Phase so the global pcap reader can safely
+	// dereference it for stray packets while the handler sits in the pool.
+	assert.NotNil(t, h.Phase)
+	assert.True(t, h.Phase.Is(Init))
 }
 
 func TestTypeConstants(t *testing.T) {

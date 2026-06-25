@@ -3,6 +3,7 @@ package scan
 import (
 	"errors"
 	"net"
+	"sync"
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -28,6 +29,12 @@ var (
 	InitScanner      func(s *Scanner) error
 	NumberOfHandlers = 1
 	tcpsequencer     = NewTCPSequencer()
+
+	// listenHandlersMu serialises pool claim/return. Without it two
+	// concurrent NewScanner calls (embedded/parallel use) can race on the
+	// Busy flag and hand the same ListenHandler to both, sharing its source
+	// port, channels and phase.
+	listenHandlersMu sync.Mutex
 )
 
 type ListenHandler struct {
@@ -55,6 +62,8 @@ func Acquire(options *Options) (*ListenHandler, error) {
 	// Only attempt to use pooled raw-socket handlers for explicit SYN scans
 	// where the raw packet infrastructure is available and we have privileges.
 	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == TypeSyn {
+		listenHandlersMu.Lock()
+		defer listenHandlersMu.Unlock()
 		for _, listenHandler := range ListenHandlers {
 			if !listenHandler.Busy {
 				listenHandler.Phase = &Phase{}
@@ -71,8 +80,13 @@ func Acquire(options *Options) (*ListenHandler, error) {
 }
 
 func (l *ListenHandler) Release() {
+	listenHandlersMu.Lock()
+	defer listenHandlersMu.Unlock()
 	l.Busy = false
-	l.Phase = nil
+	// Keep a valid (idle) Phase rather than nil: a released handler stays in
+	// the pool and the global pcap reader still dereferences Phase for any
+	// stray packet that matches its port, which would panic on nil.
+	l.Phase = &Phase{}
 }
 
 func init() {
