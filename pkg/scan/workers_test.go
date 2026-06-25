@@ -59,6 +59,29 @@ func TestCloseWithoutStartWorkers(t *testing.T) {
 	assert.Nil(t, s.ListenHandler)
 }
 
+func TestCloseWithoutCancelDoesNotHang(t *testing.T) {
+	s := newTestScanner(t)
+	s.ListenHandler.Phase.Set(Scan)
+
+	// Start workers with a context the caller never cancels. Close must still
+	// release them via its own derived cancel instead of blocking forever on
+	// workersWg.Wait.
+	s.StartWorkers(context.Background())
+
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Close()
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+		assert.Nil(t, s.ListenHandler)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() hung: workers not released without an external context cancel")
+	}
+}
+
 func TestCloseWaitsForWorkers(t *testing.T) {
 	s := newTestScanner(t)
 	s.ListenHandler.Phase = &Phase{}
