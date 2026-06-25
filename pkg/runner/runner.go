@@ -72,6 +72,10 @@ type Runner struct {
 	// skip the disk-backed IP->hostname lookups entirely and emit IPs directly.
 	hasHostnames atomic.Bool
 
+	// csvHeaderOnce guards the live CSV header so it is written exactly once per
+	// run rather than once per onReceive call (which is per result).
+	csvHeaderOnce sync.Once
+
 	fpTargetCh  chan fingerprint.Target
 	fpDone      chan struct{}
 	fpServices  map[string]*port.Service
@@ -244,6 +248,16 @@ func NewRunner(options *Options) (*Runner, error) {
 	return runner, nil
 }
 
+// finalJSONCSVToStdout reports whether handleOutput should print JSON/CSV
+// results to stdout. In the common case onReceive already streams them live
+// during the scan (and the Verify path replays through onReceive), so printing
+// again here would duplicate every line. It only falls to handleOutput when the
+// live path is intentionally suppressed: -sV emits enriched output after the
+// scan, and nmap CLI defers JSON/CSV until after nmap integration.
+func (r *Runner) finalJSONCSVToStdout() bool {
+	return r.options.ServiceVersion || (r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV))
+}
+
 // hostsForIP returns the hostnames to print for an IP. For scans whose inputs
 // are pure IPs/CIDRs (no hostnames), it returns the IP directly and avoids the
 // disk-backed Hosts lookup entirely.
@@ -333,8 +347,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		return
 	}
 
-	csvHeaderEnabled := true
-
 	buffer := bytes.Buffer{}
 	writer := csv.NewWriter(&buffer)
 	for _, host := range dt {
@@ -366,10 +378,9 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					}
 					_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 				} else if r.options.CSV {
-					if csvHeaderEnabled {
+					r.csvHeaderOnce.Do(func() {
 						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-						csvHeaderEnabled = false
-					}
+					})
 					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
@@ -1457,7 +1468,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					}
 				}
 
-				if !r.options.DisableStdout {
+				if !r.options.DisableStdout && r.finalJSONCSVToStdout() {
 					if r.options.JSON {
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else if r.options.CSV {

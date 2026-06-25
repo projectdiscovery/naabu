@@ -895,6 +895,29 @@ func TestHostsForIPUsesStoreWhenHostnames(t *testing.T) {
 	require.Equal(t, []string{"example.com"}, rec)
 }
 
+func TestFinalJSONCSVToStdout(t *testing.T) {
+	cases := []struct {
+		name string
+		opts *Options
+		want bool
+	}{
+		{"plain live", &Options{JSON: false, CSV: false}, false},
+		{"json live", &Options{JSON: true}, false},
+		{"csv live", &Options{CSV: true}, false},
+		{"service version json", &Options{JSON: true, ServiceVersion: true}, true},
+		{"service version plain", &Options{ServiceVersion: true}, true},
+		{"nmap json deferred", &Options{JSON: true, NmapCLI: "nmap -sV"}, true},
+		{"nmap csv deferred", &Options{CSV: true, NmapCLI: "nmap -sV"}, true},
+		{"nmap without json/csv", &Options{NmapCLI: "nmap -sV"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &Runner{options: tc.opts}
+			require.Equal(t, tc.want, r.finalJSONCSVToStdout())
+		})
+	}
+}
+
 // TestRunnerGetIPs tests IP preprocessing methods
 func TestRunnerGetIPs(t *testing.T) {
 	options := &Options{
