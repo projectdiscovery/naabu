@@ -1092,7 +1092,12 @@ func SetupHandler(interfaceName string) error {
 	// discovery - plus UDP, while excluding our own outgoing pure-SYN probes.
 	// The reader still routes each packet to the owning handler by destination
 	// port, so any number of handlers share this one filter.
-	bpfFilter := "(tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or udp"
+	// tcp[tcpflags] is an IPv4-only BPF accessor (classic BPF cannot walk the
+	// IPv6 extension-header chain), so the flag test is scoped to ip and IPv6
+	// TCP replies are captured with a plain "ip6 and tcp". Outgoing pure-SYN
+	// probes still get filtered: for IPv4 by the flag mask, and for IPv6 by the
+	// reader, which only acts on SYN-ACKs whose dst port is a live handler port.
+	bpfFilter := "(ip and tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or (ip6 and tcp) or udp"
 	err := SetupHandlerUnix(interfaceName, bpfFilter, protocol.TCP)
 	if err != nil {
 		return err
