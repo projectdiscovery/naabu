@@ -30,11 +30,17 @@ var (
 	NumberOfHandlers = 1
 	tcpsequencer     = NewTCPSequencer()
 
-	// listenHandlersMu serialises pool claim/return. Without it two
-	// concurrent NewScanner calls (embedded/parallel use) can race on the
-	// Busy flag and hand the same ListenHandler to both, sharing its source
-	// port, channels and phase.
-	listenHandlersMu sync.Mutex
+	// listenHandlersMu guards the on-demand ListenHandlers registry against the
+	// global pcap/icmp readers that iterate it concurrently with Acquire and
+	// Release.
+	listenHandlersMu sync.RWMutex
+
+	// buildHandlerFn and ensureRawInfraFn are wired by the raw-socket build
+	// (scan_raw.go) so Acquire here can create handlers on demand without this
+	// file referencing platform-constrained symbols. They are nil on platforms
+	// without raw-socket support, where Acquire falls back to a plain handler.
+	buildHandlerFn   func() (*ListenHandler, error)
+	ensureRawInfraFn func() bool
 )
 
 type ListenHandler struct {
@@ -59,19 +65,24 @@ func NewListenHandler() *ListenHandler {
 }
 
 func Acquire(options *Options) (*ListenHandler, error) {
-	// Only attempt to use pooled raw-socket handlers for explicit SYN scans
-	// where the raw packet infrastructure is available and we have privileges.
-	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == TypeSyn {
-		listenHandlersMu.Lock()
-		defer listenHandlersMu.Unlock()
-		for _, listenHandler := range ListenHandlers {
-			if !listenHandler.Busy {
-				listenHandler.Phase = &Phase{}
-				listenHandler.Busy = true
-				return listenHandler, nil
-			}
+	// Privileged SYN scans get a freshly built raw-socket handler with its own
+	// source port, channels and drain workers. Building on demand (rather than
+	// from a fixed pre-allocated pool) means nothing is allocated until a SYN
+	// scan actually runs, there is no fixed concurrency cap, and Release can
+	// fully tear the handler down afterwards.
+	if PkgRouter != nil && privileges.IsPrivileged && options.ScanType == TypeSyn && buildHandlerFn != nil {
+		if ensureRawInfraFn != nil && !ensureRawInfraFn() {
+			return nil, errors.New("could not initialize raw scan infrastructure")
 		}
-		return nil, errors.New("no free handlers")
+		h, err := buildHandlerFn()
+		if err != nil {
+			return nil, err
+		}
+		h.Busy = true
+		listenHandlersMu.Lock()
+		ListenHandlers = append(ListenHandlers, h)
+		listenHandlersMu.Unlock()
+		return h, nil
 	}
 
 	h := NewListenHandler()
@@ -79,14 +90,32 @@ func Acquire(options *Options) (*ListenHandler, error) {
 	return h, nil
 }
 
+// Release returns a handler at the end of a scan: it is removed from the
+// registry the readers consult and its raw sockets are closed, which also stops
+// its drain workers. Safe to call on a plain (non-raw) handler.
 func (l *ListenHandler) Release() {
 	listenHandlersMu.Lock()
-	defer listenHandlersMu.Unlock()
+	for i, h := range ListenHandlers {
+		if h == l {
+			ListenHandlers = append(ListenHandlers[:i], ListenHandlers[i+1:]...)
+			break
+		}
+	}
+	listenHandlersMu.Unlock()
+
 	l.Busy = false
-	// Keep a valid (idle) Phase rather than nil: a released handler stays in
-	// the pool and the global pcap reader still dereferences Phase for any
-	// stray packet that matches its port, which would panic on nil.
 	l.Phase = &Phase{}
+	l.teardown()
+}
+
+// teardown closes the handler's raw sockets. Closing the conns unblocks and
+// terminates the per-handler drain goroutines started in buildListenHandler.
+func (l *ListenHandler) teardown() {
+	for _, c := range []*net.IPConn{l.TcpConn4, l.UdpConn4, l.TcpConn6, l.UdpConn6} {
+		if c != nil {
+			_ = c.Close()
+		}
+	}
 }
 
 func init() {

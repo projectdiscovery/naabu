@@ -1115,20 +1115,21 @@ func TestConcurrentSYNScans(t *testing.T) {
 func TestNewRunner_ScanTypeSyncAfterFallback(t *testing.T) {
 	origRouter := scan.PkgRouter
 	origPriv := privileges.IsPrivileged
-	origHandlers := scan.ListenHandlers
+	origIface := scan.NetworkInterface
 	defer func() {
 		scan.PkgRouter = origRouter
 		privileges.IsPrivileged = origPriv
-		scan.ListenHandlers = origHandlers
+		scan.NetworkInterface = origIface
 	}()
 
-	// Force the fallback: router exists + privileged + all handlers busy
+	// Force the fallback: privileged SYN scan whose raw infrastructure cannot
+	// come up (bogus capture interface) -> Acquire errors -> connect fallback.
 	scan.PkgRouter = origRouter
 	if scan.PkgRouter == nil {
 		scan.PkgRouter = stubRouter{}
 	}
 	privileges.IsPrivileged = true
-	scan.ListenHandlers = []*scan.ListenHandler{{Busy: true, Phase: &scan.Phase{}}}
+	scan.NetworkInterface = "naabu-nonexistent-iface0"
 
 	options := &Options{
 		Host:     []string{"127.0.0.1"},

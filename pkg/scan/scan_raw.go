@@ -42,62 +42,77 @@ type Handlers struct {
 }
 
 func init() {
-	if PkgRouter == nil || !privileges.IsPrivileged {
-		return
-	}
+	// Only wire the indirection used by Acquire/Release in scan_common.go
+	// (which is not build-constrained, so it cannot reference these raw-socket
+	// symbols directly). No sockets, goroutines or pcap handles are created at
+	// import time anymore: everything is brought up lazily on the first SYN
+	// scan via ensureRawInfra.
+	buildHandlerFn = buildListenHandler
+	ensureRawInfraFn = ensureRawInfra
+}
 
-	transportPacketSend = make(chan *PkgSend, packetSendSize)
+var (
+	rawInfraOnce sync.Once
+	rawInfraOK   bool
+)
 
-	var err error
-	icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-	if err != nil {
-		gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
-	}
-
-	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
-	if err != nil {
-		gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
-	}
-
-	icmpPacketSend = make(chan *PkgSend, packetSendSize)
-	ethernetPacketSend = make(chan *PkgSend, packetSendSize)
-
-	// pre-reserve up to 10 ports
-	for i := 0; i < NumberOfHandlers; i++ {
-		listenHandler, err := buildListenHandler()
-		if err != nil {
-			gologger.Debug().Msgf("could not build listen handler: %s", err)
-			ListenHandlers = nil
+// ensureRawInfra lazily brings up the process-wide raw scan infrastructure
+// (icmp sockets, pcap capture, write/read workers) the first time a privileged
+// SYN scan needs it. Handlers are still created on demand per scan; the capture
+// filter is port-independent (flag based) so newly acquired handlers require no
+// filter changes and any number of scans can run in parallel.
+func ensureRawInfra() bool {
+	rawInfraOnce.Do(func() {
+		if PkgRouter == nil || !privileges.IsPrivileged {
 			return
 		}
 
-		ListenHandlers = append(ListenHandlers, listenHandler)
-	}
+		transportPacketSend = make(chan *PkgSend, packetSendSize)
 
-	handlers = &Handlers{
-		InterfaceHandle: make(map[string]*pcap.Handle),
-	}
-	if err := SetupHandlers(); err != nil {
-		gologger.Error().Msgf("could not setup handlers: %s\n", err)
-		ListenHandlers = nil
-		return
-	}
-	if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
-		gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
-		ListenHandlers = nil
-		return
-	}
-	go TransportReadWorker()
-	go TransportWriteWorker()
-	// Spawn multiple ICMP write workers: ranging over icmpPacketSend from
-	// several goroutines is safe, and concurrent WriteTo on the shared
-	// icmpConn4/icmpConn6 is supported by net.PacketConn. With one worker
-	// the per-host retry-sleep inside PingIcmp*RequestAsync serialises the
-	// whole scan; fanning out lets those sleeps overlap. See #1672.
-	for i := 0; i < icmpWriteWorkers; i++ {
-		go ICMPWriteWorker()
-	}
-	go EthernetWriteWorker(ethernetPacketSend)
+		var err error
+		icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+		if err != nil {
+			gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
+		}
+		icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
+		if err != nil {
+			gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
+		}
+
+		icmpPacketSend = make(chan *PkgSend, packetSendSize)
+		ethernetPacketSend = make(chan *PkgSend, packetSendSize)
+
+		handlers = &Handlers{
+			InterfaceHandle: make(map[string]*pcap.Handle),
+		}
+		if err := SetupHandlers(); err != nil {
+			gologger.Error().Msgf("could not setup handlers: %s\n", err)
+			return
+		}
+		if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
+			gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
+			return
+		}
+		go TransportReadWorker()
+		go TransportWriteWorker()
+		// One reader per icmp family routes replies to whichever handlers are
+		// currently in the host-discovery phase. A single shared reader avoids
+		// multiple per-scan handlers stealing each other's replies off the
+		// shared conn.
+		go icmpReadWorker4()
+		go icmpReadWorker6()
+		// Spawn multiple ICMP write workers: ranging over icmpPacketSend from
+		// several goroutines is safe, and concurrent WriteTo on the shared
+		// icmpConn4/icmpConn6 is supported by net.PacketConn. With one worker
+		// the per-host retry-sleep inside PingIcmp*RequestAsync serialises the
+		// whole scan; fanning out lets those sleeps overlap. See #1672.
+		for i := 0; i < icmpWriteWorkers; i++ {
+			go ICMPWriteWorker()
+		}
+		go EthernetWriteWorker(ethernetPacketSend)
+		rawInfraOK = true
+	})
+	return rawInfraOK
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -132,8 +147,9 @@ func buildListenHandler() (*ListenHandler, error) {
 
 	listenHandler.UdpConn6, _ = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP("::")})
 
-	go listenHandler.ICMPReadWorker4()
-	go listenHandler.ICMPReadWorker6()
+	// icmp replies are handled by the process-global icmpReadWorker4/6; these
+	// per-handler workers only drain the raw transport sockets so their kernel
+	// receive buffers do not fill. They exit when Release closes the conns.
 	if listenHandler.TcpConn4 != nil {
 		go listenHandler.TcpReadWorker4()
 	}
@@ -504,16 +520,35 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	}
 }
 
-// ICMPReadWorker4 reads packets from the network layer
-func (l *ListenHandler) ICMPReadWorker4() {
+// dispatchHostDiscovery delivers a host-discovery result (icmp/arp reply) to
+// every handler currently in the host-discovery phase. Sends are non-blocking
+// so a slow or torn-down handler cannot stall the shared reader, and the
+// snapshot is taken under the pool read lock so it composes with on-demand
+// Acquire/Release.
+func dispatchHostDiscovery(res *PkgResult) {
+	listenHandlersMu.RLock()
+	defer listenHandlersMu.RUnlock()
+	for _, l := range ListenHandlers {
+		if l.Phase != nil && l.Phase.Is(HostDiscovery) {
+			select {
+			case l.HostDiscoveryChan <- res:
+			default:
+			}
+		}
+	}
+}
+
+// icmpReadWorker4 reads ipv4 icmp replies from the shared conn and fans them
+// out to the handlers doing host discovery.
+func icmpReadWorker4() {
+	if icmpConn4 == nil {
+		return
+	}
 	data := make([]byte, 1500)
 	for {
-		if icmpConn4 == nil {
-			return
-		}
 		n, addr, err := icmpConn4.ReadFrom(data)
 		if err != nil {
-			continue
+			return
 		}
 
 		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
@@ -523,13 +558,14 @@ func (l *ListenHandler) ICMPReadWorker4() {
 
 		switch rm.Type {
 		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestampReply:
-			l.HostDiscoveryChan <- &PkgResult{ipv4: addr.String()}
+			dispatchHostDiscovery(&PkgResult{ipv4: addr.String()})
 		}
 	}
 }
 
-// ICMPReadWorker6 reads packets from the network layer
-func (l *ListenHandler) ICMPReadWorker6() {
+// icmpReadWorker6 reads ipv6 icmp replies from the shared conn and fans them
+// out to the handlers doing host discovery.
+func icmpReadWorker6() {
 	if icmpConn6 == nil {
 		return
 	}
@@ -537,7 +573,7 @@ func (l *ListenHandler) ICMPReadWorker6() {
 	for {
 		n, addr, err := icmpConn6.ReadFrom(data)
 		if err != nil {
-			continue
+			return
 		}
 
 		rm, err := icmp.ParseMessage(ProtocolIPv6ICMP, data[:n])
@@ -556,7 +592,7 @@ func (l *ListenHandler) ICMPReadWorker6() {
 			if idx := strings.Index(ip, "%"); idx > 0 {
 				ip = ip[:idx]
 			}
-			l.HostDiscoveryChan <- &PkgResult{ipv6: ip}
+			dispatchHostDiscovery(&PkgResult{ipv6: ip})
 		}
 	}
 }
@@ -630,7 +666,9 @@ func (l *ListenHandler) TcpReadWorker4() {
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.TcpConn4.ReadFrom(data)
+		if _, _, err := l.TcpConn4.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
@@ -640,7 +678,9 @@ func (l *ListenHandler) TcpReadWorker6() {
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.TcpConn6.ReadFrom(data)
+		if _, _, err := l.TcpConn6.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
@@ -650,7 +690,9 @@ func (l *ListenHandler) UdpReadWorker4() {
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.UdpConn4.ReadFrom(data)
+		if _, _, err := l.UdpConn4.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 func (l *ListenHandler) UdpReadWorker6() {
@@ -659,7 +701,9 @@ func (l *ListenHandler) UdpReadWorker6() {
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.UdpConn6.ReadFrom(data)
+		if _, _, err := l.UdpConn6.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
@@ -707,8 +751,6 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 			return err
 		}
 
-		// Strict BPF filter
-		// + Destination port equals to sender socket source port
 		err = handle.SetBPFFilter(bpfFilter)
 		if err != nil {
 			return err
@@ -738,6 +780,8 @@ func TransportReadWorker() {
 	var wgread sync.WaitGroup
 
 	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 string) {
+		listenHandlersMu.RLock()
+		defer listenHandlersMu.RUnlock()
 		for _, listenHandler := range ListenHandlers {
 			// We consider only incoming packets
 			tcpPortMatches := tcp.DstPort == layers.TCPPort(listenHandler.Port)
@@ -942,9 +986,7 @@ func TransportReadWorker() {
 							srcIP4 := net.IP(arp.SourceProtAddress)
 							srcMAC := net.HardwareAddr(arp.SourceHwAddress).String()
 
-							for _, listenHandler := range ListenHandlers {
-								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: ToString(srcIP4), mac: srcMAC}
-							}
+							dispatchHostDiscovery(&PkgResult{ipv4: ToString(srcIP4), mac: srcMAC})
 						}
 					}
 				}
@@ -993,12 +1035,14 @@ func SetupHandlers() error {
 }
 
 func SetupHandler(interfaceName string) error {
-	var portFilters []string
-	for _, listenHandler := range ListenHandlers {
-		portFilters = append(portFilters, fmt.Sprintf("dst port %d", listenHandler.Port))
-	}
-
-	bpfFilter := fmt.Sprintf("(%s) and (tcp or udp)", strings.Join(portFilters, " or "))
+	// Port-independent capture. Handlers are created on demand, so their source
+	// ports cannot be baked into the filter (and runtime SetBPFFilter is not
+	// safe against the live reader). Capture inbound TCP that carries ACK or
+	// RST - SYN-ACK for open ports, RST/RST-ACK for closed ports and TCP host
+	// discovery - plus UDP, while excluding our own outgoing pure-SYN probes.
+	// The reader still routes each packet to the owning handler by destination
+	// port, so any number of handlers share this one filter.
+	bpfFilter := "(tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or udp"
 	err := SetupHandlerUnix(interfaceName, bpfFilter, protocol.TCP)
 	if err != nil {
 		return err

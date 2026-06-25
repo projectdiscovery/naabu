@@ -1,6 +1,7 @@
 package scan
 
 import (
+	"errors"
 	"sync"
 	"testing"
 
@@ -12,6 +13,30 @@ import (
 
 // stubRouter satisfies routing.Router so we can make PkgRouter non-nil in tests.
 type stubRouter struct{ routing.Router }
+
+// withStubbedRawInfra wires the on-demand handler seam so the SYN Acquire path
+// can be exercised without opening real raw sockets or pcap handles. The build
+// function returns a fresh handler each call (or an error to simulate failure).
+func withStubbedRawInfra(t *testing.T, infraOK bool, build func() (*ListenHandler, error)) {
+	t.Helper()
+	origRouter := PkgRouter
+	origPriv := privileges.IsPrivileged
+	origBuild := buildHandlerFn
+	origEnsure := ensureRawInfraFn
+	origHandlers := ListenHandlers
+	t.Cleanup(func() {
+		PkgRouter = origRouter
+		privileges.IsPrivileged = origPriv
+		buildHandlerFn = origBuild
+		ensureRawInfraFn = origEnsure
+		ListenHandlers = origHandlers
+	})
+	PkgRouter = &stubRouter{}
+	privileges.IsPrivileged = true
+	ListenHandlers = nil
+	ensureRawInfraFn = func() bool { return infraOK }
+	buildHandlerFn = build
+}
 
 func TestAcquire_ConnectScan_AlwaysSucceeds(t *testing.T) {
 	opts := &Options{ScanType: TypeConnect}
@@ -49,87 +74,82 @@ func TestAcquire_NilRouter_SucceedsForAnyScanType(t *testing.T) {
 	}
 }
 
-func TestAcquire_SynScan_NoFreeHandlers_ReturnsError(t *testing.T) {
-	origRouter := PkgRouter
-	origPriv := privileges.IsPrivileged
-	origHandlers := ListenHandlers
-	defer func() {
-		PkgRouter = origRouter
-		privileges.IsPrivileged = origPriv
-		ListenHandlers = origHandlers
-	}()
-
-	PkgRouter = &stubRouter{}
-	privileges.IsPrivileged = true
-	ListenHandlers = []*ListenHandler{{Busy: true, Phase: &Phase{}}}
+func TestAcquire_SynScan_InfraFailure_ReturnsError(t *testing.T) {
+	withStubbedRawInfra(t, false, func() (*ListenHandler, error) {
+		return NewListenHandler(), nil
+	})
 
 	_, err := Acquire(&Options{ScanType: TypeSyn})
-	assert.Error(t, err, "should fail when all handlers are busy for syn scan")
+	assert.Error(t, err, "should fail when raw infrastructure cannot start")
 }
 
-func TestAcquire_SynScan_FreeHandler_Succeeds(t *testing.T) {
-	origRouter := PkgRouter
-	origPriv := privileges.IsPrivileged
-	origHandlers := ListenHandlers
-	defer func() {
-		PkgRouter = origRouter
-		privileges.IsPrivileged = origPriv
-		ListenHandlers = origHandlers
-	}()
+func TestAcquire_SynScan_BuildFailure_ReturnsError(t *testing.T) {
+	withStubbedRawInfra(t, true, func() (*ListenHandler, error) {
+		return nil, errors.New("no privileges")
+	})
 
-	PkgRouter = &stubRouter{}
-	privileges.IsPrivileged = true
-	freeHandler := &ListenHandler{Busy: false}
-	ListenHandlers = []*ListenHandler{freeHandler}
+	_, err := Acquire(&Options{ScanType: TypeSyn})
+	assert.Error(t, err, "build error should propagate")
+}
+
+func TestAcquire_SynScan_BuildsAndRegisters(t *testing.T) {
+	built := &ListenHandler{Phase: &Phase{}}
+	withStubbedRawInfra(t, true, func() (*ListenHandler, error) { return built, nil })
 
 	handler, err := Acquire(&Options{ScanType: TypeSyn})
 	require.NoError(t, err)
-	assert.Same(t, freeHandler, handler, "should return the free handler")
+	assert.Same(t, built, handler, "should return the freshly built handler")
 	assert.True(t, handler.Busy)
+	assert.Contains(t, ListenHandlers, built, "handler must be registered for the readers")
 }
 
 func TestAcquireSynScanIsConcurrencySafe(t *testing.T) {
-	origRouter := PkgRouter
-	origPriv := privileges.IsPrivileged
-	origHandlers := ListenHandlers
-	defer func() {
-		PkgRouter = origRouter
-		privileges.IsPrivileged = origPriv
-		ListenHandlers = origHandlers
-	}()
-
-	PkgRouter = &stubRouter{}
-	privileges.IsPrivileged = true
+	withStubbedRawInfra(t, true, func() (*ListenHandler, error) {
+		return &ListenHandler{Phase: &Phase{}}, nil
+	})
 
 	const n = 50
-	pool := make([]*ListenHandler, n)
-	for i := range pool {
-		pool[i] = &ListenHandler{}
-	}
-	ListenHandlers = pool
-
 	var wg sync.WaitGroup
-	var mu sync.Mutex
-	seen := map[*ListenHandler]int{}
+	got := make([]*ListenHandler, n)
 	for i := 0; i < n; i++ {
 		wg.Add(1)
-		go func() {
+		go func(i int) {
 			defer wg.Done()
-			h, err := Acquire(&Options{ScanType: TypeSyn})
-			if err != nil {
-				return
+			if h, err := Acquire(&Options{ScanType: TypeSyn}); err == nil {
+				got[i] = h
 			}
-			mu.Lock()
-			seen[h]++
-			mu.Unlock()
-		}()
+		}(i)
 	}
 	wg.Wait()
 
-	assert.Len(t, seen, n, "every handler should be claimed exactly once")
-	for h, c := range seen {
-		assert.Equalf(t, 1, c, "handler %p handed out more than once", h)
+	// Every concurrent Acquire gets its own distinct handler, and all are
+	// registered exactly once (no lost updates to the shared slice).
+	seen := map[*ListenHandler]bool{}
+	for _, h := range got {
+		require.NotNil(t, h)
+		assert.Falsef(t, seen[h], "handler %p handed out more than once", h)
+		seen[h] = true
 	}
+	listenHandlersMu.RLock()
+	registered := len(ListenHandlers)
+	listenHandlersMu.RUnlock()
+	assert.Equal(t, n, registered, "all handlers should be registered")
+}
+
+func TestReleaseRemovesFromRegistry(t *testing.T) {
+	origHandlers := ListenHandlers
+	t.Cleanup(func() { ListenHandlers = origHandlers })
+
+	// Distinct ports so testify's value-based Contains can tell them apart.
+	h := &ListenHandler{Phase: &Phase{}, Busy: true, Port: 2}
+	other := &ListenHandler{Phase: &Phase{}, Port: 1}
+	ListenHandlers = []*ListenHandler{other, h}
+
+	h.Release()
+
+	assert.False(t, h.Busy)
+	assert.NotContains(t, ListenHandlers, h, "released handler must be deregistered")
+	assert.Contains(t, ListenHandlers, other, "other handlers must remain")
 }
 
 func TestNewScanner_SetsConnectScanType(t *testing.T) {
@@ -139,19 +159,10 @@ func TestNewScanner_SetsConnectScanType(t *testing.T) {
 }
 
 func TestNewScanner_FallbackFromSynToConnect(t *testing.T) {
-	origRouter := PkgRouter
-	origPriv := privileges.IsPrivileged
-	origHandlers := ListenHandlers
-	defer func() {
-		PkgRouter = origRouter
-		privileges.IsPrivileged = origPriv
-		ListenHandlers = origHandlers
-	}()
-
-	// Set up: router exists, privileged, but all handlers busy -> Acquire fails for SYN
-	PkgRouter = &stubRouter{}
-	privileges.IsPrivileged = true
-	ListenHandlers = []*ListenHandler{{Busy: true, Phase: &Phase{}}}
+	// Privileged SYN scan whose handler build fails must fall back to connect.
+	withStubbedRawInfra(t, true, func() (*ListenHandler, error) {
+		return nil, errors.New("cannot open raw socket")
+	})
 
 	opts := &Options{ScanType: TypeSyn}
 	scanner, err := NewScanner(opts)
