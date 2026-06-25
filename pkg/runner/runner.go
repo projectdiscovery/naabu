@@ -475,12 +475,24 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.options.Rate = limits.RateLimitWithProxy(r.options.Rate)
 	}
 
-	// Scan workers
-	r.wgscan = sizedwaitgroup.New(r.options.Rate)
-	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
-
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
+
+	// Scan workers
+	scanConcurrency := r.options.Rate
+	if !shouldUseRawPackets {
+		// Connect scan opens one socket per in-flight probe. Raise the open
+		// file limit to the hard limit and cap concurrency to what it allows,
+		// so the default rate does not trip "too many open files".
+		if soft := raiseOpenFileLimit(); soft > 0 {
+			if capped := connectConcurrency(r.options.Rate, soft); capped < scanConcurrency {
+				gologger.Info().Msgf("Capping connect concurrency to %d (open file limit %d)\n", capped, soft)
+				scanConcurrency = capped
+			}
+		}
+	}
+	r.wgscan = sizedwaitgroup.New(scanConcurrency)
+	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 
 	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
