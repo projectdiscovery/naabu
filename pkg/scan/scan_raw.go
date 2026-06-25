@@ -417,18 +417,14 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
-	if err != nil {
-		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-		return
-	} else if sourceIP == nil {
-		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-		return
-	}
-
 	if listenHandler.SourceIP6 != nil {
 		ip6.SrcIP = listenHandler.SourceIP6
 	} else {
+		sourceIP := sourceIP6For(ip6.DstIP)
+		if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
+			return
+		}
 		ip6.SrcIP = sourceIP
 	}
 
@@ -438,10 +434,14 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		OptionData:   []byte{0x05, 0xB4},
 	}
 
-	seq := tcpsequencer.Next()
+	// SYN uses a cookie so the receive path can verify the returning SYN-ACK;
+	// other flags use the monotonic sequencer. Computing only the one needed
+	// avoids a wasted atomic increment on the SYN hot path.
+	var seq uint32
 	if pkgFlag == Syn {
-		// SYN cookie: lets the receive path verify the returning SYN-ACK.
 		seq = SynCookie(ip6.DstIP, uint16(p.Port), uint16(listenHandler.Port))
+	} else {
+		seq = tcpsequencer.Next()
 	}
 
 	tcp := layers.TCP{
@@ -459,8 +459,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		tcp.ACK = true
 	}
 
-	err = tcp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
+	if err := tcp.SetNetworkLayerForChecksum(&ip6); err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		if listenHandler.TcpConn6 == nil {
@@ -468,8 +467,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.TcpConn6, &tcp)
-		if err != nil {
+		if err := sendWithConnAddr(&net.IPAddr{IP: ip6.DstIP}, listenHandler.TcpConn6, &tcp); err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
 	}
@@ -484,18 +482,14 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolUDP,
 	}
 
-	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
-	if err != nil {
-		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-		return
-	} else if sourceIP == nil {
-		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-		return
-	}
-
 	if listenHandler.SourceIP6 != nil {
 		ip6.SrcIP = listenHandler.SourceIP6
 	} else {
+		sourceIP := sourceIP6For(ip6.DstIP)
+		if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
+			return
+		}
 		ip6.SrcIP = sourceIP
 	}
 
@@ -504,8 +498,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		DstPort: layers.UDPPort(p.Port),
 	}
 
-	err = udp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
+	if err := udp.SetNetworkLayerForChecksum(&ip6); err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		if listenHandler.UdpConn6 == nil {
@@ -513,8 +506,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.UdpConn6, listenHandler.udpLayersWithProbe(&udp, p.Port)...)
-		if err != nil {
+		if err := sendWithConnAddr(&net.IPAddr{IP: ip6.DstIP}, listenHandler.UdpConn6, listenHandler.udpLayersWithProbe(&udp, p.Port)...); err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
 	}
@@ -604,6 +596,13 @@ var defaultSerializeOptions = gopacket.SerializeOptions{
 
 // send sends the given layers as a single packet on the network.
 func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
+	return sendWithConnAddr(&net.IPAddr{IP: net.ParseIP(destIP)}, conn, l...)
+}
+
+// sendWithConnAddr is sendWithConn with an already-parsed destination, letting
+// callers that hold the parsed net.IP (e.g. the IPv6 path, which needs it for
+// the checksum) avoid a second net.ParseIP per packet.
+func sendWithConnAddr(addr *net.IPAddr, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	var err error
 
 	buf := gopacket.NewSerializeBuffer()
@@ -611,7 +610,6 @@ func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.Serializable
 		return err
 	}
 	data := buf.Bytes()
-	addr := &net.IPAddr{IP: net.ParseIP(destIP)}
 
 	for retries := 0; retries < maxRetries; retries++ {
 		_, err = conn.WriteTo(data, addr)
@@ -623,10 +621,50 @@ func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.Serializable
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+		return fmt.Errorf("could not send packet to %s: %s", addr.IP, err)
 	}
 
 	return nil
+}
+
+// src6CacheCap bounds the IPv6 source-route cache so a scan over many distinct
+// /64s cannot grow it without limit.
+const src6CacheCap = 1 << 16
+
+var (
+	src6CacheMu sync.RWMutex
+	src6Cache   = map[[8]byte]net.IP{}
+)
+
+// sourceIP6For returns the source IPv6 address the kernel uses to reach dst.
+// The result is cached per /64, so the per-packet send path does a cheap map
+// read instead of a routing-table lookup once the prefix is warm. Returns nil
+// when no route is found (not cached, so a transient failure can recover).
+func sourceIP6For(dst net.IP) net.IP {
+	ip16 := dst.To16()
+	if ip16 == nil || PkgRouter == nil {
+		return nil
+	}
+	var key [8]byte
+	copy(key[:], ip16[:8])
+
+	src6CacheMu.RLock()
+	src, ok := src6Cache[key]
+	src6CacheMu.RUnlock()
+	if ok {
+		return src
+	}
+
+	_, _, s, err := PkgRouter.Route(dst)
+	if err != nil || s == nil {
+		return nil
+	}
+	src6CacheMu.Lock()
+	if len(src6Cache) < src6CacheCap {
+		src6Cache[key] = s
+	}
+	src6CacheMu.Unlock()
+	return s
 }
 
 func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.SerializableLayer) error {
