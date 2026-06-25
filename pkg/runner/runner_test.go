@@ -845,11 +845,22 @@ func TestRunnerHostDiscovery(t *testing.T) {
 func TestWaitServiceDetectionReusableAcrossRuns(t *testing.T) {
 	r := &Runner{}
 	// Two consecutive scans on the same Runner (SDK reuse). Each run sets up a
-	// fresh fpTargetCh + drain goroutine the way initServiceDetection does; the
-	// second run must not deadlock waiting on fpDone.
+	// fresh queue + forwarder + drain goroutine the way initServiceDetection
+	// does; the second run must not deadlock waiting on fpDone.
 	for i := 0; i < 2; i++ {
+		r.fpQueue = newFpQueue()
 		r.fpTargetCh = make(chan fingerprint.Target, 1)
 		r.fpDone = make(chan struct{})
+		go func(q *fpQueue, ch chan fingerprint.Target) {
+			for {
+				tgt, ok := q.pop()
+				if !ok {
+					close(ch)
+					return
+				}
+				ch <- tgt
+			}
+		}(r.fpQueue, r.fpTargetCh)
 		go func(ch chan fingerprint.Target, done chan struct{}) {
 			for range ch {
 			}
@@ -866,6 +877,7 @@ func TestWaitServiceDetectionReusableAcrossRuns(t *testing.T) {
 		case <-time.After(2 * time.Second):
 			t.Fatalf("run %d: waitServiceDetection deadlocked on reuse", i)
 		}
+		require.Nil(t, r.fpQueue, "fpQueue must be cleared so the next run can recreate it")
 		require.Nil(t, r.fpTargetCh, "fpTargetCh must be cleared so the next run can recreate it")
 	}
 }

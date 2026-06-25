@@ -81,6 +81,9 @@ type Runner struct {
 	scanStartTime time.Time
 
 	fpTargetCh chan fingerprint.Target
+	// fpQueue decouples the scan hot path from the fingerprint workers so fast
+	// discovery never blocks the scan nor silently drops -sV targets.
+	fpQueue    *fpQueue
 	fpDone     chan struct{}
 	fpServices map[string]*port.Service
 	fpMu       sync.Mutex
@@ -330,8 +333,10 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
-	// Feed on-the-fly service detection (non-blocking to avoid stalling the scan path).
-	if r.fpTargetCh != nil {
+	// Feed on-the-fly service detection. The queue never blocks the scan path and
+	// never drops targets, so -sV stays complete even when discovery outpaces the
+	// fingerprint workers.
+	if r.fpQueue != nil {
 		hostname := hostResult.IP
 		for _, h := range dt {
 			if h != "ip" && h != hostResult.IP {
@@ -340,17 +345,13 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			}
 		}
 		for _, p := range hostResult.Ports {
-			t := fingerprint.Target{
+			r.fpQueue.push(fingerprint.Target{
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
 				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
 				TLSChecked:  true,
-			}
-			select {
-			case r.fpTargetCh <- t:
-			default:
-			}
+			})
 		}
 	}
 
@@ -1349,10 +1350,25 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	ctx, cancel := context.WithCancel(parentCtx)
 	r.fpCancel = cancel
 	r.fpTargetCh = make(chan fingerprint.Target, 1000)
+	r.fpQueue = newFpQueue()
 	r.fpDone = make(chan struct{})
 	r.fpServices = make(map[string]*port.Service)
 
 	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
+
+	// Forward queued targets into the engine. The unbounded queue absorbs bursts
+	// from fast discovery; this goroutine blocks on the engine channel instead
+	// of dropping, and closes fpTargetCh once the queue is closed and drained.
+	go func() {
+		for {
+			t, ok := r.fpQueue.pop()
+			if !ok {
+				close(r.fpTargetCh)
+				return
+			}
+			r.fpTargetCh <- t
+		}
+	}()
 
 	gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
 
@@ -1369,12 +1385,15 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 }
 
 func (r *Runner) waitServiceDetection(scanResults *result.Result) {
-	if r.fpTargetCh == nil {
+	if r.fpQueue == nil {
 		return
 	}
-	// Close and nil out so the repeated call sites are idempotent within a run
-	// and a reused Runner (SDK) can start a fresh detection cycle next scan.
-	close(r.fpTargetCh)
+	// Close the queue (the forwarder drains the remaining targets and then closes
+	// fpTargetCh, which ends the engine) and nil out so the repeated call sites
+	// are idempotent within a run and a reused Runner (SDK) can start a fresh
+	// detection cycle next scan.
+	r.fpQueue.close()
+	r.fpQueue = nil
 	r.fpTargetCh = nil
 	<-r.fpDone
 
