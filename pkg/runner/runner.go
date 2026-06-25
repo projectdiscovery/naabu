@@ -735,9 +735,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Unlock()
 
 				b := blackrock.New(int64(Range), currentSeed)
-				if synSender != nil && r.options.TxWorkers > 1 {
+				if synSender != nil && r.options.TxWorkers > 1 && !r.options.Resume {
 					// Multi-core transmit: fan the fast SYN sends across N
 					// workers, each with its own socket, batch and rate slice.
+					// Resume relies on serial per-index bookkeeping, so it falls
+					// back to the single-worker loop below.
 					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, synSender, payload, shouldUseRawPackets)
 				} else {
 					for index := int64(0); index < int64(Range); index++ {

@@ -19,8 +19,10 @@ var timingTemplates = map[int]timingPreset{
 	1: {rate: 100, retries: 1, timeout: 4 * time.Second, warmup: 4, threads: 10},
 	2: {rate: 400, retries: 2, timeout: 3 * time.Second, warmup: 3, threads: 15},
 	3: {rate: DefaultRateSynScan, retries: DefaultRetriesSynScan, timeout: DefaultPortTimeoutSynScan, warmup: defaultWarmUpTime, threads: DefaultThreadsNum},
-	4: {rate: 10000, retries: 2, timeout: 500 * time.Millisecond, warmup: 1, threads: 50},
-	5: {rate: 30000, retries: 1, timeout: 300 * time.Millisecond, warmup: 1, threads: 100},
+	// timeouts stay >= 500ms: GetTimeout() floors anything below that, which
+	// would otherwise silently clamp an aggressive preset back up to 1s.
+	4: {rate: 10000, retries: 2, timeout: 700 * time.Millisecond, warmup: 1, threads: 50},
+	5: {rate: 30000, retries: 1, timeout: 500 * time.Millisecond, warmup: 1, threads: 100},
 }
 
 // applyTimingTemplate applies the selected timing template, but only to knobs
