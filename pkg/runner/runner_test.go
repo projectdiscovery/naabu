@@ -841,6 +841,24 @@ func TestRunnerHostDiscovery(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {
+	runner := newConnectRunner(t)
+	runner.options.DisableStdout = true
+
+	ip := "192.168.1.10"
+	// First event records port 80.
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{{Port: 80, Protocol: protocol.TCP}}})
+	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "80")), "port 80 must be recorded")
+
+	// Second event mixes an already-seen port (80) with a new one (443).
+	// The duplicate must not cause the new port to be dropped.
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{
+		{Port: 80, Protocol: protocol.TCP},
+		{Port: 443, Protocol: protocol.TCP},
+	}})
+	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "443")), "new port 443 must still be recorded despite the leading duplicate")
+}
+
 func TestHostsForIPNoStoreFastPath(t *testing.T) {
 	options := &Options{
 		Host:      []string{"192.168.1.0/24"},

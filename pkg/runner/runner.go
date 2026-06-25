@@ -305,13 +305,24 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		return
 	}
 
-	// receive event has only one port
+	// A receive event may carry multiple ports (e.g. --verify replays the
+	// full HostResult). Keep only the ports we have not emitted yet instead
+	// of dropping the whole host the moment its first port was already seen.
+	newPorts := make([]*port.Port, 0, len(hostResult.Ports))
 	for _, p := range hostResult.Ports {
 		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
 		if r.unique.Has(ipPort) {
-			return
+			continue
 		}
+		newPorts = append(newPorts, p)
 	}
+	if len(newPorts) == 0 {
+		return
+	}
+	// shallow-copy so we don't mutate the caller's HostResult slice
+	hr := *hostResult
+	hr.Ports = newPorts
+	hostResult = &hr
 
 	// recover hostnames from ip:port combination
 	r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
