@@ -435,6 +435,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	defer cancel()
 
 	r.scanStartTime = time.Now()
+	// Reset the CSV header guard so a reused Runner writes a fresh header on
+	// every enumeration instead of omitting it after the first run.
+	r.csvHeaderOnce = sync.Once{}
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
@@ -885,7 +888,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 				// flush any SYN packets still queued in the batch sender
 				if synSender != nil {
-					_ = synSender.flush()
+					if err := synSender.flush(); err != nil {
+						if isCongestion(err) {
+							synPacer.onCongestion()
+						}
+						gologger.Debug().Msgf("final flush failed: %s\n", err)
+					}
 				}
 
 				r.wgscan.Wait()
