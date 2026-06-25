@@ -748,10 +748,12 @@ func TransportReadWorker() {
 				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
 			case listenHandler.Phase.Is(HostDiscovery):
 				proto := protocol.TCP
+				srcPort := int(tcp.SrcPort)
 				if udpPortMatches {
 					proto = protocol.UDP
+					srcPort = int(udp.SrcPort)
 				}
-				listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
+				listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}
 			case tcpPortMatches && tcp.SYN && tcp.ACK:
 				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
 					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
@@ -869,16 +871,26 @@ func TransportReadWorker() {
 					if !hasTransport {
 						continue
 					}
+					// tcp/udp are reused across packets by the parser and absent
+					// layers keep their previous value; forward only the transport
+					// layer actually present in this packet so the callback can't
+					// match on a stale port from an earlier packet.
 					var srcIP4, srcIP6 string
+					var tcpForCb layers.TCP
+					var udpForCb layers.UDP
 					for _, layerType := range decoded {
 						switch layerType {
 						case layers.LayerTypeIPv4:
 							srcIP4 = ToString(ip4.SrcIP)
 						case layers.LayerTypeIPv6:
 							srcIP6 = ToString(ip6.SrcIP)
+						case layers.LayerTypeTCP:
+							tcpForCb = tcp
+						case layers.LayerTypeUDP:
+							udpForCb = udp
 						}
 					}
-					transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+					transportReaderCallback(tcpForCb, udpForCb, srcIP4, srcIP6)
 					break
 				}
 			}
