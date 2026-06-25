@@ -9,6 +9,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestUint32ToIPv4(t *testing.T) {
+	require.Equal(t, net.IPv4(127, 0, 0, 1).To4(), uint32ToIPv4(0x7f000001).To4())
+	require.Equal(t, net.IPv4(255, 255, 255, 255).To4(), uint32ToIPv4(0xffffffff).To4())
+	require.Equal(t, net.IPv4(0, 0, 0, 0).To4(), uint32ToIPv4(0).To4())
+}
+
+func TestSameRouteSrc(t *testing.T) {
+	a := net.IPv4(10, 0, 0, 1)
+	b := net.IPv4(10, 0, 0, 2)
+	require.True(t, sameRouteSrc(nil, nil))
+	require.True(t, sameRouteSrc(a, net.IPv4(10, 0, 0, 1)))
+	require.False(t, sameRouteSrc(a, b))
+	require.False(t, sameRouteSrc(a, nil))
+	require.False(t, sameRouteSrc(nil, b))
+}
+
+// TestCidrRouteVariesSingleAddr ensures a single-address block is never treated
+// as route-varying (no per-destination resolution, no router calls needed).
+func TestCidrRouteVariesSingleAddr(t *testing.T) {
+	require.False(t, cidrRouteVaries(0x0a000001, 1))
+	require.False(t, cidrRouteVaries(0x0a000001, 0))
+}
+
 func TestWantsEthernetPath(t *testing.T) {
 	ip := net.IPv4(10, 0, 0, 5)
 	hw := net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0x00, 0x01}

@@ -246,6 +246,12 @@ type indexEntry struct {
 	// different routes (loopback, other NICs) need different source IPs for a
 	// correct TCP checksum.
 	srcSum uint32
+	// routeVaries is set when a single CIDR spans destinations the kernel would
+	// emit from different sources (e.g. a broad range covering both default-route
+	// hosts and 127.0.0.0/8). The cached srcSum is then only a fallback and the
+	// source is resolved per destination in pickIPv4 so each packet checksums
+	// against the source it is actually sent with.
+	routeVaries bool
 }
 
 // targetIndex is a pre-computed lookup table that converts a linear
@@ -274,6 +280,10 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 			if e.srcSum == 0 {
 				e.srcSum = defaultSrcSum
 			}
+			// A broad CIDR can straddle multiple source routes; sampling a few
+			// addresses catches that cheaply so pickIPv4 can resolve the source
+			// per destination instead of mis-checksumming part of the range.
+			e.routeVaries = cidrRouteVaries(e.baseIPv4, count)
 		}
 		idx.entries = append(idx.entries, e)
 		idx.total += count
@@ -281,18 +291,67 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 	return idx
 }
 
+// routeSrc resolves the source IP the kernel would use to reach dst, or nil if
+// it cannot be resolved (no router or route error).
+func routeSrc(dst net.IP) net.IP {
+	if scan.PkgRouter == nil {
+		return nil
+	}
+	_, _, src, err := scan.PkgRouter.Route(dst)
+	if err != nil {
+		return nil
+	}
+	return src
+}
+
 // routeSrcSum resolves the source IP the kernel would use to reach dst and
 // returns its pseudo-header checksum contribution, or 0 if it cannot be
 // resolved (no router, route error, or IPv6 source).
 func routeSrcSum(dst net.IP) uint32 {
-	if scan.PkgRouter == nil {
-		return 0
-	}
-	_, _, src, err := scan.PkgRouter.Route(dst)
-	if err != nil || src == nil {
+	src := routeSrc(dst)
+	if src == nil {
 		return 0
 	}
 	return ipChecksumSum(src.To4())
+}
+
+// uint32ToIPv4 turns a uint32 host-order address into a net.IP.
+func uint32ToIPv4(v uint32) net.IP {
+	return net.IPv4(byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+}
+
+// sameRouteSrc reports whether two resolved route sources are equivalent,
+// treating two unresolved (nil) sources as the same (both fall back to default).
+func sameRouteSrc(a, b net.IP) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(b)
+}
+
+// cidrRouteVaries samples a handful of addresses across a CIDR and reports
+// whether the kernel-selected source differs between them. A single-address
+// block (count <= 1) never varies. Sampling rather than scanning keeps build
+// time O(1) per CIDR while still catching the common straddle cases.
+func cidrRouteVaries(base uint32, count int64) bool {
+	if count <= 1 {
+		return false
+	}
+	last := base + uint32(count-1)
+	samples := [...]uint32{
+		base,
+		base + uint32(count/4),
+		base + uint32(count/2),
+		base + uint32((count*3)/4),
+		last,
+	}
+	baseSrc := routeSrc(uint32ToIPv4(samples[0]))
+	for _, s := range samples[1:] {
+		if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(s))) {
+			return true
+		}
+	}
+	return false
 }
 
 // pickIPv4 converts a global index to an IPv4 address. Returns the
@@ -317,7 +376,16 @@ func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, srcSum ui
 			ip[2] = byte(val >> 8)
 			ip[3] = byte(val)
 			ipStr = formatIPv4(ip)
-			return ip, ipStr, e.srcSum, true
+			ss := e.srcSum
+			if e.routeVaries {
+				// This CIDR straddles multiple source routes; resolve the source
+				// for this exact destination so the checksum matches the source
+				// the kernel emits with, falling back to the cached term.
+				if perDst := routeSrcSum(uint32ToIPv4(val)); perDst != 0 {
+					ss = perDst
+				}
+			}
+			return ip, ipStr, ss, true
 		}
 		index -= e.count
 	}
