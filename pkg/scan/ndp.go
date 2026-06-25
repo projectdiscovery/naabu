@@ -38,6 +38,11 @@ func PingNdpRequestAsync(ip string) {
 	if err != nil {
 		return
 	}
+	// icmpConn6 is nil when the ip6:icmp socket failed to open at init;
+	// guard against the nil-pointer WriteTo below.
+	if icmpConn6 == nil {
+		return
+	}
 	retries := 0
 send:
 	if retries >= maxRetries {

@@ -108,6 +108,13 @@ func PingIcmpEchoRequestAsync(ip string) {
 		destAddr = &net.UDPAddr{IP: destinationIP, Zone: networkInterface.Name}
 	}
 
+	// packetListener is nil when the matching icmp socket failed to open at
+	// init (logged at debug) or when ip is neither v4 nor v6; without this
+	// guard the WriteTo below panics on a nil PacketConn.
+	if packetListener == nil || destAddr == nil {
+		return
+	}
+
 	data, err := m.Marshal(nil)
 	if err != nil {
 		return
