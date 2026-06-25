@@ -127,6 +127,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	if options.Threads == 0 {
 		options.Threads = DefaultThreadsNum
 	}
+	if options.TxWorkers == 0 {
+		options.TxWorkers = 1
+	}
 	if options.DnsOrder == "" {
 		options.DnsOrder = "l"
 	}
@@ -732,80 +735,86 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Unlock()
 
 				b := blackrock.New(int64(Range), currentSeed)
-				for index := int64(0); index < int64(Range); index++ {
-					// Distributed sharding: each node only handles its slice of
-					// the index space. The shared seed makes the slices disjoint.
-					if !r.options.inShard(index) {
-						continue
-					}
-					xxx := b.Shuffle(index)
-					ipIndex := xxx / int64(portsCount)
-					portIndex := int(xxx % int64(portsCount))
+				if synSender != nil && r.options.TxWorkers > 1 {
+					// Multi-core transmit: fan the fast SYN sends across N
+					// workers, each with its own socket, batch and rate slice.
+					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, synSender, payload, shouldUseRawPackets)
+				} else {
+					for index := int64(0); index < int64(Range); index++ {
+						// Distributed sharding: each node only handles its slice of
+						// the index space. The shared seed makes the slices disjoint.
+						if !r.options.inShard(index) {
+							continue
+						}
+						xxx := b.Shuffle(index)
+						ipIndex := xxx / int64(portsCount)
+						portIndex := int(xxx % int64(portsCount))
 
-					// fast IPv4 generation (uint32 math) when the fast sender is
-					// active; otherwise fall back to the big.Int-based PickIP.
-					var (
-						dstIP4 [4]byte
-						isV4   bool
-						ip     string
-					)
-					if synSender != nil {
-						dstIP4, ip, isV4 = tgtIdx.pickIPv4(ipIndex)
-					}
-					if ip == "" {
-						ip = r.PickIP(targets, ipIndex)
-					}
+						// fast IPv4 generation (uint32 math) when the fast sender is
+						// active; otherwise fall back to the big.Int-based PickIP.
+						var (
+							dstIP4 [4]byte
+							isV4   bool
+							ip     string
+						)
+						if synSender != nil {
+							dstIP4, ip, isV4 = tgtIdx.pickIPv4(ipIndex)
+						}
+						if ip == "" {
+							ip = r.PickIP(targets, ipIndex)
+						}
 
-					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
-						continue
-					}
+						if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+							continue
+						}
 
-					port := r.PickPort(portIndex)
+						port := r.PickPort(portIndex)
 
-					r.options.ResumeCfg.RLock()
-					resumeCfgIndex := r.options.ResumeCfg.Index
-					r.options.ResumeCfg.RUnlock()
-					if index < resumeCfgIndex {
-						gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
-						continue
-					}
+						r.options.ResumeCfg.RLock()
+						resumeCfgIndex := r.options.ResumeCfg.Index
+						r.options.ResumeCfg.RUnlock()
+						if index < resumeCfgIndex {
+							gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
+							continue
+						}
 
-					// resume cfg logic
-					r.options.ResumeCfg.Lock()
-					r.options.ResumeCfg.Index = index
-					r.options.ResumeCfg.Unlock()
+						// resume cfg logic
+						r.options.ResumeCfg.Lock()
+						r.options.ResumeCfg.Index = index
+						r.options.ResumeCfg.Unlock()
 
-					if r.scanner.ScanResults.HasSkipped(ip) {
-						continue
-					}
-					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
-						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
-						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
-						r.scanner.ScanResults.AddSkipped(ip)
-						continue
-					}
+						if r.scanner.ScanResults.HasSkipped(ip) {
+							continue
+						}
+						if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+							hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+							gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+							r.scanner.ScanResults.AddSkipped(ip)
+							continue
+						}
 
-					if shouldUseRawPackets {
-						if synSender != nil && isV4 && port.Protocol == protocol.TCP {
-							if r.scanner.ScanResults.IPHasPort(ip, port) {
-								continue
-							}
-							if !r.canIScanIfCDN(ip, port) {
-								continue
-							}
-							synPacer.wait()
-							if err := synSender.send(dstIP4, uint16(port.Port)); err != nil {
-								gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
+						if shouldUseRawPackets {
+							if synSender != nil && isV4 && port.Protocol == protocol.TCP {
+								if r.scanner.ScanResults.IPHasPort(ip, port) {
+									continue
+								}
+								if !r.canIScanIfCDN(ip, port) {
+									continue
+								}
+								synPacer.wait()
+								if err := synSender.send(dstIP4, uint16(port.Port)); err != nil {
+									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
+								}
+							} else {
+								r.RawSocketEnumeration(ctx, ip, port)
 							}
 						} else {
-							r.RawSocketEnumeration(ctx, ip, port)
+							r.wgscan.Add()
+							go r.handleHostPort(ctx, ip, payload, port)
 						}
-					} else {
-						r.wgscan.Add()
-						go r.handleHostPort(ctx, ip, payload, port)
-					}
-					if r.options.EnableProgressBar {
-						r.stats.IncrementCounter("packets", 1)
+						if r.options.EnableProgressBar {
+							r.stats.IncrementCounter("packets", 1)
+						}
 					}
 				}
 

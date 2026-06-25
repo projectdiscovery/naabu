@@ -70,20 +70,20 @@ type Options struct {
 	// Deprecated: stats are automatically available through local endpoint
 	EnableProgressBar bool // Enable progress bar
 	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
-	StatsInterval     int                 // StatsInterval is the number of seconds to display stats after
-	ScanAllIPS        bool                // Scan all the ips
-	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
-	ScanType          string              // Scan Type
-	ConnectPayload    string              // Payload to use with CONNECT scan types
-	Proxy             string              // Socks5 proxy
-	ProxyAuth         string              // Socks5 proxy authentication (username:password)
-	Resolvers         string              // Resolvers (comma separated or file)
-	baseResolvers     []string
-	DnsOrder          string          // DNS resolution order (p/l/lp/pl)
-	SystemResolver    bool            // Use system DNS resolver as fallback
-	OnResult          result.ResultFn // callback on final host result
-	OnReceive         result.ResultFn // callback on response receive
-	CSV               bool
+	StatsInterval  int                 // StatsInterval is the number of seconds to display stats after
+	ScanAllIPS     bool                // Scan all the ips
+	IPVersion      goflags.StringSlice // IP Version to use while resolving hostnames
+	ScanType       string              // Scan Type
+	ConnectPayload string              // Payload to use with CONNECT scan types
+	Proxy          string              // Socks5 proxy
+	ProxyAuth      string              // Socks5 proxy authentication (username:password)
+	Resolvers      string              // Resolvers (comma separated or file)
+	baseResolvers  []string
+	DnsOrder       string          // DNS resolution order (p/l/lp/pl)
+	SystemResolver bool            // Use system DNS resolver as fallback
+	OnResult       result.ResultFn // callback on final host result
+	OnReceive      result.ResultFn // callback on response receive
+	CSV            bool
 	// XMLOutput is an optional file path for nmap-compatible XML output ("-" for stdout)
 	XMLOutput string
 	// GrepOutput is an optional file path for nmap-compatible greppable output ("-" for stdout)
@@ -178,6 +178,11 @@ type Options struct {
 	// identical across nodes when sharding so the slices are disjoint and
 	// complete. 0 means a random per-run seed.
 	Seed int64
+
+	// TxWorkers is the number of parallel transmit goroutines (each with its
+	// own raw socket, batch buffer and rate slice) used by the fast SYN sender.
+	// >1 overcomes the single-core send ceiling. Default 1 (unchanged behaviour).
+	TxWorkers int
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -210,6 +215,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", DefaultThreadsNum, "general internal worker threads"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
+		flagSet.IntVarP(&options.TxWorkers, "tx-workers", "tw", 1, "parallel transmit workers for the fast SYN sender"),
 	)
 
 	flagSet.CreateGroup("update", "Update",

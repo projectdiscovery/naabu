@@ -59,6 +59,10 @@ func (options *Options) ValidateOptions() error {
 		return fmt.Errorf("invalid shard %d/%d (require 1 <= index <= total)", options.Shard, options.ShardTotal)
 	}
 
+	if options.TxWorkers < 0 || options.TxWorkers > 256 {
+		return fmt.Errorf("invalid tx-workers %d (valid range 1-256)", options.TxWorkers)
+	}
+
 	if options.Rate == 0 {
 		return errkit.Wrap(errZeroValue, "rate")
 	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
