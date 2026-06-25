@@ -44,11 +44,16 @@ var (
 )
 
 type ListenHandler struct {
-	Busy                                   bool
-	Phase                                  *Phase
-	SourceHW                               net.HardwareAddr
-	SourceIp4                              net.IP
-	SourceIP6                              net.IP
+	Busy      bool
+	Phase     *Phase
+	SourceHW  net.HardwareAddr
+	SourceIp4 net.IP
+	SourceIP6 net.IP
+	// SourceBound reports that the raw transport sockets were successfully bound
+	// to SourceIp4/SourceIP6, so the kernel emits packets with that source. When
+	// set, the faithful-but-fragile L2 (ethernet) send path is skipped in favour
+	// of the bound fast/raw path.
+	SourceBound                            bool
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult

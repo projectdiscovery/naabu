@@ -226,7 +226,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	// Windows cannot open raw IPPROTO_TCP sockets; always send via Npcap L2.
 	usePcap := listenHandler.TcpConn4 == nil || (hasSourceIp && listenHandler.SourceHW != nil)
 	var iface *net.Interface
-	if hasSourceIp && listenHandler.SourceHW != nil {
+	if hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound {
 		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
 		// both source IP and HW.
 		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
@@ -696,6 +696,77 @@ func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.Serializ
 	}
 
 	return nil
+}
+
+// BindSourceIP rebinds the raw v4/v6 transport sockets to the given source
+// addresses so the kernel emits packets with that source. The fast SYN sender
+// and the plain raw send only write the transport header and otherwise let the
+// kernel pick the source by route, so without this an explicit -source-ip is
+// ignored. A nil address (or one this host does not own) leaves that family on
+// its original 0.0.0.0/:: socket. Affected drain workers are restarted.
+//
+// It is a no-op on plain (non-raw) handlers that have no transport sockets.
+func (l *ListenHandler) BindSourceIP(v4, v6 net.IP) {
+	if v4 != nil && l.TcpConn4 != nil {
+		if l.rebind4(v4) {
+			l.SourceBound = true
+		}
+	}
+	if v6 != nil && l.TcpConn6 != nil {
+		if l.rebind6(v6) {
+			l.SourceBound = true
+		}
+	}
+}
+
+func (l *ListenHandler) rebind4(ip net.IP) bool {
+	tcp, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: ip})
+	if err != nil {
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	udp, err := net.ListenIP("ip4:udp", &net.IPAddr{IP: ip})
+	if err != nil {
+		_ = tcp.Close()
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	if l.TcpConn4 != nil {
+		_ = l.TcpConn4.Close()
+	}
+	if l.UdpConn4 != nil {
+		_ = l.UdpConn4.Close()
+	}
+	l.TcpConn4 = tcp
+	l.UdpConn4 = udp
+	go l.TcpReadWorker4()
+	go l.UdpReadWorker4()
+	return true
+}
+
+func (l *ListenHandler) rebind6(ip net.IP) bool {
+	tcp, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: ip})
+	if err != nil {
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	udp, err := net.ListenIP("ip6:udp", &net.IPAddr{IP: ip})
+	if err != nil {
+		_ = tcp.Close()
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	if l.TcpConn6 != nil {
+		_ = l.TcpConn6.Close()
+	}
+	if l.UdpConn6 != nil {
+		_ = l.UdpConn6.Close()
+	}
+	l.TcpConn6 = tcp
+	l.UdpConn6 = udp
+	go l.TcpReadWorker6()
+	go l.UdpReadWorker6()
+	return true
 }
 
 func (l *ListenHandler) TcpReadWorker4() {

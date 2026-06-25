@@ -5,8 +5,56 @@ import (
 	"net"
 	"testing"
 
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/stretchr/testify/require"
 )
+
+func TestWantsEthernetPath(t *testing.T) {
+	ip := net.IPv4(10, 0, 0, 5)
+	hw := net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0x00, 0x01}
+
+	// source ip + interface MAC but not bound: must go L2 (spoof/non-owned).
+	require.True(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw}))
+	// bound source: kernel emits it, stay on the fast path.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw, SourceBound: true}))
+	// source ip alone (no interface MAC): fast path with the bound socket.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip}))
+	// interface alone: no source to force, fast path.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceHW: hw}))
+	// nothing pinned.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{}))
+}
+
+// TestSYNSenderPinnedSrcSumOverrides verifies the pinned source checksum term is
+// used regardless of the per-target srcSum passed to send.
+func TestSYNSenderPinnedSrcSumOverrides(t *testing.T) {
+	src := net.IPv4(192, 0, 2, 50).To4()
+	pinned := ipChecksumSum(src)
+
+	s := &SYNSender{srcPort: 40000, pinnedSrcSum: pinned}
+	// baseSum mirrors the constant terms set in newSYNSender.
+	var base uint32
+	base += 6
+	base += 24
+	base += uint32(s.srcPort)
+	base += 0x6002
+	base += 0x0400
+	base += 0x0204
+	base += 0x05B4
+	s.baseSum = base
+
+	dst := [4]byte{198, 51, 100, 9}
+	const dstPort = 443
+	seq := scan.SynCookie4(dst, dstPort, s.srcPort)
+
+	// Effective source term when sending: pinned wins over any per-target value.
+	got := s.effectiveSrcSum(12345)
+	require.Equal(t, pinned, got)
+
+	// And the resulting checksum matches a hand-computed one using the pinned src.
+	want := synTCPChecksum(s.baseSum, pinned, dst, dstPort, seq)
+	require.Equal(t, want, synTCPChecksum(s.baseSum, got, dst, dstPort, seq))
+}
 
 func TestParseIPv4Fast(t *testing.T) {
 	tests := []struct {

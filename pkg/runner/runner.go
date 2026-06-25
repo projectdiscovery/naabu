@@ -1264,6 +1264,12 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 		return errors.New("invalid ip type")
 	}
 
+	// Bind the raw transport sockets to the source so the kernel actually emits
+	// packets with it; otherwise the fast/raw send path lets the kernel choose
+	// the source by route and the flag is silently ignored. A non-owned source
+	// (e.g. spoofing) leaves SourceBound false and falls back to the L2 path.
+	r.scanner.ListenHandler.BindSourceIP(r.scanner.ListenHandler.SourceIp4, r.scanner.ListenHandler.SourceIP6)
+
 	return nil
 }
 

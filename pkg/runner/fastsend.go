@@ -27,7 +27,11 @@ type SYNSender struct {
 	// IP, used as a fallback when a destination has no resolvable per-route
 	// source (see send).
 	defaultSrcSum uint32
-	pkt           [24]byte
+	// pinnedSrcSum, when non-zero, overrides the per-target source checksum
+	// term: the socket is bound to a fixed -source-ip, so every packet is
+	// emitted with that source and must checksum against it.
+	pinnedSrcSum uint32
+	pkt          [24]byte
 }
 
 const (
@@ -46,11 +50,24 @@ var (
 	errNoSourceIP   = errors.New("cannot determine source IP")
 )
 
+// wantsEthernetPath reports whether a scan must use the L2 (ethernet) send path
+// instead of the fast sender: only when a source IP is pinned (with an interface
+// MAC) but the raw socket could not be bound to it, i.e. a spoofed/non-owned
+// source. A successfully bound source is emitted by the kernel directly, so the
+// fast path stays in use.
+func wantsEthernetPath(handler *scan.ListenHandler) bool {
+	return handler.SourceIp4 != nil && handler.SourceHW != nil && !handler.SourceBound
+}
+
 func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	if handler == nil || handler.TcpConn4 == nil {
 		return nil, errNoRawConn
 	}
-	if handler.SourceIp4 != nil && handler.SourceHW != nil {
+	// Hand off to the L2 (ethernet) path only when a source IP is pinned but the
+	// socket could not be bound to it (e.g. spoofed/non-owned source). When the
+	// bind succeeded the kernel already emits the chosen source, so the fast
+	// path is both correct and preferred over the fragile L2 path.
+	if wantsEthernetPath(handler) {
 		return nil, errEthernetPath
 	}
 
@@ -85,6 +102,12 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 		batch:         rawsend.NewBatch(sender.FD(), synBatchSize, synPacketLen),
 		srcPort:       uint16(handler.Port),
 		defaultSrcSum: ipChecksumSum(src4),
+	}
+	// When the socket is bound to an explicit -source-ip the kernel emits every
+	// packet with it, so pin the checksum's source term to that address instead
+	// of the per-target route source.
+	if handler.SourceBound && handler.SourceIp4 != nil {
+		s.pinnedSrcSum = ipChecksumSum(src4)
 	}
 
 	binary.BigEndian.PutUint16(s.pkt[0:2], s.srcPort)
@@ -126,9 +149,7 @@ func ipChecksumSum(ip4 net.IP) uint32 {
 // returned by targetIndex.pickIPv4); a zero srcSum falls back to the default
 // route source so the checksum still matches a single-homed setup.
 func (s *SYNSender) send(dstIP [4]byte, srcSum uint32, dstPort uint16) error {
-	if srcSum == 0 {
-		srcSum = s.defaultSrcSum
-	}
+	srcSum = s.effectiveSrcSum(srcSum)
 	// Encode a SYN cookie into the sequence number so the receive path can
 	// verify the returning SYN-ACK (Ack == seq+1) is genuinely ours.
 	seq := scan.SynCookie4(dstIP, dstPort, s.srcPort)
@@ -142,6 +163,19 @@ func (s *SYNSender) send(dstIP [4]byte, srcSum uint32, dstPort uint16) error {
 		return s.batch.Add(s.pkt[:], dstIP)
 	}
 	return s.sender.SendTo(s.pkt[:], dstIP)
+}
+
+// effectiveSrcSum resolves the source pseudo-header checksum term for a packet:
+// a pinned bound source wins over the per-target route source, which in turn
+// wins over the default-route fallback.
+func (s *SYNSender) effectiveSrcSum(srcSum uint32) uint32 {
+	if s.pinnedSrcSum != 0 {
+		return s.pinnedSrcSum
+	}
+	if srcSum == 0 {
+		return s.defaultSrcSum
+	}
+	return srcSum
 }
 
 // synTCPChecksum folds the precomputed constant terms (baseSum) with the
