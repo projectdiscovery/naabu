@@ -27,6 +27,16 @@ type SYNSender struct {
 	pkt     [24]byte
 }
 
+const (
+	// synPacketLen is the fixed size of the SYN template (20 byte TCP header +
+	// 4 byte MSS option).
+	synPacketLen = 24
+	// synBatchSize is the number of packets accumulated before a sendmmsg call.
+	// Capped at the kernel's UIO_MAXIOV (1024); partial sends are retried by
+	// rawsend.Batch.Flush.
+	synBatchSize = 1024
+)
+
 var (
 	errNoRawConn    = errors.New("no raw IPv4 connection")
 	errEthernetPath = errors.New("ethernet framing path requires standard sender")
@@ -65,8 +75,11 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	}
 
 	s := &SYNSender{
-		sender:  sender,
-		batch:   rawsend.NewBatch(sender.FD(), 32, 24),
+		sender: sender,
+		// Batch up to UIO_MAXIOV (1024) packets per sendmmsg call. At high
+		// packet rates this is the dominant syscall-amortisation lever: a 32
+		// packet batch issued ~32x more sendmmsg calls for the same throughput.
+		batch:   rawsend.NewBatch(sender.FD(), synBatchSize, synPacketLen),
 		srcPort: uint16(handler.Port),
 	}
 
