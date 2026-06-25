@@ -3,12 +3,15 @@ package runner
 import (
 	"bytes"
 	"encoding/xml"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,4 +83,89 @@ func TestGrepSanitizeStripsSeparators(t *testing.T) {
 func TestAddrType(t *testing.T) {
 	require.Equal(t, "ipv4", addrType("1.2.3.4"))
 	require.Equal(t, "ipv6", addrType("2606:2800:220:1:248:1893:25c8:1946"))
+}
+
+func newConnectRunner(t *testing.T) *Runner {
+	t.Helper()
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4"},
+	}
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = runner.Close() })
+	require.NoError(t, runner.Load())
+	return runner
+}
+
+func TestCollectNmapHostsPortsBranch(t *testing.T) {
+	runner := newConnectRunner(t)
+
+	res := result.NewResult()
+	res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+	res.AddPort("203.0.113.7", &port.Port{Port: 443, Protocol: protocol.TCP})
+	// out-of-version host must be filtered (IPVersion is 4 only).
+	res.AddPort("2606:2800:220:1::1", &port.Port{Port: 80, Protocol: protocol.TCP})
+
+	hosts := runner.collectNmapHosts(res)
+	require.Len(t, hosts, 1, "ipv6 host must be filtered out")
+	require.Equal(t, "203.0.113.7", hosts[0].ip)
+	require.Empty(t, hosts[0].hostname, "pure IP scan resolves no hostname")
+	require.Len(t, hosts[0].ports, 2)
+}
+
+func TestCollectNmapHostsIPsOnlyBranch(t *testing.T) {
+	runner := newConnectRunner(t)
+
+	res := result.NewResult()
+	res.AddIp("203.0.113.9")
+
+	hosts := runner.collectNmapHosts(res)
+	require.Len(t, hosts, 1)
+	require.Equal(t, "203.0.113.9", hosts[0].ip)
+	require.Empty(t, hosts[0].ports)
+}
+
+func TestPrimaryHostname(t *testing.T) {
+	runner := newConnectRunner(t)
+	// pure IP scan: no hostname store consulted.
+	require.Empty(t, runner.primaryHostname("203.0.113.7"))
+
+	runner.hasHostnames.Store(true)
+	require.NoError(t, runner.scanner.IPRanger.AddHostWithMetadata("203.0.113.7", "example.com"))
+	require.Equal(t, "example.com", runner.primaryHostname("203.0.113.7"))
+}
+
+func TestWriteNmapFormatsToFiles(t *testing.T) {
+	runner := newConnectRunner(t)
+	dir := t.TempDir()
+	runner.options.XMLOutput = filepath.Join(dir, "out.xml")
+	runner.options.GrepOutput = filepath.Join(dir, "out.grep")
+
+	res := result.NewResult()
+	res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+
+	runner.writeNmapFormats(res)
+
+	xmlData, err := os.ReadFile(runner.options.XMLOutput)
+	require.NoError(t, err)
+	require.Contains(t, string(xmlData), `scanner="naabu"`)
+	require.Contains(t, string(xmlData), `portid="80"`)
+	var run xmlRun
+	require.NoError(t, xml.Unmarshal(xmlData, &run), "written XML must be well-formed")
+
+	grepData, err := os.ReadFile(runner.options.GrepOutput)
+	require.NoError(t, err)
+	require.Contains(t, string(grepData), "Host: 203.0.113.7")
+	require.Contains(t, string(grepData), "80/open/tcp")
+}
+
+func TestWriteNmapFormatsNoOpWhenUnset(t *testing.T) {
+	runner := newConnectRunner(t)
+	res := result.NewResult()
+	res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+	// XMLOutput and GrepOutput are empty: must not panic or create files.
+	require.NotPanics(t, func() { runner.writeNmapFormats(res) })
 }

@@ -25,6 +25,55 @@ func TestOptions(t *testing.T) {
 	assert.EqualError(t, options.ValidateOptions(), "connect payload can only be used with connect scan")
 }
 
+func TestValidateTimingShardTxRanges(t *testing.T) {
+	base := Options{
+		Host:     []string{"example.com"},
+		Rate:     1000,
+		DnsOrder: "l",
+		ScanType: ConnectScan,
+	}
+
+	t.Run("valid defaults", func(t *testing.T) {
+		o := base
+		assert.Nil(t, o.ValidateOptions())
+	})
+	t.Run("timing too high", func(t *testing.T) {
+		o := base
+		o.TimingTemplate = 6
+		assert.ErrorContains(t, o.ValidateOptions(), "timing template")
+	})
+	t.Run("timing negative", func(t *testing.T) {
+		o := base
+		o.TimingTemplate = -1
+		assert.ErrorContains(t, o.ValidateOptions(), "timing template")
+	})
+	t.Run("shard index out of range", func(t *testing.T) {
+		o := base
+		o.Shard, o.ShardTotal = 5, 4
+		assert.ErrorContains(t, o.ValidateOptions(), "invalid shard")
+	})
+	t.Run("shard index zero", func(t *testing.T) {
+		o := base
+		o.Shard, o.ShardTotal = 0, 4
+		assert.ErrorContains(t, o.ValidateOptions(), "invalid shard")
+	})
+	t.Run("valid shard", func(t *testing.T) {
+		o := base
+		o.Shard, o.ShardTotal = 2, 4
+		assert.Nil(t, o.ValidateOptions())
+	})
+	t.Run("tx workers too high", func(t *testing.T) {
+		o := base
+		o.TxWorkers = 300
+		assert.ErrorContains(t, o.ValidateOptions(), "tx-workers")
+	})
+	t.Run("tx workers negative", func(t *testing.T) {
+		o := base
+		o.TxWorkers = -1
+		assert.ErrorContains(t, o.ValidateOptions(), "tx-workers")
+	})
+}
+
 func TestDnsOrderValidation(t *testing.T) {
 	base := Options{
 		Host:     []string{"example.com"},
