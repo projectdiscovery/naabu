@@ -76,6 +76,10 @@ type Runner struct {
 	// run rather than once per onReceive call (which is per result).
 	csvHeaderOnce sync.Once
 
+	// scanStartTime records when enumeration began, used for nmap-compatible
+	// XML/greppable output timestamps and elapsed time.
+	scanStartTime time.Time
+
 	fpTargetCh  chan fingerprint.Target
 	fpDone      chan struct{}
 	fpServices  map[string]*port.Service
@@ -415,6 +419,8 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 func (r *Runner) RunEnumeration(pctx context.Context) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
+
+	r.scanStartTime = time.Now()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
@@ -1584,6 +1590,8 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	}
 
 	r.outputDeadHosts(file, &csvFileHeaderEnabled)
+
+	r.writeNmapFormats(scanResults)
 }
 
 // outputDeadHosts reports the hosts that were probed during host discovery but

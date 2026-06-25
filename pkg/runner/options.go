@@ -84,6 +84,10 @@ type Options struct {
 	OnResult          result.ResultFn // callback on final host result
 	OnReceive         result.ResultFn // callback on response receive
 	CSV               bool
+	// XMLOutput is an optional file path for nmap-compatible XML output ("-" for stdout)
+	XMLOutput string
+	// GrepOutput is an optional file path for nmap-compatible greppable output ("-" for stdout)
+	GrepOutput        string
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
@@ -206,6 +210,8 @@ func ParseOptions() *Options {
 		flagSet.StringSliceVarP(&options.ExcludeOutputFields, "exclude-output-fields", "eof", nil, "exclude output fields output based on a condition", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
+		flagSet.StringVarP(&options.XMLOutput, "xml-output", "oX", "", "write nmap-compatible XML output to file (- for stdout)"),
+		flagSet.StringVarP(&options.GrepOutput, "grep-output", "oG", "", "write nmap-compatible greppable output to file (- for stdout)"),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
