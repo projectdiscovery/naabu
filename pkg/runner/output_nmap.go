@@ -6,6 +6,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -326,6 +327,12 @@ func (r *Runner) emitNmapFile(path string, write func(io.Writer) error) {
 			gologger.Error().Msgf("could not write nmap output: %s\n", err)
 		}
 		return
+	}
+	if dir := filepath.Dir(path); dir != "." && dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			gologger.Error().Msgf("could not create output dir %s: %s\n", dir, err)
+			return
+		}
 	}
 	f, err := os.Create(path)
 	if err != nil {
