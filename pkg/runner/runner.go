@@ -543,6 +543,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
 						return
 					}
+					defer response.Body.Close()
 					if response.StatusCode != http.StatusOK {
 						gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
 						return
