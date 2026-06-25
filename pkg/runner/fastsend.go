@@ -23,7 +23,6 @@ type SYNSender struct {
 	batch   *rawsend.Batch
 	srcPort uint16
 	baseSum uint32
-	seq     uint32
 	pkt     [24]byte
 }
 
@@ -107,8 +106,9 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 }
 
 func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
-	s.seq++
-	seq := s.seq
+	// Encode a SYN cookie into the sequence number so the receive path can
+	// verify the returning SYN-ACK (Ack == seq+1) is genuinely ours.
+	seq := scan.SynCookie4(dstIP, dstPort, s.srcPort)
 
 	binary.BigEndian.PutUint16(s.pkt[2:4], dstPort)
 	binary.BigEndian.PutUint32(s.pkt[4:8], seq)

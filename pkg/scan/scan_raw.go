@@ -293,11 +293,17 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		OptionData:   []byte{0x05, 0xB4},
 	}
 
+	seq := tcpsequencer.Next()
+	if pkgFlag == Syn {
+		// SYN cookie: lets the receive path verify the returning SYN-ACK.
+		seq = SynCookie(ip4.DstIP, uint16(p.Port), uint16(listenHandler.Port))
+	}
+
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(listenHandler.Port),
 		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
-		Seq:     tcpsequencer.Next(),
+		Seq:     seq,
 		Options: []layers.TCPOption{tcpOption},
 	}
 
@@ -416,11 +422,17 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		OptionData:   []byte{0x05, 0xB4},
 	}
 
+	seq := tcpsequencer.Next()
+	if pkgFlag == Syn {
+		// SYN cookie: lets the receive path verify the returning SYN-ACK.
+		seq = SynCookie(ip6.DstIP, uint16(p.Port), uint16(listenHandler.Port))
+	}
+
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(listenHandler.Port),
 		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
-		Seq:     tcpsequencer.Next(),
+		Seq:     seq,
 		Options: []layers.TCPOption{tcpOption},
 	}
 
@@ -741,6 +753,10 @@ func TransportReadWorker() {
 				}
 				listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
 			case tcpPortMatches && tcp.SYN && tcp.ACK:
+				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
+					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
+					continue
+				}
 				listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
 			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
 				listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
