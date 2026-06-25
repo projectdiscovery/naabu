@@ -162,6 +162,33 @@ func TestWriteNmapFormatsToFiles(t *testing.T) {
 	require.Contains(t, string(grepData), "80/open/tcp")
 }
 
+func TestExpandOutputAll(t *testing.T) {
+	opts := &Options{OutputAll: "scan"}
+	opts.expandOutputAll()
+	require.Equal(t, "scan.json", opts.Output)
+	require.True(t, opts.JSON)
+	require.Equal(t, "scan.xml", opts.XMLOutput)
+	require.Equal(t, "scan.gnmap", opts.GrepOutput)
+}
+
+func TestExpandOutputAllRespectsExplicit(t *testing.T) {
+	opts := &Options{OutputAll: "scan", Output: "custom.txt", XMLOutput: "custom.xml"}
+	opts.expandOutputAll()
+	// explicit -o/-oX win, only the unset -oG is derived
+	require.Equal(t, "custom.txt", opts.Output)
+	require.False(t, opts.JSON)
+	require.Equal(t, "custom.xml", opts.XMLOutput)
+	require.Equal(t, "scan.gnmap", opts.GrepOutput)
+}
+
+func TestExpandOutputAllEmpty(t *testing.T) {
+	opts := &Options{}
+	opts.expandOutputAll()
+	require.Empty(t, opts.Output)
+	require.Empty(t, opts.XMLOutput)
+	require.Empty(t, opts.GrepOutput)
+}
+
 func TestHandleOutputCreatesNestedDir(t *testing.T) {
 	runner := newConnectRunner(t)
 	dir := t.TempDir()

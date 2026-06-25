@@ -87,7 +87,9 @@ type Options struct {
 	// XMLOutput is an optional file path for nmap-compatible XML output ("-" for stdout)
 	XMLOutput string
 	// GrepOutput is an optional file path for nmap-compatible greppable output ("-" for stdout)
-	GrepOutput        string
+	GrepOutput string
+	// OutputAll is a base name that expands to <base>.json, <base>.xml and <base>.gnmap
+	OutputAll         string
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
@@ -231,6 +233,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
 		flagSet.StringVarP(&options.XMLOutput, "xml-output", "oX", "", "write nmap-compatible XML output to file (- for stdout)"),
 		flagSet.StringVarP(&options.GrepOutput, "grep-output", "oG", "", "write nmap-compatible greppable output to file (- for stdout)"),
+		flagSet.StringVarP(&options.OutputAll, "output-all", "oA", "", "write json, xml and greppable output to <basename>.{json,xml,gnmap}"),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
@@ -382,6 +385,7 @@ func ParseOptions() *Options {
 			gologger.Fatal().Msgf("%s\n", err)
 		}
 	}
+	options.expandOutputAll()
 	options.configureOutput()
 	// Show the user the banner
 	showBanner()

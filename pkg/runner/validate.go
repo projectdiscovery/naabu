@@ -195,6 +195,26 @@ func (options *Options) ValidateOptions() error {
 }
 
 // configureOutput configures the output on the screen
+// expandOutputAll turns -oA <base> into the three concrete output targets
+// (<base>.json, <base>.xml, <base>.gnmap). Explicitly set -o/-oX/-oG win so the
+// user can override any single target.
+func (options *Options) expandOutputAll() {
+	base := strings.TrimSpace(options.OutputAll)
+	if base == "" {
+		return
+	}
+	if options.Output == "" {
+		options.Output = base + ".json"
+		options.JSON = true
+	}
+	if options.XMLOutput == "" {
+		options.XMLOutput = base + ".xml"
+	}
+	if options.GrepOutput == "" {
+		options.GrepOutput = base + ".gnmap"
+	}
+}
+
 func (options *Options) configureOutput() {
 	if options.Verbose {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
