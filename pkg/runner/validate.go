@@ -51,6 +51,10 @@ func (options *Options) ValidateOptions() error {
 		return errTwoOutputMode
 	}
 
+	if options.TimingTemplate < 0 || options.TimingTemplate > 5 {
+		return fmt.Errorf("invalid timing template %d (valid range 0-5)", options.TimingTemplate)
+	}
+
 	if options.Rate == 0 {
 		return errkit.Wrap(errZeroValue, "rate")
 	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {

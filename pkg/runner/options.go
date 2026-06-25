@@ -158,6 +158,11 @@ type Options struct {
 	// PredictionThreshold is the minimum confidence percentage (0–100) to
 	// act on a port prediction (default 20, meaning 20%).
 	PredictionThreshold int
+
+	// TimingTemplate is an nmap-style timing level (0 paranoid .. 5 insane)
+	// that presets rate/retries/timeout/warm-up/threads. T3 is the default and
+	// matches naabu's historical behaviour.
+	TimingTemplate int
 }
 
 // ParseOptions parses the command line flags provided by a user
@@ -260,7 +265,8 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
 		flagSet.DurationVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
-		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
+		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", defaultWarmUpTime, "time in seconds between scan phases"),
+		flagSet.IntVarP(&options.TimingTemplate, "timing", "T", DefaultTimingTemplate, "timing template, higher is faster (0-5)"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model (not compatible with stream mode)"),
@@ -375,6 +381,10 @@ func ParseOptions() *Options {
 		}
 		os.Exit(0)
 	}
+
+	// Apply the timing template before validation so the connect-scan rate
+	// adjustments in ValidateOptions see the resolved values.
+	options.applyTimingTemplate()
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
