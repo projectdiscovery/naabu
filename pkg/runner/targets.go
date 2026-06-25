@@ -162,6 +162,9 @@ func (r *Runner) AddTarget(target string) error {
 					gologger.Debug().Msgf("reverse ptr failed for %s: %s\n", target, err)
 				} else {
 					metadata = strings.Trim(names[0], ".")
+					// a resolved PTR name means output must consult the
+					// IP->hostname store, so the no-store fast path is off.
+					r.hasHostnames.Store(true)
 				}
 			}
 			err := r.scanner.IPRanger.AddHostWithMetadata(target, metadata)
