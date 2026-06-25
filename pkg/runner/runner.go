@@ -912,7 +912,11 @@ func (r *Runner) PickPort(index int) *port.Port {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
-	var swg sync.WaitGroup
+	// cap concurrent verification goroutines (and their dials) at the scan rate,
+	// matching the main scan loop. A plain WaitGroup here let the goroutine count
+	// track the number of hosts with open ports, which could spawn an unbounded
+	// number of concurrent dials on large result sets.
+	swg := sizedwaitgroup.New(r.options.Rate)
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 	defer limiter.Stop()
 
@@ -921,7 +925,7 @@ func (r *Runner) ConnectVerification() {
 	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
 		limiter.Take()
 
-		swg.Add(1)
+		swg.Add()
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
 
