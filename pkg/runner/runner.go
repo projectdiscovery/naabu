@@ -1386,7 +1386,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
-		if fileutil.FolderExists(outputFolder) {
+		if !fileutil.FolderExists(outputFolder) {
 			mkdirErr := os.MkdirAll(outputFolder, 0700)
 			if mkdirErr != nil {
 				gologger.Error().Msgf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)

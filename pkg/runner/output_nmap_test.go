@@ -162,6 +162,21 @@ func TestWriteNmapFormatsToFiles(t *testing.T) {
 	require.Contains(t, string(grepData), "80/open/tcp")
 }
 
+func TestHandleOutputCreatesNestedDir(t *testing.T) {
+	runner := newConnectRunner(t)
+	dir := t.TempDir()
+	nested := filepath.Join(dir, "a", "b", "c", "out.txt")
+	runner.options.Output = nested
+	runner.options.DisableStdout = true
+
+	res := result.NewResult()
+	res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+	runner.handleOutput(res)
+
+	_, err := os.Stat(nested)
+	require.NoError(t, err, "output to a non-existent nested path must create the directory")
+}
+
 func TestWriteNmapFormatsNoOpWhenUnset(t *testing.T) {
 	runner := newConnectRunner(t)
 	res := result.NewResult()
