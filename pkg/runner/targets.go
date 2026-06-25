@@ -174,6 +174,13 @@ func (r *Runner) AddTarget(target string) error {
 
 	host, port, hasPort := getPort(target)
 
+	// A non-IP host means real hostname output mapping is required, so the
+	// output path must consult the IP->hostname store. Pure IP/CIDR/ASN scans
+	// never reach here and keep the flag false, enabling the no-store fast path.
+	if !iputil.IsIP(host) {
+		r.hasHostnames.Store(true)
+	}
+
 	targetToResolve := target
 	if hasPort {
 		targetToResolve = host

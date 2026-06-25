@@ -841,6 +841,60 @@ func TestRunnerHostDiscovery(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestHostsForIPNoStoreFastPath(t *testing.T) {
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4"},
+	}
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer func() { _ = runner.Close() }()
+	require.NoError(t, runner.Load())
+
+	// Pure CIDR input must not flag hostname mapping.
+	require.False(t, runner.hasHostnames.Load(), "pure CIDR input must not set hasHostnames")
+
+	// Fast path returns the IP directly without consulting the store, even for
+	// an IP never added to the ranger.
+	dt, err := runner.hostsForIP("203.0.113.7")
+	require.NoError(t, err)
+	require.Equal(t, []string{"203.0.113.7"}, dt)
+
+	// recoverHostnames is a no-op on the fast path.
+	in := []string{"203.0.113.7"}
+	runner.recoverHostnames("203.0.113.7", []*port.Port{{Port: 80, Protocol: protocol.TCP}}, in)
+	require.Equal(t, []string{"203.0.113.7"}, in)
+}
+
+func TestHostsForIPUsesStoreWhenHostnames(t *testing.T) {
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4"},
+	}
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer func() { _ = runner.Close() }()
+	require.NoError(t, runner.Load())
+
+	// Simulate a hostname-bearing scan and the corresponding store entries.
+	runner.hasHostnames.Store(true)
+	require.NoError(t, runner.scanner.IPRanger.AddHostWithMetadata("203.0.113.7", "example.com"))
+	require.NoError(t, runner.scanner.IPRanger.AddHostWithMetadata("203.0.113.7:80", "example.com:80"))
+
+	dt, err := runner.hostsForIP("203.0.113.7")
+	require.NoError(t, err)
+	require.Contains(t, dt, "example.com")
+
+	// ip:port recovery rewrites a bare IP with the recorded hostname.
+	rec := []string{"203.0.113.7"}
+	runner.recoverHostnames("203.0.113.7", []*port.Port{{Port: 80, Protocol: protocol.TCP}}, rec)
+	require.Equal(t, []string{"example.com"}, rec)
+}
+
 // TestRunnerGetIPs tests IP preprocessing methods
 func TestRunnerGetIPs(t *testing.T) {
 	options := &Options{

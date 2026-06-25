@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Mzack9999/gcache"
@@ -45,6 +46,11 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// defaultUniqueCacheSize bounds the output de-duplication LRU. ~64K entries
+// keeps memory flat (a few MB) while comfortably covering retry/retransmit
+// duplicate windows on large scans.
+const defaultUniqueCacheSize = 65536
+
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
@@ -60,6 +66,11 @@ type Runner struct {
 	excludedIpsNP  *networkpolicy.NetworkPolicy
 
 	unique gcache.Cache[string, struct{}]
+
+	// hasHostnames is set when at least one target resolves from a hostname
+	// (as opposed to a literal IP/CIDR/ASN). When false the output path can
+	// skip the disk-backed IP->hostname lookups entirely and emit IPs directly.
+	hasHostnames atomic.Bool
 
 	fpTargetCh  chan fingerprint.Target
 	fpDone      chan struct{}
@@ -178,7 +189,12 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.streamChannel = make(chan Target)
 
-	uniqueCache := gcache.New[string, struct{}](1500).Build()
+	// Bounded LRU for output de-duplication of ip:port (and host:port) lines.
+	// Duplicates come from scan retries and target retransmissions; a generous
+	// LRU window absorbs them while keeping memory flat on huge scans. LRU is
+	// preferred over a bloom filter here because an eviction only risks a benign
+	// repeated line, whereas a bloom false-positive would drop a real result.
+	uniqueCache := gcache.New[string, struct{}](defaultUniqueCacheSize).LRU().Build()
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
@@ -228,12 +244,42 @@ func NewRunner(options *Options) (*Runner, error) {
 	return runner, nil
 }
 
+// hostsForIP returns the hostnames to print for an IP. For scans whose inputs
+// are pure IPs/CIDRs (no hostnames), it returns the IP directly and avoids the
+// disk-backed Hosts lookup entirely.
+func (r *Runner) hostsForIP(ip string) ([]string, error) {
+	if !r.hasHostnames.Load() {
+		return []string{ip}, nil
+	}
+	return r.scanner.IPRanger.GetHostsByIP(ip)
+}
+
+// recoverHostnames rewrites bare IPs in dt with hostnames recorded against the
+// ip:port keys. It is a no-op for pure IP/CIDR scans (no hostname store).
+func (r *Runner) recoverHostnames(ip string, ports []*port.Port, dt []string) {
+	if !r.hasHostnames.Load() {
+		return
+	}
+	for _, p := range ports {
+		ipPort := net.JoinHostPort(ip, fmt.Sprint(p.Port))
+		if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
+			if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
+				for idx, ipCandidate := range dt {
+					if iputil.IsIP(ipCandidate) {
+						dt[idx] = otherName
+					}
+				}
+			}
+		}
+	}
+}
+
 func (r *Runner) onReceive(hostResult *result.HostResult) {
 	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
 		return
 	}
 
-	dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+	dt, err := r.hostsForIP(hostResult.IP)
 	if err != nil {
 		return
 	}
@@ -247,18 +293,9 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 	}
 
 	// recover hostnames from ip:port combination
+	r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
 	for _, p := range hostResult.Ports {
 		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-		if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
-			if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
-				// replace bare ip:port with host
-				for idx, ipCandidate := range dt {
-					if iputil.IsIP(ipCandidate) {
-						dt[idx] = otherName
-					}
-				}
-			}
-		}
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
@@ -1335,7 +1372,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	switch {
 	case scanResults.HasIPsPorts():
 		for hostResult := range scanResults.GetIPsPorts() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+			dt, err := r.hostsForIP(hostResult.IP)
 			if err != nil {
 				continue
 			}
@@ -1345,19 +1382,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			}
 
 			// recover hostnames from ip:port combination
-			for _, p := range hostResult.Ports {
-				ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-				if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
-					if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
-						// replace bare ip:port with host
-						for idx, ipCandidate := range dt {
-							if iputil.IsIP(ipCandidate) {
-								dt[idx] = otherName
-							}
-						}
-					}
-				}
-			}
+			r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
 
 			buffer := bytes.Buffer{}
 			for _, host := range dt {
@@ -1464,7 +1489,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}
 	case scanResults.HasIPS():
 		for hostIP := range scanResults.GetIPs() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
+			dt, err := r.hostsForIP(hostIP)
 			if err != nil {
 				continue
 			}
@@ -1566,7 +1591,7 @@ func (r *Runner) outputDeadHosts(file *os.File, csvFileHeaderEnabled *bool) {
 			continue
 		}
 
-		hosts, _ := r.scanner.IPRanger.GetHostsByIP(deadIP)
+		hosts, _ := r.hostsForIP(deadIP)
 		if len(hosts) == 0 {
 			hosts = []string{deadIP}
 		}
