@@ -109,6 +109,35 @@ func TestCloseWaitsForWorkers(t *testing.T) {
 	}
 }
 
+func TestCloseCancelsWorkersWithoutExternalCancel(t *testing.T) {
+	s := newTestScanner(t)
+	s.ListenHandler.Phase.Set(Scan)
+	// Caller never cancels the context: Close must cancel its own workers,
+	// otherwise workersWg.Wait blocks forever.
+	s.StartWorkers(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		_ = s.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() hung: it must cancel its own workers")
+	}
+	assert.Nil(t, s.ListenHandler)
+}
+
+func TestCloseIsIdempotent(t *testing.T) {
+	s := newTestScanner(t)
+	s.StartWorkers(context.Background())
+	require.NoError(t, s.Close())
+	// Second call must not panic on the already-niled ListenHandler.
+	require.NoError(t, s.Close())
+}
+
 func TestSequentialScannerReuse(t *testing.T) {
 	handler := &ListenHandler{
 		Phase:              &Phase{},
