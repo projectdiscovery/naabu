@@ -52,8 +52,8 @@ func init() {
 }
 
 var (
-	rawInfraOnce sync.Once
-	rawInfraOK   bool
+	rawInfraMu sync.Mutex
+	rawInfraOK bool
 )
 
 // ensureRawInfra lazily brings up the process-wide raw scan infrastructure
@@ -62,57 +62,90 @@ var (
 // filter is port-independent (flag based) so newly acquired handlers require no
 // filter changes and any number of scans can run in parallel.
 func ensureRawInfra() bool {
-	rawInfraOnce.Do(func() {
-		if PkgRouter == nil || !privileges.IsPrivileged {
-			return
-		}
+	rawInfraMu.Lock()
+	defer rawInfraMu.Unlock()
 
-		transportPacketSend = make(chan *PkgSend, packetSendSize)
+	// Guard on success rather than sync.Once so a transient setup failure (e.g. a
+	// momentarily bad interface) does not permanently disable raw scanning for
+	// the rest of a long-lived process; a later scan can retry from scratch.
+	if rawInfraOK {
+		return true
+	}
+	if PkgRouter == nil || !privileges.IsPrivileged {
+		return false
+	}
 
-		var err error
-		icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
-		if err != nil {
-			gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
-		}
-		icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
-		if err != nil {
-			gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
-		}
+	transportPacketSend = make(chan *PkgSend, packetSendSize)
 
-		icmpPacketSend = make(chan *PkgSend, packetSendSize)
-		ethernetPacketSend = make(chan *PkgSend, packetSendSize)
+	var err error
+	icmpConn4, err = icmp.ListenPacket("ip4:icmp", "0.0.0.0")
+	if err != nil {
+		gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
+	}
+	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
+	if err != nil {
+		gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
+	}
 
-		handlers = &Handlers{
-			InterfaceHandle: make(map[string]*pcap.Handle),
+	icmpPacketSend = make(chan *PkgSend, packetSendSize)
+	ethernetPacketSend = make(chan *PkgSend, packetSendSize)
+
+	handlers = &Handlers{
+		InterfaceHandle: make(map[string]*pcap.Handle),
+	}
+	if err := SetupHandlers(); err != nil {
+		gologger.Error().Msgf("could not setup handlers: %s\n", err)
+		// SetupHandlers cleans up its own partial pcap handles; drop the rest of
+		// the half-initialized state so the next call retries cleanly.
+		if icmpConn4 != nil {
+			_ = icmpConn4.Close()
+			icmpConn4 = nil
 		}
-		if err := SetupHandlers(); err != nil {
-			gologger.Error().Msgf("could not setup handlers: %s\n", err)
-			return
+		if icmpConn6 != nil {
+			_ = icmpConn6.Close()
+			icmpConn6 = nil
 		}
-		if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
-			gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
-			return
+		transportPacketSend = nil
+		icmpPacketSend = nil
+		ethernetPacketSend = nil
+		handlers = nil
+		return false
+	}
+	if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
+		gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
+		if icmpConn4 != nil {
+			_ = icmpConn4.Close()
+			icmpConn4 = nil
 		}
-		go TransportReadWorker()
-		go TransportWriteWorker()
-		// One reader per icmp family routes replies to whichever handlers are
-		// currently in the host-discovery phase. A single shared reader avoids
-		// multiple per-scan handlers stealing each other's replies off the
-		// shared conn.
-		go icmpReadWorker4()
-		go icmpReadWorker6()
-		// Spawn multiple ICMP write workers: ranging over icmpPacketSend from
-		// several goroutines is safe, and concurrent WriteTo on the shared
-		// icmpConn4/icmpConn6 is supported by net.PacketConn. With one worker
-		// the per-host retry-sleep inside PingIcmp*RequestAsync serialises the
-		// whole scan; fanning out lets those sleeps overlap. See #1672.
-		for i := 0; i < icmpWriteWorkers; i++ {
-			go ICMPWriteWorker()
+		if icmpConn6 != nil {
+			_ = icmpConn6.Close()
+			icmpConn6 = nil
 		}
-		go EthernetWriteWorker(ethernetPacketSend)
-		rawInfraOK = true
-	})
-	return rawInfraOK
+		transportPacketSend = nil
+		icmpPacketSend = nil
+		ethernetPacketSend = nil
+		handlers = nil
+		return false
+	}
+	go TransportReadWorker()
+	go TransportWriteWorker()
+	// One reader per icmp family routes replies to whichever handlers are
+	// currently in the host-discovery phase. A single shared reader avoids
+	// multiple per-scan handlers stealing each other's replies off the
+	// shared conn.
+	go icmpReadWorker4()
+	go icmpReadWorker6()
+	// Spawn multiple ICMP write workers: ranging over icmpPacketSend from
+	// several goroutines is safe, and concurrent WriteTo on the shared
+	// icmpConn4/icmpConn6 is supported by net.PacketConn. With one worker
+	// the per-host retry-sleep inside PingIcmp*RequestAsync serialises the
+	// whole scan; fanning out lets those sleeps overlap. See #1672.
+	for i := 0; i < icmpWriteWorkers; i++ {
+		go ICMPWriteWorker()
+	}
+	go EthernetWriteWorker(ethernetPacketSend)
+	rawInfraOK = true
+	return true
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -769,48 +802,57 @@ func (l *ListenHandler) rebind6(ip net.IP) bool {
 	return true
 }
 
+// The drain workers capture their socket into a local before looping: rebind4/
+// rebind6 can swap l.TcpConn*/l.UdpConn* under them, so reading the field every
+// iteration would race the swap and could make an old worker start draining the
+// freshly bound socket. Pinning the local keeps each worker bound to the socket
+// it started on, which is closed on rebind/teardown so the worker then exits.
 func (l *ListenHandler) TcpReadWorker4() {
-	if l.TcpConn4 == nil {
+	conn := l.TcpConn4
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		if _, _, err := l.TcpConn4.ReadFrom(data); err != nil {
+		if _, _, err := conn.ReadFrom(data); err != nil {
 			return
 		}
 	}
 }
 
 func (l *ListenHandler) TcpReadWorker6() {
-	if l.TcpConn6 == nil {
+	conn := l.TcpConn6
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		if _, _, err := l.TcpConn6.ReadFrom(data); err != nil {
+		if _, _, err := conn.ReadFrom(data); err != nil {
 			return
 		}
 	}
 }
 
 func (l *ListenHandler) UdpReadWorker4() {
-	if l.UdpConn4 == nil {
+	conn := l.UdpConn4
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		if _, _, err := l.UdpConn4.ReadFrom(data); err != nil {
+		if _, _, err := conn.ReadFrom(data); err != nil {
 			return
 		}
 	}
 }
 func (l *ListenHandler) UdpReadWorker6() {
-	if l.UdpConn6 == nil {
+	conn := l.UdpConn6
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		if _, _, err := l.UdpConn6.ReadFrom(data); err != nil {
+		if _, _, err := conn.ReadFrom(data); err != nil {
 			return
 		}
 	}
