@@ -30,10 +30,19 @@ type State int
 const (
 	maxRetries     = 10
 	sendDelayMsec  = 10
-	chanSize       = 1000  //nolint
-	packetSendSize = 2500  //nolint
-	snaplen        = 65536 //nolint
-	readtimeout    = 1500  //nolint
+	chanSize       = 1000 //nolint
+	packetSendSize = 2500 //nolint
+	// snaplen only needs to cover ethernet + IPv6 + TCP/IP options; we read
+	// transport headers, never payloads. On Linux the AF_PACKET ring sizes its
+	// frame slots from snaplen, so a small value lets the capture buffer hold
+	// far more packets and survive reply bursts from large port ranges.
+	snaplen = 256 //nolint
+	// pcapBufferSize is the kernel capture buffer per handle. The default is a
+	// few MB; a SYN scan over thousands of ports triggers a burst of RST/SYN-ACK
+	// replies, and an undersized buffer silently drops them. masscan/zmap use
+	// large buffers for the same reason.
+	pcapBufferSize = 16 * 1024 * 1024
+	readtimeout    = 1500 //nolint
 
 	// icmpWriteWorkers controls how many goroutines drain icmpPacketSend.
 	// A single worker serialises every WriteTo retry-sleep and made

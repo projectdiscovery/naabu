@@ -735,6 +735,12 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		if err != nil {
 			return err
 		}
+		// Best-effort: a large capture buffer keeps reply bursts from large port
+		// ranges from overflowing the kernel ring and silently dropping
+		// SYN-ACKs. Failure is non-fatal; the handle keeps the OS default.
+		if err = inactive.SetBufferSize(pcapBufferSize); err != nil {
+			gologger.Debug().Msgf("could not set pcap buffer size on %s: %s", interfaceName, err)
+		}
 
 		switch proto {
 		case protocol.TCP, protocol.UDP:
@@ -891,18 +897,24 @@ func TransportReadWorker() {
 				parser4NoMac, parser6NoMac,
 			)
 
-			decoded := []gopacket.LayerType{}
+			decoded := make([]gopacket.LayerType, 0, 8)
 
-			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-			packetSource.DecodeOptions = gopacket.DecodeOptions{
-				Lazy:   true,
-				NoCopy: true,
-			}
-			for packet := range packetSource.Packets() {
-				data := packet.Data()
+			// Read straight off the handle (zero-copy) instead of
+			// gopacket.PacketSource.Packets(), which allocates a *gopacket.Packet
+			// and hops through an extra goroutine+channel for every packet. On a
+			// SYN scan every reply lands here, so this is the receive hot path.
+			for {
+				data, _, err := handler.ZeroCopyReadPacketData()
+				if err != nil {
+					if errors.Is(err, pcap.NextErrorTimeoutExpired) {
+						continue
+					}
+					// EOF or a closed handle ends the reader; any other error is
+					// treated as fatal to avoid spinning on a broken handle.
+					return
+				}
 				for _, parser := range parsers {
-					err := parser.DecodeLayers(data, &decoded)
-					if err != nil {
+					if err := parser.DecodeLayers(data, &decoded); err != nil {
 						continue
 					}
 					hasTransport := false
