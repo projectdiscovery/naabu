@@ -628,12 +628,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			// path for connect scans, IPv6 targets and ethernet framing.
 			var synSender *SYNSender
 			var tgtIdx *targetIndex
+			var synPacer *pacer
 			if shouldUseRawPackets {
 				tgtIdx = buildTargetIndex(targets)
 				if s, err := newSYNSender(r.scanner.ListenHandler); err != nil {
 					gologger.Debug().Msgf("fast SYN sender unavailable (%s), using standard path\n", err)
 				} else {
 					synSender = s
+					synPacer = newPacer(r.options.Rate)
 					gologger.Info().Msgf("fast SYN sender active (direct raw socket)")
 				}
 			}
@@ -731,7 +733,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 							if !r.canIScanIfCDN(ip, port) {
 								continue
 							}
-							r.limiter.Take()
+							synPacer.wait()
 							if err := synSender.send(dstIP4, uint16(port.Port)); err != nil {
 								gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 							}
