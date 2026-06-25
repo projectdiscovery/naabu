@@ -321,13 +321,13 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
-			srcIP4WithPort := net.JoinHostPort(ip.ipv4, ip.port.String())
-			srcIP6WithPort := net.JoinHostPort(ip.ipv6, ip.port.String())
-			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
-			if !isIPInRange {
-				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
-				continue
-			}
+			// Reply authenticity is enforced upstream by the SYN-cookie check
+			// in the raw read path: a SYN-ACK only reaches this channel if its
+			// Ack matched the cookie we encoded into the probe's sequence
+			// number. That is a stronger guarantee than a target-set membership
+			// lookup (which also accepts unrelated in-range traffic) and it
+			// avoids the per-response disk-backed Hosts lookups, so no
+			// IPRanger.ContainsAny check is needed here.
 
 			if s.OnReceive != nil {
 				singlePort := []*port.Port{ip.port}

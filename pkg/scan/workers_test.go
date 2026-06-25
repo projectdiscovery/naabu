@@ -267,12 +267,14 @@ func TestTCPResultWorkerAddsToScanResults(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTCPResultWorkerDropsOutOfRangeIP(t *testing.T) {
+// TestTCPResultWorkerRecordsCookieValidated documents that the TCP result
+// worker no longer performs an IPRanger membership filter: SYN-ACK
+// authenticity is enforced upstream by the SYN-cookie check, so a result
+// delivered on TcpChan is recorded even when the IP was never added to the
+// ranger. Forgery rejection is covered by TestSynCookieRejectsForgery.
+func TestTCPResultWorkerRecordsCookieValidated(t *testing.T) {
 	s := newTestScanner(t)
 	s.ListenHandler.Phase.Set(Scan)
-
-	err := s.IPRanger.Add("10.0.0.1")
-	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.StartWorkers(ctx)
@@ -284,10 +286,10 @@ func TestTCPResultWorkerDropsOutOfRangeIP(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	assert.False(t, s.ScanResults.IPHasPort("10.0.0.99", &port.Port{Port: 80, Protocol: protocol.TCP}))
+	assert.True(t, s.ScanResults.IPHasPort("10.0.0.99", &port.Port{Port: 80, Protocol: protocol.TCP}))
 
 	cancel()
-	err = s.Close()
+	err := s.Close()
 	assert.NoError(t, err)
 }
 

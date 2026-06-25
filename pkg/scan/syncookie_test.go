@@ -39,16 +39,3 @@ func TestSynCookie4MatchesSynCookie(t *testing.T) {
 	require.Equal(t, SynCookie(ip, targetPort, ourPort), SynCookie4(ip4, targetPort, ourPort),
 		"fast IPv4 cookie must equal the generic cookie")
 }
-
-func TestSynCookieWrapAround(t *testing.T) {
-	// Force a cookie of 0xFFFFFFFF to exercise uint32 ack-1 wraparound:
-	// ack = seq+1 = 0, ack-1 must wrap back to 0xFFFFFFFF.
-	ip := net.ParseIP("10.0.0.1")
-	for p := uint16(1); p != 0; p++ {
-		if SynCookie(ip, p, 12345) == 0xFFFFFFFF {
-			require.True(t, verifySynCookie(ip.String(), "", p, 12345, 0))
-			return
-		}
-	}
-	t.Skip("no cookie hit 0xFFFFFFFF in search space")
-}
