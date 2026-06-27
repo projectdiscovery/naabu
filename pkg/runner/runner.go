@@ -1145,7 +1145,7 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 		probeFile = fingerprint.LocateNmapProbes()
 	}
 	if probeFile == "" {
-		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, skipping -sV. Install nmap or specify the path with --sV-probes")
+		gologger.Warning().Msgf("could not find nmap-service-probes, skipping -sV. Install nmap or specify the path with --sV-probes")
 		r.options.ServiceVersion = false
 		scan.EnableTLSDetection = false
 		return
@@ -1153,7 +1153,7 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 
 	db, err := r.loadProbeDB(probeFile)
 	if err != nil {
-		gologger.Info().Label("WRN").Msgf("could not load service probes from %s, skipping -sV", probeFile)
+		gologger.Warning().Msgf("could not load service probes from %s, skipping -sV", probeFile)
 		r.options.ServiceVersion = false
 		scan.EnableTLSDetection = false
 		return
