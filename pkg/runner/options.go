@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -404,6 +405,25 @@ func (options *Options) hasProbes() bool {
 
 func (options *Options) shouldUseRawPackets() bool {
 	return isOSSupported() && privileges.IsPrivileged && options.ScanType == SynScan && scan.PkgRouter != nil
+}
+
+// hasUDPPorts reports whether the user's port specification includes at least
+// one UDP port (i.e. a segment starting with "u:"). This is used at validation
+// time, before ParsePorts has expanded the port list, so we inspect the raw
+// strings rather than the parsed []*port.Port slice.
+func (options *Options) hasUDPPorts() bool {
+	// Check inline -p flag
+	if strings.Contains(options.Ports, "u:") {
+		return true
+	}
+	// Check -pf (ports file) entries — each element may itself be a
+	// comma-separated list, so we search for the "u:" prefix in the joined string.
+	for _, pf := range options.PortsFile {
+		if strings.Contains(pf, "u:") {
+			return true
+		}
+	}
+	return false
 }
 
 func (options *Options) ShouldScanIPv4() bool {

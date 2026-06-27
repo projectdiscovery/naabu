@@ -178,6 +178,16 @@ func (options *Options) ValidateOptions() error {
 	if options.PredictionThreshold < 0 || options.PredictionThreshold > 100 {
 		return errors.New("prediction threshold must be between 0 and 100")
 	}
+	// Warn when -uP is set but the port list contains no UDP ports: the
+	// feature will load the probe database but never send any probes,
+	// which is misleading for the user. We check the raw Ports string and
+	// PortsFile because ParsePorts has not run yet at validation time. The
+	// heuristic is: unless the user passed at least one "u:" segment, no
+	// UDP port will be scanned.
+	if options.UDPProbes && !options.hasUDPPorts() {
+		gologger.Warning().Msgf("-uP (UDP probes) is enabled but no UDP ports were specified. " +
+			"Add UDP ports with -p u:53,u:123 or similar. Without UDP ports -uP has no effect.")
+	}
 
 	return nil
 }
