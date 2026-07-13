@@ -20,6 +20,17 @@ func TestParsePortsList(t *testing.T) {
 		{"1-3,10", []*port.Port{{Port: 1, Protocol: protocol.TCP}, {Port: 2, Protocol: protocol.TCP}, {Port: 3, Protocol: protocol.TCP}, {Port: 10, Protocol: protocol.TCP}}, false},
 		{"17,17,17,18", []*port.Port{{Port: 17, Protocol: protocol.TCP}, {Port: 18, Protocol: protocol.TCP}}, false},
 		{"a", nil, true},
+		{"0", nil, true},
+		{"0-100", nil, true},
+		{"0-65535", nil, true},
+		{"1-65535", func() []*port.Port {
+			ports := make([]*port.Port, 0, 65535)
+			for i := 1; i <= 65535; i++ {
+				ports = append(ports, &port.Port{Port: i, Protocol: protocol.TCP})
+			}
+			return ports
+		}(), false},
+		{"80,443", []*port.Port{{Port: 80, Protocol: protocol.TCP}, {Port: 443, Protocol: protocol.TCP}}, false},
 	}
 	for _, tt := range tests {
 		t.Run("", func(t *testing.T) {
@@ -97,6 +108,10 @@ func TestParsePorts(t *testing.T) {
 		{"-", 65535, false},
 		{"a", 0, true},
 		{"1,2,4-10", 9, false},
+		{"0", 0, true},
+		{"0-100", 0, true},
+		{"1-65535", 65535, false},
+		{"80,443", 2, false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.args, func(t *testing.T) {
