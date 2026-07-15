@@ -37,6 +37,8 @@ func showNetworkCapabilities(options *Options) {
 		accessLevel = "root"
 		if osutil.IsLinux() {
 			accessLevel = "CAP_NET_RAW"
+		} else if osutil.IsWindows() {
+			accessLevel = "admin"
 		}
 		scanType = "SYN"
 	case options.Passive:
