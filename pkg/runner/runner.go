@@ -425,21 +425,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return err
 		}
 
-		// when -show-dead is set we keep track of every probed target so that,
-		// once discovery settles, we can diff it against the responsive hosts
-		// and report the ones that never replied.
-		var discoveryTargets map[string]struct{}
-		if r.options.ShowDeadHosts {
-			discoveryTargets = make(map[string]struct{})
-		}
-
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
 				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
-					if discoveryTargets != nil {
-						discoveryTargets[ip] = struct{}{}
-					}
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -457,7 +446,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		}
 
 		if r.options.ShowDeadHosts {
-			r.calculateDeadHosts(discoveryTargets)
+			// re-stream the same targets instead of holding every probed ip in
+			// memory; dead hosts are the streamed targets that never responded.
+			r.calculateDeadHosts(targetsV4, targetsv6)
 		}
 
 		// check if we should stop here or continue with full scan
@@ -543,6 +534,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
 						return
 					}
+					defer func() { _ = response.Body.Close() }()
 					if response.StatusCode != http.StatusOK {
 						gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
 						return
@@ -911,7 +903,11 @@ func (r *Runner) PickPort(index int) *port.Port {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
-	var swg sync.WaitGroup
+	// cap concurrent verification goroutines (and their dials) at the scan rate,
+	// matching the main scan loop. A plain WaitGroup here let the goroutine count
+	// track the number of hosts with open ports, which could spawn an unbounded
+	// number of concurrent dials on large result sets.
+	swg := sizedwaitgroup.New(r.options.Rate)
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 	defer limiter.Stop()
 
@@ -920,7 +916,7 @@ func (r *Runner) ConnectVerification() {
 	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
 		limiter.Take()
 
-		swg.Add(1)
+		swg.Add()
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
 
@@ -1065,28 +1061,41 @@ func vendorFromMAC(mac string) string {
 	return macvendor.Lookup(mac)
 }
 
-// calculateDeadHosts diffs the set of probed discovery targets against the
-// hosts that responded and records the difference as dead hosts. It must be
-// called after host discovery has settled (i.e. post warm-up) so that late
-// responses are accounted for.
-func (r *Runner) calculateDeadHosts(targets map[string]struct{}) {
-	if len(targets) == 0 {
-		return
-	}
-
+// calculateDeadHosts re-streams the discovery targets and records the ones that
+// never responded as dead hosts. It must be called after host discovery has
+// settled (i.e. post warm-up) so that late responses are accounted for.
+// Re-streaming the CIDRs keeps memory bounded by the responsive host set
+// instead of the full probed range, which matters for large inputs (a /8 would
+// otherwise materialize ~16M entries just to compute the diff).
+func (r *Runner) calculateDeadHosts(targets4, targets6 []*net.IPNet) {
 	alive := make(map[string]struct{})
 	for ip := range r.scanner.HostDiscoveryResults.GetIPs() {
 		alive[ip] = struct{}{}
 	}
 
-	for ip := range targets {
-		if _, ok := alive[ip]; !ok {
-			r.scanner.HostDiscoveryResults.AddDeadHost(ip)
+	var total int
+	checkCidr := func(cidr *net.IPNet) {
+		ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
+		for ip := range ipStream {
+			if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+				continue
+			}
+			total++
+			if _, ok := alive[ip]; !ok {
+				r.scanner.HostDiscoveryResults.AddDeadHost(ip)
+			}
 		}
 	}
 
+	for _, cidr := range targets4 {
+		checkCidr(cidr)
+	}
+	for _, cidr := range targets6 {
+		checkCidr(cidr)
+	}
+
 	if deadCount := len(r.scanner.HostDiscoveryResults.GetDeadHosts()); deadCount > 0 {
-		gologger.Info().Msgf("%d of %d discovery targets did not respond\n", deadCount, len(targets))
+		gologger.Info().Msgf("%d of %d discovery targets did not respond\n", deadCount, total)
 	}
 }
 
