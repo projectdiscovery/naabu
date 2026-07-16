@@ -56,14 +56,23 @@ func matchWindowsPcapDevice(iface *net.Interface) string {
 		}
 	}
 
-	// Fall back to description / partial name match when IPs are unavailable
-	// (e.g. interface briefly without address).
+	// Fall back to description / name when IPs are unavailable
+	// (e.g. interface briefly without address). Prefer exact matches; only
+	// accept a unique partial description match so "Ethernet" does not grab
+	// "Ethernet 2" / another adapter whose description shares a fragment.
 	ifaceName := strings.ToLower(iface.Name)
+	var partial []string
 	for _, dev := range devices {
 		desc := strings.ToLower(dev.Description)
-		if desc == ifaceName || strings.Contains(desc, ifaceName) || strings.EqualFold(dev.Name, iface.Name) {
+		if desc == ifaceName || strings.EqualFold(dev.Name, iface.Name) {
 			return dev.Name
 		}
+		if ifaceName != "" && strings.Contains(desc, ifaceName) {
+			partial = append(partial, dev.Name)
+		}
+	}
+	if len(partial) == 1 {
+		return partial[0]
 	}
 	return ""
 }
