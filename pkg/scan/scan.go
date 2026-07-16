@@ -105,6 +105,11 @@ type Scanner struct {
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
 	workersWg            sync.WaitGroup
+	// cancelWorkers cancels the context that drives the result workers so that
+	// Close can release them even when the scan context has not been cancelled
+	// yet (e.g. Close called out of order or on early teardown). Without it
+	// Close blocks forever on workersWg.Wait.
+	cancelWorkers context.CancelFunc
 	// UDPProbeProvider supplies per-port UDP payloads when the
 	// scanner runs in -uP mode. Keeping it on the Scanner (rather
 	// than as a package-global) lets independent runners coexist in
@@ -216,15 +221,21 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() error {
+	if s.cancelWorkers != nil {
+		s.cancelWorkers()
+	}
 	s.workersWg.Wait()
-	s.ListenHandler.Busy = false
-	s.ListenHandler = nil
+	if s.ListenHandler != nil {
+		s.ListenHandler.Busy = false
+		s.ListenHandler = nil
+	}
 
 	return nil
 }
 
 // StartWorkers of the scanner
 func (s *Scanner) StartWorkers(ctx context.Context) {
+	ctx, s.cancelWorkers = context.WithCancel(ctx)
 	s.workersWg.Add(3)
 	go func() {
 		defer s.workersWg.Done()
