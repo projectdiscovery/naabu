@@ -333,9 +333,10 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
-	// Feed on-the-fly service detection. The queue never blocks the scan path and
-	// never drops targets, so -sV stays complete even when discovery outpaces the
-	// fingerprint workers.
+	// Feed on-the-fly service detection. The queue never drops targets, so -sV
+	// stays complete even when discovery outpaces the fingerprint workers. When
+	// the backlog hits its memory ceiling, push blocks here and backpressure
+	// reaches TCPResultWorker (not the SYN TX path directly).
 	if r.fpQueue != nil {
 		hostname := hostResult.IP
 		for _, h := range dt {
@@ -463,6 +464,15 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	}
 
 	r.initServiceDetection(ctx)
+	// Always tear down fingerprint workers, including early returns (Load
+	// failure, OnlyHostDiscovery, handleNmap error). waitServiceDetection is
+	// idempotent once fpQueue is nil, so the explicit call sites below remain
+	// safe and still merge results before output.
+	defer func() {
+		if r.scanner != nil {
+			r.waitServiceDetection(r.scanner.ScanResults)
+		}
+	}()
 	r.initUDPProbes()
 
 	if r.options.Stream {
@@ -739,7 +749,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 
 			// Retries are performed regardless of the previous scan results due to network unreliability
+			scanCancelled := false
 			for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+				if scanCancelled {
+					break
+				}
 				if currentRetry < r.options.ResumeCfg.Retry {
 					gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
 					continue
@@ -769,6 +783,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, synSender, payload, shouldUseRawPackets)
 				} else {
 					for index := int64(0); index < int64(Range); index++ {
+						select {
+						case <-ctx.Done():
+							scanCancelled = true
+						default:
+						}
+						if scanCancelled {
+							break
+						}
 						// Distributed sharding: each node only handles its slice of
 						// the index space. The shared seed makes the slices disjoint.
 						if !r.options.inShard(index) {
@@ -852,6 +874,14 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 				// handle the ip:port combination
 				for twpIndex, targetWithPort := range targetsWithPort {
+					select {
+					case <-ctx.Done():
+						scanCancelled = true
+					default:
+					}
+					if scanCancelled {
+						break
+					}
 					// shard the explicit ip:port targets the same way as the
 					// generated (host, port) space.
 					if !r.options.inShard(int64(twpIndex)) {
@@ -1373,9 +1403,10 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 
 	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
 
-	// Forward queued targets into the engine. The unbounded queue absorbs bursts
-	// from fast discovery; this goroutine blocks on the engine channel instead
-	// of dropping, and closes fpTargetCh once the queue is closed and drained.
+	// Forward queued targets into the engine. The bounded queue absorbs bursts
+	// from fast discovery (with backpressure at capacity); this goroutine blocks
+	// on the engine channel instead of dropping, and closes fpTargetCh once the
+	// queue is closed and drained.
 	go func() {
 		for {
 			t, ok := r.fpQueue.pop()
@@ -1414,11 +1445,13 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 	r.fpTargetCh = nil
 	<-r.fpDone
 
-	for hostResult := range scanResults.GetIPsPorts() {
-		for _, p := range hostResult.Ports {
-			key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
-			if svc, ok := r.fpServices[key]; ok {
-				p.Service = svc
+	if scanResults != nil {
+		for hostResult := range scanResults.GetIPsPorts() {
+			for _, p := range hostResult.Ports {
+				key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
+				if svc, ok := r.fpServices[key]; ok {
+					p.Service = svc
+				}
 			}
 		}
 	}

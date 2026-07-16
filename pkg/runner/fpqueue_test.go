@@ -101,7 +101,7 @@ func TestFpQueueBackpressureBounded(t *testing.T) {
 		defer close(done)
 		for {
 			q.mu.Lock()
-			if l := len(q.items); l > maxLen {
+			if l := q.lenLocked(); l > maxLen {
 				maxLen = l
 			}
 			q.mu.Unlock()

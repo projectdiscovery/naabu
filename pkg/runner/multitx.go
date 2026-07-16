@@ -12,13 +12,16 @@ import (
 
 // forEachWorkerIndex walks the strided slice of [0,rng) owned by a given worker.
 // Workers 0..workers-1 partition the index space by residue (index % workers),
-// so every index is visited by exactly one worker.
-func forEachWorkerIndex(worker, workers int, rng int64, fn func(int64)) {
+// so every index is visited by exactly one worker. fn returning false stops the
+// walk early (used for context cancellation).
+func forEachWorkerIndex(worker, workers int, rng int64, fn func(int64) bool) {
 	if workers < 1 {
 		workers = 1
 	}
 	for index := int64(worker); index < rng; index += int64(workers) {
-		fn(index)
+		if !fn(index) {
+			return
+		}
 	}
 }
 
@@ -52,6 +55,13 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 	}
 	n = len(senders)
 
+	// Cap fan-out by the configured rate so each worker can still send at least
+	// 1 pps without inflating the aggregate rate above -rate.
+	if r.options.Rate > 0 && n > r.options.Rate {
+		n = r.options.Rate
+		senders = senders[:n]
+	}
+
 	perWorkerRate := r.options.Rate
 	if perWorkerRate > 0 {
 		perWorkerRate /= n
@@ -66,13 +76,14 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 		go func(worker int, sender *SYNSender) {
 			defer wg.Done()
 			pace := newPacer(perWorkerRate)
-			forEachWorkerIndex(worker, n, rng, func(index int64) {
+			forEachWorkerIndex(worker, n, rng, func(index int64) bool {
 				select {
 				case <-ctx.Done():
-					return
+					return false
 				default:
 				}
 				r.fastScanIndex(ctx, b, index, portsCount, targets, tgtIdx, sender, pace, payload, raw)
+				return true
 			})
 			if err := sender.flush(); err != nil {
 				if isCongestion(err) {
@@ -115,13 +126,11 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 	if ip == "" {
 		ip = r.PickIP(targets, ipIndex)
 	}
-
 	if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
 		return
 	}
 
 	port := r.PickPort(portIndex)
-
 	if r.scanner.ScanResults.HasSkipped(ip) {
 		return
 	}
@@ -154,7 +163,6 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 		r.wgscan.Add()
 		go r.handleHostPort(ctx, ip, payload, port)
 	}
-
 	if r.options.EnableProgressBar {
 		r.stats.IncrementCounter("packets", 1)
 	}

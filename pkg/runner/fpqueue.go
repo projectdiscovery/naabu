@@ -12,7 +12,7 @@ import (
 // ceiling instead of growing without limit.
 const fpQueueMaxItems = 100_000
 
-// fpQueue is a bounded, drop-free hand-off between the scan hot path and the
+// fpQueue is a bounded, drop-free hand-off between the scan result path and the
 // (slower) service-detection workers.
 //
 // The original design fed a fixed buffered channel with a non-blocking send and
@@ -22,12 +22,14 @@ const fpQueueMaxItems = 100_000
 // the engine. To avoid an unbounded backlog (and eventual OOM) when discovery
 // sustainably outruns detection, push blocks once the backlog reaches
 // maxItems and resumes as the forwarder drains, propagating backpressure to the
-// scan instead of buffering everything in memory.
+// caller (typically TCPResultWorker via onReceive) instead of buffering
+// everything in memory.
 type fpQueue struct {
 	mu       sync.Mutex
 	notEmpty *sync.Cond
 	notFull  *sync.Cond
 	items    []fingerprint.Target
+	head     int
 	maxItems int
 	closed   bool
 }
@@ -39,11 +41,15 @@ func newFpQueue() *fpQueue {
 	return q
 }
 
+func (q *fpQueue) lenLocked() int {
+	return len(q.items) - q.head
+}
+
 // push appends a target, blocking only while the backlog is at the memory
 // ceiling so nothing is ever dropped. Pushes after close are ignored.
 func (q *fpQueue) push(t fingerprint.Target) {
 	q.mu.Lock()
-	for !q.closed && q.maxItems > 0 && len(q.items) >= q.maxItems {
+	for !q.closed && q.maxItems > 0 && q.lenLocked() >= q.maxItems {
 		q.notFull.Wait()
 	}
 	if !q.closed {
@@ -64,19 +70,24 @@ func (q *fpQueue) close() {
 }
 
 // pop blocks until an item is available, or returns ok=false when the queue is
-// closed and fully drained.
+// closed and fully drained. Uses a head offset so pops are O(1); the underlying
+// slice is compacted when half of it is drained.
 func (q *fpQueue) pop() (fingerprint.Target, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	for len(q.items) == 0 && !q.closed {
+	for q.lenLocked() == 0 && !q.closed {
 		q.notEmpty.Wait()
 	}
-	if len(q.items) == 0 {
+	if q.lenLocked() == 0 {
 		return fingerprint.Target{}, false
 	}
-	t := q.items[0]
-	q.items[0] = fingerprint.Target{}
-	q.items = q.items[1:]
+	t := q.items[q.head]
+	q.items[q.head] = fingerprint.Target{}
+	q.head++
+	if q.head > 1024 && q.head*2 >= len(q.items) {
+		q.items = append([]fingerprint.Target(nil), q.items[q.head:]...)
+		q.head = 0
+	}
 	q.notFull.Signal()
 	return t, true
 }

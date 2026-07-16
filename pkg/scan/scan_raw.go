@@ -937,9 +937,15 @@ func TransportReadWorker() {
 	var wgread sync.WaitGroup
 
 	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 string) {
+		// Snapshot handlers under the registry lock, then deliver outside it.
+		// Blocking channel sends must not hold listenHandlersMu or Release/Close
+		// can deadlock when a result channel is full (e.g. -sV backpressure).
 		listenHandlersMu.RLock()
-		defer listenHandlersMu.RUnlock()
-		for _, listenHandler := range ListenHandlers {
+		handlersSnap := make([]*ListenHandler, len(ListenHandlers))
+		copy(handlersSnap, ListenHandlers)
+		listenHandlersMu.RUnlock()
+
+		for _, listenHandler := range handlersSnap {
 			// We consider only incoming packets
 			tcpPortMatches := tcp.DstPort == layers.TCPPort(listenHandler.Port)
 			udpPortMatches := udp.DstPort == layers.UDPPort(listenHandler.Port)
@@ -954,15 +960,24 @@ func TransportReadWorker() {
 					proto = protocol.UDP
 					srcPort = int(udp.SrcPort)
 				}
-				listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}
+				select {
+				case listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}:
+				default:
+				}
 			case tcpPortMatches && tcp.SYN && tcp.ACK:
 				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
 					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
 					continue
 				}
-				listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
+				select {
+				case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
+				default:
+				}
 			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
-				listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
+				select {
+				case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:
+				default:
+				}
 			}
 		}
 	}
