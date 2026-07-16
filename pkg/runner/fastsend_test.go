@@ -9,6 +9,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestWorkerSYNSenderUsesIndependentRawSocket(t *testing.T) {
+	if scan.PkgRouter == nil {
+		t.Skip("routing is unavailable")
+	}
+	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.IPv4zero})
+	if err != nil {
+		t.Skipf("raw sockets are unavailable: %v", err)
+	}
+	defer conn.Close()
+
+	handler := &scan.ListenHandler{TcpConn4: conn}
+	base, err := newSYNSender(handler)
+	require.NoError(t, err)
+	worker, err := newWorkerSYNSender(handler)
+	require.NoError(t, err)
+	defer worker.close()
+
+	require.NotEqual(t, base.sender.FD(), worker.sender.FD(),
+		"workers sharing one fd serialize in the kernel")
+}
+
 func TestUint32ToIPv4(t *testing.T) {
 	require.Equal(t, net.IPv4(127, 0, 0, 1).To4(), uint32ToIPv4(0x7f000001).To4())
 	require.Equal(t, net.IPv4(255, 255, 255, 255).To4(), uint32ToIPv4(0xffffffff).To4())

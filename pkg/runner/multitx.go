@@ -35,18 +35,15 @@ func forEachWorkerIndex(worker, workers int, rng int64, fn func(int64) bool) {
 func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int64, portsCount uint64,
 	targets []*net.IPNet, tgtIdx *targetIndex, base *SYNSender, payload string, raw bool) {
 
-	n := r.options.TxWorkers
-	if n < 1 {
-		n = 1
-	}
+	n := effectiveTxWorkers(r.options.TxWorkers, r.options.Rate, rng, base != nil && base.batch != nil)
 
 	// One sender per worker; the first reuses the already-created base sender.
-	// Additional senders share the same raw fd but keep independent batch
-	// buffers, so userspace batching does not contend.
+	// Additional senders own independent raw sockets and batch buffers so both
+	// userspace batching and the kernel transmit path can run concurrently.
 	senders := make([]*SYNSender, 1, n)
 	senders[0] = base
 	for i := 1; i < n; i++ {
-		s, err := newSYNSender(r.scanner.ListenHandler)
+		s, err := newWorkerSYNSender(r.scanner.ListenHandler)
 		if err != nil {
 			gologger.Debug().Msgf("tx worker %d sender unavailable (%s), reducing fan-out to %d\n", i, err, i)
 			break
@@ -55,27 +52,15 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 	}
 	n = len(senders)
 
-	// Cap fan-out by the configured rate so each worker can still send at least
-	// 1 pps without inflating the aggregate rate above -rate.
-	if r.options.Rate > 0 && n > r.options.Rate {
-		n = r.options.Rate
-		senders = senders[:n]
-	}
-
-	perWorkerRate := r.options.Rate
-	if perWorkerRate > 0 {
-		perWorkerRate /= n
-		if perWorkerRate < 1 {
-			perWorkerRate = 1
-		}
-	}
-
 	var wg sync.WaitGroup
 	for w := 0; w < n; w++ {
 		wg.Add(1)
 		go func(worker int, sender *SYNSender) {
 			defer wg.Done()
-			pace := newPacer(perWorkerRate)
+			if worker > 0 {
+				defer sender.close()
+			}
+			pace := newPacer(rateForWorker(r.options.Rate, n, worker))
 			forEachWorkerIndex(worker, n, rng, func(index int64) bool {
 				select {
 				case <-ctx.Done():
@@ -97,6 +82,40 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 
 	// Drain any fallback (IPv6/connect) probes handed off to handleHostPort.
 	r.wgscan.Wait()
+}
+
+// rateForWorker splits the configured global rate without dropping the
+// remainder, while keeping the sum of all worker rates exactly equal to rate.
+func rateForWorker(rate, workers, worker int) int {
+	if rate <= 0 {
+		return rate
+	}
+	base := rate / workers
+	if worker < rate%workers {
+		base++
+	}
+	return base
+}
+
+// effectiveTxWorkers avoids opening sockets and scheduling goroutines that
+// cannot do useful work. On Linux, one sender can batch synBatchSize probes
+// into a single sendmmsg call, so fan-out below that boundary only adds partial
+// flushes. Non-batched platforms are capped by probe count instead.
+func effectiveTxWorkers(requested, rate int, rng int64, batched bool) int {
+	if requested < 1 {
+		requested = 1
+	}
+	if rate > 0 && requested > rate {
+		requested = rate
+	}
+	usefulWork := rng
+	if batched && rng > 0 {
+		usefulWork = (rng + synBatchSize - 1) / synBatchSize
+	}
+	if usefulWork > 0 && int64(requested) > usefulWork {
+		requested = int(usefulWork)
+	}
+	return requested
 }
 
 // fastScanIndex processes a single Blackrock index on the fast SYN path. It is

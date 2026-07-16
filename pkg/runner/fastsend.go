@@ -19,10 +19,11 @@ import (
 //
 // NOT safe for concurrent use, reuses internal buffers.
 type SYNSender struct {
-	sender  *rawsend.Sender
-	batch   *rawsend.Batch
-	srcPort uint16
-	baseSum uint32
+	sender    *rawsend.Sender
+	batch     *rawsend.Batch
+	ownedConn *net.IPConn
+	srcPort   uint16
+	baseSum   uint32
 	// defaultSrcSum is the checksum contribution of the default-route source
 	// IP, used as a fallback when a destination has no resolvable per-route
 	// source (see send).
@@ -135,6 +136,47 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	return s, nil
 }
 
+// newWorkerSYNSender gives a transmit worker its own raw socket. Reusing the
+// handler socket would leave all workers contending on one kernel socket lock,
+// which serializes sendmmsg and defeats multi-core transmit at high rates.
+func newWorkerSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
+	if handler == nil {
+		return nil, errNoRawConn
+	}
+	if wantsEthernetPath(handler) {
+		return nil, errEthernetPath
+	}
+
+	bindIP := net.IPv4zero
+	if handler.SourceBound && handler.SourceIp4 != nil {
+		bindIP = handler.SourceIp4
+	}
+	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: bindIP})
+	if err != nil {
+		return nil, fmt.Errorf("open worker raw socket: %w", err)
+	}
+
+	workerHandler := *handler
+	workerHandler.TcpConn4 = conn
+	s, err := newSYNSender(&workerHandler)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	s.ownedConn = conn
+	go drainWorkerRawConn(conn)
+	return s, nil
+}
+
+func drainWorkerRawConn(conn *net.IPConn) {
+	var buf [4096]byte
+	for {
+		if _, _, err := conn.ReadFrom(buf[:]); err != nil {
+			return
+		}
+	}
+}
+
 // ipChecksumSum returns the two 16-bit words of an IPv4 address added together,
 // i.e. its contribution to a TCP pseudo-header checksum (not yet folded).
 func ipChecksumSum(ip4 net.IP) uint32 {
@@ -198,6 +240,12 @@ func (s *SYNSender) flush() error {
 		return s.batch.Flush()
 	}
 	return nil
+}
+
+func (s *SYNSender) close() {
+	if s != nil && s.ownedConn != nil {
+		_ = s.ownedConn.Close()
+	}
 }
 
 // parseIPv4Fast parses an IPv4 dotted-decimal string directly into a

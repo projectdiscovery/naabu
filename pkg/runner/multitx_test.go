@@ -43,6 +43,34 @@ func TestForEachWorkerIndexEarlyStop(t *testing.T) {
 	require.Equal(t, 5, count, "returning false must stop the walk")
 }
 
+func TestRateForWorkerPreservesGlobalRate(t *testing.T) {
+	for _, tc := range []struct {
+		rate, workers int
+	}{
+		{1, 1},
+		{10, 3},
+		{10001, 4},
+	} {
+		total := 0
+		for worker := 0; worker < tc.workers; worker++ {
+			workerRate := rateForWorker(tc.rate, tc.workers, worker)
+			require.GreaterOrEqual(t, workerRate, 1)
+			total += workerRate
+		}
+		require.Equal(t, tc.rate, total)
+	}
+	require.Zero(t, rateForWorker(0, 4, 0), "unlimited rate must remain unlimited")
+}
+
+func TestEffectiveTxWorkers(t *testing.T) {
+	require.Equal(t, 1, effectiveTxWorkers(0, 100, 10000, true))
+	require.Equal(t, 2, effectiveTxWorkers(8, 2, 10000, true), "rate must cap workers")
+	require.Equal(t, 1, effectiveTxWorkers(8, 10000, synBatchSize, true), "one batch needs one worker")
+	require.Equal(t, 2, effectiveTxWorkers(8, 10000, synBatchSize+1, true))
+	require.Equal(t, 3, effectiveTxWorkers(8, 10000, 3, false), "non-batched workers are capped by probes")
+	require.Equal(t, 8, effectiveTxWorkers(8, 10000, 0, true), "empty range preserves validated configuration")
+}
+
 // TestTxWorkersShardComposition confirms multi-worker striping composes with
 // distributed sharding: union of (worker stripe ∩ shard) equals the shard slice,
 // disjointly.
