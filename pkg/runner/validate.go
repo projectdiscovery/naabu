@@ -194,6 +194,11 @@ func (options *Options) ValidateOptions() error {
 
 // configureOutput configures the output on the screen
 func (options *Options) configureOutput() {
+	// gologger enables levels with `level <= maxLevel` and orders
+	// Fatal < Silent < Error < Info < Warning < Debug < Verbose.
+	// Its package default max is Info, which silently drops Warning().
+	// Raise the baseline so Warning is visible unless -silent.
+	gologger.DefaultLogger.SetMaxLevel(levels.LevelWarning)
 	if options.Verbose {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
 	}
