@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: projectdiscovery/actions/setup/go@v1
-      - uses: projectdiscovery/actions/golangci-lint@v1
+      - uses: projectdiscovery/actions/golangci-lint/v2@v1
 
   tests:
     name: "Tests"
