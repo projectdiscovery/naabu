@@ -208,7 +208,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 			break
 		}
 		if options.ScanType == TypeSyn {
-			gologger.Info().Msgf("syn scan is not possible, falling back to connect scan")
+			gologger.Info().Msgf("syn scan is not possible (%s), falling back to connect scan", acquireErr)
 			options.ScanType = TypeConnect
 			continue
 		}

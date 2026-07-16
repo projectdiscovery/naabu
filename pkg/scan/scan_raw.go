@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -65,6 +66,8 @@ func init() {
 	for i := 0; i < NumberOfHandlers; i++ {
 		listenHandler, err := buildListenHandler()
 		if err != nil {
+			gologger.Debug().Msgf("could not build listen handler: %s", err)
+			ListenHandlers = nil
 			return
 		}
 
@@ -76,6 +79,12 @@ func init() {
 	}
 	if err := SetupHandlers(); err != nil {
 		gologger.Error().Msgf("could not setup handlers: %s\n", err)
+		ListenHandlers = nil
+		return
+	}
+	if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
+		gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
+		ListenHandlers = nil
 		return
 	}
 	go TransportReadWorker()
@@ -106,7 +115,13 @@ func buildListenHandler() (*ListenHandler, error) {
 	var err error
 	listenHandler.TcpConn4, err = net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.ParseIP("0.0.0.0")})
 	if err != nil {
-		return nil, fmt.Errorf("could not setup ip4:tcp: %s", err)
+		// Windows forbids bind() on raw IPPROTO_TCP sockets. SYN scans there
+		// use Npcap for both inject and capture instead of ListenIP.
+		if runtime.GOOS == "windows" {
+			gologger.Debug().Msgf("ip4:tcp raw socket unavailable (%s); using npcap for SYN transmit", err)
+		} else {
+			return nil, fmt.Errorf("could not setup ip4:tcp: %s", err)
+		}
 	}
 	listenHandler.UdpConn4, err = net.ListenIP("ip4:udp", &net.IPAddr{IP: net.ParseIP("0.0.0.0")})
 	if err != nil {
@@ -119,9 +134,13 @@ func buildListenHandler() (*ListenHandler, error) {
 
 	go listenHandler.ICMPReadWorker4()
 	go listenHandler.ICMPReadWorker6()
-	go listenHandler.TcpReadWorker4()
+	if listenHandler.TcpConn4 != nil {
+		go listenHandler.TcpReadWorker4()
+	}
 	go listenHandler.TcpReadWorker6()
-	go listenHandler.UdpReadWorker4()
+	if listenHandler.UdpConn4 != nil {
+		go listenHandler.UdpReadWorker4()
+	}
 	go listenHandler.UdpReadWorker6()
 	return listenHandler, nil
 }
@@ -188,6 +207,8 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	}
 
 	hasSourceIp := listenHandler.SourceIp4 != nil
+	// Windows cannot open raw IPPROTO_TCP sockets; always send via Npcap L2.
+	usePcap := listenHandler.TcpConn4 == nil || (hasSourceIp && listenHandler.SourceHW != nil)
 	var iface *net.Interface
 	if hasSourceIp && listenHandler.SourceHW != nil {
 		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
@@ -197,7 +218,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return
 		}
-		gatewayMac, err := routing.GetGatewayMac(gateway.String())
+		dstMAC, err := linkDestinationMAC(gateway, ip4.DstIP)
 		if err != nil {
 			gologger.Debug().Msgf("could not find gateway MAC %s:%d: %s\n", ip, p.Port, err)
 			return
@@ -206,9 +227,47 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		eth = layers.Ethernet{
 			EthernetType: layers.EthernetTypeIPv4,
 			SrcMAC:       listenHandler.SourceHW,
-			DstMAC:       gatewayMac,
+			DstMAC:       dstMAC,
 		}
 		ip4.SrcIP = listenHandler.SourceIp4
+		iface = itf
+	} else if usePcap {
+		var itf *net.Interface
+		var gateway, sourceIP net.IP
+		var err error
+		if hasSourceIp {
+			// Keep the caller-configured source IP; only resolve iface/gateway.
+			itf, gateway, _, err = PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
+			sourceIP = listenHandler.SourceIp4
+		} else {
+			itf, gateway, sourceIP, err = PkgRouter.Route(ip4.DstIP)
+		}
+		if err != nil {
+			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
+			return
+		} else if sourceIP == nil || itf == nil {
+			gologger.Debug().Msgf("could not find correct source ipv4 for %s:%d\n", ip, p.Port)
+			return
+		}
+		srcHW := listenHandler.SourceHW
+		if len(srcHW) == 0 {
+			srcHW = itf.HardwareAddr
+		}
+		if len(srcHW) == 0 {
+			gologger.Debug().Msgf("could not find source MAC for %s:%d\n", ip, p.Port)
+			return
+		}
+		dstMAC, err := linkDestinationMAC(gateway, ip4.DstIP)
+		if err != nil {
+			gologger.Debug().Msgf("could not find gateway MAC %s:%d: %s\n", ip, p.Port, err)
+			return
+		}
+		eth = layers.Ethernet{
+			EthernetType: layers.EthernetTypeIPv4,
+			SrcMAC:       srcHW,
+			DstMAC:       dstMAC,
+		}
+		ip4.SrcIP = sourceIP
 		iface = itf
 	} else {
 		if hasSourceIp {
@@ -254,7 +313,7 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	}
 
-	if hasSourceIp && listenHandler.SourceHW != nil && iface != nil {
+	if usePcap && iface != nil && len(eth.DstMAC) > 0 {
 		err = sendWithHandler(ip, iface, &eth, &ip4, &tcp)
 	} else {
 		if listenHandler.TcpConn4 == nil {
@@ -268,6 +327,19 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 	if err != nil {
 		gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 	}
+}
+
+// linkDestinationMAC resolves the next-hop Ethernet address: the gateway when
+// routed, otherwise the on-link destination itself.
+func linkDestinationMAC(gateway, dst net.IP) (net.HardwareAddr, error) {
+	target := gateway
+	if target == nil || target.IsUnspecified() {
+		target = dst
+	}
+	if target == nil {
+		return nil, errors.New("no link destination")
+	}
+	return routing.GetGatewayMac(target.String())
 }
 
 func sendAsyncUDP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFlag PkgFlag) {
@@ -541,6 +613,9 @@ func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.Serializ
 }
 
 func (l *ListenHandler) TcpReadWorker4() {
+	if l.TcpConn4 == nil {
+		return
+	}
 	data := make([]byte, 4096)
 	for {
 		_, _, _ = l.TcpConn4.ReadFrom(data)
@@ -558,6 +633,9 @@ func (l *ListenHandler) TcpReadWorker6() {
 }
 
 func (l *ListenHandler) UdpReadWorker4() {
+	if l.UdpConn4 == nil {
+		return
+	}
 	data := make([]byte, 4096)
 	for {
 		_, _, _ = l.UdpConn4.ReadFrom(data)
@@ -575,8 +653,14 @@ func (l *ListenHandler) UdpReadWorker6() {
 
 // SetupHandlerUnix on unix OS
 func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Protocol) error {
+	iface, err := net.InterfaceByName(interfaceName)
+	if err != nil {
+		return err
+	}
+	pcapName := pcapDeviceForInterface(iface)
+
 	for _, proto := range protocols {
-		inactive, err := pcap.NewInactiveHandle(interfaceName)
+		inactive, err := pcap.NewInactiveHandle(pcapName)
 		if err != nil {
 			return err
 		}
@@ -617,10 +701,6 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		if err != nil {
 			return err
 		}
-		iface, err := net.InterfaceByName(interfaceName)
-		if err != nil {
-			return err
-		}
 		switch proto {
 		case protocol.TCP, protocol.UDP:
 			if iface.Flags&net.FlagLoopback == net.FlagLoopback {
@@ -628,6 +708,9 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 			} else {
 				handlers.TransportActive = append(handlers.TransportActive, handle)
 			}
+			// Always key by the net.Interface name so send paths that resolve
+			// routes against net.Interfaces can find the handle, even when the
+			// underlying pcap device name differs (Windows Npcap).
 			handlers.InterfaceHandle[iface.Name] = handle
 		case protocol.ARP:
 			handlers.EthernetActive = append(handlers.EthernetActive, handle)
