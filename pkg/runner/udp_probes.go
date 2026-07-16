@@ -17,7 +17,7 @@ func (r *Runner) loadProbeDB(path string) (*fingerprint.ProbeDB, error) {
 	if err != nil {
 		return nil, err
 	}
-	gologger.Info().Msgf("Loaded %d probes from %s", len(db.Probes), path)
+	gologger.Debug().Msgf("Loaded %d probes from %s", len(db.Probes), path)
 	r.probeDB = db
 	return db, nil
 }
@@ -59,13 +59,13 @@ func (r *Runner) initUDPProbes() {
 		probeFile = fingerprint.LocateNmapProbes()
 	}
 	if probeFile == "" {
-		gologger.Info().Label("WRN").Msgf("could not find nmap-service-probes, -uP has nothing to send. Install nmap or specify the path with --sV-probes")
+		gologger.Warning().Msgf("could not find nmap-service-probes, -uP has nothing to send. Install nmap or specify the path with --sV-probes")
 		r.options.UDPProbes = false
 		return
 	}
 	db, err := r.loadProbeDB(probeFile)
 	if err != nil {
-		gologger.Info().Label("WRN").Msgf("could not load service probes from %s for -uP: %s", probeFile, err)
+		gologger.Warning().Msgf("could not load service probes from %s for -uP: %s", probeFile, err)
 		r.options.UDPProbes = false
 		return
 	}
