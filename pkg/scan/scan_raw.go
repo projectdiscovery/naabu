@@ -232,7 +232,16 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		ip4.SrcIP = listenHandler.SourceIp4
 		iface = itf
 	} else if usePcap {
-		itf, gateway, sourceIP, err := PkgRouter.Route(ip4.DstIP)
+		var itf *net.Interface
+		var gateway, sourceIP net.IP
+		var err error
+		if hasSourceIp {
+			// Keep the caller-configured source IP; only resolve iface/gateway.
+			itf, gateway, _, err = PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
+			sourceIP = listenHandler.SourceIp4
+		} else {
+			itf, gateway, sourceIP, err = PkgRouter.Route(ip4.DstIP)
+		}
 		if err != nil {
 			gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
 			return

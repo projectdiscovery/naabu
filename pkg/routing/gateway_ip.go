@@ -41,8 +41,11 @@ func GetGatewayMac(gateway string) (net.HardwareAddr, error) {
 	if parseErr != nil {
 		// Some Windows builds ignore the IP filter; fall back to the full table.
 		if runtime.GOOS == "windows" {
-			cmd = exec.CommandContext(ctx, "arp", "-a")
-			if fullOut, fullErr := cmd.CombinedOutput(); fullErr == nil {
+			fbCtx, fbCancel := context.WithTimeout(context.Background(), 3*time.Second)
+			cmd = exec.CommandContext(fbCtx, "arp", "-a")
+			fullOut, fullErr := cmd.CombinedOutput()
+			fbCancel()
+			if fullErr == nil {
 				mac, parseErr = parseARPHardwareAddr(gateway, string(fullOut))
 			}
 		}
@@ -68,18 +71,22 @@ func parseARPHardwareAddr(ip, output string) (net.HardwareAddr, error) {
 		if line == "" {
 			continue
 		}
+		fields := strings.Fields(line)
 		if target != nil {
-			// Skip lines that clearly belong to another host when the IP is present.
-			hasIP := strings.Contains(line, ip)
-			// Windows may print IPv4 without aligning exactly; also accept compacted forms.
-			if !hasIP && target.To4() != nil {
-				hasIP = strings.Contains(line, target.String())
+			// Match the IP as a whole field so 192.168.1.1 does not hit 192.168.1.10.
+			hasIP := false
+			for _, f := range fields {
+				f = strings.Trim(f, "[](),")
+				if f == ip || (target.To4() != nil && f == target.String()) {
+					hasIP = true
+					break
+				}
 			}
 			if !hasIP {
 				continue
 			}
 		}
-		for _, part := range strings.Fields(line) {
+		for _, part := range fields {
 			part = strings.Trim(part, "[](),")
 			mc, err := net.ParseMAC(part)
 			if err != nil {
