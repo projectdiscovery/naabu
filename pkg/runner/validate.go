@@ -204,8 +204,14 @@ func (options *Options) expandOutputAll() {
 		return
 	}
 	if options.Output == "" {
-		options.Output = base + ".json"
-		options.JSON = true
+		// Honor an explicit -csv so -oA does not force JSON and then trip the
+		// "json and csv both specified" validation error.
+		if options.CSV {
+			options.Output = base + ".csv"
+		} else {
+			options.Output = base + ".json"
+			options.JSON = true
+		}
 	}
 	if options.XMLOutput == "" {
 		options.XMLOutput = base + ".xml"

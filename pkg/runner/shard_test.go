@@ -58,8 +58,12 @@ func TestInShardDisabled(t *testing.T) {
 
 func TestShardSeed(t *testing.T) {
 	// Explicit seed always wins.
-	o := &Options{Seed: 42, ShardTotal: 4, Shard: 1}
+	o := &Options{Seed: 42, SeedSet: true, ShardTotal: 4, Shard: 1}
 	require.EqualValues(t, 42, o.shardSeed(999))
+
+	// An explicit seed of 0 is honored rather than treated as "unset".
+	o = &Options{Seed: 0, SeedSet: true, ShardTotal: 4, Shard: 1}
+	require.EqualValues(t, 0, o.shardSeed(999))
 
 	// Sharding without explicit seed uses the fixed shared seed.
 	o = &Options{ShardTotal: 4, Shard: 1}

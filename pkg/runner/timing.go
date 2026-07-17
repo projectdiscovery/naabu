@@ -26,26 +26,36 @@ var timingTemplates = map[int]timingPreset{
 }
 
 // applyTimingTemplate applies the selected timing template, but only to knobs
-// the user left at their compile-time default - an explicitly set -rate /
-// -retries / -timeout / -warm-up-time / -c always wins over the template.
-func (options *Options) applyTimingTemplate() {
+// the user did not explicitly set - an explicitly set -rate / -retries /
+// -timeout / -warm-up-time / -c always wins over the template. setFlags holds the
+// long/short names the user actually provided on the CLI or via config, so a flag
+// set to a value that happens to equal the compile-time default is still honored.
+func (options *Options) applyTimingTemplate(setFlags map[string]struct{}) {
 	preset, ok := timingTemplates[options.TimingTemplate]
 	if !ok {
 		return
 	}
-	if options.Rate == DefaultRateSynScan {
+	set := func(names ...string) bool {
+		for _, n := range names {
+			if _, ok := setFlags[n]; ok {
+				return true
+			}
+		}
+		return false
+	}
+	if !set("rate") {
 		options.Rate = preset.rate
 	}
-	if options.Retries == DefaultRetriesSynScan {
+	if !set("retries") {
 		options.Retries = preset.retries
 	}
-	if options.Timeout == DefaultPortTimeoutSynScan {
+	if !set("timeout") {
 		options.Timeout = preset.timeout
 	}
-	if options.WarmUpTime == defaultWarmUpTime {
+	if !set("warm-up-time") {
 		options.WarmUpTime = preset.warmup
 	}
-	if options.Threads == DefaultThreadsNum {
+	if !set("c") {
 		options.Threads = preset.threads
 	}
 }

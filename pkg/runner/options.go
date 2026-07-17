@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -178,8 +179,10 @@ type Options struct {
 
 	// Seed fixes the blackrock shuffle seed for reproducible scans. It must be
 	// identical across nodes when sharding so the slices are disjoint and
-	// complete. 0 means a random per-run seed.
-	Seed int64
+	// complete. SeedSet distinguishes an explicit -seed (including 0) from an unset
+	// flag, so 0 is a usable reproducible seed rather than "random".
+	Seed    int64
+	SeedSet bool
 
 	// TxWorkers is the number of parallel transmit goroutines (each with its
 	// own raw socket, batch buffer and rate slice) used by the fast SYN sender.
@@ -423,8 +426,15 @@ func ParseOptions() *Options {
 	}
 
 	// Apply the timing template before validation so the connect-scan rate
-	// adjustments in ValidateOptions see the resolved values.
-	options.applyTimingTemplate()
+	// adjustments in ValidateOptions see the resolved values. Collect the flags the
+	// user actually set so the template only fills the ones left untouched, even
+	// when an explicit value coincides with the compile-time default.
+	setFlags := make(map[string]struct{})
+	flagSet.CommandLine.Visit(func(f *flag.Flag) { setFlags[f.Name] = struct{}{} })
+	options.applyTimingTemplate(setFlags)
+	if _, ok := setFlags["seed"]; ok {
+		options.SeedSet = true
+	}
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.

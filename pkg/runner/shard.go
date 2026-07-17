@@ -44,7 +44,7 @@ func (options *Options) inShard(pos int64) bool {
 // shardSeed returns the blackrock seed to use, preferring an explicit -seed,
 // then the fixed shard seed when sharding, then the supplied random seed.
 func (options *Options) shardSeed(randomSeed int64) int64 {
-	if options.Seed != 0 {
+	if options.SeedSet {
 		return options.Seed
 	}
 	if options.ShardTotal > 1 {
