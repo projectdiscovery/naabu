@@ -156,6 +156,13 @@ func newWorkerSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 		return nil, fmt.Errorf("open worker raw socket: %w", err)
 	}
 
+	// This socket is transmit-only, but a raw ip4:tcp socket still receives a copy
+	// of every inbound TCP packet on the host. Shrink its receive buffer to the
+	// minimum so it fills almost immediately and the kernel then drops further
+	// copies, instead of spawning a drain goroutine that wakes on every packet
+	// (which, with N workers on a busy host, duplicates the whole TCP stream N times).
+	_ = conn.SetReadBuffer(1)
+
 	workerHandler := *handler
 	workerHandler.TcpConn4 = conn
 	s, err := newSYNSender(&workerHandler)
@@ -164,17 +171,7 @@ func newWorkerSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 		return nil, err
 	}
 	s.ownedConn = conn
-	go drainWorkerRawConn(conn)
 	return s, nil
-}
-
-func drainWorkerRawConn(conn *net.IPConn) {
-	var buf [4096]byte
-	for {
-		if _, _, err := conn.ReadFrom(buf[:]); err != nil {
-			return
-		}
-	}
 }
 
 // ipChecksumSum returns the two 16-bit words of an IPv4 address added together,
@@ -377,27 +374,42 @@ func sameRouteSrc(a, b net.IP) bool {
 	return a.Equal(b)
 }
 
-// cidrRouteVaries samples a handful of addresses across a CIDR and reports
-// whether the kernel-selected source differs between them. A single-address
-// block (count <= 1) never varies. Sampling rather than scanning keeps build
-// time O(1) per CIDR while still catching the common straddle cases.
+// routeSampleCap bounds the number of route lookups cidrRouteVaries performs so
+// building the target index stays cheap even for very large CIDRs.
+const routeSampleCap = 256
+
+// cidrRouteVaries samples addresses across a CIDR and reports whether the
+// kernel-selected source differs between them. A single-address block never
+// varies. The kernel picks a source per route, and routes split on prefix
+// boundaries, so the finest granularity a source can change at (short of host
+// routes) is a connected subnet - commonly a /24. We therefore probe one address
+// per /24 up to routeSampleCap, and stride evenly for CIDRs wider than that cap.
+// This catches the realistic straddle cases (e.g. a range covering two /24s on
+// different interfaces, or one spanning 127.0.0.0/8) that a handful of fixed
+// fractional samples would miss. When it does report variation, pickIPv4 resolves
+// the source per destination so each packet checksums against its actual source.
 func cidrRouteVaries(base uint32, count int64) bool {
 	if count <= 1 {
 		return false
 	}
 	last := base + uint32(count-1)
-	samples := [...]uint32{
-		base,
-		base + uint32(count/4),
-		base + uint32(count/2),
-		base + uint32((count*3)/4),
-		last,
+
+	// Step by one /24 (256 addresses) so every /24 boundary is probed; widen the
+	// step when that would exceed the lookup cap.
+	step := int64(256)
+	if n := (count + step - 1) / step; n > routeSampleCap {
+		step = (count + routeSampleCap - 1) / routeSampleCap
 	}
-	baseSrc := routeSrc(uint32ToIPv4(samples[0]))
-	for _, s := range samples[1:] {
-		if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(s))) {
+
+	baseSrc := routeSrc(uint32ToIPv4(base))
+	for off := int64(0); off < count; off += step {
+		if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(base+uint32(off)))) {
 			return true
 		}
+	}
+	// Always include the final address; the strided walk can stop short of it.
+	if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(last))) {
+		return true
 	}
 	return false
 }
