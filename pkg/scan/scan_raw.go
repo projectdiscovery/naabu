@@ -573,7 +573,13 @@ func icmpReadWorker4() {
 	for {
 		n, addr, err := icmpConn4.ReadFrom(data)
 		if err != nil {
-			return
+			// Only a closed socket is terminal; this is the single process-global
+			// reader, so bailing on a transient error (e.g. ENOBUFS under load)
+			// would silently disable ICMP host discovery for the process lifetime.
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			continue
 		}
 
 		rm, err := icmp.ParseMessage(ProtocolICMP, data[:n])
@@ -598,7 +604,10 @@ func icmpReadWorker6() {
 	for {
 		n, addr, err := icmpConn6.ReadFrom(data)
 		if err != nil {
-			return
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
+			continue
 		}
 
 		rm, err := icmp.ParseMessage(ProtocolIPv6ICMP, data[:n])
@@ -962,7 +971,7 @@ func TransportReadWorker() {
 				}
 				select {
 				case listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}:
-				default:
+				case <-listenHandler.done:
 				}
 			case tcpPortMatches && tcp.SYN && tcp.ACK:
 				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
@@ -971,12 +980,12 @@ func TransportReadWorker() {
 				}
 				select {
 				case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
-				default:
+				case <-listenHandler.done:
 				}
 			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
 				select {
 				case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:
-				default:
+				case <-listenHandler.done:
 				}
 			}
 		}

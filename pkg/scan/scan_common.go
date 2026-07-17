@@ -57,6 +57,13 @@ type ListenHandler struct {
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult
+	// done is closed by teardown so the shared reader can deliver replies with a
+	// blocking send (no result dropped while the handler is alive) yet abandon the
+	// send the moment the handler is released, instead of stalling every handler.
+	// doneOnce is a pointer so the transmit-worker handler copy in newWorkerSYNSender
+	// does not copy a lock value.
+	done     chan struct{}
+	doneOnce *sync.Once
 	// UDPProbeProvider is the per-handler probe source used by the
 	// raw UDP send path. It is copied here from the owning Scanner so
 	// sendAsyncUDP4/6 do not need a Scanner reference; nil means "no
@@ -66,7 +73,7 @@ type ListenHandler struct {
 }
 
 func NewListenHandler() *ListenHandler {
-	return &ListenHandler{Phase: &Phase{}}
+	return &ListenHandler{Phase: &Phase{}, done: make(chan struct{}), doneOnce: &sync.Once{}}
 }
 
 func Acquire(options *Options) (*ListenHandler, error) {
@@ -109,13 +116,19 @@ func (l *ListenHandler) Release() {
 	listenHandlersMu.Unlock()
 
 	l.Busy = false
-	l.Phase = &Phase{}
+	// Phase is intentionally left as-is: handlers are built fresh per scan and
+	// discarded after Release, and the shared reader may still hold this handler
+	// in an in-flight snapshot, so reassigning Phase here would be an unsynchronized
+	// write racing that reader's Phase.Is check.
 	l.teardown()
 }
 
 // teardown closes the handler's raw sockets. Closing the conns unblocks and
 // terminates the per-handler drain goroutines started in buildListenHandler.
 func (l *ListenHandler) teardown() {
+	if l.done != nil && l.doneOnce != nil {
+		l.doneOnce.Do(func() { close(l.done) })
+	}
 	for _, c := range []*net.IPConn{l.TcpConn4, l.UdpConn4, l.TcpConn6, l.UdpConn6} {
 		if c != nil {
 			_ = c.Close()
