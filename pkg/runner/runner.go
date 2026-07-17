@@ -76,6 +76,11 @@ type Runner struct {
 	// run rather than once per onReceive call (which is per result).
 	csvHeaderOnce sync.Once
 
+	// verifyReplay is set only while handleOutput replays the post-verification
+	// result set through onReceive. In --verify mode live results are unverified,
+	// so onReceive suppresses them during the scan and emits only this replay.
+	verifyReplay atomic.Bool
+
 	// scanStartTime records when enumeration began, used for nmap-compatible
 	// XML/greppable output timestamps and elapsed time.
 	scanStartTime time.Time
@@ -298,6 +303,13 @@ func (r *Runner) recoverHostnames(ip string, ports []*port.Port, dt []string) {
 }
 
 func (r *Runner) onReceive(hostResult *result.HostResult) {
+	// In --verify mode the results streamed during the scan are unverified. Drop
+	// them here (this also covers the raw SYN path, whose TCPResultWorker calls
+	// OnReceive unconditionally) so only the verified replay reaches stdout and the
+	// unique cache, keeping stdout consistent with the file output.
+	if r.options.Verify && !r.verifyReplay.Load() {
+		return
+	}
 	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
 		return
 	}
@@ -337,7 +349,10 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 	// stays complete even when discovery outpaces the fingerprint workers. When
 	// the backlog hits its memory ceiling, push blocks here and backpressure
 	// reaches TCPResultWorker (not the SYN TX path directly).
-	if r.fpQueue != nil {
+	r.fpMu.Lock()
+	fpq := r.fpQueue
+	r.fpMu.Unlock()
+	if fpq != nil {
 		hostname := hostResult.IP
 		for _, h := range dt {
 			if h != "ip" && h != hostResult.IP {
@@ -346,7 +361,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			}
 		}
 		for _, p := range hostResult.Ports {
-			r.fpQueue.push(fingerprint.Target{
+			fpq.push(fingerprint.Target{
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
@@ -781,6 +796,13 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					// Resume relies on serial per-index bookkeeping, so it falls
 					// back to the single-worker loop below.
 					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, synSender, payload, shouldUseRawPackets)
+					// runFastTx returns early on cancellation; propagate it so we do
+					// not re-open the worker sockets for every remaining retry.
+					select {
+					case <-ctx.Done():
+						scanCancelled = true
+					default:
+					}
 				} else {
 					for index := int64(0); index < int64(Range); index++ {
 						select {
@@ -1406,15 +1428,18 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	// Forward queued targets into the engine. The bounded queue absorbs bursts
 	// from fast discovery (with backpressure at capacity); this goroutine blocks
 	// on the engine channel instead of dropping, and closes fpTargetCh once the
-	// queue is closed and drained.
+	// queue is closed and drained. It captures the queue and channel as locals so
+	// waitServiceDetection can clear the Runner fields without racing this loop.
+	q := r.fpQueue
+	ch := r.fpTargetCh
 	go func() {
 		for {
-			t, ok := r.fpQueue.pop()
+			t, ok := q.pop()
 			if !ok {
-				close(r.fpTargetCh)
+				close(ch)
 				return
 			}
-			r.fpTargetCh <- t
+			ch <- t
 		}
 	}()
 
@@ -1433,17 +1458,22 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 }
 
 func (r *Runner) waitServiceDetection(scanResults *result.Result) {
-	if r.fpQueue == nil {
+	// Swap out the queue under the lock so a concurrent onReceive either sees a
+	// live queue or nil, never a half-cleared pointer. The forwarder holds its own
+	// captured reference, so it keeps draining after this.
+	r.fpMu.Lock()
+	q := r.fpQueue
+	r.fpQueue = nil
+	r.fpMu.Unlock()
+	if q == nil {
 		return
 	}
 	// Close the queue (the forwarder drains the remaining targets and then closes
-	// fpTargetCh, which ends the engine) and nil out so the repeated call sites
-	// are idempotent within a run and a reused Runner (SDK) can start a fresh
-	// detection cycle next scan.
-	r.fpQueue.close()
-	r.fpQueue = nil
-	r.fpTargetCh = nil
+	// fpTargetCh, which ends the engine). Only clear fpTargetCh after fpDone so the
+	// forwarder has finished and a reused Runner (SDK) can start a fresh cycle.
+	q.close()
 	<-r.fpDone
+	r.fpTargetCh = nil
 
 	if scanResults != nil {
 		for hostResult := range scanResults.GetIPsPorts() {
@@ -1469,9 +1499,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	)
 
 	if r.options.Verify {
+		r.verifyReplay.Store(true)
 		for hostResult := range scanResults.GetIPsPorts() {
 			r.scanner.OnReceive(hostResult)
 		}
+		r.verifyReplay.Store(false)
 	}
 
 	// In case the user has given an output file, write all the found
@@ -1501,6 +1533,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}()
 	}
 	csvFileHeaderEnabled := true
+	// The stdout buffer and the file are written by independent CSV writers, so
+	// they each need their own "header not yet written" flag; sharing one made the
+	// file lose its header whenever the stdout buffer consumed it first.
+	csvStdoutHeaderEnabled := true
 	hostPortPrinted := make(map[string]struct{})
 
 	switch {
@@ -1582,9 +1618,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						} else if r.options.CSV {
 							writer := csv.NewWriter(&buffer)
-							if csvFileHeaderEnabled {
+							if csvStdoutHeaderEnabled {
 								writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-								csvFileHeaderEnabled = false
+								csvStdoutHeaderEnabled = false
 							}
 							writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						}
