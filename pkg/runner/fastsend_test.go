@@ -60,7 +60,7 @@ func TestWantsEthernetPath(t *testing.T) {
 	// source ip + interface MAC but not bound: must go L2 (spoof/non-owned).
 	require.True(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw}))
 	// bound source: kernel emits it, stay on the fast path.
-	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw, SourceBound: true}))
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw, SourceBound4: true}))
 	// source ip alone (no interface MAC): fast path with the bound socket.
 	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip}))
 	// interface alone: no source to force, fast path.

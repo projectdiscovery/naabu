@@ -57,7 +57,7 @@ var (
 // source. A successfully bound source is emitted by the kernel directly, so the
 // fast path stays in use.
 func wantsEthernetPath(handler *scan.ListenHandler) bool {
-	return handler.SourceIp4 != nil && handler.SourceHW != nil && !handler.SourceBound
+	return handler.SourceIp4 != nil && handler.SourceHW != nil && !handler.SourceBound4
 }
 
 func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
@@ -107,7 +107,7 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	// When the socket is bound to an explicit -source-ip the kernel emits every
 	// packet with it, so pin the checksum's source term to that address instead
 	// of the per-target route source.
-	if handler.SourceBound && handler.SourceIp4 != nil {
+	if handler.SourceBound4 && handler.SourceIp4 != nil {
 		s.pinnedSrcSum = ipChecksumSum(src4)
 	}
 
@@ -148,7 +148,7 @@ func newWorkerSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	}
 
 	bindIP := net.IPv4zero
-	if handler.SourceBound && handler.SourceIp4 != nil {
+	if handler.SourceBound4 && handler.SourceIp4 != nil {
 		bindIP = handler.SourceIp4
 	}
 	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: bindIP})

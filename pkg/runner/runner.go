@@ -451,9 +451,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	defer cancel()
 
 	r.scanStartTime = time.Now()
-	// Reset the CSV header guard so a reused Runner writes a fresh header on
-	// every enumeration instead of omitting it after the first run.
+	// Reset per-enumeration state so a reused Runner (SDK) writes a fresh CSV
+	// header and does not suppress IP:port pairs seen in a previous scan.
 	r.csvHeaderOnce = sync.Once{}
+	r.unique = gcache.New[string, struct{}](defaultUniqueCacheSize).LRU().Build()
 
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
@@ -1113,11 +1114,10 @@ func (r *Runner) PickPort(index int) *port.Port {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
-	// cap concurrent verification goroutines (and their dials) at the scan rate,
-	// matching the main scan loop. A plain WaitGroup here let the goroutine count
-	// track the number of hosts with open ports, which could spawn an unbounded
-	// number of concurrent dials on large result sets.
-	swg := sizedwaitgroup.New(r.options.Rate)
+	// Cap concurrent verification dials at the same open-file-aware limit used
+	// by the main connect scan, while still pacing with the configured rate.
+	soft := raiseOpenFileLimit()
+	swg := sizedwaitgroup.New(connectConcurrency(r.options.Rate, soft))
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 	defer limiter.Stop()
 
@@ -1327,7 +1327,7 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 	// Bind the raw transport sockets to the source so the kernel actually emits
 	// packets with it; otherwise the fast/raw send path lets the kernel choose
 	// the source by route and the flag is silently ignored. A non-owned source
-	// (e.g. spoofing) leaves SourceBound false and falls back to the L2 path.
+	// (e.g. spoofing) leaves SourceBound4/SourceBound6 false and falls back to the L2 path.
 	r.scanner.ListenHandler.BindSourceIP(r.scanner.ListenHandler.SourceIp4, r.scanner.ListenHandler.SourceIP6)
 
 	return nil
@@ -1555,6 +1555,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
 
 			buffer := bytes.Buffer{}
+			csvWriter := csv.NewWriter(&buffer)
 			for _, host := range dt {
 				buffer.Reset()
 				if host == "ip" {
@@ -1617,12 +1618,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							}
 							_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						} else if r.options.CSV {
-							writer := csv.NewWriter(&buffer)
 							if csvStdoutHeaderEnabled {
-								writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
+								writeCSVHeaders(data, csvWriter, r.options.ExcludeOutputFields)
 								csvStdoutHeaderEnabled = false
 							}
-							writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+							writeCSVRow(data, csvWriter, r.options.ExcludeOutputFields)
 						}
 					}
 				}
@@ -1631,8 +1631,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 					if r.options.JSON {
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else if r.options.CSV {
-						writer := csv.NewWriter(&buffer)
-						writer.Flush()
+						csvWriter.Flush()
 						gologger.Silent().Msgf("%s", buffer.String())
 					}
 				}

@@ -10,7 +10,7 @@ import (
 )
 
 // countingRouter records how many times Route is called and returns a fixed
-// source IP, so we can assert the /64 cache collapses per-packet lookups.
+// source IP, so we can assert the destination cache collapses per-packet lookups.
 type countingRouter struct {
 	routing.Router
 	mu    sync.Mutex
@@ -27,11 +27,11 @@ func (c *countingRouter) Route(dst net.IP) (*net.Interface, net.IP, net.IP, erro
 
 func resetSrc6Cache() {
 	src6CacheMu.Lock()
-	src6Cache = map[[8]byte]net.IP{}
+	src6Cache = map[[16]byte]net.IP{}
 	src6CacheMu.Unlock()
 }
 
-func TestSourceIP6ForCachesPerSlash64(t *testing.T) {
+func TestSourceIP6ForCachesPerDestination(t *testing.T) {
 	orig := PkgRouter
 	t.Cleanup(func() { PkgRouter = orig; resetSrc6Cache() })
 	resetSrc6Cache()
@@ -40,18 +40,15 @@ func TestSourceIP6ForCachesPerSlash64(t *testing.T) {
 	cr := &countingRouter{src: want}
 	PkgRouter = cr
 
-	// Many distinct addresses inside the same /64 must trigger exactly one
-	// routing lookup and all return the cached source.
+	dst := net.ParseIP("2001:db8::10")
 	for i := 0; i < 50; i++ {
-		dst := net.ParseIP("2001:db8::")
-		dst[15] = byte(i)
 		got := sourceIP6For(dst)
-		require.True(t, want.Equal(got), "addr %d: got %v want %v", i, got, want)
+		require.True(t, want.Equal(got), "iter %d: got %v want %v", i, got, want)
 	}
-	require.Equal(t, 1, cr.calls, "same /64 should be looked up once")
+	require.Equal(t, 1, cr.calls, "same destination should be looked up once")
 
-	// A different /64 is a separate cache entry, so one more lookup.
-	_ = sourceIP6For(net.ParseIP("2001:db8:1::1"))
+	// A different destination is a separate cache entry.
+	_ = sourceIP6For(net.ParseIP("2001:db8::11"))
 	require.Equal(t, 2, cr.calls)
 }
 

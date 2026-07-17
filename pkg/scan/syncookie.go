@@ -14,9 +14,10 @@ import (
 var synCookieKey = func() uint64 {
 	var b [8]byte
 	if _, err := rand.Read(b[:]); err != nil {
-		// Fall back to a fixed constant; validation still works for a single
-		// run, it is just predictable across runs.
-		return 0x9E3779B97F4A7C15
+		// Fail closed: a predictable fallback would defeat spoofed SYN-ACK
+		// rejection. crypto/rand failure is effectively impossible on supported
+		// platforms; abort rather than silently weaken validation.
+		panic("naabu: failed to initialize SYN cookie key: " + err.Error())
 	}
 	return binary.BigEndian.Uint64(b[:])
 }()

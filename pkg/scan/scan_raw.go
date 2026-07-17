@@ -257,9 +257,12 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	hasSourceIp := listenHandler.SourceIp4 != nil
 	// Windows cannot open raw IPPROTO_TCP sockets; always send via Npcap L2.
-	usePcap := listenHandler.TcpConn4 == nil || (hasSourceIp && listenHandler.SourceHW != nil)
+	// Bound sources stay on the raw IP socket path — SourceHW alone must not
+	// force Ethernet framing after a successful BindSourceIP.
+	usePcap := listenHandler.TcpConn4 == nil ||
+		(hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound4)
 	var iface *net.Interface
-	if hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound {
+	if hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound4 {
 		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
 		// both source IP and HW.
 		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
@@ -670,25 +673,26 @@ func sendWithConnAddr(addr *net.IPAddr, conn net.PacketConn, l ...gopacket.Seria
 }
 
 // src6CacheCap bounds the IPv6 source-route cache so a scan over many distinct
-// /64s cannot grow it without limit.
+// destinations cannot grow it without limit.
 const src6CacheCap = 1 << 16
 
 var (
 	src6CacheMu sync.RWMutex
-	src6Cache   = map[[8]byte]net.IP{}
+	src6Cache   = map[[16]byte]net.IP{}
 )
 
 // sourceIP6For returns the source IPv6 address the kernel uses to reach dst.
-// The result is cached per /64, so the per-packet send path does a cheap map
-// read instead of a routing-table lookup once the prefix is warm. Returns nil
-// when no route is found (not cached, so a transient failure can recover).
+// The result is cached per exact destination: more-specific routes / policy
+// routing can select different sources within a single /64, so prefix caching
+// would checksum against the wrong source. Returns nil when no route is found
+// (not cached, so a transient failure can recover).
 func sourceIP6For(dst net.IP) net.IP {
 	ip16 := dst.To16()
 	if ip16 == nil || PkgRouter == nil {
 		return nil
 	}
-	var key [8]byte
-	copy(key[:], ip16[:8])
+	var key [16]byte
+	copy(key[:], ip16)
 
 	src6CacheMu.RLock()
 	src, ok := src6Cache[key]
@@ -750,14 +754,10 @@ func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.Serializ
 // It is a no-op on plain (non-raw) handlers that have no transport sockets.
 func (l *ListenHandler) BindSourceIP(v4, v6 net.IP) {
 	if v4 != nil && l.TcpConn4 != nil {
-		if l.rebind4(v4) {
-			l.SourceBound = true
-		}
+		l.SourceBound4 = l.rebind4(v4)
 	}
 	if v6 != nil && l.TcpConn6 != nil {
-		if l.rebind6(v6) {
-			l.SourceBound = true
-		}
+		l.SourceBound6 = l.rebind6(v6)
 	}
 }
 
