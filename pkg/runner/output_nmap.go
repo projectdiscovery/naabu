@@ -161,8 +161,15 @@ func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end
 	}
 
 	for _, h := range hosts {
+		// A host with open ports genuinely produced a syn-ack; a host from
+		// discovery-only (no ports) has no probe-based reason, so report it the way
+		// nmap marks assumed-up hosts rather than fabricating syn-ack.
+		hostReason := "user-set"
+		if len(h.ports) > 0 {
+			hostReason = "syn-ack"
+		}
 		xh := xmlHost{
-			Status:    xmlStatus{State: "up", Reason: "syn-ack"},
+			Status:    xmlStatus{State: "up", Reason: hostReason},
 			Addresses: []xmlAddress{{Addr: h.ip, AddrType: addrType(h.ip)}},
 		}
 		if h.mac != "" {
@@ -219,7 +226,9 @@ func writeGreppable(w io.Writer, hosts []nmapHostData, start, end time.Time) err
 		return err
 	}
 	for _, h := range hosts {
-		name := h.hostname
+		// Sanitize the hostname: greppable output is line-oriented, and a PTR record
+		// carrying an embedded newline/tab would otherwise inject spurious lines.
+		name := grepSanitize(h.hostname)
 		if name == "" {
 			name = h.ip
 		}
