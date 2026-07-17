@@ -17,7 +17,7 @@ func TestWorkerSYNSenderUsesIndependentRawSocket(t *testing.T) {
 	if err != nil {
 		t.Skipf("raw sockets are unavailable: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	handler := &scan.ListenHandler{TcpConn4: conn}
 	base, err := newSYNSender(handler)
