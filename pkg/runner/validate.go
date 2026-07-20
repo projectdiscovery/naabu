@@ -59,6 +59,19 @@ func (options *Options) ValidateOptions() error {
 		return fmt.Errorf("invalid shard %d/%d (require 1 <= index <= total)", options.Shard, options.ShardTotal)
 	}
 
+	// Sharding partitions the (host, port) index space, but the smart-scan and
+	// stream paths do not consult inShard, so combining them would make every
+	// node scan the full space (duplicated work, not a partition). Reject it
+	// rather than silently mis-sharding.
+	if options.ShardTotal > 1 {
+		if options.SmartScan {
+			return fmt.Errorf("-shard is not supported with -smart-scan")
+		}
+		if options.Stream {
+			return fmt.Errorf("-shard is not supported with -stream")
+		}
+	}
+
 	if options.TxWorkers < 0 || options.TxWorkers > 256 {
 		return fmt.Errorf("invalid tx-workers %d (valid range 0-256, 0 = default)", options.TxWorkers)
 	}
