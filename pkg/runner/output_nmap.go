@@ -12,6 +12,7 @@ import (
 
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	iputil "github.com/projectdiscovery/utils/ip"
 )
@@ -181,10 +182,16 @@ func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end
 		if len(h.ports) > 0 {
 			xp := &xmlPorts{}
 			for _, p := range h.ports {
+				// nmap reports the probe that elicited the reply; a UDP open port
+				// is confirmed by a udp-response, not a syn-ack.
+				reason := "syn-ack"
+				if p.Protocol == protocol.UDP {
+					reason = "udp-response"
+				}
 				xp.Ports = append(xp.Ports, xmlPort{
 					Protocol: p.Protocol.String(),
 					PortID:   p.Port,
-					State:    xmlPortState{State: "open", Reason: "syn-ack"},
+					State:    xmlPortState{State: "open", Reason: reason},
 					Service:  newXMLService(p.Service),
 				})
 			}
