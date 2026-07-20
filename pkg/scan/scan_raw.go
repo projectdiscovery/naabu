@@ -1065,6 +1065,14 @@ func TransportReadWorker() {
 			// Interfaces without MAC (TUN/TAP)
 			parser4NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp, &udp)
 			parser6NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv6, &ip6, &tcp, &udp)
+			// A payload-bearing reply (TCP with data, or a UDP open-port response)
+			// leaves a trailing Payload layer with no decoder, which otherwise makes
+			// DecodeLayers return UnsupportedLayerType and drops the whole packet even
+			// though the transport layer decoded fine. Ignore it: the transport layer
+			// is already in the decoded slice.
+			for _, p := range []*gopacket.DecodingLayerParser{parser4Mac, parser6Mac, parser4NoMac, parser6NoMac} {
+				p.IgnoreUnsupported = true
+			}
 
 			var parsers []*gopacket.DecodingLayerParser
 			parsers = append(parsers,
