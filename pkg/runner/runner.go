@@ -750,6 +750,16 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 
 			Range := targetsCount * portsCount
+
+			// Multi-core transmit senders are opened once and reused across all
+			// retries; opening/closing every worker socket per retry was pure churn.
+			useFastTx := synSender != nil && r.options.TxWorkers > 1 && !r.options.Resume
+			var txSenders []*SYNSender
+			if useFastTx {
+				txSenders = r.buildTxSenders(synSender, int64(Range))
+				defer closeTxSenders(txSenders)
+			}
+
 			if r.options.EnableProgressBar {
 				r.stats.AddStatic("ports", portsCount)
 				r.stats.AddStatic("hosts", targetsCount)
@@ -791,12 +801,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Unlock()
 
 				b := blackrock.New(int64(Range), currentSeed)
-				if synSender != nil && r.options.TxWorkers > 1 && !r.options.Resume {
+				if useFastTx {
 					// Multi-core transmit: fan the fast SYN sends across N
 					// workers, each with its own socket, batch and rate slice.
 					// Resume relies on serial per-index bookkeeping, so it falls
 					// back to the single-worker loop below.
-					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, synSender, payload, shouldUseRawPackets)
+					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, txSenders, payload, shouldUseRawPackets)
 					// runFastTx returns early on cancellation; propagate it so we do
 					// not re-open the worker sockets for every remaining retry.
 					select {

@@ -25,21 +25,14 @@ func forEachWorkerIndex(worker, workers int, rng int64, fn func(int64) bool) {
 	}
 }
 
-// runFastTx fans the fast SYN send loop across r.options.TxWorkers goroutines,
-// each with its own raw sender, batch buffer and rate pacer, to overcome the
-// single-core transmit ceiling. The global rate is split evenly across workers.
-//
-// Note: per-index resume bookkeeping is intentionally skipped on this path - it
-// is inherently serial and meaningless once sends are fanned out; resume falls
-// back to the standard single-worker loop.
-func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int64, portsCount uint64,
-	targets []*net.IPNet, tgtIdx *targetIndex, base *SYNSender, payload string, raw bool) {
-
+// buildTxSenders creates the fan-out senders for the multi-core transmit path.
+// The first slot reuses the already-created base sender; additional workers own
+// independent raw sockets and batch buffers so both userspace batching and the
+// kernel transmit path can run concurrently. Sockets are opened once and reused
+// across retries (closeTxSenders frees the extra ones), avoiding a fresh
+// open/close of every worker socket on each retry pass.
+func (r *Runner) buildTxSenders(base *SYNSender, rng int64) []*SYNSender {
 	n := effectiveTxWorkers(r.options.TxWorkers, r.options.Rate, rng, base != nil && base.batch != nil)
-
-	// One sender per worker; the first reuses the already-created base sender.
-	// Additional senders own independent raw sockets and batch buffers so both
-	// userspace batching and the kernel transmit path can run concurrently.
 	senders := make([]*SYNSender, 1, n)
 	senders[0] = base
 	for i := 1; i < n; i++ {
@@ -50,16 +43,38 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 		}
 		senders = append(senders, s)
 	}
-	n = len(senders)
+	return senders
+}
+
+// closeTxSenders releases the extra worker sockets built by buildTxSenders. The
+// base sender (index 0) wraps the shared listen handler and is closed elsewhere.
+func closeTxSenders(senders []*SYNSender) {
+	for i := 1; i < len(senders); i++ {
+		senders[i].close()
+	}
+}
+
+// runFastTx fans the fast SYN send loop across the pre-built senders, each with
+// its own raw sender, batch buffer and rate pacer, to overcome the single-core
+// transmit ceiling. The global rate is split evenly across workers. Senders are
+// owned by the caller and reused across retries, so this does not close them.
+//
+// Note: per-index resume bookkeeping is intentionally skipped on this path - it
+// is inherently serial and meaningless once sends are fanned out; resume falls
+// back to the standard single-worker loop.
+func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int64, portsCount uint64,
+	targets []*net.IPNet, tgtIdx *targetIndex, senders []*SYNSender, payload string, raw bool) {
+
+	n := len(senders)
+	if n == 0 {
+		return
+	}
 
 	var wg sync.WaitGroup
 	for w := 0; w < n; w++ {
 		wg.Add(1)
 		go func(worker int, sender *SYNSender) {
 			defer wg.Done()
-			if worker > 0 {
-				defer sender.close()
-			}
 			pace := newPacer(rateForWorker(r.options.Rate, n, worker))
 			forEachWorkerIndex(worker, n, rng, func(index int64) bool {
 				select {
