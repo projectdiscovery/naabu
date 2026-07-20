@@ -1439,7 +1439,15 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 				close(ch)
 				return
 			}
-			ch <- t
+			// The engine stops draining ch once ctx is cancelled; select on
+			// ctx.Done() so a full channel can't block this forwarder forever
+			// (leaking the goroutine and its retained target backlog).
+			select {
+			case ch <- t:
+			case <-ctx.Done():
+				close(ch)
+				return
+			}
 		}
 	}()
 
@@ -1513,24 +1521,31 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
+		outputReady := true
 		if !fileutil.FolderExists(outputFolder) {
 			mkdirErr := os.MkdirAll(outputFolder, 0700)
 			if mkdirErr != nil {
 				gologger.Error().Msgf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
-				return
+				outputReady = false
 			}
 		}
 
-		file, err = os.Create(output)
-		if err != nil {
-			gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
-			return
-		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+		// A failure to create the primary output file must not abort the whole
+		// function: under -oA the XML/greppable writers below can still succeed,
+		// so leave file nil and fall through instead of returning.
+		if outputReady {
+			file, err = os.Create(output)
+			if err != nil {
+				gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
+				file = nil
+			} else {
+				defer func() {
+					if err := file.Close(); err != nil {
+						gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+					}
+				}()
 			}
-		}()
+		}
 	}
 	csvFileHeaderEnabled := true
 	// The stdout buffer and the file are written by independent CSV writers, so
@@ -1642,6 +1657,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						// Flip immediately after the first CSV write: multiple
+						// hostnames for one IP would otherwise each re-emit the header.
+						csvFileHeaderEnabled = false
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
