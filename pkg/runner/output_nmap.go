@@ -1,12 +1,14 @@
 package runner
 
 import (
+	"bytes"
 	"encoding/xml"
 	"fmt"
 	"io"
 	"net"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -283,7 +285,7 @@ func (r *Runner) collectNmapHosts(scanResults *result.Result) []nmapHostData {
 				hostname: r.primaryHostname(hostResult.IP),
 				mac:      hostResult.MacAddress,
 				macVnd:   vendorFromMAC(hostResult.MacAddress),
-				ports:    hostResult.Ports,
+				ports:    sortedPorts(hostResult.Ports),
 			})
 		}
 	case scanResults.HasIPS():
@@ -297,7 +299,39 @@ func (r *Runner) collectNmapHosts(scanResults *result.Result) []nmapHostData {
 			})
 		}
 	}
+	// The result store is map-backed, so host and port order is otherwise random
+	// per run; sort for reproducible output (and to match nmap's ordering).
+	sort.Slice(hosts, func(i, j int) bool {
+		return compareIPStrings(hosts[i].ip, hosts[j].ip) < 0
+	})
 	return hosts
+}
+
+// sortedPorts returns a copy of ports ordered by (port, protocol) so the output
+// is deterministic without mutating the shared result store.
+func sortedPorts(ports []*port.Port) []*port.Port {
+	if len(ports) == 0 {
+		return ports
+	}
+	out := make([]*port.Port, len(ports))
+	copy(out, ports)
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Port != out[j].Port {
+			return out[i].Port < out[j].Port
+		}
+		return out[i].Protocol.String() < out[j].Protocol.String()
+	})
+	return out
+}
+
+// compareIPStrings orders two IP strings numerically (by parsed bytes) so 9 < 10
+// and IPv4 sorts before IPv6; unparseable values fall back to lexical order.
+func compareIPStrings(a, b string) int {
+	ia, ib := net.ParseIP(a), net.ParseIP(b)
+	if ia == nil || ib == nil {
+		return strings.Compare(a, b)
+	}
+	return bytes.Compare(ia.To16(), ib.To16())
 }
 
 // primaryHostname returns the first non-IP hostname recorded for an IP, or "".
