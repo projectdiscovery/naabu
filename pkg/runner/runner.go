@@ -800,22 +800,48 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Seed = currentSeed
 				r.options.ResumeCfg.Unlock()
 
-				b := blackrock.New(int64(Range), currentSeed)
-				if useFastTx {
-					// Multi-core transmit: fan the fast SYN sends across N
-					// workers, each with its own socket, batch and rate slice.
-					// Resume relies on serial per-index bookkeeping, so it falls
-					// back to the single-worker loop below.
-					r.runFastTx(ctx, b, int64(Range), portsCount, targets, tgtIdx, txSenders, payload, shouldUseRawPackets)
-					// runFastTx returns early on cancellation; propagate it so we do
-					// not re-open the worker sockets for every remaining retry.
-					select {
-					case <-ctx.Done():
-						scanCancelled = true
-					default:
+				// Scan in priority tiers, permuting within each tier rather than
+				// across the whole range, so the most likely open ports stay early
+				// regardless of how wide the range is. A single-tier plan reproduces
+				// the previous uniform ordering exactly. See porttiers.go.
+				tiers := buildPortTiers(r.scanner.Ports, !r.options.NoPortPriority)
+				if tiers.totalTiers() > 1 {
+					gologger.Debug().Msgf("Scanning in %d priority tiers\n", tiers.totalTiers())
+				}
+
+				// indexBase keeps the index space contiguous across tiers, so shard
+				// slicing and resume bookkeeping stay monotonic and disjoint.
+				var indexBase int64
+				for _, tierPortIdx := range tiers {
+					if scanCancelled {
+						break
 					}
-				} else {
-					for index := int64(0); index < int64(Range); index++ {
+					tierPortsCount := int64(len(tierPortIdx))
+					if tierPortsCount == 0 {
+						continue
+					}
+					tierRange := int64(targetsCount) * tierPortsCount
+					b := blackrock.New(tierRange, currentSeed)
+
+					if useFastTx {
+						// Multi-core transmit: fan the fast SYN sends across N
+						// workers, each with its own socket, batch and rate slice.
+						// Resume relies on serial per-index bookkeeping, so it falls
+						// back to the single-worker loop below.
+						r.runFastTx(ctx, b, tierRange, indexBase, tierPortIdx, targets, tgtIdx, txSenders, payload, shouldUseRawPackets)
+						// runFastTx returns early on cancellation; propagate it so we do
+						// not re-open the worker sockets for every remaining retry.
+						select {
+						case <-ctx.Done():
+							scanCancelled = true
+						default:
+						}
+						indexBase += tierRange
+						continue
+					}
+
+					for local := int64(0); local < tierRange; local++ {
+						index := indexBase + local
 						select {
 						case <-ctx.Done():
 							scanCancelled = true
@@ -829,9 +855,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 						if !r.options.inShard(index) {
 							continue
 						}
-						xxx := b.Shuffle(index)
-						ipIndex := xxx / int64(portsCount)
-						portIndex := int(xxx % int64(portsCount))
+						xxx := b.Shuffle(local)
+						ipIndex := xxx / tierPortsCount
+						portIndex := tierPortIdx[int(xxx%tierPortsCount)]
 
 						// fast IPv4 generation (uint32 math) when the fast sender is
 						// active; otherwise fall back to the big.Int-based PickIP.
@@ -903,6 +929,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 							r.stats.IncrementCounter("packets", 1)
 						}
 					}
+					indexBase += tierRange
 				}
 
 				// handle the ip:port combination

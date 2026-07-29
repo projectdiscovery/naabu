@@ -62,7 +62,10 @@ func closeTxSenders(senders []*SYNSender) {
 // Note: per-index resume bookkeeping is intentionally skipped on this path - it
 // is inherently serial and meaningless once sends are fanned out; resume falls
 // back to the standard single-worker loop.
-func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int64, portsCount uint64,
+// tierPortIdx maps a within-tier port position to an index into scanner.Ports;
+// indexBase offsets this tier's local indices into the global index space so
+// shard slicing stays disjoint across tiers. See porttiers.go.
+func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng, indexBase int64, tierPortIdx []int,
 	targets []*net.IPNet, tgtIdx *targetIndex, senders []*SYNSender, payload string, raw bool) {
 
 	n := len(senders)
@@ -82,7 +85,7 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng int6
 					return false
 				default:
 				}
-				r.fastScanIndex(ctx, b, index, portsCount, targets, tgtIdx, sender, pace, payload, raw)
+				r.fastScanIndex(ctx, b, index, indexBase, tierPortIdx, targets, tgtIdx, sender, pace, payload, raw)
 				return true
 			})
 			if err := sender.flush(); err != nil {
@@ -136,17 +139,22 @@ func effectiveTxWorkers(requested, rate int, rng int64, batched bool) int {
 // fastScanIndex processes a single Blackrock index on the fast SYN path. It is
 // safe for concurrent use: the result store is mutex-protected, Blackrock.Shuffle
 // is pure, and each caller supplies its own sender and pacer.
-func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, index int64, portsCount uint64,
+func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, index, indexBase int64, tierPortIdx []int,
 	targets []*net.IPNet, tgtIdx *targetIndex, sender *SYNSender, pace *pacer, payload string, raw bool) {
 
-	// Distributed sharding: only handle this node's slice.
-	if !r.options.inShard(index) {
+	// Distributed sharding: only handle this node's slice. Shard membership is
+	// decided on the global index so slices stay disjoint across tiers.
+	if !r.options.inShard(indexBase + index) {
 		return
 	}
 
+	tierPortsCount := int64(len(tierPortIdx))
+	if tierPortsCount == 0 {
+		return
+	}
 	xxx := b.Shuffle(index)
-	ipIndex := xxx / int64(portsCount)
-	portIndex := int(xxx % int64(portsCount))
+	ipIndex := xxx / tierPortsCount
+	portIndex := tierPortIdx[int(xxx%tierPortsCount)]
 
 	var (
 		dstIP4 [4]byte

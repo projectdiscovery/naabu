@@ -162,6 +162,15 @@ type Options struct {
 	// SmartScan enables predictive port scanning: after the initial scan,
 	// a correlation model predicts additional likely-open ports per host.
 	SmartScan bool
+	// NoPortPriority disables tiered scan ordering, restoring a single uniform
+	// Blackrock permutation over the whole (host, port) space.
+	//
+	// Tiered ordering scans the nmap top-100, then the rest of the top-1000,
+	// then everything else, randomising within each tier. That keeps the most
+	// likely open ports early regardless of how wide the range is, which a single
+	// uniform permutation cannot do. Disable it to get a completely uniform probe
+	// distribution across the range.
+	NoPortPriority bool
 	// PredictionThreshold is the minimum confidence percentage (0–100) to
 	// act on a port prediction (default 20, meaning 20%).
 	PredictionThreshold int
@@ -302,6 +311,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model (not compatible with stream mode)"),
 		flagSet.IntVarP(&options.PredictionThreshold, "prediction-threshold", "pt", 20, "minimum confidence for port predictions (0-100%)"),
+		flagSet.BoolVarP(&options.NoPortPriority, "no-port-priority", "npp", false, "disable tiered port ordering (scan the whole range in one uniform random order)"),
 		flagSet.StringVar(&shardArg, "shard", "", "distributed scan slice as index/total, 1-based (e.g. 1/4)"),
 		flagSet.IntVar(&seedArg, "seed", 0, "seed for scan randomization, must match across shards (default random)"),
 	)
