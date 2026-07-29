@@ -19,13 +19,31 @@ import (
 //
 // NOT safe for concurrent use, reuses internal buffers.
 type SYNSender struct {
-	sender  *rawsend.Sender
-	batch   *rawsend.Batch
-	srcPort uint16
-	baseSum uint32
-	seq     uint32
-	pkt     [24]byte
+	sender    *rawsend.Sender
+	batch     *rawsend.Batch
+	ownedConn *net.IPConn
+	srcPort   uint16
+	baseSum   uint32
+	// defaultSrcSum is the checksum contribution of the default-route source
+	// IP, used as a fallback when a destination has no resolvable per-route
+	// source (see send).
+	defaultSrcSum uint32
+	// pinnedSrcSum, when non-zero, overrides the per-target source checksum
+	// term: the socket is bound to a fixed -source-ip, so every packet is
+	// emitted with that source and must checksum against it.
+	pinnedSrcSum uint32
+	pkt          [24]byte
 }
+
+const (
+	// synPacketLen is the fixed size of the SYN template (20 byte TCP header +
+	// 4 byte MSS option).
+	synPacketLen = 24
+	// synBatchSize is the number of packets accumulated before a sendmmsg call.
+	// Capped at the kernel's UIO_MAXIOV (1024); partial sends are retried by
+	// rawsend.Batch.Flush.
+	synBatchSize = 1024
+)
 
 var (
 	errNoRawConn    = errors.New("no raw IPv4 connection")
@@ -33,11 +51,24 @@ var (
 	errNoSourceIP   = errors.New("cannot determine source IP")
 )
 
+// wantsEthernetPath reports whether a scan must use the L2 (ethernet) send path
+// instead of the fast sender: only when a source IP is pinned (with an interface
+// MAC) but the raw socket could not be bound to it, i.e. a spoofed/non-owned
+// source. A successfully bound source is emitted by the kernel directly, so the
+// fast path stays in use.
+func wantsEthernetPath(handler *scan.ListenHandler) bool {
+	return handler.SourceIp4 != nil && handler.SourceHW != nil && !handler.SourceBound4
+}
+
 func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	if handler == nil || handler.TcpConn4 == nil {
 		return nil, errNoRawConn
 	}
-	if handler.SourceIp4 != nil && handler.SourceHW != nil {
+	// Hand off to the L2 (ethernet) path only when a source IP is pinned but the
+	// socket could not be bound to it (e.g. spoofed/non-owned source). When the
+	// bind succeeded the kernel already emits the chosen source, so the fast
+	// path is both correct and preferred over the fragile L2 path.
+	if wantsEthernetPath(handler) {
 		return nil, errEthernetPath
 	}
 
@@ -65,9 +96,19 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	}
 
 	s := &SYNSender{
-		sender:  sender,
-		batch:   rawsend.NewBatch(sender.FD(), 32, 24),
-		srcPort: uint16(handler.Port),
+		sender: sender,
+		// Batch up to UIO_MAXIOV (1024) packets per sendmmsg call. At high
+		// packet rates this is the dominant syscall-amortisation lever: a 32
+		// packet batch issued ~32x more sendmmsg calls for the same throughput.
+		batch:         rawsend.NewBatch(sender.FD(), synBatchSize, synPacketLen),
+		srcPort:       uint16(handler.Port),
+		defaultSrcSum: ipChecksumSum(src4),
+	}
+	// When the socket is bound to an explicit -source-ip the kernel emits every
+	// packet with it, so pin the checksum's source term to that address instead
+	// of the per-target route source.
+	if handler.SourceBound4 && handler.SourceIp4 != nil {
+		s.pinnedSrcSum = ipChecksumSum(src4)
 	}
 
 	binary.BigEndian.PutUint16(s.pkt[0:2], s.srcPort)
@@ -78,9 +119,11 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	s.pkt[21] = 4 // MSS option length
 	binary.BigEndian.PutUint16(s.pkt[22:24], 1460)
 
+	// The source IP is intentionally NOT folded into baseSum here: the kernel
+	// picks the source address per destination route (e.g. 127.0.0.1 for a
+	// loopback target, a different NIC for another subnet), so the pseudo-header
+	// source term is added per packet in send() from the destination's route.
 	var sum uint32
-	sum += uint32(binary.BigEndian.Uint16(src4[0:2]))
-	sum += uint32(binary.BigEndian.Uint16(src4[2:4]))
 	sum += 6  // zero + protocol (TCP)
 	sum += 24 // TCP segment length
 	sum += uint32(s.srcPort)
@@ -93,22 +136,67 @@ func newSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
 	return s, nil
 }
 
-func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
-	s.seq++
-	seq := s.seq
+// newWorkerSYNSender gives a transmit worker its own raw socket. Reusing the
+// handler socket would leave all workers contending on one kernel socket lock,
+// which serializes sendmmsg and defeats multi-core transmit at high rates.
+func newWorkerSYNSender(handler *scan.ListenHandler) (*SYNSender, error) {
+	if handler == nil {
+		return nil, errNoRawConn
+	}
+	if wantsEthernetPath(handler) {
+		return nil, errEthernetPath
+	}
+
+	bindIP := net.IPv4zero
+	if handler.SourceBound4 && handler.SourceIp4 != nil {
+		bindIP = handler.SourceIp4
+	}
+	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: bindIP})
+	if err != nil {
+		return nil, fmt.Errorf("open worker raw socket: %w", err)
+	}
+
+	// This socket is transmit-only, but a raw ip4:tcp socket still receives a copy
+	// of every inbound TCP packet on the host. Shrink its receive buffer to the
+	// minimum so it fills almost immediately and the kernel then drops further
+	// copies, instead of spawning a drain goroutine that wakes on every packet
+	// (which, with N workers on a busy host, duplicates the whole TCP stream N times).
+	_ = conn.SetReadBuffer(1)
+
+	workerHandler := *handler
+	workerHandler.TcpConn4 = conn
+	s, err := newSYNSender(&workerHandler)
+	if err != nil {
+		_ = conn.Close()
+		return nil, err
+	}
+	s.ownedConn = conn
+	return s, nil
+}
+
+// ipChecksumSum returns the two 16-bit words of an IPv4 address added together,
+// i.e. its contribution to a TCP pseudo-header checksum (not yet folded).
+func ipChecksumSum(ip4 net.IP) uint32 {
+	if len(ip4) != 4 {
+		return 0
+	}
+	return uint32(binary.BigEndian.Uint16(ip4[0:2])) + uint32(binary.BigEndian.Uint16(ip4[2:4]))
+}
+
+// send transmits a SYN to dstIP:dstPort. srcSum is the pseudo-header checksum
+// contribution of the source IP the kernel will use for this destination (as
+// returned by targetIndex.pickIPv4); a zero srcSum falls back to the default
+// route source so the checksum still matches a single-homed setup.
+func (s *SYNSender) send(dstIP [4]byte, srcSum uint32, dstPort uint16) error {
+	srcSum = s.effectiveSrcSum(srcSum)
+	// Encode a SYN cookie into the sequence number so the receive path can
+	// verify the returning SYN-ACK (Ack == seq+1) is genuinely ours.
+	seq := scan.SynCookie4(dstIP, dstPort, s.srcPort)
 
 	binary.BigEndian.PutUint16(s.pkt[2:4], dstPort)
 	binary.BigEndian.PutUint32(s.pkt[4:8], seq)
 
-	sum := s.baseSum +
-		uint32(binary.BigEndian.Uint16(dstIP[0:2])) +
-		uint32(binary.BigEndian.Uint16(dstIP[2:4])) +
-		uint32(dstPort) +
-		uint32(seq>>16) +
-		uint32(seq&0xffff)
-	sum = (sum >> 16) + (sum & 0xffff)
-	sum += sum >> 16
-	binary.BigEndian.PutUint16(s.pkt[16:18], ^uint16(sum))
+	binary.BigEndian.PutUint16(s.pkt[16:18], synTCPChecksum(s.baseSum, srcSum, dstIP, dstPort, seq))
 
 	if s.batch != nil {
 		return s.batch.Add(s.pkt[:], dstIP)
@@ -116,11 +204,45 @@ func (s *SYNSender) send(dstIP [4]byte, dstPort uint16) error {
 	return s.sender.SendTo(s.pkt[:], dstIP)
 }
 
+// effectiveSrcSum resolves the source pseudo-header checksum term for a packet:
+// a pinned bound source wins over the per-target route source, which in turn
+// wins over the default-route fallback.
+func (s *SYNSender) effectiveSrcSum(srcSum uint32) uint32 {
+	if s.pinnedSrcSum != 0 {
+		return s.pinnedSrcSum
+	}
+	if srcSum == 0 {
+		return s.defaultSrcSum
+	}
+	return srcSum
+}
+
+// synTCPChecksum folds the precomputed constant terms (baseSum) with the
+// per-packet source pseudo-header term (srcSum), destination IP, destination
+// port and sequence number into the final TCP checksum for the SYN template.
+func synTCPChecksum(baseSum, srcSum uint32, dstIP [4]byte, dstPort uint16, seq uint32) uint16 {
+	sum := baseSum + srcSum +
+		uint32(binary.BigEndian.Uint16(dstIP[0:2])) +
+		uint32(binary.BigEndian.Uint16(dstIP[2:4])) +
+		uint32(dstPort) +
+		uint32(seq>>16) +
+		uint32(seq&0xffff)
+	sum = (sum >> 16) + (sum & 0xffff)
+	sum += sum >> 16
+	return ^uint16(sum)
+}
+
 func (s *SYNSender) flush() error {
 	if s.batch != nil {
 		return s.batch.Flush()
 	}
 	return nil
+}
+
+func (s *SYNSender) close() {
+	if s != nil && s.ownedConn != nil {
+		_ = s.ownedConn.Close()
+	}
 }
 
 // parseIPv4Fast parses an IPv4 dotted-decimal string directly into a
@@ -164,6 +286,17 @@ type indexEntry struct {
 	baseIPv4 uint32     // network base as uint32 (IPv4 only)
 	count    int64      // number of addresses in this CIDR
 	network  *net.IPNet // original, kept for IPv6 fallback
+	// srcSum is the pseudo-header checksum contribution of the source IP the
+	// kernel uses to reach this CIDR (resolved once at build time). Targets on
+	// different routes (loopback, other NICs) need different source IPs for a
+	// correct TCP checksum.
+	srcSum uint32
+	// routeVaries is set when a single CIDR spans destinations the kernel would
+	// emit from different sources (e.g. a broad range covering both default-route
+	// hosts and 127.0.0.0/8). The cached srcSum is then only a fallback and the
+	// source is resolved per destination in pickIPv4 so each packet checksums
+	// against the source it is actually sent with.
+	routeVaries bool
 }
 
 // targetIndex is a pre-computed lookup table that converts a linear
@@ -176,6 +309,7 @@ type targetIndex struct {
 
 func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 	idx := &targetIndex{}
+	defaultSrcSum := routeSrcSum(net.IPv4(1, 1, 1, 1))
 	for _, t := range targets {
 		count := int64(mapcidr.AddressCountIpnet(t))
 		e := indexEntry{
@@ -185,11 +319,99 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 		if ip4 := t.IP.To4(); ip4 != nil {
 			e.isV4 = true
 			e.baseIPv4 = binary.BigEndian.Uint32(ip4)
+			// Resolve the source IP for this CIDR's route so the fast sender's
+			// TCP checksum matches the source the kernel actually emits with.
+			e.srcSum = routeSrcSum(t.IP)
+			if e.srcSum == 0 {
+				e.srcSum = defaultSrcSum
+			}
+			// A broad CIDR can straddle multiple source routes; sampling a few
+			// addresses catches that cheaply so pickIPv4 can resolve the source
+			// per destination instead of mis-checksumming part of the range.
+			e.routeVaries = cidrRouteVaries(e.baseIPv4, count)
 		}
 		idx.entries = append(idx.entries, e)
 		idx.total += count
 	}
 	return idx
+}
+
+// routeSrc resolves the source IP the kernel would use to reach dst, or nil if
+// it cannot be resolved (no router or route error).
+func routeSrc(dst net.IP) net.IP {
+	if scan.PkgRouter == nil {
+		return nil
+	}
+	_, _, src, err := scan.PkgRouter.Route(dst)
+	if err != nil {
+		return nil
+	}
+	return src
+}
+
+// routeSrcSum resolves the source IP the kernel would use to reach dst and
+// returns its pseudo-header checksum contribution, or 0 if it cannot be
+// resolved (no router, route error, or IPv6 source).
+func routeSrcSum(dst net.IP) uint32 {
+	src := routeSrc(dst)
+	if src == nil {
+		return 0
+	}
+	return ipChecksumSum(src.To4())
+}
+
+// uint32ToIPv4 turns a uint32 host-order address into a net.IP.
+func uint32ToIPv4(v uint32) net.IP {
+	return net.IPv4(byte(v>>24), byte(v>>16), byte(v>>8), byte(v))
+}
+
+// sameRouteSrc reports whether two resolved route sources are equivalent,
+// treating two unresolved (nil) sources as the same (both fall back to default).
+func sameRouteSrc(a, b net.IP) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(b)
+}
+
+// routeSampleCap bounds the number of route lookups cidrRouteVaries performs so
+// building the target index stays cheap even for very large CIDRs.
+const routeSampleCap = 256
+
+// cidrRouteVaries samples addresses across a CIDR and reports whether the
+// kernel-selected source differs between them. A single-address block never
+// varies. The kernel picks a source per route, and routes split on prefix
+// boundaries, so the finest granularity a source can change at (short of host
+// routes) is a connected subnet - commonly a /24. We therefore probe one address
+// per /24 up to routeSampleCap, and stride evenly for CIDRs wider than that cap.
+// This catches the realistic straddle cases (e.g. a range covering two /24s on
+// different interfaces, or one spanning 127.0.0.0/8) that a handful of fixed
+// fractional samples would miss. When it does report variation, pickIPv4 resolves
+// the source per destination so each packet checksums against its actual source.
+func cidrRouteVaries(base uint32, count int64) bool {
+	if count <= 1 {
+		return false
+	}
+	last := base + uint32(count-1)
+
+	// Step by one /24 (256 addresses) so every /24 boundary is probed; widen the
+	// step when that would exceed the lookup cap.
+	step := int64(256)
+	if n := (count + step - 1) / step; n > routeSampleCap {
+		step = (count + routeSampleCap - 1) / routeSampleCap
+	}
+
+	baseSrc := routeSrc(uint32ToIPv4(base))
+	for off := int64(0); off < count; off += step {
+		if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(base+uint32(off)))) {
+			return true
+		}
+	}
+	// Always include the final address; the strided walk can stop short of it.
+	if !sameRouteSrc(baseSrc, routeSrc(uint32ToIPv4(last))) {
+		return true
+	}
+	return false
 }
 
 // pickIPv4 converts a global index to an IPv4 address. Returns the
@@ -201,12 +423,12 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 //
 // Cost: ~10ns + ~25ns string format = ~35ns total, zero heap allocs
 // for the [4]byte path. (The string return does one small alloc.)
-func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, isV4 bool) {
+func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, srcSum uint32, isV4 bool) {
 	for i := range t.entries {
 		e := &t.entries[i]
 		if index < e.count {
 			if !e.isV4 {
-				return ip, "", false
+				return ip, "", 0, false
 			}
 			val := e.baseIPv4 + uint32(index)
 			ip[0] = byte(val >> 24)
@@ -214,11 +436,20 @@ func (t *targetIndex) pickIPv4(index int64) (ip [4]byte, ipStr string, isV4 bool
 			ip[2] = byte(val >> 8)
 			ip[3] = byte(val)
 			ipStr = formatIPv4(ip)
-			return ip, ipStr, true
+			ss := e.srcSum
+			if e.routeVaries {
+				// This CIDR straddles multiple source routes; resolve the source
+				// for this exact destination so the checksum matches the source
+				// the kernel emits with, falling back to the cached term.
+				if perDst := routeSrcSum(uint32ToIPv4(val)); perDst != 0 {
+					ss = perDst
+				}
+			}
+			return ip, ipStr, ss, true
 		}
 		index -= e.count
 	}
-	return ip, "", false
+	return ip, "", 0, false
 }
 
 // formatIPv4 converts a [4]byte IPv4 address to its dotted-decimal

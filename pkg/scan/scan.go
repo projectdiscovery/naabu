@@ -30,10 +30,19 @@ type State int
 const (
 	maxRetries     = 10
 	sendDelayMsec  = 10
-	chanSize       = 1000  //nolint
-	packetSendSize = 2500  //nolint
-	snaplen        = 65536 //nolint
-	readtimeout    = 1500  //nolint
+	chanSize       = 1000 //nolint
+	packetSendSize = 2500 //nolint
+	// snaplen only needs to cover ethernet + IPv6 + TCP/IP options; we read
+	// transport headers, never payloads. On Linux the AF_PACKET ring sizes its
+	// frame slots from snaplen, so a small value lets the capture buffer hold
+	// far more packets and survive reply bursts from large port ranges.
+	snaplen = 256 //nolint
+	// pcapBufferSize is the kernel capture buffer per handle. The default is a
+	// few MB; a SYN scan over thousands of ports triggers a burst of RST/SYN-ACK
+	// replies, and an undersized buffer silently drops them. masscan/zmap use
+	// large buffers for the same reason.
+	pcapBufferSize = 16 * 1024 * 1024
+	readtimeout    = 1500 //nolint
 
 	// icmpWriteWorkers controls how many goroutines drain icmpPacketSend.
 	// A single worker serialises every WriteTo retry-sleep and made
@@ -104,12 +113,15 @@ type Scanner struct {
 	ScanType             string
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
-	workersWg            sync.WaitGroup
+	workersWg sync.WaitGroup
 	// cancelWorkers cancels the context that drives the result workers so that
 	// Close can release them even when the scan context has not been cancelled
 	// yet (e.g. Close called out of order or on early teardown). Without it
 	// Close blocks forever on workersWg.Wait.
 	cancelWorkers context.CancelFunc
+	// closeOnce makes Close idempotent so a second call does not panic on the
+	// already-niled ListenHandler or double-cancel.
+	closeOnce sync.Once
 	// UDPProbeProvider supplies per-port UDP payloads when the
 	// scanner runs in -uP mode. Keeping it on the Scanner (rather
 	// than as a package-global) lets independent runners coexist in
@@ -221,14 +233,16 @@ func NewScanner(options *Options) (*Scanner, error) {
 
 // Close the scanner and terminate all workers
 func (s *Scanner) Close() error {
-	if s.cancelWorkers != nil {
-		s.cancelWorkers()
-	}
-	s.workersWg.Wait()
-	if s.ListenHandler != nil {
-		s.ListenHandler.Busy = false
-		s.ListenHandler = nil
-	}
+	s.closeOnce.Do(func() {
+		if s.cancelWorkers != nil {
+			s.cancelWorkers()
+		}
+		s.workersWg.Wait()
+		if s.ListenHandler != nil {
+			s.ListenHandler.Release()
+			s.ListenHandler = nil
+		}
+	})
 
 	return nil
 }
@@ -321,13 +335,13 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
-			srcIP4WithPort := net.JoinHostPort(ip.ipv4, ip.port.String())
-			srcIP6WithPort := net.JoinHostPort(ip.ipv6, ip.port.String())
-			isIPInRange := s.IPRanger.ContainsAny(srcIP4WithPort, srcIP6WithPort, ip.ipv4, ip.ipv6)
-			if !isIPInRange {
-				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s\n", ip.ipv4, ip.ipv6)
-				continue
-			}
+			// Reply authenticity is enforced upstream by the SYN-cookie check
+			// in the raw read path: a SYN-ACK only reaches this channel if its
+			// Ack matched the cookie we encoded into the probe's sequence
+			// number. That is a stronger guarantee than a target-set membership
+			// lookup (which also accepts unrelated in-range traffic) and it
+			// avoids the per-response disk-backed Hosts lookups, so no
+			// IPRanger.ContainsAny check is needed here.
 
 			if s.OnReceive != nil {
 				singlePort := []*port.Port{ip.port}

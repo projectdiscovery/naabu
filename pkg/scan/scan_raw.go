@@ -42,8 +42,37 @@ type Handlers struct {
 }
 
 func init() {
+	// Only wire the indirection used by Acquire/Release in scan_common.go
+	// (which is not build-constrained, so it cannot reference these raw-socket
+	// symbols directly). No sockets, goroutines or pcap handles are created at
+	// import time anymore: everything is brought up lazily on the first SYN
+	// scan via ensureRawInfra.
+	buildHandlerFn = buildListenHandler
+	ensureRawInfraFn = ensureRawInfra
+}
+
+var (
+	rawInfraMu sync.Mutex
+	rawInfraOK bool
+)
+
+// ensureRawInfra lazily brings up the process-wide raw scan infrastructure
+// (icmp sockets, pcap capture, write/read workers) the first time a privileged
+// SYN scan needs it. Handlers are still created on demand per scan; the capture
+// filter is port-independent (flag based) so newly acquired handlers require no
+// filter changes and any number of scans can run in parallel.
+func ensureRawInfra() bool {
+	rawInfraMu.Lock()
+	defer rawInfraMu.Unlock()
+
+	// Guard on success rather than sync.Once so a transient setup failure (e.g. a
+	// momentarily bad interface) does not permanently disable raw scanning for
+	// the rest of a long-lived process; a later scan can retry from scratch.
+	if rawInfraOK {
+		return true
+	}
 	if PkgRouter == nil || !privileges.IsPrivileged {
-		return
+		return false
 	}
 
 	transportPacketSend = make(chan *PkgSend, packetSendSize)
@@ -53,7 +82,6 @@ func init() {
 	if err != nil {
 		gologger.Debug().Msgf("could not setup ip4:icmp: %s", err)
 	}
-
 	icmpConn6, err = icmp.ListenPacket("ip6:icmp", "::")
 	if err != nil {
 		gologger.Debug().Msgf("could not setup ip6:icmp: %s", err)
@@ -62,33 +90,51 @@ func init() {
 	icmpPacketSend = make(chan *PkgSend, packetSendSize)
 	ethernetPacketSend = make(chan *PkgSend, packetSendSize)
 
-	// pre-reserve up to 10 ports
-	for i := 0; i < NumberOfHandlers; i++ {
-		listenHandler, err := buildListenHandler()
-		if err != nil {
-			gologger.Debug().Msgf("could not build listen handler: %s", err)
-			ListenHandlers = nil
-			return
-		}
-
-		ListenHandlers = append(ListenHandlers, listenHandler)
-	}
-
 	handlers = &Handlers{
 		InterfaceHandle: make(map[string]*pcap.Handle),
 	}
 	if err := SetupHandlers(); err != nil {
 		gologger.Error().Msgf("could not setup handlers: %s\n", err)
-		ListenHandlers = nil
-		return
+		// SetupHandlers cleans up its own partial pcap handles; drop the rest of
+		// the half-initialized state so the next call retries cleanly.
+		if icmpConn4 != nil {
+			_ = icmpConn4.Close()
+			icmpConn4 = nil
+		}
+		if icmpConn6 != nil {
+			_ = icmpConn6.Close()
+			icmpConn6 = nil
+		}
+		transportPacketSend = nil
+		icmpPacketSend = nil
+		ethernetPacketSend = nil
+		handlers = nil
+		return false
 	}
 	if len(handlers.TransportActive)+len(handlers.LoopbackHandlers) == 0 {
 		gologger.Error().Msgf("could not open any pcap capture interface (is Npcap/libpcap installed?)")
-		ListenHandlers = nil
-		return
+		if icmpConn4 != nil {
+			_ = icmpConn4.Close()
+			icmpConn4 = nil
+		}
+		if icmpConn6 != nil {
+			_ = icmpConn6.Close()
+			icmpConn6 = nil
+		}
+		transportPacketSend = nil
+		icmpPacketSend = nil
+		ethernetPacketSend = nil
+		handlers = nil
+		return false
 	}
 	go TransportReadWorker()
 	go TransportWriteWorker()
+	// One reader per icmp family routes replies to whichever handlers are
+	// currently in the host-discovery phase. A single shared reader avoids
+	// multiple per-scan handlers stealing each other's replies off the
+	// shared conn.
+	go icmpReadWorker4()
+	go icmpReadWorker6()
 	// Spawn multiple ICMP write workers: ranging over icmpPacketSend from
 	// several goroutines is safe, and concurrent WriteTo on the shared
 	// icmpConn4/icmpConn6 is supported by net.PacketConn. With one worker
@@ -98,6 +144,8 @@ func init() {
 		go ICMPWriteWorker()
 	}
 	go EthernetWriteWorker(ethernetPacketSend)
+	rawInfraOK = true
+	return true
 }
 
 func buildListenHandler() (*ListenHandler, error) {
@@ -132,8 +180,9 @@ func buildListenHandler() (*ListenHandler, error) {
 
 	listenHandler.UdpConn6, _ = net.ListenIP("ip6:udp", &net.IPAddr{IP: net.ParseIP("::")})
 
-	go listenHandler.ICMPReadWorker4()
-	go listenHandler.ICMPReadWorker6()
+	// icmp replies are handled by the process-global icmpReadWorker4/6; these
+	// per-handler workers only drain the raw transport sockets so their kernel
+	// receive buffers do not fill. They exit when Release closes the conns.
 	if listenHandler.TcpConn4 != nil {
 		go listenHandler.TcpReadWorker4()
 	}
@@ -208,9 +257,12 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 
 	hasSourceIp := listenHandler.SourceIp4 != nil
 	// Windows cannot open raw IPPROTO_TCP sockets; always send via Npcap L2.
-	usePcap := listenHandler.TcpConn4 == nil || (hasSourceIp && listenHandler.SourceHW != nil)
+	// Bound sources stay on the raw IP socket path — SourceHW alone must not
+	// force Ethernet framing after a successful BindSourceIP.
+	usePcap := listenHandler.TcpConn4 == nil ||
+		(hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound4)
 	var iface *net.Interface
-	if hasSourceIp && listenHandler.SourceHW != nil {
+	if hasSourceIp && listenHandler.SourceHW != nil && !listenHandler.SourceBound4 {
 		// NOTE(dwisiswant0): Only attempt to use ethernet framing if we have
 		// both source IP and HW.
 		itf, gateway, _, err := PkgRouter.RouteWithSrc(listenHandler.SourceHW, listenHandler.SourceIp4, ip4.DstIP)
@@ -293,11 +345,17 @@ func sendAsyncTCP4(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		OptionData:   []byte{0x05, 0xB4},
 	}
 
+	seq := tcpsequencer.Next()
+	if pkgFlag == Syn {
+		// SYN cookie: lets the receive path verify the returning SYN-ACK.
+		seq = SynCookie(ip4.DstIP, uint16(p.Port), uint16(listenHandler.Port))
+	}
+
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(listenHandler.Port),
 		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
-		Seq:     tcpsequencer.Next(),
+		Seq:     seq,
 		Options: []layers.TCPOption{tcpOption},
 	}
 
@@ -395,18 +453,14 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolTCP,
 	}
 
-	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
-	if err != nil {
-		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-		return
-	} else if sourceIP == nil {
-		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-		return
-	}
-
 	if listenHandler.SourceIP6 != nil {
 		ip6.SrcIP = listenHandler.SourceIP6
 	} else {
+		sourceIP := sourceIP6For(ip6.DstIP)
+		if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
+			return
+		}
 		ip6.SrcIP = sourceIP
 	}
 
@@ -416,11 +470,21 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		OptionData:   []byte{0x05, 0xB4},
 	}
 
+	// SYN uses a cookie so the receive path can verify the returning SYN-ACK;
+	// other flags use the monotonic sequencer. Computing only the one needed
+	// avoids a wasted atomic increment on the SYN hot path.
+	var seq uint32
+	if pkgFlag == Syn {
+		seq = SynCookie(ip6.DstIP, uint16(p.Port), uint16(listenHandler.Port))
+	} else {
+		seq = tcpsequencer.Next()
+	}
+
 	tcp := layers.TCP{
 		SrcPort: layers.TCPPort(listenHandler.Port),
 		DstPort: layers.TCPPort(p.Port),
 		Window:  1024,
-		Seq:     tcpsequencer.Next(),
+		Seq:     seq,
 		Options: []layers.TCPOption{tcpOption},
 	}
 
@@ -431,8 +495,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		tcp.ACK = true
 	}
 
-	err = tcp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
+	if err := tcp.SetNetworkLayerForChecksum(&ip6); err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		if listenHandler.TcpConn6 == nil {
@@ -440,8 +503,7 @@ func sendAsyncTCP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.TcpConn6, &tcp)
-		if err != nil {
+		if err := sendWithConnAddr(&net.IPAddr{IP: ip6.DstIP}, listenHandler.TcpConn6, &tcp); err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
 	}
@@ -456,18 +518,14 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		NextHeader: layers.IPProtocolUDP,
 	}
 
-	_, _, sourceIP, err := PkgRouter.Route(ip6.DstIP)
-	if err != nil {
-		gologger.Debug().Msgf("could not find route to host %s:%d: %s\n", ip, p.Port, err)
-		return
-	} else if sourceIP == nil {
-		gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
-		return
-	}
-
 	if listenHandler.SourceIP6 != nil {
 		ip6.SrcIP = listenHandler.SourceIP6
 	} else {
+		sourceIP := sourceIP6For(ip6.DstIP)
+		if sourceIP == nil {
+			gologger.Debug().Msgf("could not find correct source ipv6 for %s:%d\n", ip, p.Port)
+			return
+		}
 		ip6.SrcIP = sourceIP
 	}
 
@@ -476,8 +534,7 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 		DstPort: layers.UDPPort(p.Port),
 	}
 
-	err = udp.SetNetworkLayerForChecksum(&ip6)
-	if err != nil {
+	if err := udp.SetNetworkLayerForChecksum(&ip6); err != nil {
 		gologger.Debug().Msgf("Can not set network layer for %s:%d port: %s\n", ip, p.Port, err)
 	} else {
 		if listenHandler.UdpConn6 == nil {
@@ -485,22 +542,46 @@ func sendAsyncUDP6(listenHandler *ListenHandler, ip string, p *port.Port, pkgFla
 			return
 		}
 
-		err = sendWithConn(ip, listenHandler.UdpConn6, listenHandler.udpLayersWithProbe(&udp, p.Port)...)
-		if err != nil {
+		if err := sendWithConnAddr(&net.IPAddr{IP: ip6.DstIP}, listenHandler.UdpConn6, listenHandler.udpLayersWithProbe(&udp, p.Port)...); err != nil {
 			gologger.Debug().Msgf("Can not send packet to %s:%d port: %s\n", ip, p.Port, err)
 		}
 	}
 }
 
-// ICMPReadWorker4 reads packets from the network layer
-func (l *ListenHandler) ICMPReadWorker4() {
+// dispatchHostDiscovery delivers a host-discovery result (icmp/arp reply) to
+// every handler currently in the host-discovery phase. Sends are non-blocking
+// so a slow or torn-down handler cannot stall the shared reader, and the
+// snapshot is taken under the pool read lock so it composes with on-demand
+// Acquire/Release.
+func dispatchHostDiscovery(res *PkgResult) {
+	listenHandlersMu.RLock()
+	defer listenHandlersMu.RUnlock()
+	for _, l := range ListenHandlers {
+		if l.Phase != nil && l.Phase.Is(HostDiscovery) {
+			select {
+			case l.HostDiscoveryChan <- res:
+			default:
+			}
+		}
+	}
+}
+
+// icmpReadWorker4 reads ipv4 icmp replies from the shared conn and fans them
+// out to the handlers doing host discovery.
+func icmpReadWorker4() {
+	if icmpConn4 == nil {
+		return
+	}
 	data := make([]byte, 1500)
 	for {
-		if icmpConn4 == nil {
-			return
-		}
 		n, addr, err := icmpConn4.ReadFrom(data)
 		if err != nil {
+			// Only a closed socket is terminal; this is the single process-global
+			// reader, so bailing on a transient error (e.g. ENOBUFS under load)
+			// would silently disable ICMP host discovery for the process lifetime.
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			continue
 		}
 
@@ -511,13 +592,14 @@ func (l *ListenHandler) ICMPReadWorker4() {
 
 		switch rm.Type {
 		case ipv4.ICMPTypeEchoReply, ipv4.ICMPTypeTimestampReply:
-			l.HostDiscoveryChan <- &PkgResult{ipv4: addr.String()}
+			dispatchHostDiscovery(&PkgResult{ipv4: addr.String()})
 		}
 	}
 }
 
-// ICMPReadWorker6 reads packets from the network layer
-func (l *ListenHandler) ICMPReadWorker6() {
+// icmpReadWorker6 reads ipv6 icmp replies from the shared conn and fans them
+// out to the handlers doing host discovery.
+func icmpReadWorker6() {
 	if icmpConn6 == nil {
 		return
 	}
@@ -525,6 +607,9 @@ func (l *ListenHandler) ICMPReadWorker6() {
 	for {
 		n, addr, err := icmpConn6.ReadFrom(data)
 		if err != nil {
+			if errors.Is(err, net.ErrClosed) {
+				return
+			}
 			continue
 		}
 
@@ -544,7 +629,7 @@ func (l *ListenHandler) ICMPReadWorker6() {
 			if idx := strings.Index(ip, "%"); idx > 0 {
 				ip = ip[:idx]
 			}
-			l.HostDiscoveryChan <- &PkgResult{ipv6: ip}
+			dispatchHostDiscovery(&PkgResult{ipv6: ip})
 		}
 	}
 }
@@ -556,6 +641,13 @@ var defaultSerializeOptions = gopacket.SerializeOptions{
 
 // send sends the given layers as a single packet on the network.
 func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
+	return sendWithConnAddr(&net.IPAddr{IP: net.ParseIP(destIP)}, conn, l...)
+}
+
+// sendWithConnAddr is sendWithConn with an already-parsed destination, letting
+// callers that hold the parsed net.IP (e.g. the IPv6 path, which needs it for
+// the checksum) avoid a second net.ParseIP per packet.
+func sendWithConnAddr(addr *net.IPAddr, conn net.PacketConn, l ...gopacket.SerializableLayer) error {
 	var err error
 
 	buf := gopacket.NewSerializeBuffer()
@@ -563,7 +655,6 @@ func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.Serializable
 		return err
 	}
 	data := buf.Bytes()
-	addr := &net.IPAddr{IP: net.ParseIP(destIP)}
 
 	for retries := 0; retries < maxRetries; retries++ {
 		_, err = conn.WriteTo(data, addr)
@@ -575,10 +666,51 @@ func sendWithConn(destIP string, conn net.PacketConn, l ...gopacket.Serializable
 	}
 
 	if err != nil {
-		return fmt.Errorf("could not send packet to %s: %s", destIP, err)
+		return fmt.Errorf("could not send packet to %s: %s", addr.IP, err)
 	}
 
 	return nil
+}
+
+// src6CacheCap bounds the IPv6 source-route cache so a scan over many distinct
+// destinations cannot grow it without limit.
+const src6CacheCap = 1 << 16
+
+var (
+	src6CacheMu sync.RWMutex
+	src6Cache   = map[[16]byte]net.IP{}
+)
+
+// sourceIP6For returns the source IPv6 address the kernel uses to reach dst.
+// The result is cached per exact destination: more-specific routes / policy
+// routing can select different sources within a single /64, so prefix caching
+// would checksum against the wrong source. Returns nil when no route is found
+// (not cached, so a transient failure can recover).
+func sourceIP6For(dst net.IP) net.IP {
+	ip16 := dst.To16()
+	if ip16 == nil || PkgRouter == nil {
+		return nil
+	}
+	var key [16]byte
+	copy(key[:], ip16)
+
+	src6CacheMu.RLock()
+	src, ok := src6Cache[key]
+	src6CacheMu.RUnlock()
+	if ok {
+		return src
+	}
+
+	_, _, s, err := PkgRouter.Route(dst)
+	if err != nil || s == nil {
+		return nil
+	}
+	src6CacheMu.Lock()
+	if len(src6Cache) < src6CacheCap {
+		src6Cache[key] = s
+	}
+	src6CacheMu.Unlock()
+	return s
 }
 
 func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.SerializableLayer) error {
@@ -612,42 +744,126 @@ func sendWithHandler(destIP string, iface *net.Interface, l ...gopacket.Serializ
 	return nil
 }
 
+// BindSourceIP rebinds the raw v4/v6 transport sockets to the given source
+// addresses so the kernel emits packets with that source. The fast SYN sender
+// and the plain raw send only write the transport header and otherwise let the
+// kernel pick the source by route, so without this an explicit -source-ip is
+// ignored. A nil address (or one this host does not own) leaves that family on
+// its original 0.0.0.0/:: socket. Affected drain workers are restarted.
+//
+// It is a no-op on plain (non-raw) handlers that have no transport sockets.
+func (l *ListenHandler) BindSourceIP(v4, v6 net.IP) {
+	if v4 != nil && l.TcpConn4 != nil {
+		l.SourceBound4 = l.rebind4(v4)
+	}
+	if v6 != nil && l.TcpConn6 != nil {
+		l.SourceBound6 = l.rebind6(v6)
+	}
+}
+
+func (l *ListenHandler) rebind4(ip net.IP) bool {
+	tcp, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: ip})
+	if err != nil {
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	udp, err := net.ListenIP("ip4:udp", &net.IPAddr{IP: ip})
+	if err != nil {
+		_ = tcp.Close()
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	if l.TcpConn4 != nil {
+		_ = l.TcpConn4.Close()
+	}
+	if l.UdpConn4 != nil {
+		_ = l.UdpConn4.Close()
+	}
+	l.TcpConn4 = tcp
+	l.UdpConn4 = udp
+	go l.TcpReadWorker4()
+	go l.UdpReadWorker4()
+	return true
+}
+
+func (l *ListenHandler) rebind6(ip net.IP) bool {
+	tcp, err := net.ListenIP("ip6:tcp", &net.IPAddr{IP: ip})
+	if err != nil {
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	udp, err := net.ListenIP("ip6:udp", &net.IPAddr{IP: ip})
+	if err != nil {
+		_ = tcp.Close()
+		gologger.Warning().Msgf("could not bind source ip %s, using route source: %s\n", ip, err)
+		return false
+	}
+	if l.TcpConn6 != nil {
+		_ = l.TcpConn6.Close()
+	}
+	if l.UdpConn6 != nil {
+		_ = l.UdpConn6.Close()
+	}
+	l.TcpConn6 = tcp
+	l.UdpConn6 = udp
+	go l.TcpReadWorker6()
+	go l.UdpReadWorker6()
+	return true
+}
+
+// The drain workers capture their socket into a local before looping: rebind4/
+// rebind6 can swap l.TcpConn*/l.UdpConn* under them, so reading the field every
+// iteration would race the swap and could make an old worker start draining the
+// freshly bound socket. Pinning the local keeps each worker bound to the socket
+// it started on, which is closed on rebind/teardown so the worker then exits.
 func (l *ListenHandler) TcpReadWorker4() {
-	if l.TcpConn4 == nil {
+	conn := l.TcpConn4
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.TcpConn4.ReadFrom(data)
+		if _, _, err := conn.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
 func (l *ListenHandler) TcpReadWorker6() {
-	if l.TcpConn6 == nil {
+	conn := l.TcpConn6
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.TcpConn6.ReadFrom(data)
+		if _, _, err := conn.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
 func (l *ListenHandler) UdpReadWorker4() {
-	if l.UdpConn4 == nil {
+	conn := l.UdpConn4
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.UdpConn4.ReadFrom(data)
+		if _, _, err := conn.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 func (l *ListenHandler) UdpReadWorker6() {
-	if l.UdpConn6 == nil {
+	conn := l.UdpConn6
+	if conn == nil {
 		return
 	}
 	data := make([]byte, 4096)
 	for {
-		_, _, _ = l.UdpConn6.ReadFrom(data)
+		if _, _, err := conn.ReadFrom(data); err != nil {
+			return
+		}
 	}
 }
 
@@ -679,6 +895,12 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 		if err != nil {
 			return err
 		}
+		// Best-effort: a large capture buffer keeps reply bursts from large port
+		// ranges from overflowing the kernel ring and silently dropping
+		// SYN-ACKs. Failure is non-fatal; the handle keeps the OS default.
+		if err = inactive.SetBufferSize(pcapBufferSize); err != nil {
+			gologger.Debug().Msgf("could not set pcap buffer size on %s: %s", interfaceName, err)
+		}
 
 		switch proto {
 		case protocol.TCP, protocol.UDP:
@@ -695,8 +917,6 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 			return err
 		}
 
-		// Strict BPF filter
-		// + Destination port equals to sender socket source port
 		err = handle.SetBPFFilter(bpfFilter)
 		if err != nil {
 			return err
@@ -726,7 +946,15 @@ func TransportReadWorker() {
 	var wgread sync.WaitGroup
 
 	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 string) {
-		for _, listenHandler := range ListenHandlers {
+		// Snapshot handlers under the registry lock, then deliver outside it.
+		// Blocking channel sends must not hold listenHandlersMu or Release/Close
+		// can deadlock when a result channel is full (e.g. -sV backpressure).
+		listenHandlersMu.RLock()
+		handlersSnap := make([]*ListenHandler, len(ListenHandlers))
+		copy(handlersSnap, ListenHandlers)
+		listenHandlersMu.RUnlock()
+
+		for _, listenHandler := range handlersSnap {
 			// We consider only incoming packets
 			tcpPortMatches := tcp.DstPort == layers.TCPPort(listenHandler.Port)
 			udpPortMatches := udp.DstPort == layers.UDPPort(listenHandler.Port)
@@ -736,14 +964,29 @@ func TransportReadWorker() {
 				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
 			case listenHandler.Phase.Is(HostDiscovery):
 				proto := protocol.TCP
+				srcPort := int(tcp.SrcPort)
 				if udpPortMatches {
 					proto = protocol.UDP
+					srcPort = int(udp.SrcPort)
 				}
-				listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: proto}}
+				select {
+				case listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}:
+				case <-listenHandler.done:
+				}
 			case tcpPortMatches && tcp.SYN && tcp.ACK:
-				listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}
+				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
+					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
+					continue
+				}
+				select {
+				case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
+				case <-listenHandler.done:
+				}
 			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
-				listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}
+				select {
+				case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:
+				case <-listenHandler.done:
+				}
 			}
 		}
 	}
@@ -822,6 +1065,14 @@ func TransportReadWorker() {
 			// Interfaces without MAC (TUN/TAP)
 			parser4NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv4, &ip4, &tcp, &udp)
 			parser6NoMac := gopacket.NewDecodingLayerParser(layers.LayerTypeIPv6, &ip6, &tcp, &udp)
+			// A payload-bearing reply (TCP with data, or a UDP open-port response)
+			// leaves a trailing Payload layer with no decoder, which otherwise makes
+			// DecodeLayers return UnsupportedLayerType and drops the whole packet even
+			// though the transport layer decoded fine. Ignore it: the transport layer
+			// is already in the decoded slice.
+			for _, p := range []*gopacket.DecodingLayerParser{parser4Mac, parser6Mac, parser4NoMac, parser6NoMac} {
+				p.IgnoreUnsupported = true
+			}
 
 			var parsers []*gopacket.DecodingLayerParser
 			parsers = append(parsers,
@@ -829,18 +1080,24 @@ func TransportReadWorker() {
 				parser4NoMac, parser6NoMac,
 			)
 
-			decoded := []gopacket.LayerType{}
+			decoded := make([]gopacket.LayerType, 0, 8)
 
-			packetSource := gopacket.NewPacketSource(handler, handler.LinkType())
-			packetSource.DecodeOptions = gopacket.DecodeOptions{
-				Lazy:   true,
-				NoCopy: true,
-			}
-			for packet := range packetSource.Packets() {
-				data := packet.Data()
+			// Read straight off the handle (zero-copy) instead of
+			// gopacket.PacketSource.Packets(), which allocates a *gopacket.Packet
+			// and hops through an extra goroutine+channel for every packet. On a
+			// SYN scan every reply lands here, so this is the receive hot path.
+			for {
+				data, _, err := handler.ZeroCopyReadPacketData()
+				if err != nil {
+					if errors.Is(err, pcap.NextErrorTimeoutExpired) {
+						continue
+					}
+					// EOF or a closed handle ends the reader; any other error is
+					// treated as fatal to avoid spinning on a broken handle.
+					return
+				}
 				for _, parser := range parsers {
-					err := parser.DecodeLayers(data, &decoded)
-					if err != nil {
+					if err := parser.DecodeLayers(data, &decoded); err != nil {
 						continue
 					}
 					hasTransport := false
@@ -853,16 +1110,26 @@ func TransportReadWorker() {
 					if !hasTransport {
 						continue
 					}
+					// tcp/udp are reused across packets by the parser and absent
+					// layers keep their previous value; forward only the transport
+					// layer actually present in this packet so the callback can't
+					// match on a stale port from an earlier packet.
 					var srcIP4, srcIP6 string
+					var tcpForCb layers.TCP
+					var udpForCb layers.UDP
 					for _, layerType := range decoded {
 						switch layerType {
 						case layers.LayerTypeIPv4:
 							srcIP4 = ToString(ip4.SrcIP)
 						case layers.LayerTypeIPv6:
 							srcIP6 = ToString(ip6.SrcIP)
+						case layers.LayerTypeTCP:
+							tcpForCb = tcp
+						case layers.LayerTypeUDP:
+							udpForCb = udp
 						}
 					}
-					transportReaderCallback(tcp, udp, srcIP4, srcIP6)
+					transportReaderCallback(tcpForCb, udpForCb, srcIP4, srcIP6)
 					break
 				}
 			}
@@ -914,9 +1181,7 @@ func TransportReadWorker() {
 							srcIP4 := net.IP(arp.SourceProtAddress)
 							srcMAC := net.HardwareAddr(arp.SourceHwAddress).String()
 
-							for _, listenHandler := range ListenHandlers {
-								listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: ToString(srcIP4), mac: srcMAC}
-							}
+							dispatchHostDiscovery(&PkgResult{ipv4: ToString(srcIP4), mac: srcMAC})
 						}
 					}
 				}
@@ -965,12 +1230,19 @@ func SetupHandlers() error {
 }
 
 func SetupHandler(interfaceName string) error {
-	var portFilters []string
-	for _, listenHandler := range ListenHandlers {
-		portFilters = append(portFilters, fmt.Sprintf("dst port %d", listenHandler.Port))
-	}
-
-	bpfFilter := fmt.Sprintf("(%s) and (tcp or udp)", strings.Join(portFilters, " or "))
+	// Port-independent capture. Handlers are created on demand, so their source
+	// ports cannot be baked into the filter (and runtime SetBPFFilter is not
+	// safe against the live reader). Capture inbound TCP that carries ACK or
+	// RST - SYN-ACK for open ports, RST/RST-ACK for closed ports and TCP host
+	// discovery - plus UDP, while excluding our own outgoing pure-SYN probes.
+	// The reader still routes each packet to the owning handler by destination
+	// port, so any number of handlers share this one filter.
+	// tcp[tcpflags] is an IPv4-only BPF accessor (classic BPF cannot walk the
+	// IPv6 extension-header chain), so the flag test is scoped to ip and IPv6
+	// TCP replies are captured with a plain "ip6 and tcp". Outgoing pure-SYN
+	// probes still get filtered: for IPv4 by the flag mask, and for IPv6 by the
+	// reader, which only acts on SYN-ACKs whose dst port is a live handler port.
+	bpfFilter := "(ip and tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or (ip6 and tcp) or udp"
 	err := SetupHandlerUnix(interfaceName, bpfFilter, protocol.TCP)
 	if err != nil {
 		return err

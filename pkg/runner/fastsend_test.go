@@ -4,7 +4,101 @@ import (
 	"encoding/binary"
 	"net"
 	"testing"
+
+	"github.com/projectdiscovery/naabu/v2/pkg/scan"
+	"github.com/stretchr/testify/require"
 )
+
+func TestWorkerSYNSenderUsesIndependentRawSocket(t *testing.T) {
+	if scan.PkgRouter == nil {
+		t.Skip("routing is unavailable")
+	}
+	conn, err := net.ListenIP("ip4:tcp", &net.IPAddr{IP: net.IPv4zero})
+	if err != nil {
+		t.Skipf("raw sockets are unavailable: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	handler := &scan.ListenHandler{TcpConn4: conn}
+	base, err := newSYNSender(handler)
+	require.NoError(t, err)
+	worker, err := newWorkerSYNSender(handler)
+	require.NoError(t, err)
+	defer worker.close()
+
+	require.NotEqual(t, base.sender.FD(), worker.sender.FD(),
+		"workers sharing one fd serialize in the kernel")
+}
+
+func TestUint32ToIPv4(t *testing.T) {
+	require.Equal(t, net.IPv4(127, 0, 0, 1).To4(), uint32ToIPv4(0x7f000001).To4())
+	require.Equal(t, net.IPv4(255, 255, 255, 255).To4(), uint32ToIPv4(0xffffffff).To4())
+	require.Equal(t, net.IPv4(0, 0, 0, 0).To4(), uint32ToIPv4(0).To4())
+}
+
+func TestSameRouteSrc(t *testing.T) {
+	a := net.IPv4(10, 0, 0, 1)
+	b := net.IPv4(10, 0, 0, 2)
+	require.True(t, sameRouteSrc(nil, nil))
+	require.True(t, sameRouteSrc(a, net.IPv4(10, 0, 0, 1)))
+	require.False(t, sameRouteSrc(a, b))
+	require.False(t, sameRouteSrc(a, nil))
+	require.False(t, sameRouteSrc(nil, b))
+}
+
+// TestCidrRouteVariesSingleAddr ensures a single-address block is never treated
+// as route-varying (no per-destination resolution, no router calls needed).
+func TestCidrRouteVariesSingleAddr(t *testing.T) {
+	require.False(t, cidrRouteVaries(0x0a000001, 1))
+	require.False(t, cidrRouteVaries(0x0a000001, 0))
+}
+
+func TestWantsEthernetPath(t *testing.T) {
+	ip := net.IPv4(10, 0, 0, 5)
+	hw := net.HardwareAddr{0xde, 0xad, 0xbe, 0xef, 0x00, 0x01}
+
+	// source ip + interface MAC but not bound: must go L2 (spoof/non-owned).
+	require.True(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw}))
+	// bound source: kernel emits it, stay on the fast path.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip, SourceHW: hw, SourceBound4: true}))
+	// source ip alone (no interface MAC): fast path with the bound socket.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceIp4: ip}))
+	// interface alone: no source to force, fast path.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{SourceHW: hw}))
+	// nothing pinned.
+	require.False(t, wantsEthernetPath(&scan.ListenHandler{}))
+}
+
+// TestSYNSenderPinnedSrcSumOverrides verifies the pinned source checksum term is
+// used regardless of the per-target srcSum passed to send.
+func TestSYNSenderPinnedSrcSumOverrides(t *testing.T) {
+	src := net.IPv4(192, 0, 2, 50).To4()
+	pinned := ipChecksumSum(src)
+
+	s := &SYNSender{srcPort: 40000, pinnedSrcSum: pinned}
+	// baseSum mirrors the constant terms set in newSYNSender.
+	var base uint32
+	base += 6
+	base += 24
+	base += uint32(s.srcPort)
+	base += 0x6002
+	base += 0x0400
+	base += 0x0204
+	base += 0x05B4
+	s.baseSum = base
+
+	dst := [4]byte{198, 51, 100, 9}
+	const dstPort = 443
+	seq := scan.SynCookie4(dst, dstPort, s.srcPort)
+
+	// Effective source term when sending: pinned wins over any per-target value.
+	got := s.effectiveSrcSum(12345)
+	require.Equal(t, pinned, got)
+
+	// And the resulting checksum matches a hand-computed one using the pinned src.
+	want := synTCPChecksum(s.baseSum, pinned, dst, dstPort, seq)
+	require.Equal(t, want, synTCPChecksum(s.baseSum, got, dst, dstPort, seq))
+}
 
 func TestParseIPv4Fast(t *testing.T) {
 	tests := []struct {
@@ -126,32 +220,100 @@ func TestTargetIndex(t *testing.T) {
 	idx := buildTargetIndex([]*net.IPNet{cidr24, cidr16})
 
 	// First CIDR: 192.168.1.0/24 -> 256 addresses
-	ip, ipStr, ok := idx.pickIPv4(0)
+	ip, ipStr, _, ok := idx.pickIPv4(0)
 	if !ok || ip != [4]byte{192, 168, 1, 0} || ipStr != "192.168.1.0" {
 		t.Errorf("index 0: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
-	ip, ipStr, ok = idx.pickIPv4(255)
+	ip, ipStr, _, ok = idx.pickIPv4(255)
 	if !ok || ip != [4]byte{192, 168, 1, 255} || ipStr != "192.168.1.255" {
 		t.Errorf("index 255: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
 	// Second CIDR starts at index 256: 10.0.0.0/16
-	ip, ipStr, ok = idx.pickIPv4(256)
+	ip, ipStr, _, ok = idx.pickIPv4(256)
 	if !ok || ip != [4]byte{10, 0, 0, 0} || ipStr != "10.0.0.0" {
 		t.Errorf("index 256: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
-	ip, ipStr, ok = idx.pickIPv4(256 + 65535)
+	ip, ipStr, _, ok = idx.pickIPv4(256 + 65535)
 	if !ok || ip != [4]byte{10, 0, 255, 255} || ipStr != "10.0.255.255" {
 		t.Errorf("index 256+65535: got ip=%v str=%q ok=%v", ip, ipStr, ok)
 	}
 
 	// Out of range
-	_, _, ok = idx.pickIPv4(256 + 65536)
+	_, _, _, ok = idx.pickIPv4(256 + 65536)
 	if ok {
 		t.Error("expected ok=false for out-of-range index")
 	}
+}
+
+// referenceTCPChecksum independently computes the TCP checksum over the
+// pseudo-header + segment using the textbook one's-complement sum, so we can
+// assert synTCPChecksum (which folds precomputed terms) produces the same value
+// for the source IP the kernel will actually use.
+func referenceTCPChecksum(src, dst [4]byte, seg []byte) uint16 {
+	pseudo := []byte{
+		src[0], src[1], src[2], src[3],
+		dst[0], dst[1], dst[2], dst[3],
+		0, 6,
+		byte(len(seg) >> 8), byte(len(seg)),
+	}
+	var sum uint32
+	add := func(b []byte) {
+		for i := 0; i+1 < len(b); i += 2 {
+			sum += uint32(b[i])<<8 | uint32(b[i+1])
+		}
+		if len(b)%2 == 1 {
+			sum += uint32(b[len(b)-1]) << 8
+		}
+	}
+	add(pseudo)
+	add(seg)
+	for sum>>16 != 0 {
+		sum = (sum & 0xffff) + (sum >> 16)
+	}
+	return ^uint16(sum)
+}
+
+func TestSynTCPChecksumUsesPerTargetSource(t *testing.T) {
+	const srcPort = uint16(54321)
+	srcIP := [4]byte{10, 0, 0, 5}
+	dstIP := [4]byte{93, 184, 216, 34}
+	const dstPort = uint16(443)
+	const seq = uint32(0xDEADBEEF)
+
+	// Build the 24-byte SYN segment exactly as newSYNSender/send do (checksum
+	// field left zero for the reference computation).
+	var pkt [24]byte
+	binary.BigEndian.PutUint16(pkt[0:2], srcPort)
+	binary.BigEndian.PutUint16(pkt[2:4], dstPort)
+	binary.BigEndian.PutUint32(pkt[4:8], seq)
+	pkt[12] = 0x60
+	pkt[13] = 0x02
+	binary.BigEndian.PutUint16(pkt[14:16], 1024)
+	pkt[20] = 2
+	pkt[21] = 4
+	binary.BigEndian.PutUint16(pkt[22:24], 1460)
+
+	// baseSum mirrors newSYNSender (constant terms, no source IP).
+	var baseSum uint32
+	baseSum += 6
+	baseSum += 24
+	baseSum += uint32(srcPort)
+	baseSum += 0x6002
+	baseSum += 0x0400
+	baseSum += 0x0204
+	baseSum += 0x05B4
+
+	want := referenceTCPChecksum(srcIP, dstIP, pkt[:])
+	got := synTCPChecksum(baseSum, ipChecksumSum(net.IP(srcIP[:])), dstIP, dstPort, seq)
+	require.Equal(t, want, got, "checksum must match a real packet from %v", srcIP)
+
+	// Using the wrong source IP (the old always-default-route bug) yields a
+	// checksum the target stack would reject.
+	wrong := synTCPChecksum(baseSum, ipChecksumSum(net.IPv4(127, 0, 0, 1).To4()), dstIP, dstPort, seq)
+	require.NotEqual(t, want, wrong, "a mismatched source must change the checksum")
 }
 
 func TestFormatIPv4RoundTrip(t *testing.T) {

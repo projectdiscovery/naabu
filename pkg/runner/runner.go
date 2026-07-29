@@ -15,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/Mzack9999/gcache"
@@ -45,6 +46,11 @@ import (
 	"golang.org/x/net/proxy"
 )
 
+// defaultUniqueCacheSize bounds the output de-duplication LRU. ~64K entries
+// keeps memory flat (a few MB) while comfortably covering retry/retransmit
+// duplicate windows on large scans.
+const defaultUniqueCacheSize = 65536
+
 // Runner is an instance of the port enumeration
 // client used to orchestrate the whole process.
 type Runner struct {
@@ -61,12 +67,32 @@ type Runner struct {
 
 	unique gcache.Cache[string, struct{}]
 
-	fpTargetCh  chan fingerprint.Target
-	fpDone      chan struct{}
-	fpServices  map[string]*port.Service
-	fpMu        sync.Mutex
-	fpCancel    context.CancelFunc
-	fpCloseOnce sync.Once
+	// hasHostnames is set when at least one target resolves from a hostname
+	// (as opposed to a literal IP/CIDR/ASN). When false the output path can
+	// skip the disk-backed IP->hostname lookups entirely and emit IPs directly.
+	hasHostnames atomic.Bool
+
+	// csvHeaderOnce guards the live CSV header so it is written exactly once per
+	// run rather than once per onReceive call (which is per result).
+	csvHeaderOnce sync.Once
+
+	// verifyReplay is set only while handleOutput replays the post-verification
+	// result set through onReceive. In --verify mode live results are unverified,
+	// so onReceive suppresses them during the scan and emits only this replay.
+	verifyReplay atomic.Bool
+
+	// scanStartTime records when enumeration began, used for nmap-compatible
+	// XML/greppable output timestamps and elapsed time.
+	scanStartTime time.Time
+
+	fpTargetCh chan fingerprint.Target
+	// fpQueue decouples the scan hot path from the fingerprint workers so fast
+	// discovery never blocks the scan nor silently drops -sV targets.
+	fpQueue    *fpQueue
+	fpDone     chan struct{}
+	fpServices map[string]*port.Service
+	fpMu       sync.Mutex
+	fpCancel   context.CancelFunc
 	// probeDB is the parsed nmap-service-probes database, shared
 	// between service version detection (-sV) and the UDP probe
 	// injection path (-uP). It is nil until one of those features
@@ -107,6 +133,9 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	if options.Threads == 0 {
 		options.Threads = DefaultThreadsNum
+	}
+	if options.TxWorkers == 0 {
+		options.TxWorkers = 1
 	}
 	if options.DnsOrder == "" {
 		options.DnsOrder = "l"
@@ -178,7 +207,12 @@ func NewRunner(options *Options) (*Runner, error) {
 	}
 	runner.streamChannel = make(chan Target)
 
-	uniqueCache := gcache.New[string, struct{}](1500).Build()
+	// Bounded LRU for output de-duplication of ip:port (and host:port) lines.
+	// Duplicates come from scan retries and target retransmissions; a generous
+	// LRU window absorbs them while keeping memory flat on huge scans. LRU is
+	// preferred over a bloom filter here because an eviction only risks a benign
+	// repeated line, whereas a bloom false-positive would drop a real result.
+	uniqueCache := gcache.New[string, struct{}](defaultUniqueCacheSize).LRU().Build()
 	runner.unique = uniqueCache
 
 	scanOpts := &scan.Options{
@@ -228,30 +262,36 @@ func NewRunner(options *Options) (*Runner, error) {
 	return runner, nil
 }
 
-func (r *Runner) onReceive(hostResult *result.HostResult) {
-	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
+// finalJSONCSVToStdout reports whether handleOutput should print JSON/CSV
+// results to stdout. In the common case onReceive already streams them live
+// during the scan (and the Verify path replays through onReceive), so printing
+// again here would duplicate every line. It only falls to handleOutput when the
+// live path is intentionally suppressed: -sV emits enriched output after the
+// scan, and nmap CLI defers JSON/CSV until after nmap integration.
+func (r *Runner) finalJSONCSVToStdout() bool {
+	return r.options.ServiceVersion || (r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV))
+}
+
+// hostsForIP returns the hostnames to print for an IP. For scans whose inputs
+// are pure IPs/CIDRs (no hostnames), it returns the IP directly and avoids the
+// disk-backed Hosts lookup entirely.
+func (r *Runner) hostsForIP(ip string) ([]string, error) {
+	if !r.hasHostnames.Load() {
+		return []string{ip}, nil
+	}
+	return r.scanner.IPRanger.GetHostsByIP(ip)
+}
+
+// recoverHostnames rewrites bare IPs in dt with hostnames recorded against the
+// ip:port keys. It is a no-op for pure IP/CIDR scans (no hostname store).
+func (r *Runner) recoverHostnames(ip string, ports []*port.Port, dt []string) {
+	if !r.hasHostnames.Load() {
 		return
 	}
-
-	dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
-	if err != nil {
-		return
-	}
-
-	// receive event has only one port
-	for _, p := range hostResult.Ports {
-		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-		if r.unique.Has(ipPort) {
-			return
-		}
-	}
-
-	// recover hostnames from ip:port combination
-	for _, p := range hostResult.Ports {
-		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+	for _, p := range ports {
+		ipPort := net.JoinHostPort(ip, fmt.Sprint(p.Port))
 		if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
 			if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
-				// replace bare ip:port with host
 				for idx, ipCandidate := range dt {
 					if iputil.IsIP(ipCandidate) {
 						dt[idx] = otherName
@@ -259,11 +299,60 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				}
 			}
 		}
+	}
+}
+
+func (r *Runner) onReceive(hostResult *result.HostResult) {
+	// In --verify mode the results streamed during the scan are unverified. Drop
+	// them here (this also covers the raw SYN path, whose TCPResultWorker calls
+	// OnReceive unconditionally) so only the verified replay reaches stdout and the
+	// unique cache, keeping stdout consistent with the file output.
+	if r.options.Verify && !r.verifyReplay.Load() {
+		return
+	}
+	if !ipMatchesIpVersions(hostResult.IP, r.options.IPVersion...) {
+		return
+	}
+
+	dt, err := r.hostsForIP(hostResult.IP)
+	if err != nil {
+		return
+	}
+
+	// A receive event may carry multiple ports (e.g. --verify replays the
+	// full HostResult). Keep only the ports we have not emitted yet instead
+	// of dropping the whole host the moment its first port was already seen.
+	newPorts := make([]*port.Port, 0, len(hostResult.Ports))
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
+		if r.unique.Has(ipPort) {
+			continue
+		}
+		newPorts = append(newPorts, p)
+	}
+	if len(newPorts) == 0 {
+		return
+	}
+	// shallow-copy so we don't mutate the caller's HostResult slice
+	hr := *hostResult
+	hr.Ports = newPorts
+	hostResult = &hr
+
+	// recover hostnames from ip:port combination
+	r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
+	for _, p := range hostResult.Ports {
+		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
 		_ = r.unique.Set(ipPort, struct{}{})
 	}
 
-	// Feed on-the-fly service detection (non-blocking to avoid stalling the scan path).
-	if r.fpTargetCh != nil {
+	// Feed on-the-fly service detection. The queue never drops targets, so -sV
+	// stays complete even when discovery outpaces the fingerprint workers. When
+	// the backlog hits its memory ceiling, push blocks here and backpressure
+	// reaches TCPResultWorker (not the SYN TX path directly).
+	r.fpMu.Lock()
+	fpq := r.fpQueue
+	r.fpMu.Unlock()
+	if fpq != nil {
 		hostname := hostResult.IP
 		for _, h := range dt {
 			if h != "ip" && h != hostResult.IP {
@@ -272,17 +361,13 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			}
 		}
 		for _, p := range hostResult.Ports {
-			t := fingerprint.Target{
+			fpq.push(fingerprint.Target{
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
 				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
 				TLSChecked:  true,
-			}
-			select {
-			case r.fpTargetCh <- t:
-			default:
-			}
+			})
 		}
 	}
 
@@ -295,8 +380,6 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 	if r.options.NmapCLI != "" && (r.options.JSON || r.options.CSV) {
 		return
 	}
-
-	csvHeaderEnabled := true
 
 	buffer := bytes.Buffer{}
 	writer := csv.NewWriter(&buffer)
@@ -329,10 +412,9 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 					}
 					_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 				} else if r.options.CSV {
-					if csvHeaderEnabled {
+					r.csvHeaderOnce.Do(func() {
 						writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-						csvHeaderEnabled = false
-					}
+					})
 					writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 				}
 			}
@@ -368,6 +450,12 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	ctx, cancel := context.WithCancel(pctx)
 	defer cancel()
 
+	r.scanStartTime = time.Now()
+	// Reset per-enumeration state so a reused Runner (SDK) writes a fresh CSV
+	// header and does not suppress IP:port pairs seen in a previous scan.
+	r.csvHeaderOnce = sync.Once{}
+	r.unique = gcache.New[string, struct{}](defaultUniqueCacheSize).LRU().Build()
+
 	if privileges.IsPrivileged && r.options.ScanType == SynScan {
 		// Set values if those were specified via cli, errors are fatal
 		if r.options.SourceIP != "" {
@@ -392,6 +480,15 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	}
 
 	r.initServiceDetection(ctx)
+	// Always tear down fingerprint workers, including early returns (Load
+	// failure, OnlyHostDiscovery, handleNmap error). waitServiceDetection is
+	// idempotent once fpQueue is nil, so the explicit call sites below remain
+	// safe and still merge results before output.
+	defer func() {
+		if r.scanner != nil {
+			r.waitServiceDetection(r.scanner.ScanResults)
+		}
+	}()
 	r.initUDPProbes()
 
 	if r.options.Stream {
@@ -408,12 +505,24 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.options.Rate = limits.RateLimitWithProxy(r.options.Rate)
 	}
 
-	// Scan workers
-	r.wgscan = sizedwaitgroup.New(r.options.Rate)
-	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
-
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
+
+	// Scan workers
+	scanConcurrency := r.options.Rate
+	if !shouldUseRawPackets {
+		// Connect scan opens one socket per in-flight probe. Raise the open
+		// file limit to the hard limit and cap concurrency to what it allows,
+		// so the default rate does not trip "too many open files".
+		if soft := raiseOpenFileLimit(); soft > 0 {
+			if capped := connectConcurrency(r.options.Rate, soft); capped < scanConcurrency {
+				gologger.Info().Msgf("Capping connect concurrency to %d (open file limit %d)\n", capped, soft)
+				scanConcurrency = capped
+			}
+		}
+	}
+	r.wgscan = sizedwaitgroup.New(scanConcurrency)
+	r.limiter = ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 
 	if shouldDiscoverHosts && shouldUseRawPackets {
 		// perform host discovery
@@ -623,7 +732,34 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			// user's port list, reordered by the correlation model.
 			r.runPredictiveScan(ctx, targets, targetsWithPort, shouldUseRawPackets)
 		} else {
+			// Fast SYN sender: bypasses gopacket serialization, per-packet route
+			// lookups and the single-writer channel. Falls back to the standard
+			// path for connect scans, IPv6 targets and ethernet framing.
+			var synSender *SYNSender
+			var tgtIdx *targetIndex
+			var synPacer *pacer
+			if shouldUseRawPackets {
+				tgtIdx = buildTargetIndex(targets)
+				if s, err := newSYNSender(r.scanner.ListenHandler); err != nil {
+					gologger.Debug().Msgf("fast SYN sender unavailable (%s), using standard path\n", err)
+				} else {
+					synSender = s
+					synPacer = newPacer(r.options.Rate)
+					gologger.Info().Msgf("fast SYN sender active (direct raw socket)")
+				}
+			}
+
 			Range := targetsCount * portsCount
+
+			// Multi-core transmit senders are opened once and reused across all
+			// retries; opening/closing every worker socket per retry was pure churn.
+			useFastTx := synSender != nil && r.options.TxWorkers > 1 && !r.options.Resume
+			var txSenders []*SYNSender
+			if useFastTx {
+				txSenders = r.buildTxSenders(synSender, int64(Range))
+				defer closeTxSenders(txSenders)
+			}
+
 			if r.options.EnableProgressBar {
 				r.stats.AddStatic("ports", portsCount)
 				r.stats.AddStatic("hosts", targetsCount)
@@ -639,14 +775,19 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 
 			// Retries are performed regardless of the previous scan results due to network unreliability
+			scanCancelled := false
 			for currentRetry := 0; currentRetry < r.options.Retries; currentRetry++ {
+				if scanCancelled {
+					break
+				}
 				if currentRetry < r.options.ResumeCfg.Retry {
 					gologger.Debug().Msgf("Skipping Retry: %d\n", currentRetry)
 					continue
 				}
 
-				// Use current time as seed
-				currentSeed := time.Now().UnixNano()
+				// Use current time as seed, unless an explicit/shard seed applies.
+				// Sharded nodes must share a seed so their slices are disjoint.
+				currentSeed := r.options.shardSeed(time.Now().UnixNano())
 				r.options.ResumeCfg.RLock()
 				if r.options.ResumeCfg.Seed > 0 {
 					currentSeed = r.options.ResumeCfg.Seed
@@ -659,56 +800,153 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Seed = currentSeed
 				r.options.ResumeCfg.Unlock()
 
-				b := blackrock.New(int64(Range), currentSeed)
-				for index := int64(0); index < int64(Range); index++ {
-					xxx := b.Shuffle(index)
-					ipIndex := xxx / int64(portsCount)
-					portIndex := int(xxx % int64(portsCount))
-					ip := r.PickIP(targets, ipIndex)
+				// Scan in priority tiers, permuting within each tier rather than
+				// across the whole range, so the most likely open ports stay early
+				// regardless of how wide the range is. A single-tier plan reproduces
+				// the previous uniform ordering exactly. See porttiers.go.
+				tiers := buildPortTiers(r.scanner.Ports, !r.options.NoPortPriority)
+				if tiers.totalTiers() > 1 {
+					gologger.Debug().Msgf("Scanning in %d priority tiers\n", tiers.totalTiers())
+				}
 
-					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+				// indexBase keeps the index space contiguous across tiers, so shard
+				// slicing and resume bookkeeping stay monotonic and disjoint.
+				var indexBase int64
+				for _, tierPortIdx := range tiers {
+					if scanCancelled {
+						break
+					}
+					tierPortsCount := int64(len(tierPortIdx))
+					if tierPortsCount == 0 {
+						continue
+					}
+					tierRange := int64(targetsCount) * tierPortsCount
+					b := blackrock.New(tierRange, currentSeed)
+
+					if useFastTx {
+						// Multi-core transmit: fan the fast SYN sends across N
+						// workers, each with its own socket, batch and rate slice.
+						// Resume relies on serial per-index bookkeeping, so it falls
+						// back to the single-worker loop below.
+						r.runFastTx(ctx, b, tierRange, indexBase, tierPortIdx, targets, tgtIdx, txSenders, payload, shouldUseRawPackets)
+						// runFastTx returns early on cancellation; propagate it so we do
+						// not re-open the worker sockets for every remaining retry.
+						select {
+						case <-ctx.Done():
+							scanCancelled = true
+						default:
+						}
+						indexBase += tierRange
 						continue
 					}
 
-					port := r.PickPort(portIndex)
+					for local := int64(0); local < tierRange; local++ {
+						index := indexBase + local
+						select {
+						case <-ctx.Done():
+							scanCancelled = true
+						default:
+						}
+						if scanCancelled {
+							break
+						}
+						// Distributed sharding: each node only handles its slice of
+						// the index space. The shared seed makes the slices disjoint.
+						if !r.options.inShard(index) {
+							continue
+						}
+						xxx := b.Shuffle(local)
+						ipIndex := xxx / tierPortsCount
+						portIndex := tierPortIdx[int(xxx%tierPortsCount)]
 
-					r.options.ResumeCfg.RLock()
-					resumeCfgIndex := r.options.ResumeCfg.Index
-					r.options.ResumeCfg.RUnlock()
-					if index < resumeCfgIndex {
-						gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
-						continue
-					}
+						// fast IPv4 generation (uint32 math) when the fast sender is
+						// active; otherwise fall back to the big.Int-based PickIP.
+						var (
+							dstIP4 [4]byte
+							isV4   bool
+							ip     string
+							srcSum uint32
+						)
+						if synSender != nil {
+							dstIP4, ip, srcSum, isV4 = tgtIdx.pickIPv4(ipIndex)
+						}
+						if ip == "" {
+							ip = r.PickIP(targets, ipIndex)
+						}
 
-					// resume cfg logic
-					r.options.ResumeCfg.Lock()
-					r.options.ResumeCfg.Index = index
-					r.options.ResumeCfg.Unlock()
+						if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+							continue
+						}
 
-					if r.scanner.ScanResults.HasSkipped(ip) {
-						continue
-					}
-					if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
-						hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
-						gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
-						r.scanner.ScanResults.AddSkipped(ip)
-						continue
-					}
+						port := r.PickPort(portIndex)
 
-					// connect scan
-					if shouldUseRawPackets {
-						r.RawSocketEnumeration(ctx, ip, port)
-					} else {
-						r.wgscan.Add()
-						go r.handleHostPort(ctx, ip, payload, port)
+						r.options.ResumeCfg.RLock()
+						resumeCfgIndex := r.options.ResumeCfg.Index
+						r.options.ResumeCfg.RUnlock()
+						if index < resumeCfgIndex {
+							gologger.Debug().Msgf("Skipping \"%s:%d\": Resume - Port scan already completed\n", ip, port.Port)
+							continue
+						}
+
+						// resume cfg logic
+						r.options.ResumeCfg.Lock()
+						r.options.ResumeCfg.Index = index
+						r.options.ResumeCfg.Unlock()
+
+						if r.scanner.ScanResults.HasSkipped(ip) {
+							continue
+						}
+						if r.options.PortThreshold > 0 && r.scanner.ScanResults.GetPortCount(ip) >= r.options.PortThreshold {
+							hosts, _ := r.scanner.IPRanger.GetHostsByIP(ip)
+							gologger.Info().Msgf("Skipping %s %v, Threshold reached \n", ip, hosts)
+							r.scanner.ScanResults.AddSkipped(ip)
+							continue
+						}
+
+						if shouldUseRawPackets {
+							if synSender != nil && isV4 && port.Protocol == protocol.TCP {
+								if r.scanner.ScanResults.IPHasPort(ip, port) {
+									continue
+								}
+								if !r.canIScanIfCDN(ip, port) {
+									continue
+								}
+								synPacer.wait()
+								if err := synSender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
+									if isCongestion(err) {
+										synPacer.onCongestion()
+									}
+									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
+								}
+							} else {
+								r.RawSocketEnumeration(ctx, ip, port)
+							}
+						} else {
+							r.wgscan.Add()
+							go r.handleHostPort(ctx, ip, payload, port)
+						}
+						if r.options.EnableProgressBar {
+							r.stats.IncrementCounter("packets", 1)
+						}
 					}
-					if r.options.EnableProgressBar {
-						r.stats.IncrementCounter("packets", 1)
-					}
+					indexBase += tierRange
 				}
 
 				// handle the ip:port combination
-				for _, targetWithPort := range targetsWithPort {
+				for twpIndex, targetWithPort := range targetsWithPort {
+					select {
+					case <-ctx.Done():
+						scanCancelled = true
+					default:
+					}
+					if scanCancelled {
+						break
+					}
+					// shard the explicit ip:port targets the same way as the
+					// generated (host, port) space.
+					if !r.options.inShard(int64(twpIndex)) {
+						continue
+					}
 					ip, p, err := net.SplitHostPort(targetWithPort)
 					if err != nil {
 						gologger.Debug().Msgf("Skipping %s: %v\n", targetWithPort, err)
@@ -735,6 +973,16 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					}
 					if r.options.EnableProgressBar {
 						r.stats.IncrementCounter("packets", 1)
+					}
+				}
+
+				// flush any SYN packets still queued in the batch sender
+				if synSender != nil {
+					if err := synSender.flush(); err != nil {
+						if isCongestion(err) {
+							synPacer.onCongestion()
+						}
+						gologger.Debug().Msgf("final flush failed: %s\n", err)
 					}
 				}
 
@@ -903,11 +1151,10 @@ func (r *Runner) PickPort(index int) *port.Port {
 
 func (r *Runner) ConnectVerification() {
 	r.scanner.ListenHandler.Phase.Set(scan.Scan)
-	// cap concurrent verification goroutines (and their dials) at the scan rate,
-	// matching the main scan loop. A plain WaitGroup here let the goroutine count
-	// track the number of hosts with open ports, which could spawn an unbounded
-	// number of concurrent dials on large result sets.
-	swg := sizedwaitgroup.New(r.options.Rate)
+	// Cap concurrent verification dials at the same open-file-aware limit used
+	// by the main connect scan, while still pacing with the configured rate.
+	soft := raiseOpenFileLimit()
+	swg := sizedwaitgroup.New(connectConcurrency(r.options.Rate, soft))
 	limiter := ratelimit.New(context.Background(), uint(r.options.Rate), time.Second)
 	defer limiter.Stop()
 
@@ -1114,6 +1361,12 @@ func (r *Runner) SetSourceIP(sourceIP string) error {
 		return errors.New("invalid ip type")
 	}
 
+	// Bind the raw transport sockets to the source so the kernel actually emits
+	// packets with it; otherwise the fast/raw send path lets the kernel choose
+	// the source by route and the flag is silently ignored. A non-owned source
+	// (e.g. spoofing) leaves SourceBound4/SourceBound6 false and falls back to the L2 path.
+	r.scanner.ListenHandler.BindSourceIP(r.scanner.ListenHandler.SourceIp4, r.scanner.ListenHandler.SourceIP6)
+
 	return nil
 }
 
@@ -1203,10 +1456,37 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	ctx, cancel := context.WithCancel(parentCtx)
 	r.fpCancel = cancel
 	r.fpTargetCh = make(chan fingerprint.Target, 1000)
+	r.fpQueue = newFpQueue()
 	r.fpDone = make(chan struct{})
 	r.fpServices = make(map[string]*port.Service)
 
 	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
+
+	// Forward queued targets into the engine. The bounded queue absorbs bursts
+	// from fast discovery (with backpressure at capacity); this goroutine blocks
+	// on the engine channel instead of dropping, and closes fpTargetCh once the
+	// queue is closed and drained. It captures the queue and channel as locals so
+	// waitServiceDetection can clear the Runner fields without racing this loop.
+	q := r.fpQueue
+	ch := r.fpTargetCh
+	go func() {
+		for {
+			t, ok := q.pop()
+			if !ok {
+				close(ch)
+				return
+			}
+			// The engine stops draining ch once ctx is cancelled; select on
+			// ctx.Done() so a full channel can't block this forwarder forever
+			// (leaking the goroutine and its retained target backlog).
+			select {
+			case ch <- t:
+			case <-ctx.Done():
+				close(ch)
+				return
+			}
+		}
+	}()
 
 	gologger.Info().Msgf("Fingerprinting open port(s) with %d workers", r.options.ServiceVersionWorkers)
 
@@ -1223,17 +1503,30 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 }
 
 func (r *Runner) waitServiceDetection(scanResults *result.Result) {
-	if r.fpTargetCh == nil {
+	// Swap out the queue under the lock so a concurrent onReceive either sees a
+	// live queue or nil, never a half-cleared pointer. The forwarder holds its own
+	// captured reference, so it keeps draining after this.
+	r.fpMu.Lock()
+	q := r.fpQueue
+	r.fpQueue = nil
+	r.fpMu.Unlock()
+	if q == nil {
 		return
 	}
-	r.fpCloseOnce.Do(func() { close(r.fpTargetCh) })
+	// Close the queue (the forwarder drains the remaining targets and then closes
+	// fpTargetCh, which ends the engine). Only clear fpTargetCh after fpDone so the
+	// forwarder has finished and a reused Runner (SDK) can start a fresh cycle.
+	q.close()
 	<-r.fpDone
+	r.fpTargetCh = nil
 
-	for hostResult := range scanResults.GetIPsPorts() {
-		for _, p := range hostResult.Ports {
-			key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
-			if svc, ok := r.fpServices[key]; ok {
-				p.Service = svc
+	if scanResults != nil {
+		for hostResult := range scanResults.GetIPsPorts() {
+			for _, p := range hostResult.Ports {
+				key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
+				if svc, ok := r.fpServices[key]; ok {
+					p.Service = svc
+				}
 			}
 		}
 	}
@@ -1251,9 +1544,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	)
 
 	if r.options.Verify {
+		r.verifyReplay.Store(true)
 		for hostResult := range scanResults.GetIPsPorts() {
 			r.scanner.OnReceive(hostResult)
 		}
+		r.verifyReplay.Store(false)
 	}
 
 	// In case the user has given an output file, write all the found
@@ -1263,32 +1558,43 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 
 		// create path if not existing
 		outputFolder := filepath.Dir(output)
-		if fileutil.FolderExists(outputFolder) {
+		outputReady := true
+		if !fileutil.FolderExists(outputFolder) {
 			mkdirErr := os.MkdirAll(outputFolder, 0700)
 			if mkdirErr != nil {
 				gologger.Error().Msgf("Could not create output folder %s: %s\n", outputFolder, mkdirErr)
-				return
+				outputReady = false
 			}
 		}
 
-		file, err = os.Create(output)
-		if err != nil {
-			gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
-			return
-		}
-		defer func() {
-			if err := file.Close(); err != nil {
-				gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+		// A failure to create the primary output file must not abort the whole
+		// function: under -oA the XML/greppable writers below can still succeed,
+		// so leave file nil and fall through instead of returning.
+		if outputReady {
+			file, err = os.Create(output)
+			if err != nil {
+				gologger.Error().Msgf("Could not create file %s: %s\n", output, err)
+				file = nil
+			} else {
+				defer func() {
+					if err := file.Close(); err != nil {
+						gologger.Error().Msgf("Could not close file %s: %s\n", output, err)
+					}
+				}()
 			}
-		}()
+		}
 	}
 	csvFileHeaderEnabled := true
+	// The stdout buffer and the file are written by independent CSV writers, so
+	// they each need their own "header not yet written" flag; sharing one made the
+	// file lose its header whenever the stdout buffer consumed it first.
+	csvStdoutHeaderEnabled := true
 	hostPortPrinted := make(map[string]struct{})
 
 	switch {
 	case scanResults.HasIPsPorts():
 		for hostResult := range scanResults.GetIPsPorts() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostResult.IP)
+			dt, err := r.hostsForIP(hostResult.IP)
 			if err != nil {
 				continue
 			}
@@ -1298,21 +1604,10 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 			}
 
 			// recover hostnames from ip:port combination
-			for _, p := range hostResult.Ports {
-				ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-				if dtOthers, ok := r.scanner.IPRanger.Hosts.Get(ipPort); ok {
-					if otherName, _, err := net.SplitHostPort(string(dtOthers)); err == nil {
-						// replace bare ip:port with host
-						for idx, ipCandidate := range dt {
-							if iputil.IsIP(ipCandidate) {
-								dt[idx] = otherName
-							}
-						}
-					}
-				}
-			}
+			r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
 
 			buffer := bytes.Buffer{}
+			csvWriter := csv.NewWriter(&buffer)
 			for _, host := range dt {
 				buffer.Reset()
 				if host == "ip" {
@@ -1375,22 +1670,20 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							}
 							_, _ = fmt.Fprintf(&buffer, "%s\n", b)
 						} else if r.options.CSV {
-							writer := csv.NewWriter(&buffer)
-							if csvFileHeaderEnabled {
-								writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-								csvFileHeaderEnabled = false
+							if csvStdoutHeaderEnabled {
+								writeCSVHeaders(data, csvWriter, r.options.ExcludeOutputFields)
+								csvStdoutHeaderEnabled = false
 							}
-							writeCSVRow(data, writer, r.options.ExcludeOutputFields)
+							writeCSVRow(data, csvWriter, r.options.ExcludeOutputFields)
 						}
 					}
 				}
 
-				if !r.options.DisableStdout {
+				if !r.options.DisableStdout && r.finalJSONCSVToStdout() {
 					if r.options.JSON {
 						gologger.Silent().Msgf("%s", buffer.String())
 					} else if r.options.CSV {
-						writer := csv.NewWriter(&buffer)
-						writer.Flush()
+						csvWriter.Flush()
 						gologger.Silent().Msgf("%s", buffer.String())
 					}
 				}
@@ -1401,6 +1694,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						// Flip immediately after the first CSV write: multiple
+						// hostnames for one IP would otherwise each re-emit the header.
+						csvFileHeaderEnabled = false
 					} else {
 						err = WriteHostOutput(host, hostResult.Ports, r.options.OutputCDN, cdnName, file)
 					}
@@ -1417,7 +1713,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 		}
 	case scanResults.HasIPS():
 		for hostIP := range scanResults.GetIPs() {
-			dt, err := r.scanner.IPRanger.GetHostsByIP(hostIP)
+			dt, err := r.hostsForIP(hostIP)
 			if err != nil {
 				continue
 			}
@@ -1501,6 +1797,8 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 	}
 
 	r.outputDeadHosts(file, &csvFileHeaderEnabled)
+
+	r.writeNmapFormats(scanResults)
 }
 
 // outputDeadHosts reports the hosts that were probed during host discovery but
@@ -1519,7 +1817,7 @@ func (r *Runner) outputDeadHosts(file *os.File, csvFileHeaderEnabled *bool) {
 			continue
 		}
 
-		hosts, _ := r.scanner.IPRanger.GetHostsByIP(deadIP)
+		hosts, _ := r.hostsForIP(deadIP)
 		if len(hosts) == 0 {
 			hosts = []string{deadIP}
 		}

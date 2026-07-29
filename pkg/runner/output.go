@@ -11,8 +11,6 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -144,12 +142,21 @@ var (
 	headers              = []string{}
 )
 
+func stringSliceContains(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !slices.Contains(headers, csvTag) && !slices.Contains(excludedFields, csvTag) {
+		if !stringSliceContains(headers, csvTag) && !stringSliceContains(excludedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
@@ -170,7 +177,7 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		if slices.Contains(headers, csvTag) {
+		if stringSliceContains(headers, csvTag) {
 			var fieldStr string
 			if ty.Field(i).Name == "CPEs" {
 				fieldStr = strings.Join(data.CPEs, ";")

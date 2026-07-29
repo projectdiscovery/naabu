@@ -181,7 +181,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 
 		// fast IPv4 path: uint32 arithmetic, no big.Int
 		if useFastPath {
-			dstIP, ip, isV4 := tgtIdx.pickIPv4(ipIndex)
+			dstIP, ip, srcSum, isV4 := tgtIdx.pickIPv4(ipIndex)
 			if !isV4 {
 				// IPv6: fall back to standard path for this target.
 				ipStr := r.PickIP(targets, ipIndex)
@@ -216,7 +216,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 			}
 
 			r.limiter.Take()
-			if err := sender.send(dstIP, uint16(p.Port)); err != nil {
+			if err := sender.send(dstIP, srcSum, uint16(p.Port)); err != nil {
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, p.Port, err)
 			}
 			if r.options.EnableProgressBar {
@@ -428,30 +428,84 @@ func (pq *portQueue) len() int {
 	return len(pq.items)
 }
 
-func buildPopularityRank() map[int]int {
-	rank := make(map[int]int, 1200)
-	idx := 1
-	for _, segment := range strings.Split(NmapTop1000, ",") {
+// mostCommonOpenPorts lists TCP ports in descending order of how often they are
+// actually found open, which is the ordering a popularity rank needs.
+//
+// This cannot be derived from NmapTop100/NmapTop1000: both are stored as
+// numerically sorted port lists, so they record *membership* of the top-N set
+// but carry no frequency information. Walking them in order therefore yields a
+// port-number rank, not a popularity rank - which used to give port 1 (tcpmux,
+// effectively never open) the single highest priority while HTTPS sat at rank 75
+// and 8080 at rank 728.
+var mostCommonOpenPorts = []int{
+	80, 23, 443, 21, 22, 25, 3389, 110, 445, 139,
+	143, 53, 135, 3306, 8080, 1723, 111, 995, 993, 5900,
+}
+
+// expandPortListOrdered expands a comma/range port string preserving the order
+// in which ports appear, so callers can derive a stable rank from it.
+func expandPortListOrdered(list string) []int {
+	ports := make([]int, 0, 1024)
+	for _, segment := range strings.Split(list, ",") {
 		segment = strings.TrimSpace(segment)
+		if segment == "" {
+			continue
+		}
 		if strings.Contains(segment, "-") {
-			parts := strings.Split(segment, "-")
-			start, err1 := strconv.Atoi(parts[0])
-			end, err2 := strconv.Atoi(parts[1])
-			if err1 != nil || err2 != nil {
+			parts := strings.SplitN(segment, "-", 2)
+			start, err1 := strconv.Atoi(strings.TrimSpace(parts[0]))
+			end, err2 := strconv.Atoi(strings.TrimSpace(parts[1]))
+			if err1 != nil || err2 != nil || end < start {
 				continue
 			}
 			for p := start; p <= end; p++ {
-				rank[p] = idx
-				idx++
+				ports = append(ports, p)
 			}
-		} else {
-			p, err := strconv.Atoi(segment)
-			if err != nil {
+			continue
+		}
+		p, err := strconv.Atoi(segment)
+		if err != nil {
+			continue
+		}
+		ports = append(ports, p)
+	}
+	return ports
+}
+
+// buildPopularityRank assigns each known port a rank, 1 being most likely open.
+// Priority is derived as 1/rank, so lower ranks must mean genuinely more common
+// ports.
+//
+// Ranking is tiered, because real frequency data is only available for the head
+// of the distribution:
+//
+//	tier 1 - mostCommonOpenPorts, in true frequency order
+//	tier 2 - remaining members of the nmap top-100 set
+//	tier 3 - remaining members of the nmap top-1000 set
+//
+// Within tiers 2 and 3 ports keep their numeric order. That is not a frequency
+// ordering, but the tier itself carries the signal and inventing an order would
+// be worse than admitting we do not have one.
+func buildPopularityRank() map[int]int {
+	rank := make(map[int]int, 1200)
+	idx := 1
+
+	assign := func(ports []int) {
+		for _, p := range ports {
+			if p < 1 || p > 65535 {
+				continue
+			}
+			if _, seen := rank[p]; seen {
 				continue
 			}
 			rank[p] = idx
 			idx++
 		}
 	}
+
+	assign(mostCommonOpenPorts)
+	assign(expandPortListOrdered(NmapTop100))
+	assign(expandPortListOrdered(NmapTop1000))
+
 	return rank
 }

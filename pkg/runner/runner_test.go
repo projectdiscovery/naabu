@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
@@ -841,6 +842,141 @@ func TestRunnerHostDiscovery(t *testing.T) {
 	require.NoError(t, err)
 }
 
+func TestWaitServiceDetectionReusableAcrossRuns(t *testing.T) {
+	r := &Runner{}
+	// Two consecutive scans on the same Runner (SDK reuse). Each run sets up a
+	// fresh queue + forwarder + drain goroutine the way initServiceDetection
+	// does; the second run must not deadlock waiting on fpDone.
+	for i := 0; i < 2; i++ {
+		r.fpQueue = newFpQueue()
+		r.fpTargetCh = make(chan fingerprint.Target, 1)
+		r.fpDone = make(chan struct{})
+		go func(q *fpQueue, ch chan fingerprint.Target) {
+			for {
+				tgt, ok := q.pop()
+				if !ok {
+					close(ch)
+					return
+				}
+				ch <- tgt
+			}
+		}(r.fpQueue, r.fpTargetCh)
+		go func(ch chan fingerprint.Target, done chan struct{}) {
+			for range ch {
+			}
+			close(done)
+		}(r.fpTargetCh, r.fpDone)
+
+		got := make(chan struct{})
+		go func() {
+			r.waitServiceDetection(result.NewResult())
+			close(got)
+		}()
+		select {
+		case <-got:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("run %d: waitServiceDetection deadlocked on reuse", i)
+		}
+		require.Nil(t, r.fpQueue, "fpQueue must be cleared so the next run can recreate it")
+		require.Nil(t, r.fpTargetCh, "fpTargetCh must be cleared so the next run can recreate it")
+	}
+}
+
+func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {
+	runner := newConnectRunner(t)
+	runner.options.DisableStdout = true
+
+	ip := "192.168.1.10"
+	// First event records port 80.
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{{Port: 80, Protocol: protocol.TCP}}})
+	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "80")), "port 80 must be recorded")
+
+	// Second event mixes an already-seen port (80) with a new one (443).
+	// The duplicate must not cause the new port to be dropped.
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{
+		{Port: 80, Protocol: protocol.TCP},
+		{Port: 443, Protocol: protocol.TCP},
+	}})
+	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "443")), "new port 443 must still be recorded despite the leading duplicate")
+}
+
+func TestHostsForIPNoStoreFastPath(t *testing.T) {
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4"},
+	}
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer func() { _ = runner.Close() }()
+	require.NoError(t, runner.Load())
+
+	// Pure CIDR input must not flag hostname mapping.
+	require.False(t, runner.hasHostnames.Load(), "pure CIDR input must not set hasHostnames")
+
+	// Fast path returns the IP directly without consulting the store, even for
+	// an IP never added to the ranger.
+	dt, err := runner.hostsForIP("203.0.113.7")
+	require.NoError(t, err)
+	require.Equal(t, []string{"203.0.113.7"}, dt)
+
+	// recoverHostnames is a no-op on the fast path.
+	in := []string{"203.0.113.7"}
+	runner.recoverHostnames("203.0.113.7", []*port.Port{{Port: 80, Protocol: protocol.TCP}}, in)
+	require.Equal(t, []string{"203.0.113.7"}, in)
+}
+
+func TestHostsForIPUsesStoreWhenHostnames(t *testing.T) {
+	options := &Options{
+		Host:      []string{"192.168.1.0/24"},
+		Ports:     "80",
+		ScanType:  ConnectScan,
+		IPVersion: []string{"4"},
+	}
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	defer func() { _ = runner.Close() }()
+	require.NoError(t, runner.Load())
+
+	// Simulate a hostname-bearing scan and the corresponding store entries.
+	runner.hasHostnames.Store(true)
+	require.NoError(t, runner.scanner.IPRanger.AddHostWithMetadata("203.0.113.7", "example.com"))
+	require.NoError(t, runner.scanner.IPRanger.AddHostWithMetadata("203.0.113.7:80", "example.com:80"))
+
+	dt, err := runner.hostsForIP("203.0.113.7")
+	require.NoError(t, err)
+	require.Contains(t, dt, "example.com")
+
+	// ip:port recovery rewrites a bare IP with the recorded hostname.
+	rec := []string{"203.0.113.7"}
+	runner.recoverHostnames("203.0.113.7", []*port.Port{{Port: 80, Protocol: protocol.TCP}}, rec)
+	require.Equal(t, []string{"example.com"}, rec)
+}
+
+func TestFinalJSONCSVToStdout(t *testing.T) {
+	cases := []struct {
+		name string
+		opts *Options
+		want bool
+	}{
+		{"plain live", &Options{JSON: false, CSV: false}, false},
+		{"json live", &Options{JSON: true}, false},
+		{"csv live", &Options{CSV: true}, false},
+		{"service version json", &Options{JSON: true, ServiceVersion: true}, true},
+		{"service version plain", &Options{ServiceVersion: true}, true},
+		{"nmap json deferred", &Options{JSON: true, NmapCLI: "nmap -sV"}, true},
+		{"nmap csv deferred", &Options{CSV: true, NmapCLI: "nmap -sV"}, true},
+		{"nmap without json/csv", &Options{NmapCLI: "nmap -sV"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &Runner{options: tc.opts}
+			require.Equal(t, tc.want, r.finalJSONCSVToStdout())
+		})
+	}
+}
+
 // TestRunnerGetIPs tests IP preprocessing methods
 func TestRunnerGetIPs(t *testing.T) {
 	options := &Options{
@@ -989,22 +1125,30 @@ func TestConcurrentSYNScans(t *testing.T) {
 }
 
 func TestNewRunner_ScanTypeSyncAfterFallback(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		// The fallback is triggered by raw capture failing on a bogus interface.
+		// Windows CI has npcap and resolves capture independently of the given
+		// name, so raw infra comes up and no fallback happens. The fallback
+		// propagation itself is platform independent and covered on linux/macos.
+		t.Skip("raw capture availability and interface handling differ on windows")
+	}
 	origRouter := scan.PkgRouter
 	origPriv := privileges.IsPrivileged
-	origHandlers := scan.ListenHandlers
+	origIface := scan.NetworkInterface
 	defer func() {
 		scan.PkgRouter = origRouter
 		privileges.IsPrivileged = origPriv
-		scan.ListenHandlers = origHandlers
+		scan.NetworkInterface = origIface
 	}()
 
-	// Force the fallback: router exists + privileged + all handlers busy
+	// Force the fallback: privileged SYN scan whose raw infrastructure cannot
+	// come up (bogus capture interface) -> Acquire errors -> connect fallback.
 	scan.PkgRouter = origRouter
 	if scan.PkgRouter == nil {
 		scan.PkgRouter = stubRouter{}
 	}
 	privileges.IsPrivileged = true
-	scan.ListenHandlers = []*scan.ListenHandler{{Busy: true, Phase: &scan.Phase{}}}
+	scan.NetworkInterface = "naabu-nonexistent-iface0"
 
 	options := &Options{
 		Host:     []string{"127.0.0.1"},

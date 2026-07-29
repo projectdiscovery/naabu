@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,20 +72,26 @@ type Options struct {
 	// Deprecated: stats are automatically available through local endpoint
 	EnableProgressBar bool // Enable progress bar
 	// Deprecated: stats are automatically available through local endpoint (maybe used on cloud?)
-	StatsInterval     int                 // StatsInterval is the number of seconds to display stats after
-	ScanAllIPS        bool                // Scan all the ips
-	IPVersion         goflags.StringSlice // IP Version to use while resolving hostnames
-	ScanType          string              // Scan Type
-	ConnectPayload    string              // Payload to use with CONNECT scan types
-	Proxy             string              // Socks5 proxy
-	ProxyAuth         string              // Socks5 proxy authentication (username:password)
-	Resolvers         string              // Resolvers (comma separated or file)
-	baseResolvers     []string
-	DnsOrder          string          // DNS resolution order (p/l/lp/pl)
-	SystemResolver    bool            // Use system DNS resolver as fallback
-	OnResult          result.ResultFn // callback on final host result
-	OnReceive         result.ResultFn // callback on response receive
-	CSV               bool
+	StatsInterval  int                 // StatsInterval is the number of seconds to display stats after
+	ScanAllIPS     bool                // Scan all the ips
+	IPVersion      goflags.StringSlice // IP Version to use while resolving hostnames
+	ScanType       string              // Scan Type
+	ConnectPayload string              // Payload to use with CONNECT scan types
+	Proxy          string              // Socks5 proxy
+	ProxyAuth      string              // Socks5 proxy authentication (username:password)
+	Resolvers      string              // Resolvers (comma separated or file)
+	baseResolvers  []string
+	DnsOrder       string          // DNS resolution order (p/l/lp/pl)
+	SystemResolver bool            // Use system DNS resolver as fallback
+	OnResult       result.ResultFn // callback on final host result
+	OnReceive      result.ResultFn // callback on response receive
+	CSV            bool
+	// XMLOutput is an optional file path for nmap-compatible XML output ("-" for stdout)
+	XMLOutput string
+	// GrepOutput is an optional file path for nmap-compatible greppable output ("-" for stdout)
+	GrepOutput string
+	// OutputAll is a base name that expands to <base>.json, <base>.xml and <base>.gnmap
+	OutputAll         string
 	Resume            bool
 	ResumeCfg         *ResumeCfg
 	Stream            bool
@@ -156,15 +163,49 @@ type Options struct {
 	// SmartScan enables predictive port scanning: after the initial scan,
 	// a correlation model predicts additional likely-open ports per host.
 	SmartScan bool
+	// NoPortPriority disables tiered scan ordering, restoring a single uniform
+	// Blackrock permutation over the whole (host, port) space.
+	//
+	// Tiered ordering scans the nmap top-100, then the rest of the top-1000,
+	// then everything else, randomising within each tier. That keeps the most
+	// likely open ports early regardless of how wide the range is, which a single
+	// uniform permutation cannot do. Disable it to get a completely uniform probe
+	// distribution across the range.
+	NoPortPriority bool
 	// PredictionThreshold is the minimum confidence percentage (0–100) to
 	// act on a port prediction (default 20, meaning 20%).
 	PredictionThreshold int
+
+	// TimingTemplate is an nmap-style timing level (0 paranoid .. 5 insane)
+	// that presets rate/retries/timeout/warm-up/threads. T3 is the default and
+	// matches naabu's historical behaviour.
+	TimingTemplate int
+
+	// Shard / ShardTotal split the scan space across distributed nodes
+	// (masscan-style "X/Y", 1-based): node Shard of ShardTotal scans only its
+	// slice of the (host, port) space. ShardTotal == 0 disables sharding.
+	Shard      int
+	ShardTotal int
+
+	// Seed fixes the blackrock shuffle seed for reproducible scans. It must be
+	// identical across nodes when sharding so the slices are disjoint and
+	// complete. SeedSet distinguishes an explicit -seed (including 0) from an unset
+	// flag, so 0 is a usable reproducible seed rather than "random".
+	Seed    int64
+	SeedSet bool
+
+	// TxWorkers is the number of parallel transmit goroutines (each with its
+	// own raw socket, batch buffer and rate slice) used by the fast SYN sender.
+	// >1 overcomes the single-core send ceiling. Default 1 (unchanged behaviour).
+	TxWorkers int
 }
 
 // ParseOptions parses the command line flags provided by a user
 func ParseOptions() *Options {
 	options := &Options{}
 	var cfgFile string
+	var shardArg string
+	var seedArg int
 
 	flagSet := goflags.NewFlagSet()
 	flagSet.SetDescription(`Naabu is a port scanning tool written in Go that allows you to enumerate open ports for hosts in a fast and reliable manner.`)
@@ -189,6 +230,7 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("rate-limit", "Rate-limit",
 		flagSet.IntVar(&options.Threads, "c", DefaultThreadsNum, "general internal worker threads"),
 		flagSet.IntVar(&options.Rate, "rate", DefaultRateSynScan, "packets to send per second"),
+		flagSet.IntVarP(&options.TxWorkers, "tx-workers", "tw", 1, "parallel transmit workers for the fast SYN sender"),
 	)
 
 	flagSet.CreateGroup("update", "Update",
@@ -202,6 +244,9 @@ func ParseOptions() *Options {
 		flagSet.StringSliceVarP(&options.ExcludeOutputFields, "exclude-output-fields", "eof", nil, "exclude output fields output based on a condition", goflags.NormalizedOriginalStringSliceOptions),
 		flagSet.BoolVarP(&options.JSON, "json", "j", false, "write output in JSON lines format"),
 		flagSet.BoolVar(&options.CSV, "csv", false, "write output in csv format"),
+		flagSet.StringVarP(&options.XMLOutput, "xml-output", "oX", "", "write nmap-compatible XML output to file (- for stdout)"),
+		flagSet.StringVarP(&options.GrepOutput, "grep-output", "oG", "", "write nmap-compatible greppable output to file (- for stdout)"),
+		flagSet.StringVarP(&options.OutputAll, "output-all", "oA", "", "write json, xml and greppable output to <basename>.{json,xml,gnmap}"),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
@@ -261,11 +306,15 @@ func ParseOptions() *Options {
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
 		flagSet.DurationVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
-		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", 2, "time in seconds between scan phases"),
+		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", defaultWarmUpTime, "time in seconds between scan phases"),
+		flagSet.IntVarP(&options.TimingTemplate, "timing", "T", DefaultTimingTemplate, "timing template, higher is faster (0-5)"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
 		flagSet.BoolVarP(&options.SmartScan, "smart-scan", "ss", false, "predictive port scanning using port correlation model (not compatible with stream mode)"),
 		flagSet.IntVarP(&options.PredictionThreshold, "prediction-threshold", "pt", 20, "minimum confidence for port predictions (0-100%)"),
+		flagSet.BoolVarP(&options.NoPortPriority, "no-port-priority", "npp", false, "disable tiered port ordering (scan the whole range in one uniform random order)"),
+		flagSet.StringVar(&shardArg, "shard", "", "distributed scan slice as index/total, 1-based (e.g. 1/4)"),
+		flagSet.IntVar(&seedArg, "seed", 0, "seed for scan randomization, must match across shards (default random)"),
 	)
 
 	flagSet.CreateGroup("debug", "Debug",
@@ -350,6 +399,7 @@ func ParseOptions() *Options {
 			gologger.Fatal().Msgf("%s\n", err)
 		}
 	}
+	options.expandOutputAll()
 	options.configureOutput()
 	// Show the user the banner
 	showBanner()
@@ -375,6 +425,26 @@ func ParseOptions() *Options {
 			gologger.Error().Msgf("Could not get network interfaces: %s\n", err)
 		}
 		os.Exit(0)
+	}
+
+	options.Seed = int64(seedArg)
+	if shardArg != "" {
+		idx, total, err := parseShard(shardArg)
+		if err != nil {
+			gologger.Fatal().Msgf("Program exiting: %s\n", err)
+		}
+		options.Shard, options.ShardTotal = idx, total
+	}
+
+	// Apply the timing template before validation so the connect-scan rate
+	// adjustments in ValidateOptions see the resolved values. Collect the flags the
+	// user actually set so the template only fills the ones left untouched, even
+	// when an explicit value coincides with the compile-time default.
+	setFlags := make(map[string]struct{})
+	flagSet.CommandLine.Visit(func(f *flag.Flag) { setFlags[f.Name] = struct{}{} })
+	options.applyTimingTemplate(setFlags)
+	if _, ok := setFlags["seed"]; ok {
+		options.SeedSet = true
 	}
 
 	// Validate the options passed by the user and if any

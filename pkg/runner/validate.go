@@ -51,6 +51,31 @@ func (options *Options) ValidateOptions() error {
 		return errTwoOutputMode
 	}
 
+	if options.TimingTemplate < 0 || options.TimingTemplate > 5 {
+		return fmt.Errorf("invalid timing template %d (valid range 0-5)", options.TimingTemplate)
+	}
+
+	if options.ShardTotal != 0 && (options.ShardTotal < 1 || options.Shard < 1 || options.Shard > options.ShardTotal) {
+		return fmt.Errorf("invalid shard %d/%d (require 1 <= index <= total)", options.Shard, options.ShardTotal)
+	}
+
+	// Sharding partitions the (host, port) index space, but the smart-scan and
+	// stream paths do not consult inShard, so combining them would make every
+	// node scan the full space (duplicated work, not a partition). Reject it
+	// rather than silently mis-sharding.
+	if options.ShardTotal > 1 {
+		if options.SmartScan {
+			return fmt.Errorf("-shard is not supported with -smart-scan")
+		}
+		if options.Stream {
+			return fmt.Errorf("-shard is not supported with -stream")
+		}
+	}
+
+	if options.TxWorkers < 0 || options.TxWorkers > 256 {
+		return fmt.Errorf("invalid tx-workers %d (valid range 0-256, 0 = default)", options.TxWorkers)
+	}
+
 	if options.Rate == 0 {
 		return errkit.Wrap(errZeroValue, "rate")
 	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
@@ -193,6 +218,32 @@ func (options *Options) ValidateOptions() error {
 }
 
 // configureOutput configures the output on the screen
+// expandOutputAll turns -oA <base> into the three concrete output targets
+// (<base>.json, <base>.xml, <base>.gnmap). Explicitly set -o/-oX/-oG win so the
+// user can override any single target.
+func (options *Options) expandOutputAll() {
+	base := strings.TrimSpace(options.OutputAll)
+	if base == "" {
+		return
+	}
+	if options.Output == "" {
+		// Honor an explicit -csv so -oA does not force JSON and then trip the
+		// "json and csv both specified" validation error.
+		if options.CSV {
+			options.Output = base + ".csv"
+		} else {
+			options.Output = base + ".json"
+			options.JSON = true
+		}
+	}
+	if options.XMLOutput == "" {
+		options.XMLOutput = base + ".xml"
+	}
+	if options.GrepOutput == "" {
+		options.GrepOutput = base + ".gnmap"
+	}
+}
+
 func (options *Options) configureOutput() {
 	// gologger enables levels with `level <= maxLevel` and orders
 	// Fatal < Silent < Error < Info < Warning < Debug < Verbose.
