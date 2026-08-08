@@ -179,6 +179,8 @@ To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: 
 go install -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
 ```
 
+Windows tip: after `go install`, confirm `%USERPROFILE%\go\bin` (or `$env:GOBIN`) is on your `PATH`, then start a **new** terminal so `naabu` resolves.
+
 # Running Naabu
 
 To run the tool on a target, just use the following command.
