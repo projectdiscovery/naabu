@@ -230,6 +230,33 @@ func NewRunner(options *Options) (*Runner, error) {
 		ScanType:             options.ScanType,
 		NetworkPolicyOptions: options.NetworkPolicyOptions,
 	}
+	if options.OnDecoySynAck != nil {
+		// A hostile path may generate thousands of decoys for one IP. Resolve
+		// original hostnames once per IP rather than hitting IPRanger's
+		// disk-backed host index for every rejected packet.
+		var decoyHosts sync.Map
+		scanOpts.OnDecoySynAck = func(ip string, portNumber int) {
+			cached, ok := decoyHosts.Load(ip)
+			if !ok {
+				hosts, _ := runner.scanner.IPRanger.GetHostsByIP(ip)
+				if len(hosts) == 0 {
+					hosts = []string{ip}
+				}
+				cached, _ = decoyHosts.LoadOrStore(ip, hosts)
+			}
+			hosts := cached.([]string)
+			for _, host := range hosts {
+				options.OnDecoySynAck(&result.HostResult{
+					Host: host,
+					IP:   ip,
+					Ports: []*port.Port{{
+						Port:     portNumber,
+						Protocol: protocol.TCP,
+					}},
+				})
+			}
+		}
+	}
 
 	if scanOpts.OnReceive == nil {
 		scanOpts.OnReceive = runner.onReceive

@@ -113,7 +113,8 @@ type Scanner struct {
 	ScanType             string
 	ListenHandler        *ListenHandler
 	OnReceive            result.ResultFn
-	workersWg sync.WaitGroup
+	OnDecoySynAck        func(ip string, port int)
+	workersWg            sync.WaitGroup
 	// cancelWorkers cancels the context that drives the result workers so that
 	// Close can release them even when the scan context has not been cancelled
 	// yet (e.g. Close called out of order or on early teardown). Without it
@@ -183,6 +184,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		tcpsequencer:  NewTCPSequencer(),
 		IPRanger:      iprang,
 		OnReceive:     options.OnReceive,
+		OnDecoySynAck: options.OnDecoySynAck,
 	}
 
 	scanner.HostDiscoveryResults = result.NewResult()
@@ -217,6 +219,7 @@ func NewScanner(options *Options) (*Scanner, error) {
 		handler, acquireErr := Acquire(options)
 		if acquireErr == nil {
 			scanner.ListenHandler = handler
+			scanner.ListenHandler.OnDecoySynAck = scanner.OnDecoySynAck
 			break
 		}
 		if options.ScanType == TypeSyn {

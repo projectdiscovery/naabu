@@ -978,6 +978,20 @@ func TransportReadWorker() {
 					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
 					continue
 				}
+				// On-path SYN-proxies forge cookie-valid SYN-ACKs under scan
+				// load. Reject the win=0 / no-options fingerprint before the
+				// port is recorded as open; see isDecoySynAck.
+				if isDecoySynAck(tcp) {
+					gologger.Debug().Msgf("Discarding decoy SYN-ACK (win=0, no options): ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
+					if listenHandler.OnDecoySynAck != nil {
+						ip := srcIP4
+						if ip == "" {
+							ip = srcIP6
+						}
+						listenHandler.OnDecoySynAck(ip, int(tcp.SrcPort))
+					}
+					continue
+				}
 				select {
 				case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
 				case <-listenHandler.done:
