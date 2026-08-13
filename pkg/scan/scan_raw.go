@@ -983,13 +983,6 @@ func TransportReadWorker() {
 				// port is recorded as open; see isDecoySynAck.
 				if isDecoySynAck(tcp) {
 					gologger.Debug().Msgf("Discarding decoy SYN-ACK (win=0, no options): ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
-					if listenHandler.OnDecoySynAck != nil {
-						ip := srcIP4
-						if ip == "" {
-							ip = srcIP6
-						}
-						listenHandler.OnDecoySynAck(ip, int(tcp.SrcPort))
-					}
 					continue
 				}
 				select {

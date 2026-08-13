@@ -85,11 +85,7 @@ type Options struct {
 	SystemResolver bool            // Use system DNS resolver as fallback
 	OnResult       result.ResultFn // callback on final host result
 	OnReceive      result.ResultFn // callback on response receive
-	// OnDecoySynAck receives cookie-valid SYN-ACKs rejected as middlebox
-	// decoys. HostResult contains the resolved IP, original hostname when
-	// available, and the rejected source port.
-	OnDecoySynAck result.ResultFn
-	CSV           bool
+	CSV            bool
 	// XMLOutput is an optional file path for nmap-compatible XML output ("-" for stdout)
 	XMLOutput string
 	// GrepOutput is an optional file path for nmap-compatible greppable output ("-" for stdout)

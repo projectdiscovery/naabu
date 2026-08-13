@@ -14,20 +14,17 @@ const (
 
 // Options of the scan
 type Options struct {
-	Timeout       time.Duration
-	Retries       int
-	Rate          int
-	PortThreshold int
-	ExcludeCdn    bool
-	OutputCdn     bool
-	ExcludedIps   []string
-	Proxy         string
-	ProxyAuth     string
-	Stream        bool
-	OnReceive     result.ResultFn
-	// OnDecoySynAck is called for cookie-valid SYN-ACKs rejected as
-	// middlebox decoys. The IP and source port identify the affected target.
-	OnDecoySynAck        func(ip string, port int)
+	Timeout              time.Duration
+	Retries              int
+	Rate                 int
+	PortThreshold        int
+	ExcludeCdn           bool
+	OutputCdn            bool
+	ExcludedIps          []string
+	Proxy                string
+	ProxyAuth            string
+	Stream               bool
+	OnReceive            result.ResultFn
 	ScanType             string
 	NetworkPolicyOptions *networkpolicy.Options
 }

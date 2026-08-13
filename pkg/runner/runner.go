@@ -230,33 +230,6 @@ func NewRunner(options *Options) (*Runner, error) {
 		ScanType:             options.ScanType,
 		NetworkPolicyOptions: options.NetworkPolicyOptions,
 	}
-	if options.OnDecoySynAck != nil {
-		// A hostile path may generate thousands of decoys for one IP. Resolve
-		// original hostnames once per IP rather than hitting IPRanger's
-		// disk-backed host index for every rejected packet.
-		var decoyHosts sync.Map
-		scanOpts.OnDecoySynAck = func(ip string, portNumber int) {
-			cached, ok := decoyHosts.Load(ip)
-			if !ok {
-				hosts, _ := runner.scanner.IPRanger.GetHostsByIP(ip)
-				if len(hosts) == 0 {
-					hosts = []string{ip}
-				}
-				cached, _ = decoyHosts.LoadOrStore(ip, hosts)
-			}
-			hosts := cached.([]string)
-			for _, host := range hosts {
-				options.OnDecoySynAck(&result.HostResult{
-					Host: host,
-					IP:   ip,
-					Ports: []*port.Port{{
-						Port:     portNumber,
-						Protocol: protocol.TCP,
-					}},
-				})
-			}
-		}
-	}
 
 	if scanOpts.OnReceive == nil {
 		scanOpts.OnReceive = runner.onReceive
@@ -1194,13 +1167,15 @@ func (r *Runner) ConnectVerification() {
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
 
-			// skip low confidence
-			if hostResult.Confidence == confidence.Low {
-				return
-			}
-
 			results := r.scanner.ConnectVerify(hostResult.IP, hostResult.Ports)
 			verifiedResult.SetPorts(hostResult.IP, results)
+			// PortThreshold marks a host Low after truncating its scan. Keep that
+			// state through verification so consumers can distinguish a complete
+			// sparse scan from a capped one. Low is metadata, not a reason to
+			// erase the host before verification or OnResult.
+			if hostResult.Confidence == confidence.Low {
+				verifiedResult.AddSkipped(hostResult.IP)
+			}
 		}(hostResult)
 	}
 
@@ -1733,7 +1708,12 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 
 				if r.options.OnResult != nil {
-					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports})
+					r.options.OnResult(&result.HostResult{
+						Host:       host,
+						IP:         hostResult.IP,
+						Ports:      hostResult.Ports,
+						Confidence: hostResult.Confidence,
+					})
 				}
 			}
 			csvFileHeaderEnabled = false

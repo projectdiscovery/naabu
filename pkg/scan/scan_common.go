@@ -53,7 +53,7 @@ type ListenHandler struct {
 	// were successfully bound to SourceIp4/SourceIP6 so the kernel emits packets
 	// with that source. Tracked per family so a successful IPv6 bind cannot make
 	// the IPv4 path skip L2 fallback (or vice versa).
-	SourceBound4, SourceBound6             bool
+	SourceBound4, SourceBound6              bool
 	Port                                   int
 	TcpConn4, UdpConn4, TcpConn6, UdpConn6 *net.IPConn
 	TcpChan, UdpChan, HostDiscoveryChan    chan *PkgResult
@@ -70,9 +70,6 @@ type ListenHandler struct {
 	// probing", which preserves the legacy zero-length-datagram
 	// behavior for callers that have not opted in to -uP.
 	UDPProbeProvider UDPProbeProvider
-	// OnDecoySynAck receives cookie-valid SYN-ACKs rejected as middlebox
-	// decoys. It is copied from the owning Scanner when acquired.
-	OnDecoySynAck func(ip string, port int)
 }
 
 func NewListenHandler() *ListenHandler {
