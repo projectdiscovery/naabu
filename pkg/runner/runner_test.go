@@ -900,6 +900,53 @@ func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {
 	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "443")), "new port 443 must still be recorded despite the leading duplicate")
 }
 
+// TestOnReceiveTLSCheckedReflectsScanPath guards against feeding the
+// fingerprint engine a false "TLS already checked" signal. TLSChecked must
+// only be true when the port genuinely went through scan.ConnectPort's TLS
+// handshake (the CONNECT-scan path) - raw SYN scanning and passive
+// (Shodan-sourced) results never open a real connection, so p.TLS is just
+// its unset zero value there, not a confirmed "not TLS".
+func TestOnReceiveTLSCheckedReflectsScanPath(t *testing.T) {
+	origRouter := scan.PkgRouter
+	origPriv := privileges.IsPrivileged
+	defer func() {
+		scan.PkgRouter = origRouter
+		privileges.IsPrivileged = origPriv
+	}()
+	scan.PkgRouter = stubRouter{}
+	privileges.IsPrivileged = true
+
+	tests := []struct {
+		name        string
+		scanType    string
+		passive     bool
+		wantChecked bool
+	}{
+		{"syn scan never performs a real TLS check", SynScan, false, false},
+		{"connect scan performs a real TLS check", ConnectScan, false, true},
+		{"passive results are never TLS-checked even on connect scan type", ConnectScan, true, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			runner := newConnectRunner(t)
+			runner.options.ScanType = tt.scanType
+			runner.options.Passive = tt.passive
+			runner.fpQueue = newFpQueue()
+
+			runner.onReceive(&result.HostResult{
+				IP:    "192.168.1.77",
+				Ports: []*port.Port{{Port: 443, Protocol: protocol.TCP}},
+			})
+
+			tgt, ok := runner.fpQueue.pop()
+			require.True(t, ok, "port must have been queued for fingerprinting")
+			require.Equal(t, tt.wantChecked, tgt.TLSChecked)
+			require.False(t, tgt.TLSDetected, "p.TLS was never set to true on this path")
+		})
+	}
+}
+
 func TestHostsForIPNoStoreFastPath(t *testing.T) {
 	options := &Options{
 		Host:      []string{"192.168.1.0/24"},
