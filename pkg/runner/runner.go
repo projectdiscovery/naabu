@@ -360,13 +360,21 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 				break
 			}
 		}
+		// TLS is only actually probed on the CONNECT-scan path (scan.ConnectPort,
+		// gated by scan.EnableTLSDetection). Raw SYN scanning never opens a real
+		// connection, and passive (Shodan-sourced) ports are never probed at all,
+		// so p.TLS is just its false zero value on both paths - telling the
+		// fingerprint engine TLSChecked in that case would make it trust a "not
+		// TLS" that was never actually checked, and it would silently stop trying
+		// TLS handshakes against real HTTPS/TLS ports.
+		tlsChecked := !r.options.Passive && !r.options.shouldUseRawPackets()
 		for _, p := range hostResult.Ports {
 			fpq.push(fingerprint.Target{
 				Host:        hostname,
 				IP:          hostResult.IP,
 				Port:        p.Port,
 				TLSDetected: p.TLS, //nolint:staticcheck // deprecated but still set by scan layer
-				TLSChecked:  true,
+				TLSChecked:  tlsChecked,
 			})
 		}
 	}
