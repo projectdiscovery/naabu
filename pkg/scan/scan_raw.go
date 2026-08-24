@@ -942,54 +942,64 @@ func SetupHandlerUnix(interfaceName, bpfFilter string, protocols ...protocol.Pro
 	return nil
 }
 
-func TransportReadWorker() {
-	var wgread sync.WaitGroup
+// transportReaderCallback routes one decoded transport packet to every
+// registered listen handler. It is the single point where a reply becomes a
+// recorded port, so the cookie and decoy rejections both live here.
+func transportReaderCallback(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 string) {
+	// Snapshot handlers under the registry lock, then deliver outside it.
+	// Blocking channel sends must not hold listenHandlersMu or Release/Close
+	// can deadlock when a result channel is full (e.g. -sV backpressure).
+	listenHandlersMu.RLock()
+	handlersSnap := make([]*ListenHandler, len(ListenHandlers))
+	copy(handlersSnap, ListenHandlers)
+	listenHandlersMu.RUnlock()
 
-	transportReaderCallback := func(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 string) {
-		// Snapshot handlers under the registry lock, then deliver outside it.
-		// Blocking channel sends must not hold listenHandlersMu or Release/Close
-		// can deadlock when a result channel is full (e.g. -sV backpressure).
-		listenHandlersMu.RLock()
-		handlersSnap := make([]*ListenHandler, len(ListenHandlers))
-		copy(handlersSnap, ListenHandlers)
-		listenHandlersMu.RUnlock()
-
-		for _, listenHandler := range handlersSnap {
-			// We consider only incoming packets
-			tcpPortMatches := tcp.DstPort == layers.TCPPort(listenHandler.Port)
-			udpPortMatches := udp.DstPort == layers.UDPPort(listenHandler.Port)
-			sourcePortMatches := tcpPortMatches || udpPortMatches
-			switch {
-			case !sourcePortMatches:
-				gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
-			case listenHandler.Phase.Is(HostDiscovery):
-				proto := protocol.TCP
-				srcPort := int(tcp.SrcPort)
-				if udpPortMatches {
-					proto = protocol.UDP
-					srcPort = int(udp.SrcPort)
-				}
-				select {
-				case listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}:
-				case <-listenHandler.done:
-				}
-			case tcpPortMatches && tcp.SYN && tcp.ACK:
-				if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
-					gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
-					continue
-				}
-				select {
-				case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
-				case <-listenHandler.done:
-				}
-			case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
-				select {
-				case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:
-				case <-listenHandler.done:
-				}
+	for _, listenHandler := range handlersSnap {
+		// We consider only incoming packets
+		tcpPortMatches := tcp.DstPort == layers.TCPPort(listenHandler.Port)
+		udpPortMatches := udp.DstPort == layers.UDPPort(listenHandler.Port)
+		sourcePortMatches := tcpPortMatches || udpPortMatches
+		switch {
+		case !sourcePortMatches:
+			gologger.Debug().Msgf("Discarding Transport packet from non target ips: ip4=%s ip6=%s tcp_dport=%d udp_dport=%d\n", srcIP4, srcIP6, tcp.DstPort, udp.DstPort)
+		case listenHandler.Phase.Is(HostDiscovery):
+			proto := protocol.TCP
+			srcPort := int(tcp.SrcPort)
+			if udpPortMatches {
+				proto = protocol.UDP
+				srcPort = int(udp.SrcPort)
+			}
+			select {
+			case listenHandler.HostDiscoveryChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: srcPort, Protocol: proto}}:
+			case <-listenHandler.done:
+			}
+		case tcpPortMatches && tcp.SYN && tcp.ACK:
+			if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
+				gologger.Debug().Msgf("Discarding SYN-ACK with invalid cookie: ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
+				continue
+			}
+			// On-path SYN-proxies forge cookie-valid SYN-ACKs under scan
+			// load. Reject the win=0 / no-options fingerprint before the
+			// port is recorded as open; see isDecoySynAck.
+			if isDecoySynAck(tcp) {
+				gologger.Debug().Msgf("Discarding decoy SYN-ACK (win=0, no options): ip4=%s ip6=%s port=%d\n", srcIP4, srcIP6, tcp.SrcPort)
+				continue
+			}
+			select {
+			case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
+			case <-listenHandler.done:
+			}
+		case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
+			select {
+			case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:
+			case <-listenHandler.done:
 			}
 		}
 	}
+}
+
+func TransportReadWorker() {
+	var wgread sync.WaitGroup
 
 	// In case of OSX, when we decode the data from 'loO' interface
 	// always get [Ethernet] layer only.
