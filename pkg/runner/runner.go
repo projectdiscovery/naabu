@@ -1167,13 +1167,15 @@ func (r *Runner) ConnectVerification() {
 		go func(hostResult *result.HostResult) {
 			defer swg.Done()
 
-			// skip low confidence
-			if hostResult.Confidence == confidence.Low {
-				return
-			}
-
 			results := r.scanner.ConnectVerify(hostResult.IP, hostResult.Ports)
 			verifiedResult.SetPorts(hostResult.IP, results)
+			// PortThreshold marks a host Low after truncating its scan. Keep that
+			// state through verification so consumers can distinguish a complete
+			// sparse scan from a capped one. Low is metadata, not a reason to
+			// erase the host before verification or OnResult.
+			if hostResult.Confidence == confidence.Low {
+				verifiedResult.AddSkipped(hostResult.IP)
+			}
 		}(hostResult)
 	}
 
@@ -1706,7 +1708,12 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				}
 
 				if r.options.OnResult != nil {
-					r.options.OnResult(&result.HostResult{Host: host, IP: hostResult.IP, Ports: hostResult.Ports})
+					r.options.OnResult(&result.HostResult{
+						Host:       host,
+						IP:         hostResult.IP,
+						Ports:      hostResult.Ports,
+						Confidence: hostResult.Confidence,
+					})
 				}
 			}
 			csvFileHeaderEnabled = false

@@ -6,6 +6,7 @@ import (
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/stretchr/testify/require"
 )
@@ -48,4 +49,35 @@ func TestConnectVerificationBoundedAndVerifies(t *testing.T) {
 
 	require.True(t, scanner.ScanResults.IPHasPort("127.0.0.1", openP), "open port must survive verification")
 	require.False(t, scanner.ScanResults.IPHasPort("127.0.0.1", closedP), "closed port must be dropped by verification")
+}
+
+func TestConnectVerificationKeepsCappedHosts(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	scanner, err := scan.NewScanner(&scan.Options{})
+	require.NoError(t, err)
+
+	openP := &port.Port{Port: ln.Addr().(*net.TCPAddr).Port, Protocol: protocol.TCP}
+	scanner.ScanResults.AddPort("127.0.0.1", openP)
+	scanner.ScanResults.AddSkipped("127.0.0.1")
+
+	r := &Runner{scanner: scanner, options: &Options{Rate: 10}}
+	r.ConnectVerification()
+
+	require.True(t, scanner.ScanResults.IPHasPort("127.0.0.1", openP),
+		"a capped host must be verified rather than erased")
+	hostResult := <-scanner.ScanResults.GetIPsPorts()
+	require.Equal(t, confidence.Low, hostResult.Confidence,
+		"verification must preserve the signal that the scan was truncated")
 }
