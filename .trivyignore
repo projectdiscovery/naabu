@@ -1,0 +1,6 @@
+# GO-2026-5932: golang.org/x/crypto/openpgp is an unmaintained-package advisory
+# (no CVE, no fix version). naabu does not import x/crypto/openpgp anywhere in
+# its source (verified via `grep -r x/crypto/openpgp`); the package is only
+# present transitively because it lives in the same golang.org/x/crypto module
+# as x/crypto/ssh, which naabu does use.
+GO-2026-5932 exp:2027-08-26
