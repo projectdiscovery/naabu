@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -21,6 +24,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/routing"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/projectdiscovery/ratelimit"
+	"github.com/projectdiscovery/uncover/sources/agent/shodanidb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -1244,4 +1248,80 @@ func TestNewRunner_ScanTypeSyncMatchesScanner(t *testing.T) {
 
 	assert.Equal(t, runner.scanner.ScanType, runner.options.ScanType,
 		"runner options and scanner scan type should always match")
+}
+
+// TestStreamSkipsExcludedIps verifies that both stream code paths drop the ips
+// of a CIDR target that match the exclude list instead of probing them.
+func TestStreamSkipsExcludedIps(t *testing.T) {
+	t.Run("active", func(t *testing.T) {
+		ln, err := net.Listen("tcp", "127.0.0.1:0")
+		require.NoError(t, err)
+		defer ln.Close() //nolint:errcheck
+		go func() {
+			for {
+				conn, err := ln.Accept()
+				if err != nil {
+					return
+				}
+				_ = conn.Close()
+			}
+		}()
+		listenPort := strconv.Itoa(ln.Addr().(*net.TCPAddr).Port)
+
+		// the run without an exclude list proves 127.0.0.1 is reachable, so its
+		// absence from the second run can only come from the exclusion.
+		for _, tc := range []struct {
+			excludeIps string
+			wantOpen   bool
+		}{
+			{excludeIps: "", wantOpen: true},
+			{excludeIps: "127.0.0.1", wantOpen: false},
+		} {
+			r, err := NewRunner(&Options{
+				Host:       []string{"127.0.0.0/30"},
+				ExcludeIps: tc.excludeIps,
+				Ports:      listenPort,
+				ScanType:   ConnectScan,
+				Stream:     true,
+				Rate:       100,
+				Timeout:    time.Second,
+			})
+			require.NoError(t, err)
+			require.NoError(t, r.RunEnumeration(context.Background()))
+			require.Equal(t, tc.wantOpen, r.scanner.ScanResults.HasIP("127.0.0.1"), "exclude list %q", tc.excludeIps)
+			require.NoError(t, r.Close())
+		}
+	})
+
+	t.Run("passive", func(t *testing.T) {
+		var (
+			mu        sync.Mutex
+			requested []string
+		)
+		ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			mu.Lock()
+			requested = append(requested, strings.TrimPrefix(req.URL.Path, "/"))
+			mu.Unlock()
+			_, _ = w.Write([]byte(`{"ports":[80]}`))
+		}))
+		defer ts.Close()
+		originalURL := shodanidb.URL
+		shodanidb.URL = ts.URL + "/%s"
+		defer func() { shodanidb.URL = originalURL }()
+
+		r, err := NewRunner(&Options{
+			Host:       []string{"10.0.0.0/29"},
+			ExcludeIps: "10.0.0.0/30",
+			ScanType:   ConnectScan,
+			Stream:     true,
+			Passive:    true,
+			Rate:       100,
+		})
+		require.NoError(t, err)
+		require.NoError(t, r.RunEnumeration(context.Background()))
+		require.NoError(t, r.Close())
+
+		require.ElementsMatch(t, []string{"10.0.0.4", "10.0.0.5", "10.0.0.6", "10.0.0.7"}, requested,
+			"excluded ips must not be looked up")
+	})
 }
