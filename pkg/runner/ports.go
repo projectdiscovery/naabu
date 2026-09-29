@@ -88,8 +88,11 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 		}
 	}
 
-	// merge all the specified ports (meaningless if "all" is used)
-	ports := merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList)
+	// merge all the specified ports (meaningless if "all" is used).
+	// Each source is deduplicated on its own, so the merged list still needs a
+	// pass: -p 80 together with -top-ports 100 named port 80 twice and naabu
+	// probed it twice.
+	ports := dedupePorts(merge(portsFileMap, portsCLIMap, topPortsCLIMap, portsConfigList))
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
@@ -186,18 +189,31 @@ func parsePortsSlice(ranges []string) ([]*port.Port, error) {
 		}
 	}
 
-	// dedupe ports
-	seen := make(map[string]struct{})
+	return dedupePorts(ports), nil
+}
+
+// portKey identifies a port for deduplication. The protocol belongs in the key:
+// port.String() prints the number alone, so keying on it treated tcp/80 and
+// udp/80 as the same entry and dropped whichever was asked for second.
+// excludePorts already compares the number and the protocol together.
+type portKey struct {
+	number   int
+	protocol protocol.Protocol
+}
+
+// dedupePorts removes repeated ports, keeping the first occurrence of each.
+func dedupePorts(ports []*port.Port) []*port.Port {
+	seen := make(map[portKey]struct{}, len(ports))
 	var dedupedPorts []*port.Port
-	for _, port := range ports {
-		if _, ok := seen[port.String()]; ok {
+	for _, p := range ports {
+		key := portKey{number: p.Port, protocol: p.Protocol}
+		if _, ok := seen[key]; ok {
 			continue
 		}
-		seen[port.String()] = struct{}{}
-		dedupedPorts = append(dedupedPorts, port)
+		seen[key] = struct{}{}
+		dedupedPorts = append(dedupedPorts, p)
 	}
-
-	return dedupedPorts, nil
+	return dedupedPorts
 }
 
 func parsePortsList(data string) ([]*port.Port, error) {

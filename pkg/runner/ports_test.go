@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -44,6 +45,49 @@ func TestParsePortsList(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A port number on tcp and on udp are two different scans. The dedupe key used
+// to be the number alone, so asking for both kept only whichever came first.
+func TestParsePortsListKeepsBothProtocols(t *testing.T) {
+	tcp80 := &port.Port{Port: 80, Protocol: protocol.TCP}
+	udp80 := &port.Port{Port: 80, Protocol: protocol.UDP}
+
+	tests := []struct {
+		args string
+		want []*port.Port
+	}{
+		{"80", []*port.Port{tcp80}},
+		{"u:80", []*port.Port{udp80}},
+		{"80,u:80", []*port.Port{tcp80, udp80}},
+		{"u:80,80", []*port.Port{udp80, tcp80}},
+		// Repeats within one protocol still collapse.
+		{"80,u:80,80,u:80", []*port.Port{tcp80, udp80}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.args, func(t *testing.T) {
+			got, err := parsePortsList(tt.args)
+			assert.Nil(t, err)
+			assert.EqualValues(t, tt.want, got)
+		})
+	}
+}
+
+// -p and -top-ports are deduplicated separately, so a port named by both used
+// to be probed twice.
+func TestParsePortsDeduplicatesAcrossSources(t *testing.T) {
+	options := Options{Ports: "80,443", TopPorts: "100"}
+	ports, err := ParsePorts(&options)
+	assert.Nil(t, err)
+
+	counts := make(map[string]int)
+	for _, p := range ports {
+		counts[fmt.Sprintf("%d/%s", p.Port, p.Protocol)]++
+	}
+	for key, n := range counts {
+		assert.Equal(t, 1, n, "port %s appears %d times", key, n)
+	}
+	assert.Equal(t, len(counts), len(ports))
 }
 
 func TestExcludePorts(t *testing.T) {
