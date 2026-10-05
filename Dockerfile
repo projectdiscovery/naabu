@@ -7,7 +7,7 @@ RUN go mod download
 RUN CGO_ENABLED=0 go build ./cmd/naabu
 
 # Release
-FROM alpine:3.24.1
+FROM alpine:3.24.2
 RUN apk upgrade --no-cache \
     && apk add --no-cache nmap libpcap bind-tools ca-certificates nmap-scripts
 COPY --from=build-env /app/naabu /usr/local/bin/
