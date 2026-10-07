@@ -1,4 +1,4 @@
-FROM alpine:3.24.2
+FROM alpine:latest
 
 LABEL org.opencontainers.image.authors="ProjectDiscovery"
 LABEL org.opencontainers.image.description="Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner."
