@@ -29,13 +29,57 @@ builds:
       - goos: windows
         goarch: arm64
 
+  # NOTE: same binary as above, but with the musl ELF interpreter so it runs on
+  # the Alpine image (purego makes the CGO_ENABLED=0 binary dynamically linked).
+  - id: naabu-docker
+    ldflags:
+      - -s -w
+      - -I /lib/ld-musl-{{ if eq .Arch "amd64" }}x86_64{{ else if eq .Arch "arm64" }}aarch64{{ else }}armhf{{ end }}.so.1
+    binary: naabu
+    env:
+      - CGO_ENABLED=0
+    main: ./cmd/naabu/main.go
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+    goarm:
+      - "7"
+
 archives:
-  - formats:
+  - ids:
+      - naabu
+    formats:
       - zip
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
 
 checksum:
   name_template: "{{ .ProjectName }}-checksums.txt"
+
+dockers_v2:
+  - ids:
+      - naabu-docker
+    images:
+      - projectdiscovery/naabu
+    tags:
+      - "{{ .Tag }}"
+      - "v{{ .Major }}.{{ .Minor }}"
+      - "v{{ .Major }}"
+      - latest
+    labels:
+      org.opencontainers.image.created: "{{ .Date }}"
+      org.opencontainers.image.ref.name: "{{ .Tag }}"
+      org.opencontainers.image.revision: "{{ .FullCommit }}"
+      org.opencontainers.image.version: "{{ .Version }}"
+    platforms:
+      - linux/amd64
+      - linux/arm64
+      - linux/arm/v7
+    # NOTE: CI snapshot runners may lack QEMU; only build images in CI on real
+    # releases.
+    disable: '{{ and .IsSnapshot (isEnvSet "CI") }}'
 
 announce:
   slack:
