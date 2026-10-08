@@ -1,14 +1,15 @@
-# Build
-FROM golang:1.27.1-alpine AS build-env
-RUN apk add --no-cache build-base libpcap-dev
-WORKDIR /app
-COPY . /app
-RUN go mod download
-RUN CGO_ENABLED=0 go build ./cmd/naabu
+FROM alpine:latest
 
-# Release
-FROM alpine:3.24.2
+LABEL org.opencontainers.image.authors="ProjectDiscovery"
+LABEL org.opencontainers.image.description="Naabu is a port scanning tool written in Go that allows you to enumerate valid ports for hosts in a fast and reliable manner."
+LABEL org.opencontainers.image.licenses="MIT"
+LABEL org.opencontainers.image.title="naabu"
+LABEL org.opencontainers.image.url="https://github.com/projectdiscovery/naabu"
+
 RUN apk upgrade --no-cache \
     && apk add --no-cache nmap libpcap bind-tools ca-certificates nmap-scripts
-COPY --from=build-env /app/naabu /usr/local/bin/
+
+ARG TARGETPLATFORM
+COPY $TARGETPLATFORM/naabu /usr/local/bin/
+
 ENTRYPOINT ["naabu"]
