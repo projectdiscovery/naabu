@@ -27,7 +27,7 @@ require (
 	github.com/projectdiscovery/retryabledns v1.0.116
 	github.com/projectdiscovery/retryablehttp-go v1.3.29
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.7
+	github.com/projectdiscovery/utils v0.11.8
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
