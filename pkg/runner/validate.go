@@ -194,6 +194,10 @@ func (options *Options) ValidateOptions() error {
 		options.WarmUpTime = 2
 	}
 
+	if options.Timeout >= minTimeout && options.Timeout < lowTimeout {
+		gologger.Warning().Msgf("timeout %s is very low and may miss open ports: a bare -timeout value is milliseconds, use a unit for seconds (e.g. 2s)", options.Timeout)
+	}
+
 	if options.SmartScan && options.Stream {
 		return errors.New("smart scan is not supported in stream mode")
 	}

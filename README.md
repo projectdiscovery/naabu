@@ -134,7 +134,7 @@ HOST-DISCOVERY:
 
 OPTIMIZATION:
    -retries int                    number of retries for the port scan (default 3)
-   -timeout int                    millisecond to wait before timing out (default 1000)
+   -timeout value                  time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds) (default 1s)
    -warm-up-time int               time in seconds between scan phases (default 2)
    -ping                           ping probes for verification of host
    -verify                         validate the ports again with TCP verification
