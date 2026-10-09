@@ -131,7 +131,7 @@ func (r *Result) AddPort(ip string, p *port.Port) {
 		r.ipPorts[ip] = make(map[string]*port.Port)
 	}
 
-	r.ipPorts[ip][p.String()] = p
+	r.ipPorts[ip][portIdentity(p)] = p
 	r.ips[ip] = struct{}{}
 }
 
@@ -145,9 +145,16 @@ func (r *Result) SetPorts(ip string, ports []*port.Port) {
 	}
 
 	for _, p := range ports {
-		r.ipPorts[ip][p.String()] = p
+		r.ipPorts[ip][portIdentity(p)] = p
 	}
 	r.ips[ip] = struct{}{}
+}
+
+// portIdentity is the result-map key. Port.String() prints the number alone,
+// so using it made tcp/80 and udp/80 the same entry: recording one skipped
+// the scan of the other, and the output could keep only one of them.
+func portIdentity(p *port.Port) string {
+	return fmt.Sprintf("%d/%s", p.Port, p.Protocol)
 }
 
 // IPHasPort checks if an ip has a specific port
@@ -159,7 +166,7 @@ func (r *Result) IPHasPort(ip string, p *port.Port) bool {
 	if !hasports {
 		return false
 	}
-	_, hasport := ipPorts[p.String()]
+	_, hasport := ipPorts[portIdentity(p)]
 
 	return hasport
 }
