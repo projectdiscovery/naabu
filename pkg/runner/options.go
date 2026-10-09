@@ -305,7 +305,7 @@ func ParseOptions() *Options {
 
 	flagSet.CreateGroup("optimization", "Optimization",
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
-		flagSet.DurationVar(&options.Timeout, "timeout", DefaultPortTimeoutSynScan, "millisecond to wait before timing out"),
+		flagSet.Var(newMillisecondDuration(&options.Timeout, DefaultPortTimeoutSynScan), "timeout", "time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds)"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", defaultWarmUpTime, "time in seconds between scan phases"),
 		flagSet.IntVarP(&options.TimingTemplate, "timing", "T", DefaultTimingTemplate, "timing template, higher is faster (0-5)"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
@@ -504,8 +504,10 @@ func (options *Options) ShouldScanIPv6() bool {
 	return sliceutil.Contains(options.IPVersion, "6")
 }
 
+// GetTimeout returns the port timeout, falling back to the scan type default
+// when it is below minTimeout. Explicit values are honored as-is.
 func (options *Options) GetTimeout() time.Duration {
-	if options.Timeout < time.Millisecond*500 {
+	if options.Timeout < minTimeout {
 		if options.ScanType == SynScan {
 			return DefaultPortTimeoutSynScan
 		}

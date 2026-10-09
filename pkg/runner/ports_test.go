@@ -176,3 +176,46 @@ func TestParsePorts(t *testing.T) {
 	assert.Nil(t, err)
 	assert.Equal(t, 100, len(got))
 }
+
+func TestParsePortsAllSpecifiedPortsExcluded(t *testing.T) {
+	// Ports the user explicitly specified (-p, -pf, -tp) must never be
+	// silently replaced by the default top-100 list when the exclusion list
+	// removes them all: that would probe ports the user never asked for.
+	tests := []struct {
+		name         string
+		ports        string
+		topPorts     string
+		portsFile    goflags.StringSlice
+		excludePorts goflags.StringSlice
+		wantErr      bool
+		wantCount    int
+	}{
+		{"cli ports fully excluded", "80", "", nil, goflags.StringSlice{"80"}, true, 0},
+		{"cli ports fully excluded by range", "80,443", "", nil, goflags.StringSlice{"79-444"}, true, 0},
+		{"cli range fully excluded", "80-90", "", nil, goflags.StringSlice{"79-91"}, true, 0},
+		{"full port range fully excluded", "1-65535", "", nil, goflags.StringSlice{"1-65535"}, true, 0},
+		{"top ports fully excluded", "", "100", nil, goflags.StringSlice{"1-65535"}, true, 0},
+		{"ports file fully excluded", "", "", goflags.StringSlice{"80"}, goflags.StringSlice{"80"}, true, 0},
+		{"cli ports partially excluded", "80,443", "", nil, goflags.StringSlice{"80"}, false, 1},
+		{"top ports partially excluded", "", "100", nil, goflags.StringSlice{"80"}, false, 99},
+		{"exclusions only still default to top-100", "", "", nil, goflags.StringSlice{"80"}, false, 99},
+		{"no ports and no exclusions default to top-100", "", "", nil, nil, false, 100},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			options := &Options{
+				Ports:        tt.ports,
+				TopPorts:     tt.topPorts,
+				PortsFile:    tt.portsFile,
+				ExcludePorts: tt.excludePorts,
+			}
+			got, err := ParsePorts(options)
+			if tt.wantErr {
+				assert.EqualError(t, err, "no ports to scan: all specified ports were excluded")
+			} else {
+				assert.Nil(t, err)
+			}
+			assert.Equal(t, tt.wantCount, len(got))
+		})
+	}
+}
