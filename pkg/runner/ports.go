@@ -93,6 +93,13 @@ func ParsePorts(options *Options) ([]*port.Port, error) {
 
 	// By default scan top 100 ports only
 	if len(ports) == 0 {
+		// The default top-100 list must only apply when no ports were specified
+		// at all. If the user provided ports (-p, -pf or -tp) and the exclusion
+		// list removed them all, scanning top-100 instead would probe ports the
+		// user never asked for, so error out (nmap behaves the same way).
+		if options.Ports != "" || len(options.PortsFile) > 0 || options.TopPorts != "" {
+			return nil, errors.New("no ports to scan: all specified ports were excluded")
+		}
 		portsList, err := parsePortsList(NmapTop100)
 		if err != nil {
 			return nil, fmt.Errorf("could not read ports: %s", err)
