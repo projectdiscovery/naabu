@@ -11,7 +11,7 @@ import (
 func TestAddPort(t *testing.T) {
 	targetIP := "127.0.0.1"
 	targetPort := &port.Port{Port: 8080, Protocol: protocol.TCP}
-	targetPorts := map[string]*port.Port{targetPort.String(): targetPort}
+	targetPorts := map[string]*port.Port{portIdentity(targetPort): targetPort}
 
 	res := NewResult()
 	res.AddPort(targetIP, targetPort)
@@ -28,8 +28,8 @@ func TestSetPorts(t *testing.T) {
 	port80 := &port.Port{Port: 80, Protocol: protocol.TCP}
 	port443 := &port.Port{Port: 443, Protocol: protocol.TCP}
 	targetPorts := map[string]*port.Port{
-		port80.String():  port80,
-		port443.String(): port443,
+		portIdentity(port80):  port80,
+		portIdentity(port443): port443,
 	}
 
 	res := NewResult()
@@ -51,6 +51,25 @@ func TestIPHasPort(t *testing.T) {
 	res.AddPort(targetIP, expectedPort)
 	assert.True(t, res.IPHasPort(targetIP, expectedPort))
 	assert.False(t, res.IPHasPort(targetIP, unexpectedPort))
+}
+
+func TestIPHasPortDistinguishesProtocol(t *testing.T) {
+	targetIP := "127.0.0.1"
+	tcp80 := &port.Port{Port: 80, Protocol: protocol.TCP}
+	udp80 := &port.Port{Port: 80, Protocol: protocol.UDP}
+
+	res := NewResult()
+	res.AddPort(targetIP, tcp80)
+	assert.True(t, res.IPHasPort(targetIP, tcp80))
+	assert.False(t, res.IPHasPort(targetIP, udp80))
+	assert.Equal(t, 1, res.GetPortCount(targetIP))
+
+	res.AddPort(targetIP, udp80)
+	assert.True(t, res.IPHasPort(targetIP, tcp80))
+	assert.True(t, res.IPHasPort(targetIP, udp80))
+	assert.Equal(t, 2, res.GetPortCount(targetIP))
+	assert.Equal(t, tcp80, res.ipPorts[targetIP][portIdentity(tcp80)])
+	assert.Equal(t, udp80, res.ipPorts[targetIP][portIdentity(udp80)])
 }
 
 func TestAddIP(t *testing.T) {
