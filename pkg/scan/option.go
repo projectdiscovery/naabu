@@ -27,4 +27,5 @@ type Options struct {
 	OnReceive            result.ResultFn
 	ScanType             string
 	NetworkPolicyOptions *networkpolicy.Options
+	SourcePort           string
 }

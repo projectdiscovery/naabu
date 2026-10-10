@@ -641,6 +641,47 @@ func TestRunnerSetSourcePort(t *testing.T) {
 	}
 }
 
+func TestRunnerSourcePortOptions(t *testing.T) {
+	origRouter := scan.PkgRouter
+	origPriv := privileges.IsPrivileged
+	origHandlers := scan.ListenHandlers
+	defer func() {
+		scan.PkgRouter = origRouter
+		privileges.IsPrivileged = origPriv
+		scan.ListenHandlers = origHandlers
+	}()
+
+	scan.PkgRouter = &stubRouter{}
+	privileges.IsPrivileged = true
+	handler := &scan.ListenHandler{Port: 3333, Busy: false}
+	scan.ListenHandlers = []*scan.ListenHandler{handler}
+
+	options := &Options{
+		Host:       []string{"example.com"},
+		Ports:      "80",
+		Timeout:    30 * time.Second,
+		Retries:    3,
+		Rate:       1000,
+		ScanType:   SynScan,
+		SourcePort: "58915",
+	}
+
+	runner, err := NewRunner(options)
+	require.NoError(t, err)
+	assert.Equal(t, "58915", runner.options.SourcePort)
+	assert.Equal(t, 58915, runner.scanner.ListenHandler.Port)
+
+	bpf := scan.BuildBPFFilter()
+	if bpf != "" {
+		assert.Contains(t, bpf, "tcp")
+	}
+
+	err = runner.SetSourcePort("60000")
+	require.NoError(t, err)
+	assert.Equal(t, "60000", runner.options.SourcePort)
+	assert.Equal(t, 60000, runner.scanner.ListenHandler.Port)
+}
+
 func mustParsePort(t *testing.T, s string) int {
 	port, err := net.LookupPort("tcp", s)
 	require.NoError(t, err)

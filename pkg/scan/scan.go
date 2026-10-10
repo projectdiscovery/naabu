@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,6 +21,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/utils/limits"
 	"github.com/projectdiscovery/networkpolicy"
 	envutil "github.com/projectdiscovery/utils/env"
+	iputil "github.com/projectdiscovery/utils/ip"
 	netutil "github.com/projectdiscovery/utils/net"
 	"golang.org/x/net/proxy"
 )
@@ -228,7 +230,37 @@ func NewScanner(options *Options) (*Scanner, error) {
 	}
 
 	scanner.ScanType = options.ScanType
+
+	if options.SourcePort != "" {
+		if err := scanner.SetSourcePort(options.SourcePort); err != nil {
+			if scanner.ListenHandler != nil {
+				scanner.ListenHandler.Release()
+				scanner.ListenHandler = nil
+			}
+			return nil, err
+		}
+	}
+
 	return scanner, err
+}
+
+// SetSourcePort sets the source port for the scanner's listen handler and rebuilds the BPF filter
+func (s *Scanner) SetSourcePort(sourcePort string) error {
+	isValidPort := iputil.IsPort(sourcePort)
+	if !isValidPort {
+		return errors.New("invalid source port")
+	}
+
+	port, err := strconv.Atoi(sourcePort)
+	if err != nil {
+		return err
+	}
+
+	if s.ListenHandler != nil {
+		s.ListenHandler.Port = port
+	}
+
+	return UpdateBPFFilter()
 }
 
 // Close the scanner and terminate all workers

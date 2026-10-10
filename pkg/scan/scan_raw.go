@@ -1239,6 +1239,46 @@ func SetupHandlers() error {
 	return nil
 }
 
+// TransportBPFFilter is the port-independent capture filter for TCP and UDP replies.
+const TransportBPFFilter = "(ip and tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or (ip6 and tcp) or udp"
+
+// BuildBPFFilter builds the BPF filter string for transport packet capture.
+func BuildBPFFilter() string {
+	return TransportBPFFilter
+}
+
+// UpdateBPFFilter rebuilds and applies the transport BPF filter on all active pcap handles.
+func UpdateBPFFilter() error {
+	if handlers == nil {
+		return nil
+	}
+	bpfFilter := BuildBPFFilter()
+	if bpfFilter == "" {
+		return nil
+	}
+
+	var lastErr error
+	for _, handle := range handlers.TransportActive {
+		if handle == nil {
+			continue
+		}
+		if err := handle.SetBPFFilter(bpfFilter); err != nil {
+			gologger.Warning().Msgf("could not update bpf filter on transport handler: %s", err)
+			lastErr = err
+		}
+	}
+	for _, handle := range handlers.LoopbackHandlers {
+		if handle == nil {
+			continue
+		}
+		if err := handle.SetBPFFilter(bpfFilter); err != nil {
+			gologger.Warning().Msgf("could not update bpf filter on loopback handler: %s", err)
+			lastErr = err
+		}
+	}
+	return lastErr
+}
+
 func SetupHandler(interfaceName string) error {
 	// Port-independent capture. Handlers are created on demand, so their source
 	// ports cannot be baked into the filter (and runtime SetBPFFilter is not
@@ -1252,7 +1292,7 @@ func SetupHandler(interfaceName string) error {
 	// TCP replies are captured with a plain "ip6 and tcp". Outgoing pure-SYN
 	// probes still get filtered: for IPv4 by the flag mask, and for IPv6 by the
 	// reader, which only acts on SYN-ACKs whose dst port is a live handler port.
-	bpfFilter := "(ip and tcp and (tcp[tcpflags] & (tcp-ack|tcp-rst) != 0)) or (ip6 and tcp) or udp"
+	bpfFilter := BuildBPFFilter()
 	err := SetupHandlerUnix(interfaceName, bpfFilter, protocol.TCP)
 	if err != nil {
 		return err
