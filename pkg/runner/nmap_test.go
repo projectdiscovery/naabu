@@ -3,11 +3,13 @@ package runner
 import (
 	"testing"
 
+	"github.com/Ullaakut/nmap/v3"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHandleNmap(t *testing.T) {
@@ -92,4 +94,29 @@ func TestUpdatePortWithServiceInfo(t *testing.T) {
 	}
 
 	t.Fatal("Port not found or not updated correctly")
+}
+
+func TestIntegrateNmapResultsPersistsOS(t *testing.T) {
+	var r Runner
+	r.options = &Options{}
+	r.scanner = &scan.Scanner{ScanResults: result.NewResult()}
+	// 192.0.2.x is not private, so GetIPsPorts runs no ARP lookup
+	r.scanner.ScanResults.AddPort("192.0.2.10", &port.Port{Port: 22, Protocol: protocol.TCP})
+
+	r.integrateNmapResults(&nmap.Run{Hosts: []nmap.Host{{
+		Addresses: []nmap.Address{{Addr: "192.0.2.10"}},
+		Ports:     []nmap.Port{{ID: 22, Protocol: "tcp", State: nmap.State{State: "open"}, Service: nmap.Service{Name: "ssh"}}},
+		OS:        nmap.OS{Matches: []nmap.OSMatch{{Name: "Linux 5.15"}}},
+	}}})
+
+	var got []*result.HostResult
+	for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
+		got = append(got, hostResult)
+	}
+	require.Len(t, got, 1)
+	require.NotNil(t, got[0].OS)
+	assert.Equal(t, "Linux 5.15", got[0].OS.Running)
+	require.Len(t, got[0].Ports, 1)
+	require.NotNil(t, got[0].Ports[0].Service)
+	assert.Equal(t, "ssh", got[0].Ports[0].Service.Name)
 }

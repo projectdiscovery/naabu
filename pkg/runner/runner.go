@@ -1674,6 +1674,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						data.TLS = p.TLS
 
 						copyServiceFields(data, p.Service)
+						data.setOS(hostResult.OS)
 						if r.options.JSON {
 							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {
@@ -1702,9 +1703,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
+						err = writeJSONOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						err = writeCsvOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 						// Flip immediately after the first CSV write: multiple
 						// hostnames for one IP would otherwise each re-emit the header.
 						csvFileHeaderEnabled = false
@@ -1722,6 +1723,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						IP:         hostResult.IP,
 						Ports:      hostResult.Ports,
 						Confidence: hostResult.Confidence,
+						OS:         hostResult.OS,
 					})
 				}
 			}

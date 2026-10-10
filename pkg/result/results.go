@@ -45,6 +45,7 @@ type Result struct {
 	skipped   map[string]struct{}
 	deadHosts map[string]struct{}
 	macs      map[string]string
+	os        map[string]OSFingerprint
 }
 
 // NewResult structure
@@ -55,6 +56,7 @@ func NewResult() *Result {
 		skipped:   make(map[string]struct{}),
 		deadHosts: make(map[string]struct{}),
 		macs:      make(map[string]string),
+		os:        make(map[string]OSFingerprint),
 	}
 }
 
@@ -82,8 +84,8 @@ func (r *Result) HasIPS() bool {
 
 // GetIPsPorts returns a snapshot of the ips and ports. The lock is released
 // before streaming, so the caller may use any other Result method while
-// ranging over it. The ports are copies: changes to stored ports go through
-// Result methods such as UpdatePortService.
+// ranging over it. The ports and OS info are copies: changes to stored results
+// go through Result methods such as UpdatePortService.
 func (r *Result) GetIPsPorts() chan *HostResult {
 	r.RLock()
 	hostResults := make([]*HostResult, 0, len(r.ipPorts))
@@ -96,7 +98,11 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 		for _, p := range ports {
 			hostPorts = append(hostPorts, copyPort(p))
 		}
-		hostResults = append(hostResults, &HostResult{IP: ip, Ports: hostPorts, Confidence: confidenceLevel})
+		hostResult := &HostResult{IP: ip, Ports: hostPorts, Confidence: confidenceLevel}
+		if osfp, ok := r.os[ip]; ok {
+			hostResult.OS = &osfp
+		}
+		hostResults = append(hostResults, hostResult)
 	}
 	r.RUnlock()
 
@@ -373,14 +379,16 @@ func (r *Result) HasSkipped(ip string) bool {
 	return ok
 }
 
-// UpdateHostOS updates the OS info for a given IP in the results
+// UpdateHostOS stores a copy of the OS info for a given IP. A nil fingerprint
+// is ignored so it never clears previously recorded info.
 func (r *Result) UpdateHostOS(ip string, osfp *OSFingerprint) {
-	for hostResult := range r.GetIPsPorts() {
-		if hostResult.IP == ip {
-			hostResult.OS = osfp
-			return
-		}
+	if osfp == nil {
+		return
 	}
+	r.Lock()
+	defer r.Unlock()
+
+	r.os[ip] = *osfp
 }
 
 // isPrivateIP checks if an IP address is in a private/local network range

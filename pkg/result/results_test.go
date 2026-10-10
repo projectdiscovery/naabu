@@ -236,3 +236,35 @@ func TestGetIPsPortsEarlyReturn(t *testing.T) {
 		return len(out) == len(targetIPs)-1
 	}, 5*time.Second, 10*time.Millisecond)
 }
+
+func TestUpdateHostOS(t *testing.T) {
+	res := NewResult()
+	p := &port.Port{Port: 22, Protocol: protocol.TCP}
+	res.AddPort("192.0.2.1", p)
+	res.AddPort("192.0.2.2", p)
+
+	osfp := &OSFingerprint{Target: "192.0.2.1", OSDetails: "Linux 5.x"}
+	res.UpdateHostOS("192.0.2.1", osfp)
+	// nil must not clear existing info
+	res.UpdateHostOS("192.0.2.1", nil)
+	// the stored fingerprint is a copy, so later changes by the caller don't reach it
+	osfp.OSDetails = "changed"
+
+	snapshot := func() map[string]*OSFingerprint {
+		got := make(map[string]*OSFingerprint)
+		for hostResult := range res.GetIPsPorts() {
+			got[hostResult.IP] = hostResult.OS
+		}
+		return got
+	}
+	want := &OSFingerprint{Target: "192.0.2.1", OSDetails: "Linux 5.x"}
+
+	got := snapshot()
+	assert.Len(t, got, 2)
+	assert.Equal(t, want, got["192.0.2.1"])
+	assert.Nil(t, got["192.0.2.2"])
+
+	// writes to a snapshot must never change the stored fingerprint
+	got["192.0.2.1"].OSDetails = "changed"
+	assert.Equal(t, want, snapshot()["192.0.2.1"])
+}
