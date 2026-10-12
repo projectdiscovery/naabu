@@ -1772,7 +1772,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							continue
 						}
 						_, _ = fmt.Fprintf(&buffer, "%s\n", b)
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !r.options.DisableStdout {
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
 					} else {
 						if csvFileHeaderEnabled {
 							writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
@@ -1780,9 +1782,11 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						}
 						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						writer.Flush()
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !r.options.DisableStdout {
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
 					}
-				} else {
+				} else if !r.options.DisableStdout {
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s [%s]\n", host, cdnName)
 					} else {
