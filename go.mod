@@ -22,12 +22,12 @@ require (
 	github.com/projectdiscovery/gologger v1.1.73
 	github.com/projectdiscovery/ipranger v0.0.68
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.53
+	github.com/projectdiscovery/networkpolicy v0.1.54
 	github.com/projectdiscovery/ratelimit v0.0.92
 	github.com/projectdiscovery/retryabledns v1.0.116
-	github.com/projectdiscovery/retryablehttp-go v1.3.29
+	github.com/projectdiscovery/retryablehttp-go v1.3.30
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.8
+	github.com/projectdiscovery/utils v0.11.9
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
@@ -80,7 +80,7 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/projectdiscovery/asnmap v1.1.1 // indirect
-	github.com/projectdiscovery/fastdialer v0.5.23 // indirect
+	github.com/projectdiscovery/fastdialer v0.5.24 // indirect
 	github.com/projectdiscovery/hmap v0.0.102 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/refraction-networking/utls v1.8.2 // indirect
