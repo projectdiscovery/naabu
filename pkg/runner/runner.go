@@ -229,6 +229,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		OnReceive:            options.OnReceive,
 		ScanType:             options.ScanType,
 		NetworkPolicyOptions: options.NetworkPolicyOptions,
+		SourcePort:           options.SourcePort,
 	}
 
 	if scanOpts.OnReceive == nil {
@@ -247,6 +248,12 @@ func NewRunner(options *Options) (*Runner, error) {
 	runner.options.ScanType = scanner.ScanType
 
 	runner.scanner.Ports = ports
+
+	if options.SourcePort != "" {
+		if err := runner.SetSourcePort(options.SourcePort); err != nil {
+			return nil, err
+		}
+	}
 
 	if options.EnableProgressBar {
 		defaultOptions := &clistats.DefaultOptions
@@ -1386,12 +1393,13 @@ func (r *Runner) SetSourcePort(sourcePort string) error {
 		return errors.New("invalid source port")
 	}
 
-	port, err := strconv.Atoi(sourcePort)
-	if err != nil {
-		return err
+	if r.options != nil {
+		r.options.SourcePort = sourcePort
 	}
 
-	r.scanner.ListenHandler.Port = port
+	if r.scanner != nil {
+		return r.scanner.SetSourcePort(sourcePort)
+	}
 
 	return nil
 }
