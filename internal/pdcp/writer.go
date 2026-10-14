@@ -190,7 +190,6 @@ func (u *UploadWriter) uploadChunk(buff *bytes.Buffer) error {
 }
 
 func (u *UploadWriter) upload(data []byte) error {
-	fmt.Println("upload:", string(data))
 	req, err := u.getRequest(data)
 	if err != nil {
 		return errkit.Wrap(err, "could not create upload request")

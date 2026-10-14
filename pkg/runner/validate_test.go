@@ -25,6 +25,12 @@ func TestOptions(t *testing.T) {
 	assert.EqualError(t, options.ValidateOptions(), "connect payload can only be used with connect scan")
 }
 
+func TestValidateDashboardUploadWithoutInput(t *testing.T) {
+	// -dashboard-upload uploads a results file and scans nothing
+	options := Options{AssetFileUpload: "results.jsonl", Rate: 1000, DnsOrder: "l", ScanType: ConnectScan}
+	assert.Nil(t, options.ValidateOptions())
+}
+
 func TestValidateTimingShardTxRanges(t *testing.T) {
 	base := Options{
 		Host:     []string{"example.com"},
