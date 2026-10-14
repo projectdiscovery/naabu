@@ -1536,6 +1536,7 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 				key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
 				if svc, ok := r.fpServices[key]; ok {
 					p.Service = svc
+					scanResults.UpdatePortService(hostResult.IP, p)
 				}
 			}
 		}
