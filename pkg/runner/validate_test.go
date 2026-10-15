@@ -12,6 +12,10 @@ func TestOptions(t *testing.T) {
 	options := Options{}
 	assert.ErrorIs(t, errNoInputList, options.ValidateOptions())
 
+	options.AssetFileUpload = "results.json"
+	assert.EqualError(t, options.ValidateOptions(), errkit.Wrap(errZeroValue, "rate").Error())
+	options.AssetFileUpload = ""
+
 	options.Host = []string{"target1", "target2"}
 	options.Timeout = 2
 	assert.EqualError(t, options.ValidateOptions(), errkit.Wrap(errZeroValue, "rate").Error())
