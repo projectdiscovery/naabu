@@ -29,14 +29,14 @@ const (
 	uploadEndpoint = "/v1/assets"
 	appendEndpoint = "/v1/assets/%s/contents"
 	flushTimer     = time.Minute
-	MaxChunkSize   = 4 * unitutils.Mega // 4 MB
 	xidRe          = `^[a-z0-9]{20}$`
 	teamIDHeader   = "X-Team-Id"
 	NoneTeamID     = "none"
 )
 
 var (
-	xidRegex = regexp.MustCompile(xidRe)
+	MaxChunkSize = 4 * unitutils.Mega // 4 MB
+	xidRegex     = regexp.MustCompile(xidRe)
 	// EnableeUpload if set to true enables the upload feature
 	HideAutoSaveMsg   = env.GetEnvOrDefault("DISABLE_CLOUD_UPLOAD_WRN", false)
 	EnableCloudUpload = env.GetEnvOrDefault("ENABLE_CLOUD_UPLOAD", false)
@@ -169,10 +169,9 @@ func (u *UploadWriter) autoCommit(ctx context.Context) {
 				if err := u.uploadChunk(buff); err != nil {
 					gologger.Error().Msgf("Failed to upload asset results on cloud: %v", err)
 				}
-			} else {
-				buff.WriteString(line)
-				buff.WriteString("\n")
 			}
+			buff.WriteString(line)
+			buff.WriteString("\n")
 		}
 	}
 }
@@ -190,7 +189,6 @@ func (u *UploadWriter) uploadChunk(buff *bytes.Buffer) error {
 }
 
 func (u *UploadWriter) upload(data []byte) error {
-	fmt.Println("upload:", string(data))
 	req, err := u.getRequest(data)
 	if err != nil {
 		return errkit.Wrap(err, "could not create upload request")

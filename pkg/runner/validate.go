@@ -31,9 +31,9 @@ var (
 
 // ValidateOptions validates the configuration options passed
 func (options *Options) ValidateOptions() error {
-	// Check if Host, list of domains, or stdin info was provided.
+	// Check if Host, list of domains, stdin info, or file upload was provided.
 	// If none was provided, then return.
-	if options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
+	if options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 && options.AssetFileUpload == "" {
 		return errNoInputList
 	}
 

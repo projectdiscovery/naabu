@@ -24,7 +24,10 @@ func main() {
 
 	// validation for local results file upload
 	if options.AssetFileUpload != "" {
-		_ = setupOptionalAssetUpload(options)
+		writer := setupOptionalAssetUpload(options)
+		if writer == nil || options.OnResult == nil {
+			gologger.Fatal().Msgf("Could not setup UI dashboard upload: credentials missing or setup failed (use 'naabu -auth' to configure)")
+		}
 		file, err := os.Open(options.AssetFileUpload)
 		if err != nil {
 			gologger.Fatal().Msgf("Could not open file: %s\n", err)
@@ -141,7 +144,7 @@ func main() {
 func setupOptionalAssetUpload(opts *runner.Options) *pdcp.UploadWriter {
 	var mustEnable bool
 	// enable on multiple conditions
-	if opts.AssetUpload || opts.AssetID != "" || opts.AssetName != "" || pdcp.EnableCloudUpload {
+	if opts.AssetUpload || opts.AssetFileUpload != "" || opts.AssetID != "" || opts.AssetName != "" || pdcp.EnableCloudUpload {
 		mustEnable = true
 	}
 	a := aurora.NewAurora(!opts.NoColor)
