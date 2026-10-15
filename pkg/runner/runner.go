@@ -581,6 +581,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 
 		handleStreamIp := func(target string, port *port.Port) bool {
+			if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(target) {
+				return false
+			}
 			if r.scanner.ScanResults.HasSkipped(target) {
 				return false
 			}
@@ -605,6 +608,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 			if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
 				for ip := range ipStream {
+					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+						continue
+					}
 					for _, port := range r.scanner.Ports {
 						if !handleStreamIp(ip, port) {
 							break
@@ -612,6 +618,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					}
 				}
 			} else if target.Ip != "" && target.Port != "" {
+				if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(target.Ip) {
+					continue
+				}
 				pp, _ := strconv.Atoi(target.Port)
 				handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 			}
@@ -632,61 +641,65 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
 				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
 			}
-			ipStream, _ := mapcidr.IPAddressesAsStream(target.Cidr)
-			for ip := range ipStream {
-				r.wgscan.Add()
-				go func(ip string) {
-					defer r.wgscan.Done()
+			if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
+				for ip := range ipStream {
+					if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+						continue
+					}
+					r.wgscan.Add()
+					go func(ip string) {
+						defer r.wgscan.Done()
 
-					// obtain ports from shodan idb
-					shodanURL := fmt.Sprintf(shodanidb.URL, url.QueryEscape(ip))
-					request, err := retryablehttp.NewRequest(http.MethodGet, shodanURL, nil)
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't create http request for %s: %s\n", ip, err)
-						return
-					}
-					r.limiter.Take()
-					response, err := httpClient.Do(request)
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
-						return
-					}
-					defer func() { _ = response.Body.Close() }()
-					if response.StatusCode != http.StatusOK {
-						gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
-						return
-					}
-
-					// unmarshal the response
-					data := &shodanidb.ShodanResponse{}
-					if err := json.NewDecoder(response.Body).Decode(data); err != nil {
-						gologger.Warning().Msgf("Couldn't unmarshal json data for %s: %s\n", ip, err)
-						return
-					}
-
-					var passivePorts []*port.Port
-					for _, p := range data.Ports {
-						pp := &port.Port{Port: p, Protocol: protocol.TCP}
-						passivePorts = append(passivePorts, pp)
-					}
-
-					filteredPorts, err := excludePorts(r.options, passivePorts)
-					if err != nil {
-						gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
-						return
-					}
-					for _, p := range filteredPorts {
-						r.scanner.ScanResults.AddPort(ip, p)
-						// ignore OnReceive when verification is enabled
-						if r.options.Verify {
-							continue
+						// obtain ports from shodan idb
+						shodanURL := fmt.Sprintf(shodanidb.URL, url.QueryEscape(ip))
+						request, err := retryablehttp.NewRequest(http.MethodGet, shodanURL, nil)
+						if err != nil {
+							gologger.Warning().Msgf("Couldn't create http request for %s: %s\n", ip, err)
+							return
 						}
-						if r.scanner.OnReceive != nil {
-							r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
+						r.limiter.Take()
+						response, err := httpClient.Do(request)
+						if err != nil {
+							gologger.Warning().Msgf("Couldn't retrieve http response for %s: %s\n", ip, err)
+							return
+						}
+						defer func() { _ = response.Body.Close() }()
+						if response.StatusCode != http.StatusOK {
+							gologger.Warning().Msgf("Couldn't retrieve data for %s, server replied with status code: %d\n", ip, response.StatusCode)
+							return
 						}
 
-					}
-				}(ip)
+						// unmarshal the response
+						data := &shodanidb.ShodanResponse{}
+						if err := json.NewDecoder(response.Body).Decode(data); err != nil {
+							gologger.Warning().Msgf("Couldn't unmarshal json data for %s: %s\n", ip, err)
+							return
+						}
+
+						var passivePorts []*port.Port
+						for _, p := range data.Ports {
+							pp := &port.Port{Port: p, Protocol: protocol.TCP}
+							passivePorts = append(passivePorts, pp)
+						}
+
+						filteredPorts, err := excludePorts(r.options, passivePorts)
+						if err != nil {
+							gologger.Warning().Msgf("Couldn't exclude ports for %s: %s\n", ip, err)
+							return
+						}
+						for _, p := range filteredPorts {
+							r.scanner.ScanResults.AddPort(ip, p)
+							// ignore OnReceive when verification is enabled
+							if r.options.Verify {
+								continue
+							}
+							if r.scanner.OnReceive != nil {
+								r.scanner.OnReceive(&result.HostResult{IP: ip, Ports: []*port.Port{p}})
+							}
+
+						}
+					}(ip)
+				}
 			}
 		}
 		r.wgscan.Wait()
