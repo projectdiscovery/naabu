@@ -62,6 +62,7 @@ func main() {
 			options.OnResult(&result.HostResult{
 				Host: r.Host,
 				IP:   r.IP,
+				OS:   r.OS,
 				Ports: []*port.Port{
 					{
 						Port:     r.Port,

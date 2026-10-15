@@ -1659,7 +1659,13 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// console output
 				if r.options.JSON || r.options.CSV {
 					for _, p := range hostResult.Ports {
-						data := &Result{IP: hostResult.IP, TimeStamp: time.Now().UTC(), MacAddress: hostResult.MacAddress, MacVendor: vendorFromMAC(hostResult.MacAddress)}
+						data := &Result{
+							IP:         hostResult.IP,
+							TimeStamp:  time.Now().UTC(),
+							MacAddress: hostResult.MacAddress,
+							MacVendor:  vendorFromMAC(hostResult.MacAddress),
+							OS:         hostResult.OS,
+						}
 						if r.options.OutputCDN {
 							data.IsCDNIP = isCDNIP
 							data.CDNName = cdnName
@@ -1701,9 +1707,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
+						err = WriteJSONOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						err = WriteCsvOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 						// Flip immediately after the first CSV write: multiple
 						// hostnames for one IP would otherwise each re-emit the header.
 						csvFileHeaderEnabled = false
@@ -1721,6 +1727,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						IP:         hostResult.IP,
 						Ports:      hostResult.Ports,
 						Confidence: hostResult.Confidence,
+						OS:         hostResult.OS,
 					})
 				}
 			}

@@ -114,3 +114,34 @@ func TestMACAddress(t *testing.T) {
 	res.SetMACAddress("10.0.0.1", "")
 	assert.Equal(t, "aa:bb:cc:dd:ee:ff", res.GetMACAddress("10.0.0.1"))
 }
+
+func TestUpdateHostOS(t *testing.T) {
+	res := NewResult()
+	targetIP := "192.168.1.10"
+	port80 := &port.Port{Port: 80, Protocol: protocol.TCP}
+	res.AddPort(targetIP, port80)
+
+	osfp := &OSFingerprint{
+		Target:     targetIP,
+		DeviceType: "general purpose",
+		Running:    "Linux 5.X",
+		OSDetails:  "Linux 5.4 - 5.10",
+		OSCPE:      "cpe:/o:linux:linux_kernel:5",
+	}
+
+	assert.Nil(t, res.GetHostOS(targetIP))
+
+	res.UpdateHostOS(targetIP, osfp)
+	assert.Equal(t, osfp, res.GetHostOS(targetIP))
+	assert.Equal(t, "Linux 5.4 - 5.10", osfp.String())
+
+	var found *HostResult
+	for hr := range res.GetIPsPorts() {
+		if hr.IP == targetIP {
+			found = hr
+			break
+		}
+	}
+	assert.NotNil(t, found)
+	assert.Equal(t, osfp, found.OS)
+}
