@@ -8,6 +8,7 @@ import (
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -240,4 +241,53 @@ func TestVendorFromMAC(t *testing.T) {
 	assert.Empty(t, vendorFromMAC(""))
 	// 00:00:0C is a well-known IEEE OUI assigned to Cisco
 	assert.Contains(t, vendorFromMAC("00:00:0c:aa:bb:cc"), "Cisco")
+}
+
+func TestResultJSONAndCSVWithOS(t *testing.T) {
+	osfp := &result.OSFingerprint{
+		Target:     "192.168.1.10",
+		DeviceType: "general purpose",
+		Running:    "Linux 5.X",
+		OSDetails:  "Linux 5.4 - 5.10",
+		OSCPE:      "cpe:/o:linux:linux_kernel:5",
+	}
+
+	r := &Result{
+		IP:       "192.168.1.10",
+		Port:     80,
+		Protocol: "tcp",
+		OS:       osfp,
+	}
+
+	// 1. Verify JSON serialization of OS
+	b, err := r.JSON(nil)
+	require.NoError(t, err)
+
+	var parsed map[string]interface{}
+	require.NoError(t, json.Unmarshal(b, &parsed))
+
+	require.Contains(t, parsed, "os")
+	osMap, ok := parsed["os"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "Linux 5.X", osMap["running"])
+	assert.Equal(t, "Linux 5.4 - 5.10", osMap["os_details"])
+	assert.Equal(t, "cpe:/o:linux:linux_kernel:5", osMap["os_cpe"])
+
+	// 2. Verify WriteJSONOutputWithOS
+	var jsonBuf bytes.Buffer
+	ports := []*port.Port{{Port: 80, Protocol: protocol.TCP}}
+	err = WriteJSONOutputWithOS("192.168.1.10", "192.168.1.10", "", osfp, ports, false, false, "", nil, &jsonBuf)
+	require.NoError(t, err)
+
+	var jsonLine map[string]interface{}
+	require.NoError(t, json.Unmarshal(jsonBuf.Bytes(), &jsonLine))
+	require.Contains(t, jsonLine, "os")
+
+	// 3. Verify WriteCsvOutputWithOS
+	var csvBuf bytes.Buffer
+	err = WriteCsvOutputWithOS("192.168.1.10", "192.168.1.10", "", osfp, ports, false, false, "", true, nil, &csvBuf)
+	require.NoError(t, err)
+	csvContent := csvBuf.String()
+	assert.Contains(t, csvContent, "os")
+	assert.Contains(t, csvContent, "Linux 5.4 - 5.10")
 }

@@ -19,11 +19,21 @@ import (
 type ResultFn func(*HostResult)
 
 type OSFingerprint struct {
-	Target     string
-	DeviceType string
-	Running    string
-	OSCPE      string
-	OSDetails  string
+	Target     string `json:"target,omitempty" csv:"target"`
+	DeviceType string `json:"device_type,omitempty" csv:"device_type"`
+	Running    string `json:"running,omitempty" csv:"running"`
+	OSCPE      string `json:"os_cpe,omitempty" csv:"os_cpe"`
+	OSDetails  string `json:"os_details,omitempty" csv:"os_details"`
+}
+
+func (os *OSFingerprint) String() string {
+	if os == nil {
+		return ""
+	}
+	if os.OSDetails != "" {
+		return os.OSDetails
+	}
+	return os.Running
 }
 
 type HostResult struct {
@@ -45,6 +55,7 @@ type Result struct {
 	skipped   map[string]struct{}
 	deadHosts map[string]struct{}
 	macs      map[string]string
+	os        map[string]*OSFingerprint
 }
 
 // NewResult structure
@@ -55,6 +66,7 @@ func NewResult() *Result {
 		skipped:   make(map[string]struct{}),
 		deadHosts: make(map[string]struct{}),
 		macs:      make(map[string]string),
+		os:        make(map[string]*OSFingerprint),
 	}
 }
 
@@ -99,7 +111,12 @@ func (r *Result) GetIPsPorts() chan *HostResult {
 				confidenceLevel = confidence.Low
 			}
 
-			hostResult := &HostResult{IP: ip, Ports: maps.Values(ports), Confidence: confidenceLevel}
+			hostResult := &HostResult{
+				IP:         ip,
+				Ports:      maps.Values(ports),
+				Confidence: confidenceLevel,
+				OS:         r.os[ip],
+			}
 
 			// Perform ARP lookup for private/local network IPs
 			if isPrivateIP(ip) {
@@ -334,12 +351,24 @@ func (r *Result) HasSkipped(ip string) bool {
 
 // UpdateHostOS updates the OS info for a given IP in the results
 func (r *Result) UpdateHostOS(ip string, osfp *OSFingerprint) {
-	for hostResult := range r.GetIPsPorts() {
-		if hostResult.IP == ip {
-			hostResult.OS = osfp
-			return
-		}
+	r.Lock()
+	defer r.Unlock()
+
+	if r.os == nil {
+		r.os = make(map[string]*OSFingerprint)
 	}
+	r.os[ip] = osfp
+}
+
+// GetHostOS returns the OS info for a given IP in the results
+func (r *Result) GetHostOS(ip string) *OSFingerprint {
+	r.RLock()
+	defer r.RUnlock()
+
+	if r.os == nil {
+		return nil
+	}
+	return r.os[ip]
 }
 
 // isPrivateIP checks if an IP address is in a private/local network range
