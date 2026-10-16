@@ -882,6 +882,24 @@ func TestWaitServiceDetectionReusableAcrossRuns(t *testing.T) {
 	}
 }
 
+func TestWaitServiceDetectionStoresServices(t *testing.T) {
+	svc := &port.Service{Name: "http"}
+	r := &Runner{
+		fpQueue:    newFpQueue(),
+		fpDone:     make(chan struct{}),
+		fpServices: map[string]*port.Service{"192.0.2.1:80": svc},
+	}
+	close(r.fpDone)
+
+	res := result.NewResult()
+	res.AddPort("192.0.2.1", &port.Port{Port: 80, Protocol: protocol.TCP})
+	r.waitServiceDetection(res)
+
+	hostResult := <-res.GetIPsPorts()
+	require.Len(t, hostResult.Ports, 1)
+	require.Equal(t, svc, hostResult.Ports[0].Service)
+}
+
 func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {
 	runner := newConnectRunner(t)
 	runner.options.DisableStdout = true
