@@ -2,9 +2,11 @@ package result
 
 import (
 	"testing"
+	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -72,6 +74,44 @@ func TestIPHasPortDistinguishesProtocol(t *testing.T) {
 	assert.Equal(t, udp80, res.ipPorts[targetIP][portIdentity(udp80)])
 }
 
+func TestUpdatePortService(t *testing.T) {
+	targetIP := "127.0.0.1"
+	stored := &port.Port{Port: 80, Protocol: protocol.TCP}
+	service := &port.Service{Name: "http", CPEs: []string{"cpe:/a:example:http"}}
+
+	res := NewResult()
+	res.AddPort(targetIP, stored)
+
+	assert.True(t, res.UpdatePortService(targetIP, &port.Port{Port: 80, Protocol: protocol.TCP, Service: service}))
+	assert.Equal(t, service, stored.Service)
+
+	// udp/80 is a different port: not stored, and tcp/80 keeps its service info
+	assert.False(t, res.UpdatePortService(targetIP, &port.Port{Port: 80, Protocol: protocol.UDP, Service: &port.Service{Name: "dns"}}))
+	assert.Equal(t, service, stored.Service)
+
+	assert.False(t, res.UpdatePortService(targetIP, &port.Port{Port: 81, Protocol: protocol.TCP, Service: service}))
+	assert.False(t, res.UpdatePortService("127.0.0.2", &port.Port{Port: 80, Protocol: protocol.TCP, Service: service}))
+
+	// the stored service is a copy, so later changes by the caller don't reach it
+	service.Name = "changed"
+	service.CPEs[0] = "changed"
+	assert.Equal(t, &port.Service{Name: "http", CPEs: []string{"cpe:/a:example:http"}}, stored.Service)
+}
+
+func TestGetIPsPortsCopiesPorts(t *testing.T) {
+	res := NewResult()
+	res.AddPort("192.0.2.1", &port.Port{Port: 80, Protocol: protocol.TCP, Service: &port.Service{Name: "http", CPEs: []string{"cpe:/a:example:http"}}})
+
+	// writes to a snapshot must never change the stored port
+	snapshot := <-res.GetIPsPorts()
+	snapshot.Ports[0].Service.Name = "changed"
+	snapshot.Ports[0].Service.CPEs[0] = "changed"
+	snapshot.Ports[0].Service = nil
+
+	stored := <-res.GetIPsPorts()
+	assert.Equal(t, &port.Service{Name: "http", CPEs: []string{"cpe:/a:example:http"}}, stored.Ports[0].Service)
+}
+
 func TestAddIP(t *testing.T) {
 	targetIP := "127.0.0.1"
 
@@ -113,4 +153,118 @@ func TestMACAddress(t *testing.T) {
 	// empty MAC values are ignored and never overwrite an existing entry
 	res.SetMACAddress("10.0.0.1", "")
 	assert.Equal(t, "aa:bb:cc:dd:ee:ff", res.GetMACAddress("10.0.0.1"))
+}
+
+// runWithTimeout fails the test instead of hanging forever when fn deadlocks.
+func runWithTimeout(t *testing.T, fn func()) {
+	t.Helper()
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		fn()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("deadlock: timed out while ranging over results")
+	}
+}
+
+func TestGetIPsReentrant(t *testing.T) {
+	res := NewResult()
+	targetIPs := []string{"10.0.0.1", "10.0.0.2", "10.0.0.3"}
+	for _, ip := range targetIPs {
+		res.AddIp(ip)
+		res.SetMACAddress(ip, "aa:bb:cc:dd:ee:ff")
+	}
+
+	var got []string
+	runWithTimeout(t, func() {
+		for ip := range res.GetIPs() {
+			// readers and writers on the same result must not block while
+			// the consumer is still ranging (mirrors handleOutput in -sn mode)
+			assert.True(t, res.HasIP(ip))
+			assert.Equal(t, "aa:bb:cc:dd:ee:ff", res.GetMACAddress(ip))
+			res.AddDeadHost(ip)
+			got = append(got, ip)
+		}
+	})
+	assert.ElementsMatch(t, targetIPs, got)
+}
+
+func TestGetIPsPortsReentrant(t *testing.T) {
+	res := NewResult()
+	// non-private ips so that no ARP lookup is attempted
+	targetIPs := []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"}
+	targetPort := &port.Port{Port: 80, Protocol: protocol.TCP}
+	for _, ip := range targetIPs {
+		res.AddPort(ip, targetPort)
+	}
+	res.AddSkipped("192.0.2.2")
+
+	var got []string
+	runWithTimeout(t, func() {
+		for hostResult := range res.GetIPsPorts() {
+			assert.True(t, res.IPHasPort(hostResult.IP, targetPort))
+			if hostResult.IP == "192.0.2.2" {
+				assert.Equal(t, confidence.Low, hostResult.Confidence)
+			} else {
+				assert.Equal(t, confidence.Normal, hostResult.Confidence)
+			}
+			res.AddPort(hostResult.IP, &port.Port{Port: 443, Protocol: protocol.TCP})
+			got = append(got, hostResult.IP)
+		}
+	})
+	assert.ElementsMatch(t, targetIPs, got)
+}
+
+func TestGetIPsPortsEarlyReturn(t *testing.T) {
+	res := NewResult()
+	// non-private ips so that no ARP lookup is attempted
+	targetIPs := []string{"192.0.2.1", "192.0.2.2", "192.0.2.3"}
+	for _, ip := range targetIPs {
+		res.AddPort(ip, &port.Port{Port: 80, Protocol: protocol.TCP})
+	}
+
+	// consumers like UpdateHostOS stop after the first match; the producer
+	// must still run to completion instead of blocking forever on send
+	out := res.GetIPsPorts()
+	<-out
+	assert.Eventually(t, func() bool {
+		return len(out) == len(targetIPs)-1
+	}, 5*time.Second, 10*time.Millisecond)
+}
+
+func TestUpdateHostOS(t *testing.T) {
+	res := NewResult()
+	p := &port.Port{Port: 22, Protocol: protocol.TCP}
+	res.AddPort("192.0.2.1", p)
+	res.AddPort("192.0.2.2", p)
+
+	osfp := &OSFingerprint{Target: "192.0.2.1", OSDetails: "Linux 5.x"}
+	res.UpdateHostOS("192.0.2.1", osfp)
+	// nil must not clear existing info
+	res.UpdateHostOS("192.0.2.1", nil)
+	// the stored fingerprint is a copy, so later changes by the caller don't reach it
+	osfp.OSDetails = "changed"
+
+	snapshot := func() map[string]*OSFingerprint {
+		got := make(map[string]*OSFingerprint)
+		for hostResult := range res.GetIPsPorts() {
+			got[hostResult.IP] = hostResult.OS
+		}
+		return got
+	}
+	want := &OSFingerprint{Target: "192.0.2.1", OSDetails: "Linux 5.x"}
+
+	got := snapshot()
+	assert.Len(t, got, 2)
+	assert.Equal(t, want, got["192.0.2.1"])
+	assert.Nil(t, got["192.0.2.2"])
+
+	// writes to a snapshot must never change the stored fingerprint
+	got["192.0.2.1"].OSDetails = "changed"
+	assert.Equal(t, want, snapshot()["192.0.2.1"])
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/utils/structs"
 )
 
@@ -51,6 +52,10 @@ type Result struct {
 	Version     string   `json:"version,omitempty"`
 	Confidence  int      `json:"confidence,omitempty"`
 	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
+
+	// OS fingerprint of the host from nmap OS detection
+	OS    string `json:"os,omitempty" csv:"os"`
+	OSCPE string `json:"os_cpe,omitempty" csv:"os_cpe"`
 }
 
 // TODO:
@@ -88,6 +93,9 @@ type jsonResult struct {
 	Version     string   `json:"version,omitempty"`
 	Confidence  int      `json:"confidence,omitempty"`
 	CPEs        []string `json:"cpes,omitempty"`
+
+	OS    string `json:"os,omitempty"`
+	OSCPE string `json:"os_cpe,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -124,6 +132,8 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Version = r.Version
 	data.Confidence = r.Confidence
 	data.CPEs = r.CPEs
+	data.OS = r.OS
+	data.OSCPE = r.OSCPE
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -226,12 +236,17 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 
 // WriteJSONOutputWithMac writes the output list of subdomain in JSON to an io.Writer with MAC address
 func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
+	return writeJSONOutputWithOS(host, ip, macAddress, nil, ports, outputCDN, isCdn, cdnName, excludedFields, writer)
+}
+
+func writeJSONOutputWithOS(host, ip, macAddress string, osfp *result.OSFingerprint, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
 	result := &Result{
 		Host:       host,
 		IP:         ip,
 		MacAddress: macAddress,
 		TimeStamp:  time.Now().UTC(),
 	}
+	result.setOS(osfp)
 	if outputCDN {
 		result.IsCDNIP = isCdn
 		result.CDNName = cdnName
@@ -273,8 +288,13 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 
 // WriteCsvOutputWithMac writes the output list of subdomain in csv format to an io.Writer with MAC address
 func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
+	return writeCsvOutputWithOS(host, ip, macAddress, nil, ports, outputCDN, isCdn, cdnName, header, excludedFields, writer)
+}
+
+func writeCsvOutputWithOS(host, ip, macAddress string, osfp *result.OSFingerprint, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{IP: ip, MacAddress: macAddress, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
+	data.setOS(osfp)
 	if host != ip {
 		data.Host = host
 	}
@@ -327,6 +347,15 @@ func writeCSVRow(data *Result, writer *csv.Writer, excludedFields []string) {
 		errMsg := errors.Wrap(err, "Could not write row")
 		gologger.Error().Msg(errMsg.Error())
 	}
+}
+
+// setOS copies the host's OS fingerprint, if any, into the output fields.
+func (r *Result) setOS(osfp *result.OSFingerprint) {
+	if osfp == nil {
+		return
+	}
+	r.OS = osfp.OSDetails
+	r.OSCPE = osfp.OSCPE
 }
 
 // copyServiceFields copies all service fields from service to result, or clears them if service is nil.
