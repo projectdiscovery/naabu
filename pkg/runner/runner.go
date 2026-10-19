@@ -545,7 +545,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
+				if !r.isExcluded(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -581,6 +581,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 
 		handleStreamIp := func(target string, port *port.Port) bool {
+			if r.isExcluded(target) {
+				return false
+			}
 			if r.scanner.ScanResults.HasSkipped(target) {
 				return false
 			}
@@ -634,6 +637,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 			ipStream, _ := mapcidr.IPAddressesAsStream(target.Cidr)
 			for ip := range ipStream {
+				if r.isExcluded(ip) {
+					continue
+				}
 				r.wgscan.Add()
 				go func(ip string) {
 					defer r.wgscan.Done()
@@ -882,7 +888,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 							ip = r.PickIP(targets, ipIndex)
 						}
 
-						if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+						if r.isExcluded(ip) {
 							continue
 						}
 
@@ -1334,7 +1340,7 @@ func (r *Runner) calculateDeadHosts(targets4, targets6 []*net.IPNet) {
 	checkCidr := func(cidr *net.IPNet) {
 		ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 		for ip := range ipStream {
-			if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+			if r.isExcluded(ip) {
 				continue
 			}
 			total++

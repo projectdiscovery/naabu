@@ -35,6 +35,12 @@ func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	return excludedIps, nil
 }
 
+// isExcluded reports whether ip matches the user supplied exclude list
+// (-exclude-hosts / -exclude-file).
+func (r *Runner) isExcluded(ip string) bool {
+	return r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip)
+}
+
 func (r *Runner) getExcludeItems(s string) ([]string, error) {
 	if isIpOrCidr(s) {
 		return []string{s}, nil
