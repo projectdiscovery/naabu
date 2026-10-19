@@ -9,6 +9,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/gologger/levels"
+	"github.com/projectdiscovery/gologger/writer"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
@@ -246,6 +249,48 @@ func TestHandleOutputWritesOS(t *testing.T) {
 			require.Contains(t, string(b), "cpe:/o:linux:linux_kernel:5")
 		})
 	}
+}
+
+func TestHandleOutputDiscoverySkipsStdout(t *testing.T) {
+	for _, format := range []string{"text", "json", "csv"} {
+		t.Run(format, func(t *testing.T) {
+			runner := newConnectRunner(t)
+			buf := &bytes.Buffer{}
+			gologger.DefaultLogger.SetWriter(captureWriter{buf: buf})
+			gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
+			t.Cleanup(func() {
+				gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
+				gologger.DefaultLogger.SetWriter(writer.NewCLI())
+			})
+			runner.options.DisableStdout = true
+			runner.options.JSON = format == "json"
+			runner.options.CSV = format == "csv"
+			res := result.NewResult()
+			res.AddIp("203.0.113.9")
+			runner.handleOutput(res)
+
+			require.NotContains(t, buf.String(), "203.0.113.9")
+		})
+	}
+}
+
+func TestHandleOutputDiscoveryCSVKeepsFileHeader(t *testing.T) {
+	runner := newConnectRunner(t)
+	out := filepath.Join(t.TempDir(), "out.csv")
+	runner.options.Output = out
+	runner.options.CSV = true
+	runner.options.DisableStdout = true
+
+	res := result.NewResult()
+	res.AddIp("203.0.113.9")
+	runner.handleOutput(res)
+
+	b, err := os.ReadFile(out)
+	require.NoError(t, err)
+	lines := strings.Split(strings.TrimSpace(string(b)), "\n")
+	require.GreaterOrEqual(t, len(lines), 2)
+	require.Contains(t, lines[0], "ip")
+	require.Contains(t, string(b), "203.0.113.9")
 }
 
 func TestWriteNmapFormatsNoOpWhenUnset(t *testing.T) {

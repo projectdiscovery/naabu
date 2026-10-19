@@ -1781,17 +1781,21 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							continue
 						}
 						_, _ = fmt.Fprintf(&buffer, "%s\n", b)
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !r.options.DisableStdout {
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
 					} else {
-						if csvFileHeaderEnabled {
+						if csvStdoutHeaderEnabled {
 							writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-							csvFileHeaderEnabled = false
+							csvStdoutHeaderEnabled = false
 						}
 						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						writer.Flush()
-						gologger.Silent().Msgf("%s", buffer.String())
+						if !r.options.DisableStdout {
+							gologger.Silent().Msgf("%s", buffer.String())
+						}
 					}
-				} else {
+				} else if !r.options.DisableStdout {
 					if r.options.OutputCDN && isCDNIP {
 						gologger.Silent().Msgf("%s [%s]\n", host, cdnName)
 					} else {
@@ -1804,6 +1808,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						err = WriteJSONOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						csvFileHeaderEnabled = false
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
