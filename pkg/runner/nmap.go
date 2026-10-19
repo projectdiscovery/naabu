@@ -224,23 +224,7 @@ func (r *Runner) integrateNmapResults(nmapResult *nmap.Run) {
 
 // updatePortWithServiceInfo updates an existing port in scan results with enhanced service information
 func (r *Runner) updatePortWithServiceInfo(ip string, enhancedPort *port.Port) {
-	// Check if the port already exists in scan results
-	if r.scanner.ScanResults.IPHasPort(ip, enhancedPort) {
-		// Get all ports for this IP and update the matching one
-		for hostResult := range r.scanner.ScanResults.GetIPsPorts() {
-			if hostResult.IP == ip {
-				for _, existingPort := range hostResult.Ports {
-					if existingPort.Port == enhancedPort.Port && existingPort.Protocol == enhancedPort.Protocol {
-						// Update the existing port with service information
-						if enhancedPort.Service != nil {
-							existingPort.Service = enhancedPort.Service
-						}
-						return
-					}
-				}
-			}
-		}
-	} else {
+	if !r.scanner.ScanResults.UpdatePortService(ip, enhancedPort) {
 		// Port doesn't exist, add it
 		r.scanner.ScanResults.AddPort(ip, enhancedPort)
 	}

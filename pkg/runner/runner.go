@@ -545,7 +545,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		discoverCidr := func(cidr *net.IPNet) {
 			ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 			for ip := range ipStream {
-				if r.excludedIpsNP == nil || r.excludedIpsNP.ValidateAddress(ip) {
+				if !r.isExcluded(ip) {
 					r.handleHostDiscovery(ip)
 				}
 			}
@@ -581,6 +581,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
 
 		handleStreamIp := func(target string, port *port.Port) bool {
+			if r.isExcluded(target) {
+				return false
+			}
 			if r.scanner.ScanResults.HasSkipped(target) {
 				return false
 			}
@@ -634,6 +637,9 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			}
 			ipStream, _ := mapcidr.IPAddressesAsStream(target.Cidr)
 			for ip := range ipStream {
+				if r.isExcluded(ip) {
+					continue
+				}
 				r.wgscan.Add()
 				go func(ip string) {
 					defer r.wgscan.Done()
@@ -882,7 +888,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 							ip = r.PickIP(targets, ipIndex)
 						}
 
-						if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+						if r.isExcluded(ip) {
 							continue
 						}
 
@@ -1334,7 +1340,7 @@ func (r *Runner) calculateDeadHosts(targets4, targets6 []*net.IPNet) {
 	checkCidr := func(cidr *net.IPNet) {
 		ipStream, _ := mapcidr.IPAddressesAsStream(cidr.String())
 		for ip := range ipStream {
-			if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+			if r.isExcluded(ip) {
 				continue
 			}
 			total++
@@ -1536,6 +1542,7 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 				key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
 				if svc, ok := r.fpServices[key]; ok {
 					p.Service = svc
+					scanResults.UpdatePortService(hostResult.IP, p)
 				}
 			}
 		}
@@ -1673,6 +1680,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						data.TLS = p.TLS
 
 						copyServiceFields(data, p.Service)
+						data.setOS(hostResult.OS)
 						if r.options.JSON {
 							b, err := data.JSON(r.options.ExcludeOutputFields)
 							if err != nil {
@@ -1701,9 +1709,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 				// file output
 				if file != nil {
 					if r.options.JSON {
-						err = WriteJSONOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
+						err = writeJSONOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
-						err = WriteCsvOutputWithMac(host, hostResult.IP, hostResult.MacAddress, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						err = writeCsvOutputWithOS(host, hostResult.IP, hostResult.MacAddress, hostResult.OS, hostResult.Ports, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
 						// Flip immediately after the first CSV write: multiple
 						// hostnames for one IP would otherwise each re-emit the header.
 						csvFileHeaderEnabled = false
@@ -1721,6 +1729,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						IP:         hostResult.IP,
 						Ports:      hostResult.Ports,
 						Confidence: hostResult.Confidence,
+						OS:         hostResult.OS,
 					})
 				}
 			}

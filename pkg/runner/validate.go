@@ -32,8 +32,9 @@ var (
 // ValidateOptions validates the configuration options passed
 func (options *Options) ValidateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
-	// If none was provided, then return.
-	if options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
+	// If none was provided, then return. -dashboard-upload only uploads
+	// an existing results file, so it needs no input.
+	if options.AssetFileUpload == "" && options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
 		return errNoInputList
 	}
 

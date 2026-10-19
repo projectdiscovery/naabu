@@ -196,7 +196,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 				continue
 			}
 
-			if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+			if r.isExcluded(ip) {
 				continue
 			}
 			if r.scanner.ScanResults.HasSkipped(ip) {
@@ -230,7 +230,7 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 		if ip == "" {
 			continue
 		}
-		if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+		if r.isExcluded(ip) {
 			continue
 		}
 		if r.scanner.ScanResults.HasSkipped(ip) {

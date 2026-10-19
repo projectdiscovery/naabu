@@ -168,7 +168,7 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 	if ip == "" {
 		ip = r.PickIP(targets, ipIndex)
 	}
-	if r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip) {
+	if r.isExcluded(ip) {
 		return
 	}
 

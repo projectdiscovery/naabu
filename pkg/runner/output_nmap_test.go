@@ -207,6 +207,50 @@ func TestHandleOutputCreatesNestedDir(t *testing.T) {
 	require.NoError(t, err, "output to a non-existent nested path must create the directory")
 }
 
+func TestHandleOutputOnResultCarriesOS(t *testing.T) {
+	runner := newConnectRunner(t)
+	runner.options.DisableStdout = true
+
+	var got []*result.HostResult
+	runner.options.OnResult = func(hr *result.HostResult) {
+		got = append(got, hr)
+	}
+
+	osfp := &result.OSFingerprint{Target: "203.0.113.7", OSDetails: "Linux 5.x"}
+	res := result.NewResult()
+	res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+	res.UpdateHostOS("203.0.113.7", osfp)
+	runner.handleOutput(res)
+
+	require.NotEmpty(t, got)
+	for _, hr := range got {
+		require.Equal(t, osfp, hr.OS)
+	}
+}
+
+func TestHandleOutputWritesOS(t *testing.T) {
+	for _, format := range []string{"json", "csv"} {
+		t.Run(format, func(t *testing.T) {
+			runner := newConnectRunner(t)
+			out := filepath.Join(t.TempDir(), "out."+format)
+			runner.options.Output = out
+			runner.options.DisableStdout = true
+			runner.options.JSON = format == "json"
+			runner.options.CSV = format == "csv"
+
+			res := result.NewResult()
+			res.AddPort("203.0.113.7", &port.Port{Port: 80, Protocol: protocol.TCP})
+			res.UpdateHostOS("203.0.113.7", &result.OSFingerprint{OSDetails: "Linux 5.X", OSCPE: "cpe:/o:linux:linux_kernel:5"})
+			runner.handleOutput(res)
+
+			b, err := os.ReadFile(out)
+			require.NoError(t, err)
+			require.Contains(t, string(b), "Linux 5.X")
+			require.Contains(t, string(b), "cpe:/o:linux:linux_kernel:5")
+		})
+	}
+}
+
 func TestHandleOutputDiscoverySkipsStdout(t *testing.T) {
 	for _, format := range []string{"text", "json", "csv"} {
 		t.Run(format, func(t *testing.T) {

@@ -169,10 +169,9 @@ func (u *UploadWriter) autoCommit(ctx context.Context) {
 				if err := u.uploadChunk(buff); err != nil {
 					gologger.Error().Msgf("Failed to upload asset results on cloud: %v", err)
 				}
-			} else {
-				buff.WriteString(line)
-				buff.WriteString("\n")
 			}
+			buff.WriteString(line)
+			buff.WriteString("\n")
 		}
 	}
 }
@@ -190,7 +189,6 @@ func (u *UploadWriter) uploadChunk(buff *bytes.Buffer) error {
 }
 
 func (u *UploadWriter) upload(data []byte) error {
-	fmt.Println("upload:", string(data))
 	req, err := u.getRequest(data)
 	if err != nil {
 		return errkit.Wrap(err, "could not create upload request")
