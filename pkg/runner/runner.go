@@ -1776,9 +1776,9 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 							gologger.Silent().Msgf("%s", buffer.String())
 						}
 					} else {
-						if csvFileHeaderEnabled {
+						if csvStdoutHeaderEnabled {
 							writeCSVHeaders(data, writer, r.options.ExcludeOutputFields)
-							csvFileHeaderEnabled = false
+							csvStdoutHeaderEnabled = false
 						}
 						writeCSVRow(data, writer, r.options.ExcludeOutputFields)
 						writer.Flush()
@@ -1799,6 +1799,7 @@ func (r *Runner) handleOutput(scanResults *result.Result) {
 						err = WriteJSONOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, r.options.ExcludeOutputFields, file)
 					} else if r.options.CSV {
 						err = WriteCsvOutputWithMac(host, hostIP, macAddress, nil, r.options.OutputCDN, isCDNIP, cdnName, csvFileHeaderEnabled, r.options.ExcludeOutputFields, file)
+						csvFileHeaderEnabled = false
 					} else {
 						err = WriteHostOutput(host, nil, r.options.OutputCDN, cdnName, file)
 					}
