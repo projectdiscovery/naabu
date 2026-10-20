@@ -2,6 +2,8 @@ module github.com/projectdiscovery/naabu/v2
 
 go 1.26.0
 
+toolchain go1.26.10
+
 require (
 	github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057
 	github.com/Mzack9999/gopacket v0.0.0-20260720123648-429cac97ac7a
