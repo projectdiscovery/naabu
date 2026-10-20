@@ -166,11 +166,13 @@ CLOUD:
 
 Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
+On musl-based distributions such as Alpine, use the `linux_<arch>_musl` release archive.
+
 ## Prerequisite
 
 > **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
+To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Alpine**: `apk add libpcap`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
 
 
 ## Installing Naabu
