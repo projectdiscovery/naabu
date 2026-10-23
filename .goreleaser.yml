@@ -30,8 +30,9 @@ builds:
         goarch: arm64
 
   # NOTE: same binary as above, but with the musl ELF interpreter so it runs on
-  # the Alpine image (purego makes the CGO_ENABLED=0 binary dynamically linked).
-  - id: naabu-docker
+  # musl distros such as Alpine (purego makes the CGO_ENABLED=0 binary
+  # dynamically linked against the glibc loader).
+  - id: naabu-musl
     ldflags:
       - -s -w
       - -I /lib/ld-musl-{{ if eq .Arch "amd64" }}x86_64{{ else if eq .Arch "arm64" }}aarch64{{ else }}armhf{{ end }}.so.1
@@ -54,13 +55,19 @@ archives:
     formats:
       - zip
     name_template: '{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os "darwin" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}'
+  - id: naabu-musl
+    ids:
+      - naabu-musl
+    formats:
+      - zip
+    name_template: '{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}{{ with .Arm }}v{{ . }}{{ end }}_musl'
 
 checksum:
   name_template: "{{ .ProjectName }}-checksums.txt"
 
 dockers_v2:
   - ids:
-      - naabu-docker
+      - naabu-musl
     images:
       - projectdiscovery/naabu
     tags:
