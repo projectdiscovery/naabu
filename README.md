@@ -66,26 +66,32 @@ INPUT:
    -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            ports to scan (80,443, 100-200)
-   -top-ports, -tp string      top ports to scan (default 100) [full,100,1000]
-   -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
-   -ports-file, -pf string     list of ports to scan (file)
-   -port-threshold, -pts int   port threshold to skip port scan for the host
-   -exclude-cdn, -ec           skip full port scans for CDN/WAF (only scan for port 80,443)
-   -display-cdn, -cdn          display cdn in use
+   -port, -p string              ports to scan (80,443, 100-200)
+   -top-ports, -tp string        top ports to scan (default 100) [full,100,1000]
+   -exclude-ports, -ep string[]  ports to exclude from scan (file or comma-separated)
+   -ports-file, -pf string[]     list of ports to scan (file or comma-separated)
+   -port-threshold, -pts int     port threshold to skip port scan for the host
+   -exclude-cdn, -ec             skip full port scans for CDN/WAF (only scan for port 80,443)
+   -display-cdn, -cdn            display cdn in use
 
 RATE-LIMIT:
-   -c int     general internal worker threads (default 25)
-   -rate int  packets to send per second (default 1000)
+   -c int                general internal worker threads (default 25)
+   -rate int             packets to send per second (default 1000)
+   -tw, -tx-workers int  parallel transmit workers for the fast SYN sender (default 1)
 
 UPDATE:
    -up, -update                 update naabu to latest version
    -duc, -disable-update-check  disable automatic naabu update check
 
 OUTPUT:
-   -o, -output string  file to write output to (optional)
-   -j, -json           write output in JSON lines format
-   -csv                write output in csv format
+   -o, -output string                     file to write output to (optional)
+   -lof, -list-output-fields              list of fields to output (comma separated)
+   -eof, -exclude-output-fields string[]  exclude output fields output based on a condition
+   -j, -json                              write output in JSON lines format
+   -csv                                   write output in csv format
+   -oX, -xml-output string                write nmap-compatible XML output to file (- for stdout)
+   -oG, -grep-output string               write nmap-compatible greppable output to file (- for stdout)
+   -oA, -output-all string                write json, xml and greppable output to <basename>.{json,xml,gnmap}
 
 SERVICES-DISCOVERY:
    -sD, -service-discovery           identify services by port number
@@ -136,10 +142,14 @@ OPTIMIZATION:
    -retries int                    number of retries for the port scan (default 3)
    -timeout value                  time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds) (default 1s)
    -warm-up-time int               time in seconds between scan phases (default 2)
+   -T, -timing int                 timing template, higher is faster (0-5) (default 3)
    -ping                           ping probes for verification of host
    -verify                         validate the ports again with TCP verification
    -ss, -smart-scan                predictive port scanning using port correlation model (not compatible with stream mode)
    -pt, -prediction-threshold int  minimum confidence for port predictions (0-100%) (default 20)
+   -npp, -no-port-priority         disable tiered port ordering (scan the whole range in one uniform random order)
+   -shard string                   distributed scan slice as index/total, 1-based (e.g. 1/4)
+   -seed int                       seed for scan randomization, must match across shards (default random)
 
 DEBUG:
    -health-check, -hc        run diagnostic check up
