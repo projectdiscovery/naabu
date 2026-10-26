@@ -20,14 +20,14 @@ require (
 	github.com/projectdiscovery/freeport v0.0.7
 	github.com/projectdiscovery/goflags v0.2.1
 	github.com/projectdiscovery/gologger v1.1.73
-	github.com/projectdiscovery/ipranger v0.0.69
+	github.com/projectdiscovery/ipranger v0.0.70
 	github.com/projectdiscovery/mapcidr v1.1.97
 	github.com/projectdiscovery/networkpolicy v0.1.55
 	github.com/projectdiscovery/ratelimit v0.0.94
 	github.com/projectdiscovery/retryabledns v1.0.116
 	github.com/projectdiscovery/retryablehttp-go v1.3.31
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.10-0.20261013234757-73f5497aaf2e
+	github.com/projectdiscovery/utils v0.11.10
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
