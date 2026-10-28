@@ -75,7 +75,7 @@ func DoHealthCheck(options *Options, flagSet *goflags.FlagSet) string {
 	if err != nil {
 		testResult = fmt.Sprintf("Ko (%s)", err)
 	}
-	_, _ = fmt.Fprintf(&test, "UDP IPv4 connectivity to scanme.sh:80 => %s\n", testResult)
+	_, _ = fmt.Fprintf(&test, "UDP IPv4 connectivity to scanme.sh:53 => %s\n", testResult)
 	u6, err := net.Dial("udp6", "scanme.sh:80")
 	if err == nil && u6 != nil {
 		_ = u6.Close()

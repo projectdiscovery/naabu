@@ -20,7 +20,7 @@ const banner = `
 `
 
 // Version is the current Version of naabu
-const Version = `2.6.1`
+const Version = `2.7.0`
 
 // showBanner is used to show the banner to the user
 func showBanner() {
@@ -37,6 +37,8 @@ func showNetworkCapabilities(options *Options) {
 		accessLevel = "root"
 		if osutil.IsLinux() {
 			accessLevel = "CAP_NET_RAW"
+		} else if osutil.IsWindows() {
+			accessLevel = "admin"
 		}
 		scanType = "SYN"
 	case options.Passive:

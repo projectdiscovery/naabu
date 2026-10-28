@@ -36,6 +36,30 @@ func TestParseExcludedIps(t *testing.T) {
 	}()
 }
 
+func TestIsExcluded(t *testing.T) {
+	r, err := NewRunner(&Options{})
+	require.NoError(t, err)
+	defer r.Close() //nolint:errcheck
+	require.False(t, r.isExcluded("10.0.0.1"), "nothing is excluded without an exclude list")
+
+	r, err = NewRunner(&Options{ExcludeIps: "10.0.0.0/30,192.168.1.1,2001:db8::/126"})
+	require.NoError(t, err)
+	defer r.Close() //nolint:errcheck
+
+	tests := map[string]bool{
+		"10.0.0.0":    true,
+		"10.0.0.3":    true,
+		"10.0.0.4":    false,
+		"192.168.1.1": true,
+		"192.168.1.2": false,
+		"2001:db8::3": true,
+		"2001:db8::4": false,
+	}
+	for ip, want := range tests {
+		require.Equal(t, want, r.isExcluded(ip), ip)
+	}
+}
+
 func TestIsIpOrCidr(t *testing.T) {
 	valid := []string{"1.1.1.1", "2.2.2.2", "1.1.1.0/24"}
 	invalid := []string{"1.1.1.1.1", "a.a.a.a", "77"}

@@ -42,6 +42,7 @@ all ports that return a reply.
  - **Host Discovery** scan (**experimental**)
  - **NMAP** integration for service discovery
  - **Custom UDP payloads** for CONNECT scans
+ - **Native UDP service probes** powered by nmap-service-probes
  - Multiple input support - **STDIN/HOST/IP/CIDR/ASN**
  - Multiple output format support - **JSON/TXT/STDOUT**
 
@@ -65,26 +66,41 @@ INPUT:
    -exclude-file, -ef string   list of hosts to exclude from scan (file)
 
 PORT:
-   -port, -p string            ports to scan (80,443, 100-200)
-   -top-ports, -tp string      top ports to scan (default 100) [full,100,1000]
-   -exclude-ports, -ep string  ports to exclude from scan (comma-separated)
-   -ports-file, -pf string     list of ports to scan (file)
-   -port-threshold, -pts int   port threshold to skip port scan for the host
-   -exclude-cdn, -ec           skip full port scans for CDN/WAF (only scan for port 80,443)
-   -display-cdn, -cdn          display cdn in use
+   -port, -p string              ports to scan (80,443, 100-200)
+   -top-ports, -tp string        top ports to scan (default 100) [full,100,1000]
+   -exclude-ports, -ep string[]  ports to exclude from scan (file or comma-separated)
+   -ports-file, -pf string[]     list of ports to scan (file or comma-separated)
+   -port-threshold, -pts int     port threshold to skip port scan for the host
+   -exclude-cdn, -ec             skip full port scans for CDN/WAF (only scan for port 80,443)
+   -display-cdn, -cdn            display cdn in use
 
 RATE-LIMIT:
-   -c int     general internal worker threads (default 25)
-   -rate int  packets to send per second (default 1000)
+   -c int                general internal worker threads (default 25)
+   -rate int             packets to send per second (default 1000)
+   -tw, -tx-workers int  parallel transmit workers for the fast SYN sender (default 1)
 
 UPDATE:
    -up, -update                 update naabu to latest version
    -duc, -disable-update-check  disable automatic naabu update check
 
 OUTPUT:
-   -o, -output string  file to write output to (optional)
-   -j, -json           write output in JSON lines format
-   -csv                write output in csv format
+   -o, -output string                     file to write output to (optional)
+   -lof, -list-output-fields              list of fields to output (comma separated)
+   -eof, -exclude-output-fields string[]  exclude output fields output based on a condition
+   -j, -json                              write output in JSON lines format
+   -csv                                   write output in csv format
+   -oX, -xml-output string                write nmap-compatible XML output to file (- for stdout)
+   -oG, -grep-output string               write nmap-compatible greppable output to file (- for stdout)
+   -oA, -output-all string                write json, xml and greppable output to <basename>.{json,xml,gnmap}
+
+SERVICES-DISCOVERY:
+   -sD, -service-discovery           identify services by port number
+   -sV, -service-version             detect service versions using nmap-service-probes
+   -sV-fast                          only probe port-hinted services (faster, skips fallback)
+   -sV-timeout duration              timeout for service version probes (default 5s)
+   -sV-workers int                   number of concurrent service version workers (default 25)
+   -sV-probes string                 custom nmap-service-probes file path (auto-detected from local nmap install if empty)
+   -uP, -udp-probes                  send protocol-specific payloads on UDP scans using nmap-service-probes
 
 CONFIGURATION:
    -config string                   path to the naabu configuration file (default $HOME/.config/naabu/config.yaml)
@@ -104,12 +120,13 @@ CONFIGURATION:
    -sr, -system-resolver            use system DNS as fallback resolver
    -resume                          resume scan using resume.cfg
    -stream                          stream mode (disables resume, nmap, verify, retries, shuffling, etc)
-   -passive                         display passive open ports using shodan internetdb api
+   -passive                         display passive open ports using shodan internetdb api (automatically enables stream mode)
    -irt, -input-read-timeout value  timeout on input read (default 3m0s)
    -no-stdin                        Disable Stdin processing
 
 HOST-DISCOVERY:
    -sn, -host-discovery           Perform Only Host Discovery
+   -show-dead                     show hosts that did not respond to host discovery (requires host discovery)
    -Pn, -skip-host-discovery      Skip Host discovery (Deprecated: use -wn/-with-host-discovery instead)
    -wn, -with-host-discovery      Enable Host discovery
    -ps, -probe-tcp-syn string[]   TCP SYN Ping (host discovery needs to be enabled)
@@ -123,12 +140,16 @@ HOST-DISCOVERY:
 
 OPTIMIZATION:
    -retries int                    number of retries for the port scan (default 3)
-   -timeout int                    millisecond to wait before timing out (default 1000)
+   -timeout value                  time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds) (default 1s)
    -warm-up-time int               time in seconds between scan phases (default 2)
+   -T, -timing int                 timing template, higher is faster (0-5) (default 3)
    -ping                           ping probes for verification of host
    -verify                         validate the ports again with TCP verification
-   -ss, -smart-scan                predictive port scanning using port correlation model
+   -ss, -smart-scan                predictive port scanning using port correlation model (not compatible with stream mode)
    -pt, -prediction-threshold int  minimum confidence for port predictions (0-100%) (default 20)
+   -npp, -no-port-priority         disable tiered port ordering (scan the whole range in one uniform random order)
+   -shard string                   distributed scan slice as index/total, 1-based (e.g. 1/4)
+   -seed int                       seed for scan randomization, must match across shards (default random)
 
 DEBUG:
    -health-check, -hc        run diagnostic check up
@@ -155,11 +176,13 @@ CLOUD:
 
 Download the ready to run [binary](https://github.com/projectdiscovery/naabu/releases/) / [docker](https://hub.docker.com/r/projectdiscovery/naabu) or install with GO
 
+On musl-based distributions such as Alpine, use the `linux_<arch>_musl` release archive.
+
 ## Prerequisite
 
 > **Note**: before installing naabu, make sure to install `libpcap` library for packet capturing.
 
-To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
+To install libpcap on **Linux**: `sudo apt install -y libpcap-dev`, on **Alpine**: `apk add libpcap`, on **Mac**: `brew install libpcap`, on **Windows**: install [Npcap](https://npcap.com/)
 
 
 ## Installing Naabu
@@ -367,6 +390,50 @@ PORT     STATE SERVICE       VERSION
 8080/tcp open  http-proxy    cloudflare
 8443/tcp open  ssl/https-alt cloudflare
 ```
+
+# Service Version Detection
+
+Naabu has built-in service version detection using nmap's service probes database. This runs in parallel with port scanning for maximum performance.
+
+```sh
+naabu -host scanme.sh -sV
+```
+
+```console
+scanme.sh:22 [ssh OpenSSH/6.6.1p1]
+scanme.sh:80 [http Apache httpd/2.4.7]
+scanme.sh:9929 [nping-echo Nping echo]
+
+[INF] Found 3 ports on host scanme.sh (45.33.32.156) with 3 services identified
+```
+
+Available flags:
+
+| Flag | Description |
+|------|-------------|
+| `-sV` | Enable service version detection |
+| `-sV-fast` | Only probe port-hinted services (faster, skips fallback probes) |
+| `-sV-timeout duration` | Timeout for service version probes (default 5s) |
+| `-sV-workers int` | Number of concurrent service version workers (default 25) |
+| `-sV-probes string` | Custom nmap-service-probes file path (auto-detected from local nmap install if empty) |
+| `-sD` | Service discovery (match port number to service name, no active probing) |
+
+The `-sV` flag requires the `nmap-service-probes` database file. naabu does not ship this database itself (it is licensed under the copyleft Nmap Public Source License, which is incompatible with naabu's MIT license), so it reads the file from a local nmap installation, automatically looking in standard nmap installation paths. To use a custom file, specify the path with `-sV-probes`.
+
+# UDP Service Probes
+
+UDP services typically stay silent when they receive an empty datagram, so a blind UDP port scan misses most of them. With `-uP` (`-udp-probes`) naabu picks a protocol-specific payload from the `nmap-service-probes` database for each UDP port being scanned (DNS query for 53, NTP request for 123, SNMPv1 GetRequest for 161, and so on), so real services have something to reply to and naabu can report them as open.
+
+```sh
+naabu -host scanme.sh -p u:53,u:123,u:161 -uP
+```
+
+Notes:
+
+- `-uP` is opt-in and additive. When disabled (the default) UDP scans keep their historical zero-length-datagram behavior.
+- The selected probe is the highest-priority (lowest-rarity) match for the destination port; if no probe is registered for a port the scan falls back to the empty datagram.
+- A user-supplied payload via `-cp` always wins over the automatic probe for that port.
+- `-uP` reuses the same probe database as `-sV`, so you can combine the two without paying the parse cost twice. The probe file is auto-located from a local nmap install; use `-sV-probes` to point at a custom file. If no database can be found `-uP` logs a warning and is silently disabled.
 
 # CDN/WAF Exclusion
 

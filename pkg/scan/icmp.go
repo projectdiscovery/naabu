@@ -97,6 +97,9 @@ func PingIcmpEchoRequestAsync(ip string) {
 	case iputil.IsIPv6(ip):
 		m.Type = ipv6.ICMPTypeEchoRequest
 		packetListener = icmpConn6
+		if PkgRouter == nil {
+			return
+		}
 		networkInterface, _, _, err := PkgRouter.Route(destinationIP)
 		if networkInterface == nil {
 			err = fmt.Errorf("could not send ICMP Echo Request packet to %s: no interface with outbout source ipv6 found", destinationIP)
@@ -106,6 +109,13 @@ func PingIcmpEchoRequestAsync(ip string) {
 			return
 		}
 		destAddr = &net.UDPAddr{IP: destinationIP, Zone: networkInterface.Name}
+	}
+
+	// packetListener is nil when the matching icmp socket failed to open at
+	// init (logged at debug) or when ip is neither v4 nor v6; without this
+	// guard the WriteTo below panics on a nil PacketConn.
+	if packetListener == nil || destAddr == nil {
+		return
 	}
 
 	data, err := m.Marshal(nil)

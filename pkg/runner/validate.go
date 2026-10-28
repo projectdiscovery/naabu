@@ -1,12 +1,12 @@
 package runner
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net"
 	"strings"
-
-	"errors"
+	"time"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -32,8 +32,9 @@ var (
 // ValidateOptions validates the configuration options passed
 func (options *Options) ValidateOptions() error {
 	// Check if Host, list of domains, or stdin info was provided.
-	// If none was provided, then return.
-	if options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
+	// If none was provided, then return. -dashboard-upload only uploads
+	// an existing results file, so it needs no input.
+	if options.AssetFileUpload == "" && options.Host == nil && options.HostsFile == "" && !options.Stdin && len(flag.Args()) == 0 {
 		return errNoInputList
 	}
 
@@ -49,6 +50,31 @@ func (options *Options) ValidateOptions() error {
 
 	if options.JSON && options.CSV {
 		return errTwoOutputMode
+	}
+
+	if options.TimingTemplate < 0 || options.TimingTemplate > 5 {
+		return fmt.Errorf("invalid timing template %d (valid range 0-5)", options.TimingTemplate)
+	}
+
+	if options.ShardTotal != 0 && (options.ShardTotal < 1 || options.Shard < 1 || options.Shard > options.ShardTotal) {
+		return fmt.Errorf("invalid shard %d/%d (require 1 <= index <= total)", options.Shard, options.ShardTotal)
+	}
+
+	// Sharding partitions the (host, port) index space, but the smart-scan and
+	// stream paths do not consult inShard, so combining them would make every
+	// node scan the full space (duplicated work, not a partition). Reject it
+	// rather than silently mis-sharding.
+	if options.ShardTotal > 1 {
+		if options.SmartScan {
+			return fmt.Errorf("-shard is not supported with -smart-scan")
+		}
+		if options.Stream {
+			return fmt.Errorf("-shard is not supported with -stream")
+		}
+	}
+
+	if options.TxWorkers < 0 || options.TxWorkers > 256 {
+		return fmt.Errorf("invalid tx-workers %d (valid range 0-256, 0 = default)", options.TxWorkers)
 	}
 
 	if options.Rate == 0 {
@@ -68,11 +94,10 @@ func (options *Options) ValidateOptions() error {
 	}
 
 	if fileutil.FileExists(options.Resolvers) {
-		chanResolvers, err := fileutil.ReadFile(options.Resolvers)
-		if err != nil {
-			return err
-		}
-		for resolver := range chanResolvers {
+		for resolver, err := range fileutil.Lines(options.Resolvers) {
+			if err != nil {
+				return err
+			}
 			options.baseResolvers = append(options.baseResolvers, resolver)
 		}
 	} else if options.Resolvers != "" {
@@ -158,13 +183,20 @@ func (options *Options) ValidateOptions() error {
 		options.ScanType = ConnectScan
 	}
 
-	if options.ServiceDiscovery || options.ServiceVersion {
-		return errors.New("service discovery feature is not implemented")
+	if options.ServiceVersion && options.ServiceVersionWorkers <= 0 {
+		options.ServiceVersionWorkers = 25
+	}
+	if options.ServiceVersion && options.ServiceVersionTimeout <= 0 {
+		options.ServiceVersionTimeout = 5 * time.Second
 	}
 
 	if options.WarmUpTime <= 0 {
 		gologger.Debug().Msgf("Warm up time must be greater than 0, setting to 2")
 		options.WarmUpTime = 2
+	}
+
+	if options.Timeout >= minTimeout && options.Timeout < lowTimeout {
+		gologger.Warning().Msgf("timeout %s is very low and may miss open ports: a bare -timeout value is milliseconds, use a unit for seconds (e.g. 2s)", options.Timeout)
 	}
 
 	if options.SmartScan && options.Stream {
@@ -176,12 +208,53 @@ func (options *Options) ValidateOptions() error {
 	if options.PredictionThreshold < 0 || options.PredictionThreshold > 100 {
 		return errors.New("prediction threshold must be between 0 and 100")
 	}
+	// Warn when -uP is set but the port list contains no UDP ports: the
+	// feature will load the probe database but never send any probes,
+	// which is misleading for the user. We check the raw Ports string and
+	// PortsFile because ParsePorts has not run yet at validation time. The
+	// heuristic is: unless the user passed at least one "u:" segment, no
+	// UDP port will be scanned.
+	if options.UDPProbes && !options.hasUDPPorts() {
+		gologger.Warning().Msgf("-uP (UDP probes) is enabled but no UDP ports were specified. " +
+			"Add UDP ports with -p u:53,u:123 or similar. Without UDP ports -uP has no effect.")
+	}
 
 	return nil
 }
 
 // configureOutput configures the output on the screen
+// expandOutputAll turns -oA <base> into the three concrete output targets
+// (<base>.json, <base>.xml, <base>.gnmap). Explicitly set -o/-oX/-oG win so the
+// user can override any single target.
+func (options *Options) expandOutputAll() {
+	base := strings.TrimSpace(options.OutputAll)
+	if base == "" {
+		return
+	}
+	if options.Output == "" {
+		// Honor an explicit -csv so -oA does not force JSON and then trip the
+		// "json and csv both specified" validation error.
+		if options.CSV {
+			options.Output = base + ".csv"
+		} else {
+			options.Output = base + ".json"
+			options.JSON = true
+		}
+	}
+	if options.XMLOutput == "" {
+		options.XMLOutput = base + ".xml"
+	}
+	if options.GrepOutput == "" {
+		options.GrepOutput = base + ".gnmap"
+	}
+}
+
 func (options *Options) configureOutput() {
+	// gologger enables levels with `level <= maxLevel` and orders
+	// Fatal < Silent < Error < Info < Warning < Debug < Verbose.
+	// Its package default max is Info, which silently drops Warning().
+	// Raise the baseline so Warning is visible unless -silent.
+	gologger.DefaultLogger.SetMaxLevel(levels.LevelWarning)
 	if options.Verbose {
 		gologger.DefaultLogger.SetMaxLevel(levels.LevelVerbose)
 	}

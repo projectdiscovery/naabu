@@ -59,6 +59,29 @@ func TestCloseWithoutStartWorkers(t *testing.T) {
 	assert.Nil(t, s.ListenHandler)
 }
 
+func TestCloseWithoutCancelDoesNotHang(t *testing.T) {
+	s := newTestScanner(t)
+	s.ListenHandler.Phase.Set(Scan)
+
+	// Start workers with a context the caller never cancels. Close must still
+	// release them via its own derived cancel instead of blocking forever on
+	// workersWg.Wait.
+	s.StartWorkers(context.Background())
+
+	done := make(chan error, 1)
+	go func() {
+		done <- s.Close()
+	}()
+
+	select {
+	case err := <-done:
+		assert.NoError(t, err)
+		assert.Nil(t, s.ListenHandler)
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() hung: workers not released without an external context cancel")
+	}
+}
+
 func TestCloseWaitsForWorkers(t *testing.T) {
 	s := newTestScanner(t)
 	s.ListenHandler.Phase = &Phase{}
@@ -84,6 +107,35 @@ func TestCloseWaitsForWorkers(t *testing.T) {
 	case <-time.After(5 * time.Second):
 		t.Fatal("Close() did not return in time — workers may be stuck")
 	}
+}
+
+func TestCloseCancelsWorkersWithoutExternalCancel(t *testing.T) {
+	s := newTestScanner(t)
+	s.ListenHandler.Phase.Set(Scan)
+	// Caller never cancels the context: Close must cancel its own workers,
+	// otherwise workersWg.Wait blocks forever.
+	s.StartWorkers(context.Background())
+
+	done := make(chan struct{})
+	go func() {
+		_ = s.Close()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Close() hung: it must cancel its own workers")
+	}
+	assert.Nil(t, s.ListenHandler)
+}
+
+func TestCloseIsIdempotent(t *testing.T) {
+	s := newTestScanner(t)
+	s.StartWorkers(context.Background())
+	require.NoError(t, s.Close())
+	// Second call must not panic on the already-niled ListenHandler.
+	require.NoError(t, s.Close())
 }
 
 func TestSequentialScannerReuse(t *testing.T) {
@@ -244,12 +296,14 @@ func TestTCPResultWorkerAddsToScanResults(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-func TestTCPResultWorkerDropsOutOfRangeIP(t *testing.T) {
+// TestTCPResultWorkerRecordsCookieValidated documents that the TCP result
+// worker no longer performs an IPRanger membership filter: SYN-ACK
+// authenticity is enforced upstream by the SYN-cookie check, so a result
+// delivered on TcpChan is recorded even when the IP was never added to the
+// ranger. Forgery rejection is covered by TestSynCookieRejectsForgery.
+func TestTCPResultWorkerRecordsCookieValidated(t *testing.T) {
 	s := newTestScanner(t)
 	s.ListenHandler.Phase.Set(Scan)
-
-	err := s.IPRanger.Add("10.0.0.1")
-	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	s.StartWorkers(ctx)
@@ -261,10 +315,10 @@ func TestTCPResultWorkerDropsOutOfRangeIP(t *testing.T) {
 
 	time.Sleep(100 * time.Millisecond)
 
-	assert.False(t, s.ScanResults.IPHasPort("10.0.0.99", &port.Port{Port: 80, Protocol: protocol.TCP}))
+	assert.True(t, s.ScanResults.IPHasPort("10.0.0.99", &port.Port{Port: 80, Protocol: protocol.TCP}))
 
 	cancel()
-	err = s.Close()
+	err := s.Close()
 	assert.NoError(t, err)
 }
 

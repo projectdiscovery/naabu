@@ -24,4 +24,11 @@ const (
 	// DefaultThreadsNum is the default number of threads to use for the scan
 	// the default value of 25 is a good balance between performance and resource usage
 	DefaultThreadsNum = 25
+
+	// defaultWarmUpTime is the default seconds between scan phases.
+	defaultWarmUpTime = 2
+
+	// DefaultTimingTemplate is the default nmap-style timing level (T3, normal),
+	// which maps to naabu's historical defaults.
+	DefaultTimingTemplate = 3
 )

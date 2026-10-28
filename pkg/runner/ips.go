@@ -20,11 +20,10 @@ func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	}
 
 	if options.ExcludeIpsFile != "" {
-		cdata, err := fileutil.ReadFile(options.ExcludeIpsFile)
-		if err != nil {
-			return excludedIps, err
-		}
-		for host := range cdata {
+		for host, err := range fileutil.Lines(options.ExcludeIpsFile) {
+			if err != nil {
+				return excludedIps, err
+			}
 			ips, err := r.getExcludeItems(host)
 			if err != nil {
 				return nil, err
@@ -34,6 +33,12 @@ func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	}
 
 	return excludedIps, nil
+}
+
+// isExcluded reports whether ip matches the user supplied exclude list
+// (-exclude-hosts / -exclude-file).
+func (r *Runner) isExcluded(ip string) bool {
+	return r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip)
 }
 
 func (r *Runner) getExcludeItems(s string) ([]string, error) {

@@ -24,7 +24,9 @@ func main() {
 
 	// validation for local results file upload
 	if options.AssetFileUpload != "" {
-		_ = setupOptionalAssetUpload(options)
+		if setupOptionalAssetUpload(options) == nil {
+			gologger.Fatal().Msgf("Could not set up dashboard upload\n")
+		}
 		file, err := os.Open(options.AssetFileUpload)
 		if err != nil {
 			gologger.Fatal().Msgf("Could not open file: %s\n", err)
@@ -53,10 +55,15 @@ func main() {
 				Product:     r.Product,
 				Proto:       r.Proto,
 				RPCNum:      r.RPCNum,
+				Banner:      r.Banner,
 				ServiceFP:   r.ServiceFP,
 				Tunnel:      r.Tunnel,
 				Version:     r.Version,
 				Confidence:  r.Confidence,
+			}
+			var osfp *result.OSFingerprint
+			if r.OS != "" || r.OSCPE != "" {
+				osfp = &result.OSFingerprint{Target: r.IP, OSDetails: r.OS, OSCPE: r.OSCPE}
 			}
 			options.OnResult(&result.HostResult{
 				Host: r.Host,
@@ -69,6 +76,7 @@ func main() {
 						Service:  service,
 					},
 				},
+				OS: osfp,
 			})
 		}
 		options.OnClose()
@@ -140,7 +148,7 @@ func main() {
 func setupOptionalAssetUpload(opts *runner.Options) *pdcp.UploadWriter {
 	var mustEnable bool
 	// enable on multiple conditions
-	if opts.AssetUpload || opts.AssetID != "" || opts.AssetName != "" || pdcp.EnableCloudUpload {
+	if opts.AssetUpload || opts.AssetFileUpload != "" || opts.AssetID != "" || opts.AssetName != "" || pdcp.EnableCloudUpload {
 		mustEnable = true
 	}
 	a := aurora.NewAurora(!opts.NoColor)

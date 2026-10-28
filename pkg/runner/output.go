@@ -11,12 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"golang.org/x/exp/slices"
-
 	"github.com/pkg/errors"
 	"github.com/projectdiscovery/gologger"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
+	"github.com/projectdiscovery/naabu/v2/pkg/result"
 	"github.com/projectdiscovery/utils/structs"
 )
 
@@ -31,24 +30,32 @@ type Result struct {
 	CDNName    string    `json:"cdn-name,omitempty" csv:"cdn-name"`
 	TimeStamp  time.Time `json:"timestamp,omitempty" csv:"timestamp"`
 	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
+	MacVendor  string    `json:"mac_vendor,omitempty" csv:"mac_vendor"`
+	IsDeadHost bool      `json:"is_dead_host,omitempty" csv:"is_dead_host"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string `json:"device_type,omitempty"`
-	ExtraInfo   string `json:"extra_info,omitempty"`
-	HighVersion string `json:"high_version,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	LowVersion  string `json:"low_version,omitempty"`
-	Method      string `json:"method,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OSType      string `json:"os_type,omitempty"`
-	Product     string `json:"product,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	RPCNum      string `json:"rpc_num,omitempty"`
-	ServiceFP   string `json:"service_fp,omitempty"`
-	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty"`
+	ExtraInfo   string   `json:"extra_info,omitempty"`
+	HighVersion string   `json:"high_version,omitempty"`
+	Hostname    string   `json:"hostname,omitempty"`
+	LowVersion  string   `json:"low_version,omitempty"`
+	Method      string   `json:"method,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	OSType      string   `json:"os_type,omitempty"`
+	Product     string   `json:"product,omitempty"`
+	Proto       string   `json:"proto,omitempty"`
+	RPCNum      string   `json:"rpc_num,omitempty"`
+	Banner      string   `json:"banner,omitempty" csv:"banner"`
+	ServiceFP   string   `json:"service_fp,omitempty"`
+	Tunnel      string   `json:"tunnel,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
+
+	// OS fingerprint of the host from nmap OS detection
+	OS    string `json:"os,omitempty" csv:"os"`
+	OSCPE string `json:"os_cpe,omitempty" csv:"os_cpe"`
 }
 
 // TODO:
@@ -64,24 +71,31 @@ type jsonResult struct {
 	Protocol   string    `json:"protocol"`
 	TLS        bool      `json:"tls"`
 	MacAddress string    `json:"mac_address,omitempty" csv:"mac_address"`
+	MacVendor  string    `json:"mac_vendor,omitempty" csv:"mac_vendor"`
+	IsDeadHost bool      `json:"is_dead_host,omitempty" csv:"is_dead_host"`
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string `json:"device_type,omitempty"`
-	ExtraInfo   string `json:"extra_info,omitempty"`
-	HighVersion string `json:"high_version,omitempty"`
-	Hostname    string `json:"hostname,omitempty"`
-	LowVersion  string `json:"low_version,omitempty"`
-	Method      string `json:"method,omitempty"`
-	Name        string `json:"name,omitempty"`
-	OSType      string `json:"os_type,omitempty"`
-	Product     string `json:"product,omitempty"`
-	Proto       string `json:"proto,omitempty"`
-	RPCNum      string `json:"rpc_num,omitempty"`
-	ServiceFP   string `json:"service_fp,omitempty"`
-	Tunnel      string `json:"tunnel,omitempty"`
-	Version     string `json:"version,omitempty"`
-	Confidence  int    `json:"confidence,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty"`
+	ExtraInfo   string   `json:"extra_info,omitempty"`
+	HighVersion string   `json:"high_version,omitempty"`
+	Hostname    string   `json:"hostname,omitempty"`
+	LowVersion  string   `json:"low_version,omitempty"`
+	Method      string   `json:"method,omitempty"`
+	Name        string   `json:"name,omitempty"`
+	OSType      string   `json:"os_type,omitempty"`
+	Product     string   `json:"product,omitempty"`
+	Proto       string   `json:"proto,omitempty"`
+	RPCNum      string   `json:"rpc_num,omitempty"`
+	Banner      string   `json:"banner,omitempty"`
+	ServiceFP   string   `json:"service_fp,omitempty"`
+	Tunnel      string   `json:"tunnel,omitempty"`
+	Version     string   `json:"version,omitempty"`
+	Confidence  int      `json:"confidence,omitempty"`
+	CPEs        []string `json:"cpes,omitempty"`
+
+	OS    string `json:"os,omitempty"`
+	OSCPE string `json:"os_cpe,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -97,6 +111,8 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Protocol = r.Protocol
 	data.TLS = r.TLS
 	data.MacAddress = r.MacAddress
+	data.MacVendor = r.MacVendor
+	data.IsDeadHost = r.IsDeadHost
 
 	// copy the service fields
 	data.DeviceType = r.DeviceType
@@ -110,10 +126,14 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.Product = r.Product
 	data.Proto = r.Proto
 	data.RPCNum = r.RPCNum
+	data.Banner = r.Banner
 	data.ServiceFP = r.ServiceFP
 	data.Tunnel = r.Tunnel
 	data.Version = r.Version
 	data.Confidence = r.Confidence
+	data.CPEs = r.CPEs
+	data.OS = r.OS
+	data.OSCPE = r.OSCPE
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -132,12 +152,21 @@ var (
 	headers              = []string{}
 )
 
+func stringSliceContains(ss []string, s string) bool {
+	for _, v := range ss {
+		if v == s {
+			return true
+		}
+	}
+	return false
+}
+
 func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	ty := reflect.TypeOf(*r)
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !slices.Contains(headers, csvTag) && !slices.Contains(excludedFields, csvTag) {
+		if !stringSliceContains(headers, csvTag) && !stringSliceContains(excludedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
@@ -158,15 +187,21 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		fieldValue := field.Interface()
-		if slices.Contains(headers, csvTag) {
-			fields = append(fields, fmt.Sprint(fieldValue))
+		if stringSliceContains(headers, csvTag) {
+			var fieldStr string
+			if ty.Field(i).Name == "CPEs" {
+				fieldStr = strings.Join(data.CPEs, ";")
+			} else {
+				fieldStr = fmt.Sprint(field.Interface())
+			}
+			fields = append(fields, fieldStr)
 		}
 	}
 	return fields, nil
 }
 
-// WriteHostOutput writes the output list of host ports to an io.Writer
+// WriteHostOutput writes the output list of host ports to an io.Writer.
+// When a port has service information, it is appended in brackets.
 func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName string, writer io.Writer) error {
 	bufwriter := bufio.NewWriter(writer)
 	sb := &strings.Builder{}
@@ -175,6 +210,11 @@ func WriteHostOutput(host string, ports []*port.Port, outputCDN bool, cdnName st
 		sb.WriteString(host)
 		sb.WriteString(":")
 		sb.WriteString(strconv.Itoa(p.Port))
+		if serviceInfo := formatServiceInfo(p.Service); serviceInfo != "" {
+			sb.WriteString(" [")
+			sb.WriteString(serviceInfo)
+			sb.WriteString("]")
+		}
 		if outputCDN && cdnName != "" {
 			sb.WriteString(" [" + cdnName + "]")
 		}
@@ -196,12 +236,17 @@ func WriteJSONOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn 
 
 // WriteJSONOutputWithMac writes the output list of subdomain in JSON to an io.Writer with MAC address
 func WriteJSONOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
+	return writeJSONOutputWithOS(host, ip, macAddress, nil, ports, outputCDN, isCdn, cdnName, excludedFields, writer)
+}
+
+func writeJSONOutputWithOS(host, ip, macAddress string, osfp *result.OSFingerprint, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, excludedFields []string, writer io.Writer) error {
 	result := &Result{
 		Host:       host,
 		IP:         ip,
 		MacAddress: macAddress,
 		TimeStamp:  time.Now().UTC(),
 	}
+	result.setOS(osfp)
 	if outputCDN {
 		result.IsCDNIP = isCdn
 		result.CDNName = cdnName
@@ -243,8 +288,13 @@ func WriteCsvOutput(host, ip string, ports []*port.Port, outputCDN bool, isCdn b
 
 // WriteCsvOutputWithMac writes the output list of subdomain in csv format to an io.Writer with MAC address
 func WriteCsvOutputWithMac(host, ip, macAddress string, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
+	return writeCsvOutputWithOS(host, ip, macAddress, nil, ports, outputCDN, isCdn, cdnName, header, excludedFields, writer)
+}
+
+func writeCsvOutputWithOS(host, ip, macAddress string, osfp *result.OSFingerprint, ports []*port.Port, outputCDN bool, isCdn bool, cdnName string, header bool, excludedFields []string, writer io.Writer) error {
 	encoder := csv.NewWriter(writer)
 	data := &Result{IP: ip, MacAddress: macAddress, TimeStamp: time.Now().UTC(), Port: 0, Protocol: protocol.TCP.String(), TLS: false}
+	data.setOS(osfp)
 	if host != ip {
 		data.Host = host
 	}
@@ -299,6 +349,15 @@ func writeCSVRow(data *Result, writer *csv.Writer, excludedFields []string) {
 	}
 }
 
+// setOS copies the host's OS fingerprint, if any, into the output fields.
+func (r *Result) setOS(osfp *result.OSFingerprint) {
+	if osfp == nil {
+		return
+	}
+	r.OS = osfp.OSDetails
+	r.OSCPE = osfp.OSCPE
+}
+
 // copyServiceFields copies all service fields from service to result, or clears them if service is nil.
 func copyServiceFields(result *Result, service *port.Service) {
 	var s *port.Service
@@ -319,8 +378,25 @@ func copyServiceFields(result *Result, service *port.Service) {
 	result.Product = s.Product
 	result.Proto = s.Proto
 	result.RPCNum = s.RPCNum
+	result.Banner = s.Banner
 	result.ServiceFP = s.ServiceFP
 	result.Tunnel = s.Tunnel
 	result.Version = s.Version
 	result.Confidence = s.Confidence
+	result.CPEs = s.CPEs
+}
+
+func formatServiceInfo(svc *port.Service) string {
+	if svc == nil || svc.Name == "" {
+		return ""
+	}
+	parts := []string{svc.Name}
+	if svc.Product != "" {
+		if svc.Version != "" {
+			parts = append(parts, svc.Product+"/"+svc.Version)
+		} else {
+			parts = append(parts, svc.Product)
+		}
+	}
+	return strings.Join(parts, " ")
 }

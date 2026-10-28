@@ -252,11 +252,23 @@ func fallbackOutboundRoutes() (Router, error) {
 			NetworkInterface: interface6,
 		})
 	} else if len(routes) > 0 {
-		routes = append(routes, &Route{
-			Type:             IPv6,
-			Default:          true,
-			NetworkInterface: routes[0].NetworkInterface,
-		})
+		// Only add an IPv6 fallback if the IPv4 interface has an IPv6 address,
+		// otherwise FindSourceIpForIp will fail with a confusing error.
+		if iface := routes[0].NetworkInterface; iface != nil {
+			if addrs, err := iface.Addrs(); err == nil {
+				for _, a := range addrs {
+					if ipNet, ok := a.(*net.IPNet); ok && ipNet.IP.To4() == nil {
+						routes = append(routes, &Route{
+							Type:             IPv6,
+							Default:          true,
+							DefaultSourceIP:  ipNet.IP,
+							NetworkInterface: iface,
+						})
+						break
+					}
+				}
+			}
+		}
 	}
 
 	if len(routes) > 0 {

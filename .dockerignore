@@ -1,0 +1,10 @@
+.git
+.gitignore
+**/*_test.go
+**/.DS_Store
+**/node_modules
+**/.cursor
+dist
+bin
+*.md
+!README.md
