@@ -1,8 +1,6 @@
 name: 🔄 Update OUI Database
 
 on:
-  release:
-    types: [published]
   schedule:
     # refresh monthly so the embedded vendor data does not drift
     - cron: "0 4 1 * *"
