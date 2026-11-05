@@ -79,7 +79,7 @@ func (options *Options) ValidateOptions() error {
 
 	if options.Rate == 0 {
 		return errkit.Wrap(errZeroValue, "rate")
-	} else if !privileges.IsPrivileged && options.Rate == DefaultRateSynScan {
+	} else if !privileges.IsPrivileged && !options.RateSet && options.Rate == DefaultRateSynScan {
 		options.Rate = DefaultRateConnectScan
 	}
 
