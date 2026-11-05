@@ -48,6 +48,10 @@ type Options struct {
 
 	Retries int // Retries is the number of retries for the port
 	Rate    int // Rate is the rate of port scan requests
+	// RateSet distinguishes an explicit -rate from the flag default, so the
+	// connect-scan fallback only replaces a rate the user left alone. Without it
+	// an explicit -rate 1000 (the SYN default) is silently raised to 1500.
+	RateSet bool
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
 	Timeout             time.Duration
 	WarmUpTime          int                 // WarmUpTime between scan phases
@@ -445,6 +449,9 @@ func ParseOptions() *Options {
 	options.applyTimingTemplate(setFlags)
 	if _, ok := setFlags["seed"]; ok {
 		options.SeedSet = true
+	}
+	if _, ok := setFlags["rate"]; ok {
+		options.RateSet = true
 	}
 
 	// Validate the options passed by the user and if any

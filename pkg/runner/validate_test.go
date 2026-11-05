@@ -1,9 +1,11 @@
 package runner
 
 import (
+	"os"
 	"testing"
 	"time"
 
+	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/utils/errkit"
 	"github.com/stretchr/testify/assert"
 )
@@ -77,6 +79,65 @@ func TestValidateTimingShardTxRanges(t *testing.T) {
 		o := base
 		o.TxWorkers = -1
 		assert.ErrorContains(t, o.ValidateOptions(), "tx-workers")
+	})
+}
+
+// TestConnectScanRateDoesNotClobberExplicitRate guards the unprivileged
+// connect-scan fallback: it must only replace a rate the user left alone, not
+// an explicit -rate that happens to equal the SYN default.
+func TestConnectScanRateDoesNotClobberExplicitRate(t *testing.T) {
+	origPriv := privileges.IsPrivileged
+	defer func() { privileges.IsPrivileged = origPriv }()
+	privileges.IsPrivileged = false
+
+	base := Options{
+		Host:     []string{"example.com"},
+		DnsOrder: "l",
+		ScanType: ConnectScan,
+	}
+
+	t.Run("unset rate gets the connect scan default", func(t *testing.T) {
+		o := base
+		o.Rate = DefaultRateSynScan
+		assert.Nil(t, o.ValidateOptions())
+		assert.Equal(t, DefaultRateConnectScan, o.Rate)
+	})
+
+	t.Run("explicit rate equal to the syn default is honored", func(t *testing.T) {
+		o := base
+		o.Rate = DefaultRateSynScan
+		o.RateSet = true
+		assert.Nil(t, o.ValidateOptions())
+		assert.Equal(t, DefaultRateSynScan, o.Rate)
+	})
+
+	t.Run("explicit non default rate is honored", func(t *testing.T) {
+		o := base
+		o.Rate = 2000
+		o.RateSet = true
+		assert.Nil(t, o.ValidateOptions())
+		assert.Equal(t, 2000, o.Rate)
+	})
+
+	// The cases above set RateSet directly; this one goes through the parser so
+	// that ParseOptions is what has to notice the explicit flag.
+	t.Run("parser marks an explicit rate", func(t *testing.T) {
+		origArgs := os.Args
+		defer func() { os.Args = origArgs }()
+
+		tests := []struct {
+			name string
+			args []string
+			want int
+		}{
+			{"explicit -rate equal to the syn default", []string{"naabu", "-host", "127.0.0.1", "-p", "80", "-rate", "1000", "-silent"}, DefaultRateSynScan},
+			{"unset -rate", []string{"naabu", "-host", "127.0.0.1", "-p", "80", "-silent"}, DefaultRateConnectScan},
+		}
+		for _, tt := range tests {
+			os.Args = tt.args
+			o := ParseOptions()
+			assert.Equal(t, tt.want, o.Rate, tt.name)
+		}
 	})
 }
 
