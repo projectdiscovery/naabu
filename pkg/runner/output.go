@@ -35,22 +35,22 @@ type Result struct {
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string   `json:"device_type,omitempty"`
-	ExtraInfo   string   `json:"extra_info,omitempty"`
-	HighVersion string   `json:"high_version,omitempty"`
-	Hostname    string   `json:"hostname,omitempty"`
-	LowVersion  string   `json:"low_version,omitempty"`
-	Method      string   `json:"method,omitempty"`
-	Name        string   `json:"name,omitempty"`
-	OSType      string   `json:"os_type,omitempty"`
-	Product     string   `json:"product,omitempty"`
-	Proto       string   `json:"proto,omitempty"`
-	RPCNum      string   `json:"rpc_num,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty" csv:"device_type"`
+	ExtraInfo   string   `json:"extra_info,omitempty" csv:"extra_info"`
+	HighVersion string   `json:"high_version,omitempty" csv:"high_version"`
+	Hostname    string   `json:"hostname,omitempty" csv:"hostname"`
+	LowVersion  string   `json:"low_version,omitempty" csv:"low_version"`
+	Method      string   `json:"method,omitempty" csv:"method"`
+	Name        string   `json:"name,omitempty" csv:"name"`
+	OSType      string   `json:"os_type,omitempty" csv:"os_type"`
+	Product     string   `json:"product,omitempty" csv:"product"`
+	Proto       string   `json:"proto,omitempty" csv:"proto"`
+	RPCNum      string   `json:"rpc_num,omitempty" csv:"rpc_num"`
 	Banner      string   `json:"banner,omitempty" csv:"banner"`
-	ServiceFP   string   `json:"service_fp,omitempty"`
-	Tunnel      string   `json:"tunnel,omitempty"`
-	Version     string   `json:"version,omitempty"`
-	Confidence  int      `json:"confidence,omitempty"`
+	ServiceFP   string   `json:"service_fp,omitempty" csv:"service_fp"`
+	Tunnel      string   `json:"tunnel,omitempty" csv:"tunnel"`
+	Version     string   `json:"version,omitempty" csv:"version"`
+	Confidence  int      `json:"confidence,omitempty" csv:"confidence"`
 	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
 
 	// OS fingerprint of the host from nmap OS detection
@@ -166,6 +166,9 @@ func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
+		if csvTag == "" {
+			continue
+		}
 		if !stringSliceContains(headers, csvTag) && !stringSliceContains(excludedFields, csvTag) {
 			headers = append(headers, csvTag)
 		}
@@ -187,7 +190,7 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		if stringSliceContains(headers, csvTag) {
+		if csvTag != "" && stringSliceContains(headers, csvTag) {
 			var fieldStr string
 			if ty.Field(i).Name == "CPEs" {
 				fieldStr = strings.Join(data.CPEs, ";")
