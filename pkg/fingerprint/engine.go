@@ -32,7 +32,7 @@ type Engine struct {
 	matchCache     sync.Map // response hash → *matchCacheEntry (avoids re-matching identical banners)
 }
 
-// StreamResult is emitted by FingerprintStream for each identified service.
+// StreamResult is emitted by FingerprintStream for each completed target. Service is nil when no probe matched.
 type StreamResult struct {
 	IP      string
 	Port    int
@@ -125,17 +125,14 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 					return
 				}
 				r := e.fingerprintOne(ctx, t)
+				sr := StreamResult{IP: t.IP, Port: t.Port}
 				if r != nil {
-					sr := StreamResult{
-						IP:      t.IP,
-						Port:    t.Port,
-						Service: r.ToService(),
-					}
-					select {
-					case results <- sr:
-					case <-ctx.Done():
-						return
-					}
+					sr.Service = r.ToService()
+				}
+				select {
+				case results <- sr:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
