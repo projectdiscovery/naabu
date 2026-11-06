@@ -233,15 +233,21 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	// Instead of connecting sequentially (each waiting for its own handshake),
 	// batches of probes dial concurrently so only one RTT is paid per batch.
 	const fallbackBatchSize = 4
-	for i := 0; i < len(fallback); i += fallbackBatchSize {
+	for i := 0; i < len(fallback); {
 		if ctx.Err() != nil {
 			break
 		}
-		end := i + fallbackBatchSize
-		if end > len(fallback) {
-			end = len(fallback)
+		batch := make([]*ServiceProbe, 0, fallbackBatchSize)
+		for i < len(fallback) && len(batch) < fallbackBatchSize {
+			sp := fallback[i]
+			i++
+			if softResult == nil || e.probeSupportsService(sp, softResult.Service) {
+				batch = append(batch, sp)
+			}
 		}
-		batch := fallback[i:end]
+		if len(batch) == 0 {
+			break
+		}
 
 		if len(batch) == 1 {
 			sp := batch[0]
@@ -304,6 +310,35 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	}
 
 	return nil
+}
+
+// probeSupportsService checks rules belonging to the probe and its explicit
+// fallbacks. The implicit NULL fallback must not qualify every unrelated probe.
+func (e *Engine) probeSupportsService(sp *ServiceProbe, service string) bool {
+	service = strings.TrimPrefix(service, "ssl/")
+	// A generic SSL softmatch identifies a tunnel, not the service behind it.
+	if service == "ssl" {
+		return true
+	}
+	supports := func(p *ServiceProbe) bool {
+		for _, matches := range [][]*Match{p.Matches, p.SoftMatches} {
+			for _, m := range matches {
+				if strings.TrimPrefix(m.Service, "ssl/") == service {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if supports(sp) {
+		return true
+	}
+	for _, name := range strings.Split(sp.Fallback, ",") {
+		if fb := e.findProbe(strings.TrimSpace(name)); fb != nil && supports(fb) {
+			return true
+		}
+	}
+	return false
 }
 
 // classifyProbes splits probes into hinted (run in parallel) and fallback
