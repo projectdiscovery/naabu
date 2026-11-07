@@ -157,8 +157,9 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 // eliminates the sequential bottleneck where HTTP targets wait 6s for NULL
 // to timeout before GetRequest even starts.
 //
-// Phase 2 (sequential): remaining non-hinted probes run one at a time, sorted
-// by rarity. Skipped entirely in fast mode.
+// Phase 2: non-hinted probes run in batches of four, sorted by rarity. A unique
+// softmatched service narrows later batches; conflicting softmatches keep the
+// full search. Skipped entirely in fast mode.
 func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	if e.db == nil || len(e.db.Probes) == 0 {
 		return nil
@@ -185,6 +186,17 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 
 	var softResult *MatchResult
 	var softTLS bool
+	var conflictingSoftmatches bool
+	rememberSoftmatch := func(soft *MatchResult, tls bool) {
+		if soft == nil {
+			return
+		}
+		if softResult == nil {
+			softResult, softTLS = soft, tls
+		} else if strings.TrimPrefix(softResult.Service, "ssl/") != strings.TrimPrefix(soft.Service, "ssl/") {
+			conflictingSoftmatches = true
+		}
+	}
 	var wrappedResult *MatchResult
 
 	if len(hinted) > 0 {
@@ -221,10 +233,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 				probeCancel()
 				return matchResultToResult(r.hard, r.tls, "")
 			}
-			if r.soft != nil && softResult == nil {
-				softResult = r.soft
-				softTLS = r.tls
-			}
+			rememberSoftmatch(r.soft, r.tls)
 		}
 		probeCancel()
 	}
@@ -233,16 +242,26 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	// Instead of connecting sequentially (each waiting for its own handshake),
 	// batches of probes dial concurrently so only one RTT is paid per batch.
 	const fallbackBatchSize = 4
-	for i := 0; i < len(fallback); {
+	var skipped []*ServiceProbe
+	for i := 0; i < len(fallback) || (conflictingSoftmatches && len(skipped) > 0); {
 		if ctx.Err() != nil {
 			break
+		}
+		// A later conflict invalidates the earlier narrowing decision. Retry
+		// only candidates that were skipped, never probes already sent.
+		if conflictingSoftmatches && len(skipped) > 0 {
+			fallback = append(skipped, fallback[i:]...)
+			skipped = nil
+			i = 0
 		}
 		batch := make([]*ServiceProbe, 0, fallbackBatchSize)
 		for i < len(fallback) && len(batch) < fallbackBatchSize {
 			sp := fallback[i]
 			i++
-			if softResult == nil || e.probeSupportsService(sp, softResult.Service) {
+			if softResult == nil || conflictingSoftmatches || e.probeSupportsService(sp, softResult.Service) {
 				batch = append(batch, sp)
+			} else {
+				skipped = append(skipped, sp)
 			}
 		}
 		if len(batch) == 0 {
@@ -263,10 +282,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 			if result != nil {
 				return matchResultToResult(result, useTLS, "")
 			}
-			if soft != nil && softResult == nil {
-				softResult = soft
-				softTLS = useTLS
-			}
+			rememberSoftmatch(soft, useTLS)
 			continue
 		}
 
@@ -293,10 +309,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 				batchCancel()
 				return matchResultToResult(r.hard, r.tls, "")
 			}
-			if r.soft != nil && softResult == nil {
-				softResult = r.soft
-				softTLS = r.tls
-			}
+			rememberSoftmatch(r.soft, r.tls)
 		}
 		batchCancel()
 	}

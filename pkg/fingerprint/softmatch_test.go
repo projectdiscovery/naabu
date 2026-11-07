@@ -168,3 +168,60 @@ func TestCancelledFingerprintDoesNotDial(t *testing.T) {
 	require.Nil(t, got)
 	require.Empty(t, sent())
 }
+
+func TestConflictingSoftmatchesKeepLaterHardMatches(t *testing.T) {
+	for _, phase := range []string{"hinted", "fallback"} {
+		t.Run(phase, func(t *testing.T) {
+			// Given conflicting softmatches in one parallel batch and a later hard match.
+			hint := ""
+			if phase == "hinted" {
+				hint = "ports 12345\n"
+			}
+			probes := "Probe TCP HTTP q|HTTP\\n|\n" + hint + "rarity 1\nsoftmatch http m|^HTTP|\n" +
+				"Probe TCP SMTP q|SMTP\\n|\n" + hint + "rarity 1\nsoftmatch smtp m|^SMTP|\n" +
+				"Probe TCP Other1 q|OTHER1\\n|\nrarity 1\n" +
+				"Probe TCP Other2 q|OTHER2\\n|\nrarity 1\n" +
+				"Probe TCP Version q|VERSION\\n|\nrarity 2\nmatch ftp m|^FTP/(\\S+)| p/Synthetic/ v/$1/\n"
+			dial, sent := softmatchEndpoint("", map[string]string{
+				"HTTP\n": "HTTP\r\n", "SMTP\n": "SMTP\r\n", "VERSION\n": "FTP/1.2\r\n",
+			})
+			engine := New(buildTestDB(probes), WithDialer(dial), WithTimeout(time.Second))
+
+			// When the conflicting hints are followed by fallback probing.
+			got := engine.fingerprintOne(context.Background(), Target{IP: "192.0.2.1", Port: 12345, TLSChecked: true})
+
+			// Then ambiguity does not prevent a hard match, regardless of response order.
+			require.NotNil(t, got)
+			require.Equal(t, "ftp", got.Name)
+			require.Equal(t, "1.2", got.Version)
+			require.Contains(t, sent(), "VERSION\n")
+		})
+	}
+}
+
+func TestConflictingSoftmatchReconsidersUnsentProbes(t *testing.T) {
+	// Given a soft HTTP hint that skips FTP before another probe softmatches SMTP.
+	db := buildTestDB(`Probe TCP NULL q||
+softmatch http m|^HTTP|
+Probe TCP Version q|VERSION\n|
+rarity 1
+match ftp m|^FTP/(\S+)| p/Synthetic/ v/$1/
+Probe TCP Alternate q|ALT\n|
+rarity 2
+match http m|^NEVER|
+softmatch smtp m|^SMTP|
+`)
+	dial, sent := softmatchEndpoint("HTTP\r\n", map[string]string{
+		"ALT\n": "SMTP\r\n", "VERSION\n": "FTP/1.2\r\n",
+	})
+	engine := New(db, WithDialer(dial), WithTimeout(time.Second))
+
+	// When the later softmatch makes the initial hint ambiguous.
+	got := engine.fingerprintOne(context.Background(), Target{IP: "192.0.2.1", Port: 12345, TLSChecked: true})
+
+	// Then the skipped candidate runs, while the already sent probe is not repeated.
+	require.NotNil(t, got)
+	require.Equal(t, "ftp", got.Name)
+	require.Equal(t, "1.2", got.Version)
+	require.Equal(t, []string{"ALT\n", "VERSION\n"}, sent())
+}
