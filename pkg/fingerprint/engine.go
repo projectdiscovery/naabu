@@ -108,8 +108,8 @@ func (e *Engine) Fingerprint(ctx context.Context, targets []Target) map[string]*
 	return results
 }
 
-// FingerprintStream processes targets from a channel and emits results as
-// they're identified. This enables pipeline fingerprinting: the caller can
+// FingerprintStream processes targets from a channel and emits completed results,
+// including targets without a service match. The caller can
 // feed targets as ports are discovered during scanning, overlapping the scan
 // and fingerprint phases to eliminate idle time between them.
 func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <-chan StreamResult {

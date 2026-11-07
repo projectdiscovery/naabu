@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
@@ -206,24 +208,133 @@ func TestUnmatchedCompletionPreservesNmapService(t *testing.T) {
 }
 
 func TestFinalServiceOutputRetriesFailedFileOpen(t *testing.T) {
-	// Given an output path that is temporarily a directory.
+	for _, format := range []string{"plain", "csv"} {
+		t.Run(format, func(t *testing.T) {
+			// Given an output path that is temporarily a directory.
+			r := newConnectRunner(t)
+			r.options.ServiceVersion = true
+			r.options.DisableStdout = true
+			r.options.CSV = format == "csv"
+			r.options.Output = filepath.Join(t.TempDir(), "out")
+			require.NoError(t, os.Mkdir(r.options.Output, 0700))
+			r.fpOutput = true
+			r.fpCSVFileHeader, r.fpCSVStdoutHeader = true, true
+			p := &port.Port{Port: 80, Protocol: protocol.TCP}
+			r.writeOutput(nil, &result.HostResult{IP: "192.0.2.1", Ports: []*port.Port{p}})
+			require.NoError(t, os.Remove(r.options.Output))
+			require.NoError(t, os.WriteFile(r.options.Output, []byte("stale"), 0600))
+			res := result.NewResult()
+			res.AddPort("192.0.2.1", p)
+			// When final output retries after the path becomes writable.
+			r.handleOutput(res)
+			// Then the endpoint is preserved in the file.
+			data, err := os.ReadFile(r.options.Output)
+			require.NoError(t, err)
+			if format == "csv" {
+				reader := csv.NewReader(bytes.NewReader(data))
+				reader.FieldsPerRecord = -1 // The base revision predates the CSV width fix.
+				rows, err := reader.ReadAll()
+				require.NoError(t, err)
+				require.Len(t, rows, 2)
+				require.Equal(t, "host", rows[0][0])
+				require.Contains(t, rows[1], "192.0.2.1")
+			} else {
+				require.Contains(t, string(data), "192.0.2.1:80")
+			}
+			require.NotContains(t, string(data), "stale")
+		})
+	}
+}
+
+func TestServiceOutputKeepsTCPAndUDPSeparate(t *testing.T) {
+	for _, order := range [][]protocol.Protocol{{protocol.UDP, protocol.TCP}, {protocol.TCP, protocol.UDP}} {
+		t.Run(order[0].String()+" first", func(t *testing.T) {
+			// Given TCP and UDP discoveries sharing one address and port number.
+			r := newConnectRunner(t)
+			r.options.ServiceVersion = true
+			r.options.DisableStdout = true
+			r.options.JSON = true
+			r.options.Output = filepath.Join(t.TempDir(), "out")
+			r.fpOutput = true
+			r.fpQueue = newFpQueue()
+			r.fpDone = make(chan struct{})
+			r.fpHosts = make(map[string]*result.HostResult)
+			r.fpServices = make(map[string]*port.Service)
+			res := result.NewResult()
+			for _, transport := range order {
+				p := &port.Port{Port: 53, Protocol: transport}
+				res.AddPort("192.0.2.1", p)
+				r.onReceive(&result.HostResult{IP: "192.0.2.1", Ports: []*port.Port{p}})
+			}
+			completions := make(chan fingerprint.StreamResult, 1)
+			completions <- fingerprint.StreamResult{IP: "192.0.2.1", Port: 53, Service: &port.Service{Name: "domain"}}
+			close(completions)
+
+			// When TCP fingerprinting completes and the remaining ports are finalized.
+			r.consumeServiceResults(completions)
+			r.waitServiceDetection(res)
+			r.handleOutput(res)
+
+			// Then each protocol is preserved, and only TCP receives the TCP service.
+			data, err := os.ReadFile(r.options.Output)
+			require.NoError(t, err)
+			lines := strings.Split(strings.TrimSpace(string(data)), "\n")
+			require.Len(t, lines, 2)
+			var transports []string
+			for _, line := range lines {
+				var row map[string]any
+				require.NoError(t, json.Unmarshal([]byte(line), &row))
+				transports = append(transports, row["protocol"].(string))
+				if row["protocol"] == "tcp" {
+					require.Equal(t, "domain", row["name"])
+				} else {
+					require.Equal(t, "udp", row["protocol"])
+					require.NotContains(t, row, "name")
+				}
+			}
+			require.ElementsMatch(t, []string{"tcp", "udp"}, transports)
+		})
+	}
+}
+
+func TestConcurrentFinalizationWritesCompletedServicesOnce(t *testing.T) {
+	// Given a discovered endpoint whose fingerprint is still pending.
 	r := newConnectRunner(t)
 	r.options.ServiceVersion = true
 	r.options.DisableStdout = true
+	r.options.JSON = true
 	r.options.Output = filepath.Join(t.TempDir(), "out")
-	require.NoError(t, os.Mkdir(r.options.Output, 0700))
 	r.fpOutput = true
+	r.fpQueue = newFpQueue()
+	r.fpDone = make(chan struct{})
+	r.fpServices = make(map[string]*port.Service)
 	p := &port.Port{Port: 80, Protocol: protocol.TCP}
-	r.writeOutput(nil, &result.HostResult{IP: "192.0.2.1", Ports: []*port.Port{p}})
-	require.NoError(t, os.Remove(r.options.Output))
-	require.NoError(t, os.WriteFile(r.options.Output, []byte("stale"), 0600))
+	r.fpHosts = map[string]*result.HostResult{"192.0.2.1:80": {IP: "192.0.2.1", Ports: []*port.Port{p}}}
 	res := result.NewResult()
-	res.AddPort("192.0.2.1", p)
-	// When final output retries after the path becomes writable.
-	r.handleOutput(res)
-	// Then the endpoint is preserved in the file.
+	res.AddPort("192.0.2.1", &port.Port{Port: 80, Protocol: protocol.TCP})
+	var callbacks atomic.Int32
+	r.options.OnResult = func(*result.HostResult) { callbacks.Add(1) }
+	completions := make(chan fingerprint.StreamResult)
+	go r.consumeServiceResults(completions)
+
+	// When enumeration and interruption finalize while fingerprinting completes.
+	var finalizers sync.WaitGroup
+	for range 2 {
+		finalizers.Add(1)
+		go func() {
+			defer finalizers.Done()
+			r.handleOutput(res)
+		}()
+	}
+	completions <- fingerprint.StreamResult{IP: "192.0.2.1", Port: 80, Service: &port.Service{Name: "http"}}
+	close(completions)
+	finalizers.Wait()
+	<-r.fpDone
+
+	// Then the enriched endpoint and the final callback each appear once.
 	data, err := os.ReadFile(r.options.Output)
 	require.NoError(t, err)
-	require.Contains(t, string(data), "192.0.2.1:80")
-	require.NotContains(t, string(data), "stale")
+	require.Len(t, strings.Split(strings.TrimSpace(string(data)), "\n"), 1)
+	require.Contains(t, string(data), `"name":"http"`)
+	require.EqualValues(t, 1, callbacks.Load())
 }

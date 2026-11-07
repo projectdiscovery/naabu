@@ -99,6 +99,8 @@ type Runner struct {
 	fpMACs            map[string]string
 	fpCSVFileHeader   bool
 	fpCSVStdoutHeader bool
+	fpWaitMu          sync.Mutex
+	fpOutputOnce      sync.Once
 	fpMu              sync.Mutex
 	fpCancel          context.CancelFunc
 	// probeDB is the parsed nmap-service-probes database, shared
@@ -310,6 +312,7 @@ func (r *Runner) recoverHostnames(ip string, ports []*port.Port, dt []string) {
 	}
 }
 
+// onReceive deduplicates discoveries, queues TCP fingerprints, and emits live results.
 func (r *Runner) onReceive(hostResult *result.HostResult) {
 	// Discovery ACK responses can be RSTs from closed ports. They are not
 	// open endpoints and must not enter the service output stream.
@@ -337,6 +340,11 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 	// of dropping the whole host the moment its first port was already seen.
 	newPorts := make([]*port.Port, 0, len(hostResult.Ports))
 	for _, p := range hostResult.Ports {
+		// The version engine speaks TCP. Other protocols remain in final output
+		// and must not claim the deduplication key of a TCP endpoint.
+		if r.options.ServiceVersion && p.Protocol != protocol.TCP {
+			continue
+		}
 		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
 		if r.unique.Has(ipPort) {
 			continue
@@ -1435,6 +1443,7 @@ func (r *Runner) SetInterface(interfaceName string) error {
 	return nil
 }
 
+// initServiceDetection starts the TCP fingerprint pipeline when -sV is enabled.
 func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	if !r.options.ServiceVersion {
 		return
@@ -1505,6 +1514,7 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	r.fpMACs = make(map[string]string)
 	r.fpCSVFileHeader = true
 	r.fpCSVStdoutHeader = true
+	r.fpOutputOnce = sync.Once{}
 
 	resultCh := engine.FingerprintStream(ctx, r.fpTargetCh)
 
@@ -1539,6 +1549,7 @@ func (r *Runner) initServiceDetection(parentCtx context.Context) {
 	go r.consumeServiceResults(resultCh)
 }
 
+// consumeServiceResults records matches and writes completed endpoints in order.
 func (r *Runner) consumeServiceResults(resultCh <-chan fingerprint.StreamResult) {
 	defer close(r.fpDone)
 	for sr := range resultCh {
@@ -1561,7 +1572,12 @@ func (r *Runner) consumeServiceResults(resultCh <-chan fingerprint.StreamResult)
 	}
 }
 
+// waitServiceDetection drains fingerprints and merges TCP services once, even
+// when enumeration and the signal handler request finalization concurrently.
 func (r *Runner) waitServiceDetection(scanResults *result.Result) {
+	r.fpWaitMu.Lock()
+	defer r.fpWaitMu.Unlock()
+
 	// Swap out the queue under the lock so a concurrent onReceive either sees a
 	// live queue or nil, never a half-cleared pointer. The forwarder holds its own
 	// captured reference, so it keeps draining after this.
@@ -1582,6 +1598,9 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 	if scanResults != nil {
 		for hostResult := range scanResults.GetIPsPorts() {
 			for _, p := range hostResult.Ports {
+				if p.Protocol != protocol.TCP {
+					continue
+				}
 				key := net.JoinHostPort(hostResult.IP, strconv.Itoa(p.Port))
 				if svc, ok := r.fpServices[key]; ok {
 					p.Service = svc
@@ -1596,7 +1615,13 @@ func (r *Runner) waitServiceDetection(scanResults *result.Result) {
 	}
 }
 
+// handleOutput waits for completed fingerprints and finalizes streamed output once.
 func (r *Runner) handleOutput(scanResults *result.Result) {
+	r.waitServiceDetection(scanResults)
+	if r.fpOutput {
+		r.fpOutputOnce.Do(func() { r.writeOutput(scanResults, nil) })
+		return
+	}
 	r.writeOutput(scanResults, nil)
 }
 
@@ -1854,7 +1879,6 @@ func (r *Runner) writeOutput(scanResults *result.Result, completed *result.HostR
 					})
 				}
 			}
-			csvFileHeaderEnabled = false
 		}
 	case scanResults.HasIPS():
 		for hostIP := range scanResults.GetIPs() {
