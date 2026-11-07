@@ -32,7 +32,7 @@ type Engine struct {
 	matchCache     sync.Map // response hash → *matchCacheEntry (avoids re-matching identical banners)
 }
 
-// StreamResult is emitted by FingerprintStream for each identified service.
+// StreamResult is emitted by FingerprintStream for each completed target. Service is nil when no probe matched.
 type StreamResult struct {
 	IP      string
 	Port    int
@@ -108,8 +108,8 @@ func (e *Engine) Fingerprint(ctx context.Context, targets []Target) map[string]*
 	return results
 }
 
-// FingerprintStream processes targets from a channel and emits results as
-// they're identified. This enables pipeline fingerprinting: the caller can
+// FingerprintStream processes targets from a channel and emits completed results,
+// including targets without a service match. The caller can
 // feed targets as ports are discovered during scanning, overlapping the scan
 // and fingerprint phases to eliminate idle time between them.
 func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <-chan StreamResult {
@@ -125,17 +125,14 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 					return
 				}
 				r := e.fingerprintOne(ctx, t)
+				sr := StreamResult{IP: t.IP, Port: t.Port}
 				if r != nil {
-					sr := StreamResult{
-						IP:      t.IP,
-						Port:    t.Port,
-						Service: r.ToService(),
-					}
-					select {
-					case results <- sr:
-					case <-ctx.Done():
-						return
-					}
+					sr.Service = r.ToService()
+				}
+				select {
+				case results <- sr:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
