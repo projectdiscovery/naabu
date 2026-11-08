@@ -22,12 +22,12 @@ require (
 	github.com/projectdiscovery/gologger v1.1.75
 	github.com/projectdiscovery/ipranger v0.0.71
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.57
+	github.com/projectdiscovery/networkpolicy v0.1.58
 	github.com/projectdiscovery/ratelimit v0.0.94
 	github.com/projectdiscovery/retryabledns v1.0.118
 	github.com/projectdiscovery/retryablehttp-go v1.3.33
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.12
+	github.com/projectdiscovery/utils v0.11.13
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
