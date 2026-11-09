@@ -13,21 +13,21 @@ require (
 	github.com/miekg/dns v1.1.73
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.2
-	github.com/projectdiscovery/cdncheck v1.3.3
+	github.com/projectdiscovery/cdncheck v1.4.0
 	github.com/projectdiscovery/clistats v0.1.9
 	github.com/projectdiscovery/dnsx v1.3.1
 	github.com/projectdiscovery/fdmax v0.0.6
 	github.com/projectdiscovery/freeport v0.0.8
 	github.com/projectdiscovery/goflags v0.2.1
 	github.com/projectdiscovery/gologger v1.1.75
-	github.com/projectdiscovery/ipranger v0.0.71
+	github.com/projectdiscovery/ipranger v0.0.72
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.57
+	github.com/projectdiscovery/networkpolicy v0.1.58
 	github.com/projectdiscovery/ratelimit v0.0.94
 	github.com/projectdiscovery/retryabledns v1.0.118
-	github.com/projectdiscovery/retryablehttp-go v1.3.33
+	github.com/projectdiscovery/retryablehttp-go v1.3.34
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.12
+	github.com/projectdiscovery/utils v0.11.13
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
@@ -78,7 +78,7 @@ require (
 	github.com/muesli/termenv v0.15.3-0.20240618155329-98d742f6907a // indirect
 	github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 // indirect
 	github.com/projectdiscovery/asnmap v1.2.0 // indirect
-	github.com/projectdiscovery/fastdialer v0.6.1 // indirect
+	github.com/projectdiscovery/fastdialer v0.6.2 // indirect
 	github.com/projectdiscovery/hmap v0.0.104 // indirect
 	github.com/projectdiscovery/machineid v0.0.0-20250715113114-c77eb3567582 // indirect
 	github.com/refraction-networking/utls v1.8.2 // indirect
