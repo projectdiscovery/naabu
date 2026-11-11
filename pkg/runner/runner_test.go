@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"log"
@@ -16,6 +17,9 @@ import (
 	"time"
 
 	"github.com/miekg/dns"
+	"github.com/projectdiscovery/gologger"
+	"github.com/projectdiscovery/gologger/levels"
+	"github.com/projectdiscovery/gologger/writer"
 	"github.com/projectdiscovery/naabu/v2/pkg/fingerprint"
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
@@ -920,6 +924,28 @@ func TestOnReceiveKeepsUnseenPortsOnPartialDuplicate(t *testing.T) {
 		{Port: 443, Protocol: protocol.TCP},
 	}})
 	require.True(t, runner.unique.Has(net.JoinHostPort(ip, "443")), "new port 443 must still be recorded despite the leading duplicate")
+}
+
+// The same port open on TCP and UDP (-p 53,u:53) is two results: the UDP one
+// must not be dropped from stdout as a duplicate of the TCP one.
+func TestOnReceiveKeepsTCPAndUDPOnSamePort(t *testing.T) {
+	buf := &bytes.Buffer{}
+	gologger.DefaultLogger.SetWriter(captureWriter{buf: buf})
+	gologger.DefaultLogger.SetMaxLevel(levels.LevelSilent)
+	t.Cleanup(func() {
+		gologger.DefaultLogger.SetMaxLevel(levels.LevelInfo)
+		gologger.DefaultLogger.SetWriter(writer.NewCLI())
+	})
+
+	runner := newConnectRunner(t)
+	runner.options.JSON = true
+
+	ip := "192.168.1.10"
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{{Port: 53, Protocol: protocol.TCP}}})
+	runner.onReceive(&result.HostResult{IP: ip, Ports: []*port.Port{{Port: 53, Protocol: protocol.UDP}}})
+
+	require.Contains(t, buf.String(), `"protocol":"tcp"`)
+	require.Contains(t, buf.String(), `"protocol":"udp"`)
 }
 
 // TestOnReceiveTLSCheckedReflectsScanPath guards against feeding the
