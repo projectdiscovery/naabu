@@ -169,11 +169,23 @@ func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 		if csvTag == "" {
 			continue
 		}
-		if !stringSliceContains(headers, csvTag) && !stringSliceContains(excludedFields, csvTag) {
+		if !stringSliceContains(headers, csvTag) && !isExcludedCSVField(excludedFields, field.Name, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
 	return headers, nil
+}
+
+// isExcludedCSVField reports whether -eof names the field, either as -lof
+// lists it (the field name, case-insensitive like the JSON filter) or by its
+// csv tag.
+func isExcludedCSVField(excludedFields []string, fieldName, csvTag string) bool {
+	for _, excluded := range excludedFields {
+		if strings.EqualFold(excluded, fieldName) || strings.EqualFold(excluded, csvTag) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
