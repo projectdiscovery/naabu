@@ -439,7 +439,7 @@ Notes:
 
 Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
-Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
+IPs are matched against the CDN and WAF ranges in [cdncheck](https://github.com/projectdiscovery/cdncheck) (for example Cloudflare, Fastly, CloudFront and Imperva Incapsula). Cloud provider ranges are not excluded.
 
 # Scan Status
 Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` (the port can be changed via the `-metrics-port` flag)
