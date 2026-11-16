@@ -7,6 +7,19 @@ import (
 	iputil "github.com/projectdiscovery/utils/ip"
 )
 
+// nonUnicastRanges can never be a scan target, so they are always excluded.
+// Dialing 0.0.0.0/8 or :: reaches the scanning host itself and reports its own
+// services as the target's, and multicast/reserved space only wastes probes
+// (1/8 of IPv4, so a 0.0.0.0/0 scan spent 12.5% of its packets on it).
+// Private, loopback and link-local ranges stay scannable on purpose.
+var nonUnicastRanges = []string{
+	"0.0.0.0/8",
+	"224.0.0.0/4",
+	"240.0.0.0/4",
+	"::/128",
+	"ff00::/8",
+}
+
 func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 	var excludedIps []string
 	if options.ExcludeIps != "" {
@@ -36,7 +49,7 @@ func (r *Runner) parseExcludedIps(options *Options) ([]string, error) {
 }
 
 // isExcluded reports whether ip matches the user supplied exclude list
-// (-exclude-hosts / -exclude-file).
+// (-exclude-hosts / -exclude-file) or nonUnicastRanges.
 func (r *Runner) isExcluded(ip string) bool {
 	return r.excludedIpsNP != nil && !r.excludedIpsNP.ValidateAddress(ip)
 }

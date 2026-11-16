@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -201,20 +202,19 @@ func NewRunner(options *Options) (*Runner, error) {
 		runner.dnsclientProxy = dnsclientProxy
 	}
 
-	excludedIps, err := runner.parseExcludedIps(options)
+	userExcludedIps, err := runner.parseExcludedIps(options)
 	if err != nil {
 		return nil, err
 	}
+	excludedIps := append(slices.Clone(nonUnicastRanges), userExcludedIps...)
 
-	if len(excludedIps) > 0 {
-		excludedIpsNP, err := networkpolicy.New(networkpolicy.Options{
-			DenyList: excludedIps,
-		})
-		if err != nil {
-			return nil, err
-		}
-		runner.excludedIpsNP = excludedIpsNP
+	excludedIpsNP, err := networkpolicy.New(networkpolicy.Options{
+		DenyList: excludedIps,
+	})
+	if err != nil {
+		return nil, err
 	}
+	runner.excludedIpsNP = excludedIpsNP
 	runner.streamChannel = make(chan Target)
 
 	// Bounded LRU for output de-duplication of ip:port (and host:port) lines.
