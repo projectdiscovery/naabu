@@ -191,7 +191,9 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 				if ipStr == "" {
 					continue
 				}
-				r.limiter.Take()
+				// Same budget as the IPv4 fast path. A separate limiter would
+				// let a mixed target set send about twice the configured rate.
+				pace.wait()
 				r.scanner.EnqueueTCP(ipStr, scan.Syn, p)
 				if r.options.EnableProgressBar {
 					r.stats.IncrementCounter("packets", 1)

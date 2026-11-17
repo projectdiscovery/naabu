@@ -119,8 +119,9 @@ func (p *pacer) wait() {
 	}
 	p.next = now.Add(p.window)
 	// Packets a failed flush kept queued go out with the next flush, so they
-	// use up this window's budget. A negative budget admits one packet per
-	// window until they drain, instead of a full window on top of them.
+	// count against this window. When that count exceeds the batch the budget
+	// goes negative, and the next wait retries the flush instead of granting
+	// another full window on top of them.
 	p.budget = p.batch - 1 - pending
 }
 
