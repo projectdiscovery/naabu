@@ -42,10 +42,10 @@ func TestPacerFlushesEachWindow(t *testing.T) {
 	const rate = 1000 // batch of 10 per 10ms window
 	p := newPacer(rate)
 	queued, maxQueued, flushes := 0, 0, 0
-	p.flush = func() error {
+	p.flush = func() (int, error) {
 		flushes++
 		queued = 0
-		return nil
+		return 0, nil
 	}
 	for i := 0; i < 100; i++ {
 		p.wait()
@@ -60,11 +60,35 @@ func TestPacerFlushesEachWindow(t *testing.T) {
 // window flush halves the rate like a failed send does.
 func TestPacerFlushCongestionBacksOff(t *testing.T) {
 	p := newPacer(10000)
-	p.flush = func() error { return syscall.ENOBUFS }
+	p.flush = func() (int, error) { return 0, syscall.ENOBUFS }
 	for i := 0; i < 300; i++ {
 		p.wait()
 	}
 	require.Less(t, p.rate, int64(10000))
+}
+
+// TestPacerChargesRetainedPackets ensures packets a failed flush kept queued
+// count against the next window, so a retry does not send them on top of a
+// full new budget.
+func TestPacerChargesRetainedPackets(t *testing.T) {
+	p := newPacer(1000) // batch of 10 per window
+	queued, failed, maxSent := 0, false, 0
+	p.flush = func() (int, error) {
+		if queued >= 10 && !failed {
+			failed = true
+			return queued, syscall.ENOBUFS
+		}
+		maxSent = max(maxSent, queued)
+		queued = 0
+		return 0, nil
+	}
+	for i := 0; i < 60; i++ {
+		p.wait()
+		queued++
+	}
+	require.True(t, failed)
+	// The 10 retained packets plus the one admitted while they were pending.
+	require.LessOrEqual(t, maxSent, 11)
 }
 
 // TestPacerExactRateViaWindow verifies the average rate is preserved even when

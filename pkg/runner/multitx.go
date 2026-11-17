@@ -79,7 +79,7 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng, ind
 		go func(worker int, sender *SYNSender) {
 			defer wg.Done()
 			pace := newPacer(rateForWorker(r.options.Rate, n, worker))
-			pace.flush = sender.flush
+			pace.flush = sender.flushQueued
 			forEachWorkerIndex(worker, n, rng, func(index int64) bool {
 				select {
 				case <-ctx.Done():

@@ -44,12 +44,15 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 	// Fast SYN sender: bypasses gopacket + channel + single writer.
 	// Falls back to standard path for Ethernet framing or IPv6.
 	var sender *SYNSender
+	var pace *pacer
 	if shouldUseRawPackets {
 		var err error
 		sender, err = newSYNSender(r.scanner.ListenHandler)
 		if err != nil {
 			gologger.Debug().Msgf("Fast sender unavailable (%s), using standard path\n", err)
 		} else {
+			pace = newPacer(r.options.Rate)
+			pace.flush = sender.flushQueued
 			gologger.Info().Msgf("Smart scan: fast SYN sender active (direct raw socket, zero-copy template)")
 		}
 	}
@@ -122,7 +125,7 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 				break
 			}
 			brSeed++
-			r.scanSinglePortOnTargets(ctx, targets, tgtIdx, p, targetsCount, shouldUseRawPackets, sender, brSeed)
+			r.scanSinglePortOnTargets(ctx, targets, tgtIdx, p, targetsCount, shouldUseRawPackets, sender, pace, brSeed)
 			if sender != nil {
 				_ = sender.flush()
 			}
@@ -162,8 +165,8 @@ func (r *Runner) runPredictiveScan(ctx context.Context, targets []*net.IPNet, ta
 //	Send:           direct WriteTo syscall     (~2µs)
 //	                                    total  ~2.1µs/pkt -> ~475K pps
 //
-// The rate limiter is the only intentional throttle.
-func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPNet, tgtIdx *targetIndex, p *port.Port, targetsCount uint64, shouldUseRawPackets bool, sender *SYNSender, seed int64) {
+// The pacer (rate limiter off the fast path) is the only intentional throttle.
+func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPNet, tgtIdx *targetIndex, p *port.Port, targetsCount uint64, shouldUseRawPackets bool, sender *SYNSender, pace *pacer, seed int64) {
 	payload := r.options.ConnectPayload
 	b := blackrock.New(int64(targetsCount), seed)
 	useFastPath := sender != nil && p.Protocol == protocol.TCP
@@ -215,8 +218,11 @@ func (r *Runner) scanSinglePortOnTargets(ctx context.Context, targets []*net.IPN
 				continue
 			}
 
-			r.limiter.Take()
+			pace.wait()
 			if err := sender.send(dstIP, srcSum, uint16(p.Port)); err != nil {
+				if isCongestion(err) {
+					pace.onCongestion()
+				}
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, p.Port, err)
 			}
 			if r.options.EnableProgressBar {

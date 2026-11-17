@@ -239,6 +239,16 @@ func (s *SYNSender) flush() error {
 	return nil
 }
 
+// flushQueued flushes the batch and reports how many packets it still holds,
+// which is non-zero only when the kernel refused part of the send.
+func (s *SYNSender) flushQueued() (int, error) {
+	err := s.flush()
+	if s.batch == nil {
+		return 0, err
+	}
+	return s.batch.Len(), err
+}
+
 func (s *SYNSender) close() {
 	if s != nil && s.ownedConn != nil {
 		_ = s.ownedConn.Close()
@@ -327,7 +337,7 @@ func buildTargetIndex(targets []*net.IPNet) *targetIndex {
 			}
 			// A broad CIDR can straddle multiple source routes; sampling a few
 			// addresses catches that cheaply so pickIPv4 can resolve the source
-			// per destination instead of mis-checksumming part of the range.
+			// per destination instead of using the wrong checksum for part of the range.
 			e.routeVaries = cidrRouteVaries(e.baseIPv4, count)
 		}
 		idx.entries = append(idx.entries, e)
