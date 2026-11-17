@@ -37,8 +37,9 @@ type pacer struct {
 	lastAdjust time.Time
 	// flush, when set, sends the packets queued in the caller's sendmmsg batch
 	// at each window boundary, so they leave as one window's budget instead of
-	// piling up into a 1024-packet line-rate burst at low rates.
-	flush func() error
+	// piling up into a 1024-packet line-rate burst at low rates. It returns
+	// how many packets are still queued after a failed send.
+	flush func() (pending int, err error)
 }
 
 // pacerRecoverEvery is how long the pacer waits between additive-increase steps
@@ -88,10 +89,13 @@ func (p *pacer) wait() {
 		p.budget--
 		return
 	}
+	var pending int64
 	if p.flush != nil {
-		if err := p.flush(); isCongestion(err) {
+		n, err := p.flush()
+		if isCongestion(err) {
 			p.onCongestion()
 		}
+		pending = int64(n)
 	}
 	now := time.Now()
 	if p.next.IsZero() {
@@ -114,7 +118,11 @@ func (p *pacer) wait() {
 		p.setRate(nr)
 	}
 	p.next = now.Add(p.window)
-	p.budget = p.batch - 1
+	// Packets a failed flush kept queued go out with the next flush, so they
+	// count against this window. When that count exceeds the batch the budget
+	// goes negative, and the next wait retries the flush instead of granting
+	// another full window on top of them.
+	p.budget = p.batch - 1 - pending
 }
 
 // onCongestion halves the effective rate after the kernel signals a full TX
