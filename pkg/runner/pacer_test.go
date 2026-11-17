@@ -35,6 +35,38 @@ func TestPacerHonorsRate(t *testing.T) {
 	require.Less(t, elapsed, 900*time.Millisecond, "pacer must not be drastically slower than the configured rate")
 }
 
+// TestPacerFlushesEachWindow ensures packets queued in a sendmmsg batch leave
+// at every window boundary. Without it a low rate filled the 1024-packet batch
+// for seconds and then sent it as one line-rate burst that small queues drop.
+func TestPacerFlushesEachWindow(t *testing.T) {
+	const rate = 1000 // batch of 10 per 10ms window
+	p := newPacer(rate)
+	queued, maxQueued, flushes := 0, 0, 0
+	p.flush = func() error {
+		flushes++
+		queued = 0
+		return nil
+	}
+	for i := 0; i < 100; i++ {
+		p.wait()
+		queued++
+		maxQueued = max(maxQueued, queued)
+	}
+	require.LessOrEqual(t, maxQueued, 10, "a burst must not exceed one window's budget")
+	require.GreaterOrEqual(t, flushes, 9)
+}
+
+// TestPacerFlushCongestionBacksOff ensures a full TX buffer reported by the
+// window flush halves the rate like a failed send does.
+func TestPacerFlushCongestionBacksOff(t *testing.T) {
+	p := newPacer(10000)
+	p.flush = func() error { return syscall.ENOBUFS }
+	for i := 0; i < 300; i++ {
+		p.wait()
+	}
+	require.Less(t, p.rate, int64(10000))
+}
+
 // TestPacerExactRateViaWindow verifies the average rate is preserved even when
 // rate/100 truncates (the window compensates).
 func TestPacerExactRateViaWindow(t *testing.T) {

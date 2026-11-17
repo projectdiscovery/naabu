@@ -789,6 +789,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				} else {
 					synSender = s
 					synPacer = newPacer(r.options.Rate)
+					synPacer.flush = s.flush
 					gologger.Info().Msgf("fast SYN sender active (direct raw socket)")
 				}
 			}

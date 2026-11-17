@@ -35,6 +35,10 @@ type pacer struct {
 	budget     int64
 	next       time.Time
 	lastAdjust time.Time
+	// flush, when set, sends the packets queued in the caller's sendmmsg batch
+	// at each window boundary, so they leave as one window's budget instead of
+	// piling up into a 1024-packet line-rate burst at low rates.
+	flush func() error
 }
 
 // pacerRecoverEvery is how long the pacer waits between additive-increase steps
@@ -83,6 +87,11 @@ func (p *pacer) wait() {
 	if p.budget > 0 {
 		p.budget--
 		return
+	}
+	if p.flush != nil {
+		if err := p.flush(); isCongestion(err) {
+			p.onCongestion()
+		}
 	}
 	now := time.Now()
 	if p.next.IsZero() {
