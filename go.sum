@@ -149,8 +149,8 @@ github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 h1:o4JXh1EVt
 github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 github.com/projectdiscovery/asnmap v1.2.0 h1:xxZxVYJYPyBNbwF7jL/rtpThKBMdjomQBmlAZRqhq7E=
 github.com/projectdiscovery/asnmap v1.2.0/go.mod h1:0tNdUGHUE7TFWDaHZtuXcVpQfRTZZ1BKmFfl8gtQbiU=
-github.com/projectdiscovery/blackrock v0.0.2 h1:mxXdu0uM8P2L2Qi210COlU8QiICPFW/Rxk5QUhlPO2k=
-github.com/projectdiscovery/blackrock v0.0.2/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
+github.com/projectdiscovery/blackrock v0.0.4 h1:xFqk3gqbLDfJuqfpTer+rtwz3q7JLnz/a/A2hbFB8rI=
+github.com/projectdiscovery/blackrock v0.0.4/go.mod h1:ANUtjDfaVrqB453bzToU+YB4cUbvBRpLvEwoWIwlTss=
 github.com/projectdiscovery/cdncheck v1.4.0 h1:FP+ALhMtm+HyE8WgeWp3lUvNp3WaE7LCsC7LpB9QsWw=
 github.com/projectdiscovery/cdncheck v1.4.0/go.mod h1:27FjISwBKtdQXsC31q16xspX5xAu0gbYfF0rs3yGNxs=
 github.com/projectdiscovery/clistats v0.1.10 h1:G+Ml7L1RoYPhkspkGPwSse7r2Nhnee2Z5wsr7YE0HTs=
