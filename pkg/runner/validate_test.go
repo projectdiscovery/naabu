@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -263,4 +264,18 @@ func TestServiceVersionValidation(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, 0, o.ServiceVersionWorkers)
 	})
+}
+
+func TestDiscoveryProbesNeedHostDiscovery(t *testing.T) {
+	const msg = "discovery probes were provided but host discovery is disabled"
+	base := Options{Host: []string{"192.168.1.1"}, Rate: 1000, DnsOrder: "l", IcmpEchoRequestProbe: true}
+	assert.EqualError(t, base.ValidateOptions(), msg)
+
+	only := base
+	only.OnlyHostDiscovery = true
+	assert.NotContains(t, fmt.Sprint(only.ValidateOptions()), msg, "-sn enables host discovery, so -sn -pe must pass")
+
+	with := base
+	with.WithHostDiscovery = true
+	assert.NotContains(t, fmt.Sprint(with.ValidateOptions()), msg)
 }
