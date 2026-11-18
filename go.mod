@@ -12,7 +12,7 @@ require (
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.73
 	github.com/pkg/errors v0.9.1
-	github.com/projectdiscovery/blackrock v0.0.2
+	github.com/projectdiscovery/blackrock v0.0.4
 	github.com/projectdiscovery/cdncheck v1.4.0
 	github.com/projectdiscovery/clistats v0.1.10
 	github.com/projectdiscovery/dnsx v1.3.1
