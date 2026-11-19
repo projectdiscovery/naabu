@@ -963,10 +963,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 									}
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
-							} else if synPacer != nil {
-								r.enumerateRaw(ctx, ip, port, synPacer.wait)
 							} else {
-								r.RawSocketEnumeration(ctx, ip, port)
+								r.enumerateRaw(ctx, ip, port, rawWait(synPacer, r.limiter.Take))
 							}
 						} else {
 							r.wgscan.Add()
@@ -1241,6 +1239,16 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 
 func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
 	r.enumerateRaw(ctx, ip, p, r.limiter.Take)
+}
+
+// rawWait is the admission function for one raw probe. A live fast-scan
+// pacer is the same budget the IPv4 SYN sender spends. Without one, the
+// probe uses the general limiter.
+func rawWait(p *pacer, fallback func()) func() {
+	if p != nil {
+		return p.wait
+	}
+	return fallback
 }
 
 // enumerateRaw enqueues one raw probe after wait admits it. Loops that also
