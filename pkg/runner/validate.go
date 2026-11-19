@@ -63,7 +63,7 @@ func (options *Options) ValidateOptions() error {
 	// Sharding partitions the (host, port) index space, but the smart-scan and
 	// stream paths do not consult inShard, so combining them would make every
 	// node scan the full space (duplicated work, not a partition). Reject it
-	// rather than silently sharding wrong.
+	// rather than silently mis-sharding.
 	if options.ShardTotal > 1 {
 		if options.SmartScan {
 			return fmt.Errorf("-shard is not supported with -smart-scan")
@@ -155,6 +155,12 @@ func (options *Options) ValidateOptions() error {
 			return errors.New("host discovery not (yet) supported on windows")
 		}
 		return errors.New("sudo access required to perform host discovery")
+	}
+
+	// A proxy forces connect scan, which skips raw-packet discovery, so the scan
+	// would go straight to the port scan. Refuse it rather than skip discovery.
+	if options.OnlyHostDiscovery && options.Proxy != "" {
+		return errors.New("host discovery (-sn) can't be used with a proxy")
 	}
 
 	if options.PortThreshold < 0 || options.PortThreshold > 65535 {

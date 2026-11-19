@@ -1,7 +1,6 @@
 package runner
 
 import (
-	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -9,6 +8,7 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/privileges"
 	"github.com/projectdiscovery/utils/errkit"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestOptions(t *testing.T) {
@@ -271,11 +271,31 @@ func TestDiscoveryProbesNeedHostDiscovery(t *testing.T) {
 	base := Options{Host: []string{"192.168.1.1"}, Rate: 1000, DnsOrder: "l", IcmpEchoRequestProbe: true}
 	assert.EqualError(t, base.ValidateOptions(), msg)
 
+	origPriv := privileges.IsPrivileged
+	t.Cleanup(func() { privileges.IsPrivileged = origPriv })
+	privileges.IsPrivileged = true
+
 	only := base
 	only.OnlyHostDiscovery = true
-	assert.NotContains(t, fmt.Sprint(only.ValidateOptions()), msg, "-sn enables host discovery, so -sn -pe must pass")
+	require.NoError(t, only.ValidateOptions(), "-sn enables host discovery, so -sn -pe must pass")
 
 	with := base
 	with.WithHostDiscovery = true
-	assert.NotContains(t, fmt.Sprint(with.ValidateOptions()), msg)
+	require.NoError(t, with.ValidateOptions())
+}
+
+func TestDiscoveryOnlyRejectsProxy(t *testing.T) {
+	origPriv := privileges.IsPrivileged
+	t.Cleanup(func() { privileges.IsPrivileged = origPriv })
+	privileges.IsPrivileged = true
+
+	// Without the guard this would fall through to a port scan.
+	for _, opts := range []Options{
+		{Host: []string{"192.168.1.1"}, Rate: 1000, DnsOrder: "l", OnlyHostDiscovery: true, Proxy: "socks5://127.0.0.1:1080"},
+		{Host: []string{"192.168.1.1"}, Rate: 1000, DnsOrder: "l", OnlyHostDiscovery: true, IcmpEchoRequestProbe: true, Proxy: "socks5://127.0.0.1:1080"},
+	} {
+		err := opts.ValidateOptions()
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "host discovery (-sn) can't be used with a proxy")
+	}
 }
