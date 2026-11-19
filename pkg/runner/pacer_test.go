@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"syscall"
 	"testing"
 	"time"
@@ -13,7 +14,7 @@ func TestPacerUnlimited(t *testing.T) {
 	p := newPacer(0)
 	start := time.Now()
 	for i := 0; i < 100000; i++ {
-		p.wait()
+		p.wait(context.Background())
 	}
 	require.Less(t, time.Since(start), 50*time.Millisecond, "unlimited pacer must not block")
 }
@@ -27,7 +28,7 @@ func TestPacerHonorsRate(t *testing.T) {
 
 	start := time.Now()
 	for i := 0; i < rate/2; i++ {
-		p.wait()
+		p.wait(context.Background())
 	}
 	elapsed := time.Since(start)
 
@@ -48,7 +49,7 @@ func TestPacerFlushesEachWindow(t *testing.T) {
 		return 0, nil
 	}
 	for i := 0; i < 100; i++ {
-		p.wait()
+		p.wait(context.Background())
 		queued++
 		maxQueued = max(maxQueued, queued)
 	}
@@ -62,7 +63,7 @@ func TestPacerFlushCongestionBacksOff(t *testing.T) {
 	p := newPacer(10000)
 	p.flush = func() (int, error) { return 0, syscall.ENOBUFS }
 	for i := 0; i < 300; i++ {
-		p.wait()
+		p.wait(context.Background())
 	}
 	require.Less(t, p.rate, int64(10000))
 }
@@ -83,7 +84,7 @@ func TestPacerChargesRetainedPackets(t *testing.T) {
 		return 0, nil
 	}
 	for i := 0; i < 60; i++ {
-		p.wait()
+		p.wait(context.Background())
 		queued++
 	}
 	require.True(t, failed)
@@ -150,7 +151,7 @@ func TestPacerRecoversToCeiling(t *testing.T) {
 		p.lastAdjust = time.Now().Add(-pacerRecoverEvery)
 		p.budget = 0
 		p.next = time.Time{}
-		p.wait()
+		p.wait(context.Background())
 	}
 	require.EqualValues(t, p.maxRate, p.rate, "rate must recover to the configured ceiling")
 }
@@ -161,7 +162,27 @@ func TestPacerCongestionNoopUnlimited(t *testing.T) {
 	p := newPacer(0)
 	p.onCongestion()
 	require.EqualValues(t, 0, p.rate)
-	p.wait() // must remain a no-op
+	p.wait(context.Background()) // must remain a no-op
+}
+
+func TestPacerWaitStopsWhenContextCancelled(t *testing.T) {
+	p := newPacer(1) // the second wait sleeps for about a second
+	require.True(t, p.wait(context.Background()))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan bool, 1)
+	go func() {
+		done <- p.wait(ctx)
+	}()
+	time.Sleep(20 * time.Millisecond)
+	cancel()
+
+	select {
+	case ok := <-done:
+		require.False(t, ok, "a cancelled context must not admit another packet")
+	case <-time.After(500 * time.Millisecond):
+		t.Fatal("wait must return when the context is cancelled")
+	}
 }
 
 func TestIsCongestion(t *testing.T) {
@@ -177,10 +198,11 @@ func TestRawWaitSharesTheFastPacer(t *testing.T) {
 	p := newPacer(1000)
 	p.budget = 3
 
-	rawWait(p, func() { t.Fatal("raw probe used the limiter") })()
+	ctx := context.Background()
+	require.True(t, rawWait(p, func(context.Context) bool { t.Fatal("raw probe used the limiter"); return false })(ctx))
 	require.Equal(t, int64(2), p.budget)
 
 	called := false
-	rawWait(nil, func() { called = true })()
+	require.True(t, rawWait(nil, func(context.Context) bool { called = true; return true })(ctx))
 	require.True(t, called)
 }

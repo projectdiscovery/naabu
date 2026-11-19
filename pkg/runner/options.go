@@ -55,6 +55,7 @@ type Options struct {
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
 	Timeout             time.Duration
 	WarmUpTime          int                 // WarmUpTime between scan phases
+	MaxRuntime          time.Duration       // MaxRuntime caps the port scan phase, 0 means no limit
 	Host                goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile           string              // HostsFile is the file containing list of hosts to find port for
 	Output              string              // Output is the file to write found ports to.
@@ -311,6 +312,7 @@ func ParseOptions() *Options {
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
 		flagSet.Var(newMillisecondDuration(&options.Timeout, DefaultPortTimeoutSynScan), "timeout", "time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds)"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", defaultWarmUpTime, "time in seconds between scan phases"),
+		flagSet.DurationVarP(&options.MaxRuntime, "max-runtime", "mrt", 0, "stop sending port scan probes after this long and report results so far (e.g. 10m)"),
 		flagSet.IntVarP(&options.TimingTemplate, "timing", "T", DefaultTimingTemplate, "timing template, higher is faster (0-5)"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),

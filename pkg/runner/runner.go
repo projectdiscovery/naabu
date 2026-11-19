@@ -618,6 +618,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
+		ctx, stopScan := r.withMaxRuntime(ctx)
+		defer stopScan()
 
 		handleStreamIp := func(target string, port *port.Port) bool {
 			if r.isExcluded(target) {
@@ -641,24 +643,52 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return true
 		}
 
-		for target := range r.streamChannel {
-			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
-				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
-			}
-			if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
-				for ip := range ipStream {
+	streamLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				// Drain so the input producer can finish and close the channel.
+				go func() {
+					for range r.streamChannel {
+					}
+				}()
+				break streamLoop
+			case target, ok := <-r.streamChannel:
+				if !ok {
+					break streamLoop
+				}
+				if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
+					gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
+				}
+				stopped, err := eachCIDRAddress(ctx, target.Cidr, func(ip string) bool {
 					for _, port := range r.scanner.Ports {
+						if ctx.Err() != nil {
+							return false
+						}
 						if !handleStreamIp(ip, port) {
 							break
 						}
 					}
+					return ctx.Err() == nil
+				})
+				if err == nil {
+					if stopped || ctx.Err() != nil {
+						// Remaining targets are finite. Drain them so the input
+						// producer can finish. Address generation already stopped.
+						go func() {
+							for range r.streamChannel {
+							}
+						}()
+						break streamLoop
+					}
+				} else if target.Ip != "" && target.Port != "" && ctx.Err() == nil {
+					pp, _ := strconv.Atoi(target.Port)
+					handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 				}
-			} else if target.Ip != "" && target.Port != "" {
-				pp, _ := strconv.Atoi(target.Port)
-				handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 			}
 		}
 		r.wgscan.Wait()
+		stopScan()
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
@@ -779,6 +809,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		targetsWithPortCount = uint64(len(targetsWithPort))
 
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
+		ctx, stopScan := r.withMaxRuntime(ctx)
+		defer stopScan()
 
 		if r.options.SmartScan {
 			// Predictive scan: two-phase priority-ordered scan of the
@@ -965,7 +997,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 								if !r.canIScanIfCDN(ip, port) {
 									continue
 								}
-								synPacer.wait()
+								if !synPacer.wait(ctx) {
+									scanCancelled = true
+									break
+								}
 								if err := synSender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
 									if isCongestion(err) {
 										synPacer.onCongestion()
@@ -973,7 +1008,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
 							} else {
-								r.enumerateRaw(ctx, ip, port, rawWait(synPacer, r.limiter.Take))
+								r.enumerateRaw(ctx, ip, port, rawWait(synPacer, r.takeLimiter))
 							}
 						} else {
 							r.wgscan.Add()
@@ -1053,6 +1088,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Unlock()
 			}
 		}
+
+		// Sending is done; ending the budget here keeps warm-up and -sV from
+		// tripping a false "results are partial" warning.
+		stopScan()
 
 		warmUpTime := 2 * time.Second
 		if r.options.WarmUpTime > 0 {
@@ -1247,13 +1286,19 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 }
 
 func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
-	r.enumerateRaw(ctx, ip, p, r.limiter.Take)
+	r.enumerateRaw(ctx, ip, p, r.takeLimiter)
+}
+
+// takeLimiter admits one probe on the general limiter and gives up when ctx
+// ends, so a probe waiting for a token does not outlive -max-runtime.
+func (r *Runner) takeLimiter(ctx context.Context) bool {
+	return r.limiter.TakeContext(ctx) == nil
 }
 
 // rawWait is the admission function for one raw probe. A live fast-scan
 // pacer is the same budget the IPv4 SYN sender spends. Without one, the
 // probe uses the general limiter.
-func rawWait(p *pacer, fallback func()) func() {
+func rawWait(p *pacer, fallback func(context.Context) bool) func(context.Context) bool {
 	if p != nil {
 		return p.wait
 	}
@@ -1263,7 +1308,7 @@ func rawWait(p *pacer, fallback func()) func() {
 // enumerateRaw enqueues one raw probe after wait admits it. Loops that also
 // drive the fast SYN sender pass its pacer, so IPv6 and UDP probes share the
 // IPv4 budget instead of drawing on a second, independent -rate.
-func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait func()) {
+func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait func(context.Context) bool) {
 	select {
 	case <-ctx.Done():
 		return
@@ -1278,7 +1323,9 @@ func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait
 			return
 		}
 
-		wait()
+		if !wait(ctx) {
+			return
+		}
 		switch p.Protocol {
 		case protocol.TCP:
 			r.scanner.EnqueueTCP(ip, scan.Syn, p)
