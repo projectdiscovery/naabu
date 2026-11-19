@@ -963,6 +963,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 									}
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
+							} else if synPacer != nil {
+								r.enumerateRaw(ctx, ip, port, synPacer.wait)
 							} else {
 								r.RawSocketEnumeration(ctx, ip, port)
 							}
@@ -1238,6 +1240,13 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 }
 
 func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
+	r.enumerateRaw(ctx, ip, p, r.limiter.Take)
+}
+
+// enumerateRaw enqueues one raw probe after wait admits it. Loops that also
+// drive the fast SYN sender pass its pacer, so IPv6 and UDP probes share the
+// IPv4 budget instead of drawing on a second, independent -rate.
+func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait func()) {
 	select {
 	case <-ctx.Done():
 		return
@@ -1252,7 +1261,7 @@ func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Po
 			return
 		}
 
-		r.limiter.Take()
+		wait()
 		switch p.Protocol {
 		case protocol.TCP:
 			r.scanner.EnqueueTCP(ip, scan.Syn, p)
