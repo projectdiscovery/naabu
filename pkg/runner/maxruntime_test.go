@@ -122,7 +122,7 @@ func TestStreamMaxRuntimeStopsPortList(t *testing.T) {
 }
 
 func TestEachCIDRAddressMatchesMapcidr(t *testing.T) {
-	for _, cidr := range []string{"192.0.2.0/30", "192.0.2.5/32", "2001:db8::/126", "::ffff:192.0.2.0/124"} {
+	for _, cidr := range []string{"192.0.2.0/30", "192.0.2.5/32", "2001:db8::/126", "::ffff:192.0.2.0/124", "::ffff:192.0.2.0/120"} {
 		var got []string
 		stopped, err := eachCIDRAddress(context.Background(), cidr, func(ip string) bool {
 			got = append(got, ip)
