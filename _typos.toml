@@ -2,3 +2,5 @@
 Pn = "Pn"
 nd = "nd"
 AIMD = "AIMD"
+# DefautStatsInterval is exported; renaming it breaks SDK callers
+Defaut = "Defaut"

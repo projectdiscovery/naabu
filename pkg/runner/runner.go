@@ -618,6 +618,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 	case r.options.Stream && !r.options.Passive: // stream active
 		showNetworkCapabilities(r.options)
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
+		ctx, stopScan := r.withMaxRuntime(ctx)
+		defer stopScan()
 
 		handleStreamIp := func(target string, port *port.Port) bool {
 			if r.isExcluded(target) {
@@ -779,6 +781,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		targetsWithPortCount = uint64(len(targetsWithPort))
 
 		r.scanner.ListenHandler.Phase.Set(scan.Scan)
+		ctx, stopScan := r.withMaxRuntime(ctx)
+		defer stopScan()
 
 		if r.options.SmartScan {
 			// Predictive scan: two-phase priority-ordered scan of the
