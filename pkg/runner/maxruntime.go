@@ -3,11 +3,24 @@ package runner
 import (
 	"context"
 	"errors"
+	"sync/atomic"
+	"time"
 
 	"github.com/projectdiscovery/gologger"
 )
 
 var errMaxRuntime = errors.New("max runtime reached")
+
+// maxRuntimeWarning reports a partial scan. Tests replace it; the pointer keeps
+// that swap from racing a warning already in flight.
+var maxRuntimeWarning atomic.Pointer[func(time.Duration)]
+
+func init() {
+	warn := func(d time.Duration) {
+		gologger.Warning().Msgf("Max runtime %s reached, stopped sending probes: results are partial\n", d)
+	}
+	maxRuntimeWarning.Store(&warn)
+}
 
 // withMaxRuntime bounds only the probe-sending phase. Receivers, -sV and output
 // keep the parent context, so in-flight replies are still collected and the
@@ -19,7 +32,9 @@ func (r *Runner) withMaxRuntime(ctx context.Context) (context.Context, context.C
 	ctx, cancel := context.WithTimeoutCause(ctx, r.options.MaxRuntime, errMaxRuntime)
 	context.AfterFunc(ctx, func() {
 		if errors.Is(context.Cause(ctx), errMaxRuntime) {
-			gologger.Warning().Msgf("Max runtime %s reached, stopped sending probes: results are partial\n", r.options.MaxRuntime)
+			if warn := maxRuntimeWarning.Load(); warn != nil {
+				(*warn)(r.options.MaxRuntime)
+			}
 		}
 	})
 	return ctx, cancel
