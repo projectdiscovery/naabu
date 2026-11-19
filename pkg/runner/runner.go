@@ -643,24 +643,43 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			return true
 		}
 
-		for target := range r.streamChannel {
-			if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
-				gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
-			}
-			if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
-				for ip := range ipStream {
-					for _, port := range r.scanner.Ports {
-						if !handleStreamIp(ip, port) {
-							break
+	streamLoop:
+		for {
+			select {
+			case <-ctx.Done():
+				// Drain so the input producer can finish and close the channel.
+				go func() {
+					for range r.streamChannel {
+					}
+				}()
+				break streamLoop
+			case target, ok := <-r.streamChannel:
+				if !ok {
+					break streamLoop
+				}
+				if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
+					gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
+				}
+				if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
+					for ip := range ipStream {
+						// Keep consuming so the stream goroutine exits, but stop probing.
+						if ctx.Err() != nil {
+							continue
+						}
+						for _, port := range r.scanner.Ports {
+							if !handleStreamIp(ip, port) {
+								break
+							}
 						}
 					}
+				} else if target.Ip != "" && target.Port != "" {
+					pp, _ := strconv.Atoi(target.Port)
+					handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 				}
-			} else if target.Ip != "" && target.Port != "" {
-				pp, _ := strconv.Atoi(target.Port)
-				handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 			}
 		}
 		r.wgscan.Wait()
+		stopScan()
 
 		time.Sleep(time.Duration(r.options.WarmUpTime) * time.Second)
 
@@ -1057,6 +1076,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.options.ResumeCfg.Unlock()
 			}
 		}
+
+		// Sending is done; ending the budget here keeps warm-up and -sV from
+		// tripping a false "results are partial" warning.
+		stopScan()
 
 		warmUpTime := 2 * time.Second
 		if r.options.WarmUpTime > 0 {
