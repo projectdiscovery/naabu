@@ -144,17 +144,23 @@ func (options *Options) ValidateOptions() error {
 	if len(options.IPVersion) > 0 && !sliceutil.ContainsItems([]string{scan.IPv4, scan.IPv6}, options.IPVersion) {
 		return errors.New("IP Version must be 4 and/or 6")
 	}
-	// Return error if any host discovery releated option is provided but host discovery is disabled
-	if !options.WithHostDiscovery && options.hasProbes() {
+	// Return error if any host discovery related option is provided but host discovery is disabled
+	if !options.WithHostDiscovery && !options.OnlyHostDiscovery && options.hasProbes() {
 		return errors.New("discovery probes were provided but host discovery is disabled")
 	}
 
-	// Host Discovery mode needs provileged access
+	// Host Discovery mode needs privileged access
 	if options.OnlyHostDiscovery && !privileges.IsPrivileged {
 		if osutil.IsWindows() {
 			return errors.New("host discovery not (yet) supported on windows")
 		}
 		return errors.New("sudo access required to perform host discovery")
+	}
+
+	// A proxy forces connect scan, which skips raw-packet discovery, so the scan
+	// would go straight to the port scan. Refuse it rather than skip discovery.
+	if options.OnlyHostDiscovery && options.Proxy != "" {
+		return errors.New("host discovery (-sn) can't be used with a proxy")
 	}
 
 	if options.PortThreshold < 0 || options.PortThreshold > 65535 {
