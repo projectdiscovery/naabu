@@ -16,6 +16,7 @@ func eachCIDRAddress(ctx context.Context, cidr string, yield func(ip string) boo
 	if err != nil {
 		return false, err
 	}
+	network = ipv4MappedAsV4(network)
 	first, last, err := mapcidr.AddressRange(network)
 	if err != nil {
 		return false, err
@@ -37,4 +38,24 @@ func eachCIDRAddress(ctx context.Context, cidr string, yield func(ip string) boo
 		}
 		ip = next
 	}
+}
+
+// ipv4MappedAsV4 rewrites an IPv4-mapped network as a 4-byte CIDR.
+// AddressRange sizes the host portion from IPToInteger, which reports 32 bits
+// for a mapped address, while the mask can still be 128 bits wide. A prefix
+// above 32 then wraps that subtraction and Lsh panics.
+func ipv4MappedAsV4(network *net.IPNet) *net.IPNet {
+	ip4 := network.IP.To4()
+	if ip4 == nil {
+		return network
+	}
+	ones, bits := network.Mask.Size()
+	if bits != 128 {
+		return network
+	}
+	ones -= 96
+	if ones < 0 {
+		ones = 0
+	}
+	return &net.IPNet{IP: ip4, Mask: net.CIDRMask(ones, 32)}
 }

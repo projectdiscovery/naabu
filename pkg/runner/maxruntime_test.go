@@ -19,6 +19,33 @@ func watchMaxRuntime(t *testing.T) <-chan time.Duration {
 	return warned
 }
 
+func TestMaxRuntimeWarningKeepsTheRegisteredHook(t *testing.T) {
+	prev := maxRuntimeWarning.Load()
+	t.Cleanup(func() { maxRuntimeWarning.Store(prev) })
+
+	first := make(chan struct{}, 1)
+	registered := func(time.Duration) { first <- struct{}{} }
+	maxRuntimeWarning.Store(&registered)
+
+	r := &Runner{options: &Options{MaxRuntime: 20 * time.Millisecond}}
+	ctx, stop := r.withMaxRuntime(context.Background())
+	defer stop()
+
+	later := func(time.Duration) { t.Error("a later hook must not receive this scan's warning") }
+	maxRuntimeWarning.Store(&later)
+
+	select {
+	case <-ctx.Done():
+	case <-time.After(time.Second):
+		t.Fatal("scan context must expire after max runtime")
+	}
+	select {
+	case <-first:
+	case <-time.After(time.Second):
+		t.Fatal("the hook registered with the scan was not called")
+	}
+}
+
 func TestWithMaxRuntime(t *testing.T) {
 	r := &Runner{options: &Options{}}
 	ctx, stop := r.withMaxRuntime(context.Background())
@@ -95,7 +122,7 @@ func TestStreamMaxRuntimeStopsPortList(t *testing.T) {
 }
 
 func TestEachCIDRAddressMatchesMapcidr(t *testing.T) {
-	for _, cidr := range []string{"192.0.2.0/30", "192.0.2.5/32", "2001:db8::/126"} {
+	for _, cidr := range []string{"192.0.2.0/30", "192.0.2.5/32", "2001:db8::/126", "::ffff:192.0.2.0/124"} {
 		var got []string
 		stopped, err := eachCIDRAddress(context.Background(), cidr, func(ip string) bool {
 			got = append(got, ip)

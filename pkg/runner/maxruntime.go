@@ -30,11 +30,11 @@ func (r *Runner) withMaxRuntime(ctx context.Context) (context.Context, context.C
 		return ctx, func() {}
 	}
 	ctx, cancel := context.WithTimeoutCause(ctx, r.options.MaxRuntime, errMaxRuntime)
+	// Captured now, so a later test swapping the hook cannot receive this scan's warning.
+	warn := maxRuntimeWarning.Load()
 	context.AfterFunc(ctx, func() {
-		if errors.Is(context.Cause(ctx), errMaxRuntime) {
-			if warn := maxRuntimeWarning.Load(); warn != nil {
-				(*warn)(r.options.MaxRuntime)
-			}
+		if warn != nil && errors.Is(context.Cause(ctx), errMaxRuntime) {
+			(*warn)(r.options.MaxRuntime)
 		}
 	})
 	return ctx, cancel
