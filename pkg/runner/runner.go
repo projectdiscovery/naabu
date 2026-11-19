@@ -312,6 +312,17 @@ func (r *Runner) recoverHostnames(ip string, ports []*port.Port, dt []string) {
 	}
 }
 
+// uniquePortKey identifies an emitted ip/port pair. TCP keeps the plain
+// ip:port key; other protocols get a suffix so that udp/53 is not dropped as a
+// duplicate of tcp/53.
+func uniquePortKey(ip string, p *port.Port) string {
+	key := net.JoinHostPort(ip, fmt.Sprint(p.Port))
+	if p.Protocol != protocol.TCP {
+		key += "/" + p.Protocol.String()
+	}
+	return key
+}
+
 // onReceive deduplicates discoveries, queues TCP fingerprints, and emits live results.
 func (r *Runner) onReceive(hostResult *result.HostResult) {
 	// Discovery ACK responses can be RSTs from closed ports. They are not
@@ -345,8 +356,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 		if r.options.ServiceVersion && p.Protocol != protocol.TCP {
 			continue
 		}
-		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-		if r.unique.Has(ipPort) {
+		if r.unique.Has(uniquePortKey(hostResult.IP, p)) {
 			continue
 		}
 		newPorts = append(newPorts, p)
@@ -362,8 +372,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 	// recover hostnames from ip:port combination
 	r.recoverHostnames(hostResult.IP, hostResult.Ports, dt)
 	for _, p := range hostResult.Ports {
-		ipPort := net.JoinHostPort(hostResult.IP, fmt.Sprint(p.Port))
-		_ = r.unique.Set(ipPort, struct{}{})
+		_ = r.unique.Set(uniquePortKey(hostResult.IP, p), struct{}{})
 	}
 
 	// Feed on-the-fly service detection. The queue never drops targets, so -sV
@@ -466,7 +475,7 @@ func (r *Runner) onReceive(hostResult *result.HostResult) {
 			} else {
 				for _, p := range hostResult.Ports {
 					if host != hostResult.IP {
-						hostPort := net.JoinHostPort(host, fmt.Sprint(p.Port))
+						hostPort := uniquePortKey(host, p)
 						if r.unique.Has(hostPort) {
 							continue
 						}
