@@ -1017,7 +1017,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 									gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 								}
 							} else {
-								r.enumerateRaw(ctx, ip, port, rawWait(synPacer, r.limiter.Take))
+								r.enumerateRaw(ctx, ip, port, rawWait(synPacer, r.takeLimiter))
 							}
 						} else {
 							r.wgscan.Add()
@@ -1295,13 +1295,19 @@ func (r *Runner) RawSocketHostDiscovery(ip string) {
 }
 
 func (r *Runner) RawSocketEnumeration(ctx context.Context, ip string, p *port.Port) {
-	r.enumerateRaw(ctx, ip, p, r.limiter.Take)
+	r.enumerateRaw(ctx, ip, p, r.takeLimiter)
+}
+
+// takeLimiter admits one probe on the general limiter and gives up when ctx
+// ends, so a probe waiting for a token does not outlive -max-runtime.
+func (r *Runner) takeLimiter(ctx context.Context) bool {
+	return r.limiter.TakeContext(ctx) == nil
 }
 
 // rawWait is the admission function for one raw probe. A live fast-scan
 // pacer is the same budget the IPv4 SYN sender spends. Without one, the
 // probe uses the general limiter.
-func rawWait(p *pacer, fallback func()) func() {
+func rawWait(p *pacer, fallback func(context.Context) bool) func(context.Context) bool {
 	if p != nil {
 		return p.wait
 	}
@@ -1311,7 +1317,7 @@ func rawWait(p *pacer, fallback func()) func() {
 // enumerateRaw enqueues one raw probe after wait admits it. Loops that also
 // drive the fast SYN sender pass its pacer, so IPv6 and UDP probes share the
 // IPv4 budget instead of drawing on a second, independent -rate.
-func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait func()) {
+func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait func(context.Context) bool) {
 	select {
 	case <-ctx.Done():
 		return
@@ -1326,7 +1332,9 @@ func (r *Runner) enumerateRaw(ctx context.Context, ip string, p *port.Port, wait
 			return
 		}
 
-		wait()
+		if !wait(ctx) {
+			return
+		}
 		switch p.Protocol {
 		case protocol.TCP:
 			r.scanner.EnqueueTCP(ip, scan.Syn, p)

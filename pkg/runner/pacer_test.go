@@ -198,10 +198,11 @@ func TestRawWaitSharesTheFastPacer(t *testing.T) {
 	p := newPacer(1000)
 	p.budget = 3
 
-	rawWait(p, func() { t.Fatal("raw probe used the limiter") })()
+	ctx := context.Background()
+	require.True(t, rawWait(p, func(context.Context) bool { t.Fatal("raw probe used the limiter"); return false })(ctx))
 	require.Equal(t, int64(2), p.budget)
 
 	called := false
-	rawWait(nil, func() { called = true })()
+	require.True(t, rawWait(nil, func(context.Context) bool { called = true; return true })(ctx))
 	require.True(t, called)
 }

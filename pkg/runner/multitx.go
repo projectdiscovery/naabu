@@ -202,7 +202,7 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 			}
 		} else {
-			r.enumerateRaw(ctx, ip, port, rawWait(pace, r.limiter.Take))
+			r.enumerateRaw(ctx, ip, port, rawWait(pace, r.takeLimiter))
 		}
 	} else {
 		r.wgscan.Add()
