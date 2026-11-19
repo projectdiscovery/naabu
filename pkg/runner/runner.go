@@ -660,30 +660,21 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				if err := r.scanner.IPRanger.Add(target.Cidr); err != nil {
 					gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
 				}
-				if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
-					stopTarget := false
-					for ip := range ipStream {
+				stopped, err := eachCIDRAddress(ctx, target.Cidr, func(ip string) bool {
+					for _, port := range r.scanner.Ports {
 						if ctx.Err() != nil {
-							stopTarget = true
-							break
+							return false
 						}
-						for _, port := range r.scanner.Ports {
-							if ctx.Err() != nil || !handleStreamIp(ip, port) {
-								stopTarget = ctx.Err() != nil
-								break
-							}
-						}
-						if stopTarget {
+						if !handleStreamIp(ip, port) {
 							break
 						}
 					}
-					if stopTarget {
-						// The address generator blocks on send. Drain it off the
-						// scan goroutine so a wide CIDR cannot outlive the budget.
-						go func() {
-							for range ipStream {
-							}
-						}()
+					return ctx.Err() == nil
+				})
+				if err == nil {
+					if stopped || ctx.Err() != nil {
+						// Remaining targets are finite. Drain them so the input
+						// producer can finish. Address generation already stopped.
 						go func() {
 							for range r.streamChannel {
 							}
