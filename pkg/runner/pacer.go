@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"syscall"
 	"time"
@@ -81,13 +82,17 @@ func (p *pacer) setRate(rate int64) {
 // wait blocks as needed to keep the average send rate at or below the current
 // effective packets per second, nudging the rate back up toward the configured
 // ceiling once a recovery interval has elapsed since the last backoff.
-func (p *pacer) wait() {
+// It returns false when ctx is cancelled, without admitting another packet.
+func (p *pacer) wait(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return false
+	}
 	if p.maxRate <= 0 {
-		return
+		return true
 	}
 	if p.budget > 0 {
 		p.budget--
-		return
+		return true
 	}
 	var pending int64
 	if p.flush != nil {
@@ -102,7 +107,18 @@ func (p *pacer) wait() {
 		p.next = now
 	}
 	if now.Before(p.next) {
-		time.Sleep(p.next.Sub(now))
+		timer := time.NewTimer(p.next.Sub(now))
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return false
+		case <-timer.C:
+		}
 		now = p.next
 	}
 	if p.rate < p.maxRate && now.Sub(p.lastAdjust) >= pacerRecoverEvery {
@@ -123,6 +139,7 @@ func (p *pacer) wait() {
 	// goes negative, and the next wait retries the flush instead of granting
 	// another full window on top of them.
 	p.budget = p.batch - 1 - pending
+	return ctx.Err() == nil
 }
 
 // onCongestion halves the effective rate after the kernel signals a full TX

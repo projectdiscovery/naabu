@@ -661,18 +661,36 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 					gologger.Warning().Msgf("Couldn't track %s in scan results: %s\n", target, err)
 				}
 				if ipStream, err := mapcidr.IPAddressesAsStream(target.Cidr); err == nil {
+					stopTarget := false
 					for ip := range ipStream {
-						// Keep consuming so the stream goroutine exits, but stop probing.
 						if ctx.Err() != nil {
-							continue
+							stopTarget = true
+							break
 						}
 						for _, port := range r.scanner.Ports {
-							if !handleStreamIp(ip, port) {
+							if ctx.Err() != nil || !handleStreamIp(ip, port) {
+								stopTarget = ctx.Err() != nil
 								break
 							}
 						}
+						if stopTarget {
+							break
+						}
 					}
-				} else if target.Ip != "" && target.Port != "" {
+					if stopTarget {
+						// The address generator blocks on send. Drain it off the
+						// scan goroutine so a wide CIDR cannot outlive the budget.
+						go func() {
+							for range ipStream {
+							}
+						}()
+						go func() {
+							for range r.streamChannel {
+							}
+						}()
+						break streamLoop
+					}
+				} else if target.Ip != "" && target.Port != "" && ctx.Err() == nil {
 					pp, _ := strconv.Atoi(target.Port)
 					handleStreamIp(target.Ip, &port.Port{Port: pp, Protocol: protocol.TCP})
 				}
@@ -988,7 +1006,10 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 								if !r.canIScanIfCDN(ip, port) {
 									continue
 								}
-								synPacer.wait()
+								if !synPacer.wait(ctx) {
+									scanCancelled = true
+									break
+								}
 								if err := synSender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
 									if isCongestion(err) {
 										synPacer.onCongestion()

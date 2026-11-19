@@ -192,7 +192,9 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 			if !r.canIScanIfCDN(ip, port) {
 				return
 			}
-			pace.wait()
+			if !pace.wait(ctx) {
+				return
+			}
 			if err := sender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
 				if isCongestion(err) {
 					pace.onCongestion()
