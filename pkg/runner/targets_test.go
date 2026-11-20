@@ -1,8 +1,8 @@
 package runner
 
 import (
-	"io"
 	"log"
+	"os"
 	"testing"
 	"time"
 
@@ -49,21 +49,30 @@ func Test_AddTarget(t *testing.T) {
 	// require.Nil(t, err, "ASN incorrectly parsed")
 }
 
-// TestAddTargetsStreamsBeforeEOF ensures a piped target reaches the stream
-// scanner while the producer is still writing, not only after it closes.
-func TestAddTargetsStreamsBeforeEOF(t *testing.T) {
+// TestLoadStreamsStdinBeforeEOF ensures stream mode scans a piped target while
+// the producer is still writing. Buffering stdin into a file first would not
+// deliver the target until the pipe closes.
+func TestLoadStreamsStdinBeforeEOF(t *testing.T) {
 	ipranger, err := ipranger.New()
 	require.NoError(t, err)
 	defer func() { _ = ipranger.Close() }()
 
+	pr, pw, err := os.Pipe()
+	require.NoError(t, err)
+	previous := os.Stdin
+	os.Stdin = pr
+	t.Cleanup(func() {
+		os.Stdin = previous
+		_ = pr.Close()
+	})
+
 	r := &Runner{
-		options:       &Options{Stream: true, Threads: 1},
-		scanner:       &scan.Scanner{IPRanger: ipranger},
+		options:       &Options{Stream: true, Stdin: true, Threads: 1, InputReadTimeout: 30 * time.Second},
+		scanner:       &scan.Scanner{IPRanger: ipranger, ListenHandler: &scan.ListenHandler{Phase: &scan.Phase{}}},
 		streamChannel: make(chan Target),
 	}
-	pr, pw := io.Pipe()
 	done := make(chan error, 1)
-	go func() { done <- r.addTargets(pr) }()
+	go func() { done <- r.Load() }()
 
 	_, err = pw.Write([]byte("127.0.0.1\n"))
 	require.NoError(t, err)
@@ -71,7 +80,7 @@ func TestAddTargetsStreamsBeforeEOF(t *testing.T) {
 	case target := <-r.streamChannel:
 		require.Equal(t, "127.0.0.1/32", target.Cidr)
 	case <-time.After(2 * time.Second):
-		t.Fatal("target must be streamed before the input closes")
+		t.Fatal("target must be streamed before stdin closes")
 	}
 
 	require.NoError(t, pw.Close())
