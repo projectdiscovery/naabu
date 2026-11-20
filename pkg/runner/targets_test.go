@@ -2,7 +2,9 @@ package runner
 
 import (
 	"log"
+	"os"
 	"testing"
+	"time"
 
 	"github.com/projectdiscovery/ipranger"
 	"github.com/projectdiscovery/naabu/v2/pkg/scan"
@@ -45,4 +47,42 @@ func Test_AddTarget(t *testing.T) {
 	// todo: excluding due to api instability (https://github.com/projectdiscovery/asnmap/issues/198)
 	// err = r.AddTarget("AS14421")
 	// require.Nil(t, err, "ASN incorrectly parsed")
+}
+
+// TestLoadStreamsStdinBeforeEOF ensures stream mode scans a piped target while
+// the producer is still writing. Buffering stdin into a file first would not
+// deliver the target until the pipe closes.
+func TestLoadStreamsStdinBeforeEOF(t *testing.T) {
+	ipranger, err := ipranger.New()
+	require.NoError(t, err)
+	defer func() { _ = ipranger.Close() }()
+
+	pr, pw, err := os.Pipe()
+	require.NoError(t, err)
+	previous := os.Stdin
+	os.Stdin = pr
+	t.Cleanup(func() {
+		os.Stdin = previous
+		_ = pr.Close()
+	})
+
+	r := &Runner{
+		options:       &Options{Stream: true, Stdin: true, Threads: 1, InputReadTimeout: 30 * time.Second},
+		scanner:       &scan.Scanner{IPRanger: ipranger, ListenHandler: &scan.ListenHandler{Phase: &scan.Phase{}}},
+		streamChannel: make(chan Target),
+	}
+	done := make(chan error, 1)
+	go func() { done <- r.Load() }()
+
+	_, err = pw.Write([]byte("127.0.0.1\n"))
+	require.NoError(t, err)
+	select {
+	case target := <-r.streamChannel:
+		require.Equal(t, "127.0.0.1/32", target.Cidr)
+	case <-time.After(2 * time.Second):
+		t.Fatal("target must be streamed before stdin closes")
+	}
+
+	require.NoError(t, pw.Close())
+	require.NoError(t, <-done)
 }

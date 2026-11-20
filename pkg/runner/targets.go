@@ -3,7 +3,6 @@ package runner
 import (
 	"bufio"
 	"flag"
-	"fmt"
 	"io"
 	"net"
 	"os"
@@ -21,6 +20,21 @@ import (
 func (r *Runner) Load() error {
 	r.scanner.ListenHandler.Phase.Set(scan.Init)
 
+	// Stream mode reads the sources directly: buffering them into a file first
+	// would hold every target until stdin hits EOF.
+	if r.options.Stream {
+		defer close(r.streamChannel)
+		input, closeInput, err := r.targetSources()
+		if err != nil {
+			return err
+		}
+		defer closeInput()
+		if err := r.addTargets(input); err != nil {
+			gologger.Warning().Msgf("%s\n", err)
+		}
+		return nil
+	}
+
 	// merge all target sources into a file
 	targetfile, err := r.mergeToFile()
 	if err != nil {
@@ -37,6 +51,35 @@ func (r *Runner) Load() error {
 	return nil
 }
 
+// targetSources joins every target source in order: -host, -list, stdin, then
+// positional arguments.
+func (r *Runner) targetSources() (io.Reader, func(), error) {
+	var readers []io.Reader
+	closeInput := func() {}
+	if len(r.options.Host) > 0 {
+		readers = append(readers, strings.NewReader(strings.Join(r.options.Host, "\n")+"\n"))
+	}
+	if r.options.HostsFile != "" {
+		f, err := os.Open(r.options.HostsFile)
+		if err != nil {
+			return nil, nil, err
+		}
+		closeInput = func() {
+			if err := f.Close(); err != nil {
+				gologger.Error().Msgf("Could not close file %s: %s\n", r.options.HostsFile, err)
+			}
+		}
+		readers = append(readers, f)
+	}
+	if r.options.Stdin {
+		readers = append(readers, readerutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout})
+	}
+	if args := flag.Args(); len(args) > 0 {
+		readers = append(readers, strings.NewReader(strings.Join(args, "\n")+"\n"))
+	}
+	return io.MultiReader(readers...), closeInput, nil
+}
+
 func (r *Runner) mergeToFile() (string, error) {
 	// merge all targets in a unique file
 	tempInput, err := os.CreateTemp("", "stdin-input-*")
@@ -49,51 +92,21 @@ func (r *Runner) mergeToFile() (string, error) {
 		}
 	}()
 
-	// target defined via CLI argument
-	if len(r.options.Host) > 0 {
-		for _, v := range r.options.Host {
-			_, _ = fmt.Fprintf(tempInput, "%s\n", v)
-		}
+	input, closeInput, err := r.targetSources()
+	if err != nil {
+		return "", err
 	}
-
-	// Targets from file
-	if r.options.HostsFile != "" {
-		f, err := os.Open(r.options.HostsFile)
-		if err != nil {
-			return "", err
-		}
-		defer func() {
-			if err := f.Close(); err != nil {
-				gologger.Error().Msgf("Could not close file %s: %s\n", r.options.HostsFile, err)
-			}
-		}()
-		if _, err := io.Copy(tempInput, f); err != nil {
-			return "", err
-		}
+	defer closeInput()
+	if _, err := io.Copy(tempInput, input); err != nil {
+		return "", err
 	}
-
-	// targets from STDIN
-	if r.options.Stdin {
-		timeoutReader := readerutil.TimeoutReader{Reader: os.Stdin, Timeout: r.options.InputReadTimeout}
-		if _, err := io.Copy(tempInput, timeoutReader); err != nil {
-			return "", err
-		}
-	}
-
-	// all additional non-named cli arguments are interpreted as targets
-	for _, target := range flag.Args() {
-		_, _ = fmt.Fprintf(tempInput, "%s\n", target)
-	}
-
-	filename := tempInput.Name()
-	return filename, nil
+	return tempInput.Name(), nil
 }
 
 func (r *Runner) PreProcessTargets() error {
 	if r.options.Stream {
 		defer close(r.streamChannel)
 	}
-	wg := sizedwaitgroup.New(r.options.Threads)
 	f, err := os.Open(r.targetsFile)
 	if err != nil {
 		return err
@@ -103,7 +116,13 @@ func (r *Runner) PreProcessTargets() error {
 			gologger.Error().Msgf("Could not close file %s: %s\n", r.targetsFile, err)
 		}
 	}()
-	s := bufio.NewScanner(f)
+	return r.addTargets(f)
+}
+
+// addTargets adds each line of input as a target, resolving them concurrently.
+func (r *Runner) addTargets(input io.Reader) error {
+	wg := sizedwaitgroup.New(r.options.Threads)
+	s := bufio.NewScanner(input)
 	for s.Scan() {
 		wg.Add()
 		go func(target string) {
@@ -113,9 +132,8 @@ func (r *Runner) PreProcessTargets() error {
 			}
 		}(s.Text())
 	}
-
 	wg.Wait()
-	return nil
+	return s.Err()
 }
 
 func (r *Runner) AddTarget(target string) error {
