@@ -81,9 +81,6 @@ type Runner struct {
 	// result set through onReceive. In --verify mode live results are unverified,
 	// so onReceive suppresses them during the scan and emits only this replay.
 	verifyReplay atomic.Bool
-	// dialExhausted counts connect probes that failed for lack of local
-	// sockets or source ports, which hides open ports as closed.
-	dialExhausted atomic.Uint64
 
 	// scanStartTime records when enumeration began, used for nmap-compatible
 	// XML/greppable output timestamps and elapsed time.
@@ -557,7 +554,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
-	r.dialExhausted.Store(0)
+	r.scanner.LocalDialFailures.Store(0)
 	defer r.warnPossibleLoss(scan.CaptureDrops())
 
 	// Scan workers
@@ -1375,9 +1372,6 @@ func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *po
 
 		r.limiter.Take()
 		open, err := r.scanner.ConnectPort(host, payload, p, r.options.GetTimeout())
-		if isLocalExhaustion(err) {
-			r.dialExhausted.Add(1)
-		}
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled

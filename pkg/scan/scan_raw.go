@@ -60,7 +60,7 @@ func captureDrops() uint64 {
 		return 0
 	}
 	var dropped uint64
-	for _, h := range slices.Concat(handlers.TransportActive, handlers.LoopbackHandlers) {
+	for _, h := range slices.Concat(handlers.TransportActive, handlers.LoopbackHandlers, handlers.EthernetActive) {
 		if stats, err := h.Stats(); err == nil {
 			dropped += uint64(stats.PacketsDropped)
 		}

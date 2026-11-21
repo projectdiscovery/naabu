@@ -1,4 +1,4 @@
-package runner
+package scan
 
 import (
 	"net"
@@ -17,4 +17,12 @@ func TestIsLocalExhaustion(t *testing.T) {
 	require.True(t, isLocalExhaustion(dialErr(syscall.EMFILE)), "open file limit reached")
 	require.False(t, isLocalExhaustion(dialErr(syscall.ECONNREFUSED)), "a closed port is not local loss")
 	require.False(t, isLocalExhaustion(nil))
+}
+
+func TestCountLocalFailure(t *testing.T) {
+	s := &Scanner{}
+	s.countLocalFailure(&net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.EADDRNOTAVAIL)})
+	s.countLocalFailure(&net.OpError{Op: "dial", Err: os.NewSyscallError("connect", syscall.ECONNREFUSED)})
+	s.countLocalFailure(nil)
+	require.EqualValues(t, 1, s.LocalDialFailures.Load(), "only local exhaustion counts")
 }
