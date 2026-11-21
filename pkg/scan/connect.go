@@ -31,7 +31,7 @@ func (s *Scanner) ConnectVerify(host string, ports []*port.Port) []*port.Port {
 // out of sockets or source ports, not because the target port is closed.
 func isLocalExhaustion(err error) bool {
 	return errors.Is(err, syscall.EADDRNOTAVAIL) || errors.Is(err, syscall.EMFILE) ||
-		errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ENOBUFS)
+		errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ENOBUFS) || isPlatformExhaustion(err)
 }
 
 func (s *Scanner) countLocalFailure(err error) {
