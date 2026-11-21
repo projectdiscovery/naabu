@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/projectdiscovery/cdncheck"
@@ -129,6 +130,9 @@ type Scanner struct {
 	// also pushes the value into the ListenHandler so the raw send
 	// path sees it.
 	UDPProbeProvider UDPProbeProvider
+	// LocalDialFailures counts connect probes that failed for lack of local
+	// sockets or source ports, which hides open ports as closed.
+	LocalDialFailures atomic.Uint64
 }
 
 // PkgSend is a TCP package
@@ -464,6 +468,7 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 		}
 		conn, err = proxyDialer.DialContext(ctx, p.Protocol.String(), hostport)
 		if err != nil {
+			s.countLocalFailure(err)
 			return false, err
 		}
 	} else {
@@ -478,6 +483,7 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 		conn, err = netDialer.Dial(p.Protocol.String(), hostport)
 	}
 	if err != nil {
+		s.countLocalFailure(err)
 		return false, err
 	}
 	defer func() {

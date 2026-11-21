@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +50,22 @@ func init() {
 	// scan via ensureRawInfra.
 	buildHandlerFn = buildListenHandler
 	ensureRawInfraFn = ensureRawInfra
+	captureDropsFn = captureDrops
+}
+
+func captureDrops() uint64 {
+	rawInfraMu.Lock()
+	defer rawInfraMu.Unlock()
+	if !rawInfraOK || handlers == nil {
+		return 0
+	}
+	var dropped uint64
+	for _, h := range slices.Concat(handlers.TransportActive, handlers.LoopbackHandlers, handlers.EthernetActive) {
+		if stats, err := h.Stats(); err == nil {
+			dropped += uint64(stats.PacketsDropped)
+		}
+	}
+	return dropped
 }
 
 var (

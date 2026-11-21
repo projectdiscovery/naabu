@@ -554,6 +554,8 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 
 	shouldDiscoverHosts := r.options.shouldDiscoverHosts()
 	shouldUseRawPackets := r.options.shouldUseRawPackets()
+	r.scanner.LocalDialFailures.Store(0)
+	defer r.warnPossibleLoss(scan.CaptureDrops())
 
 	// Scan workers
 	scanConcurrency := r.options.Rate
