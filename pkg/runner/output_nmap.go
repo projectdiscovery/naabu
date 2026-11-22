@@ -300,9 +300,10 @@ func writeGreppable(w io.Writer, hosts []nmapHostData, start, end time.Time) err
 			entries = append(entries, entry{p.Port, fmt.Sprintf("%d/open/%s//%s//%s/", p.Port, p.Protocol.String(), svcName, version)})
 		}
 		ignoredState, ignored := stateFiltered, h.filtered
-		// Greppable output has room for one ignored state, so like nmap it
-		// names the largest; a closed group it does not name is listed.
-		if len(h.closed) > collapseThreshold && len(h.closed) > h.filtered {
+		// Greppable output has room for one ignored state. Filtered takes it
+		// whenever there is any, since it can only be a count; closed ports
+		// are then listed.
+		if h.filtered == 0 && len(h.closed) > collapseThreshold {
 			ignoredState, ignored = stateClosed, len(h.closed)
 		} else {
 			for _, p := range h.closed {

@@ -34,10 +34,11 @@ type hostPortStates struct {
 }
 
 // enableFilteredCount turns on the filtered count when every host was probed
-// on the same port list. Smart scan picks ports per host and ip:port targets
-// probe only their own port, so either would make the count wrong.
+// on the same port list. Smart scan picks ports per host, ip:port targets
+// probe only their own port and a shard probes a slice of the (host, port)
+// space, so any of them would make the count wrong.
 func (r *Runner) enableFilteredCount(targetsWithPort []string) {
-	r.countFiltered = r.options.PortState && !r.options.SmartScan && len(targetsWithPort) == 0
+	r.countFiltered = r.options.PortState && !r.options.SmartScan && len(targetsWithPort) == 0 && r.options.ShardTotal <= 1
 }
 
 // portStates returns the -port-state view of every host with an open or

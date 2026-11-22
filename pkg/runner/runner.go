@@ -1377,7 +1377,8 @@ func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *po
 
 		r.limiter.Take()
 		open, err := r.scanner.ConnectPort(host, payload, p, r.options.GetTimeout())
-		if r.options.PortState && p.Protocol == protocol.TCP && scan.IsRefused(err) {
+		// Through a proxy, a refusal comes from the proxy itself, not the target.
+		if r.options.PortState && r.options.Proxy == "" && p.Protocol == protocol.TCP && scan.IsRefused(err) {
 			r.scanner.ScanResults.AddClosedPort(host, p)
 		}
 		if open && err == nil {

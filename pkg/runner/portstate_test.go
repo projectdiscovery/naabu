@@ -2,8 +2,10 @@ package runner
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"encoding/xml"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -13,6 +15,8 @@ import (
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
 	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result"
+	"github.com/projectdiscovery/ratelimit"
+	"github.com/remeh/sizedwaitgroup"
 	"github.com/stretchr/testify/require"
 )
 
@@ -57,6 +61,7 @@ func TestPortStatesFilteredUnknown(t *testing.T) {
 	for name, setup := range map[string]func(r *Runner){
 		"smart scan":      func(r *Runner) { r.options.SmartScan = true; r.enableFilteredCount(nil) },
 		"ip:port targets": func(r *Runner) { r.enableFilteredCount([]string{"203.0.113.7:80"}) },
+		"shard":           func(r *Runner) { r.options.ShardTotal = 2; r.enableFilteredCount(nil) },
 	} {
 		t.Run(name, func(t *testing.T) {
 			runner := newConnectRunner(t)
@@ -111,6 +116,7 @@ func TestWriteGreppablePortStates(t *testing.T) {
 	hosts := []nmapHostData{
 		{ip: "203.0.113.7", ports: tcpPorts(80), closed: tcpPorts(22), filtered: 997},
 		{ip: "203.0.113.8", closed: tcpPorts(portRange(1, collapseThreshold+1)...), filtered: 3},
+		{ip: "203.0.113.9", closed: tcpPorts(portRange(1, collapseThreshold+1)...)},
 	}
 	var buf bytes.Buffer
 	start := time.Unix(1_700_000_000, 0)
@@ -118,7 +124,9 @@ func TestWriteGreppablePortStates(t *testing.T) {
 
 	out := buf.String()
 	require.Contains(t, out, "Host: 203.0.113.7 (203.0.113.7)\tPorts: 22/closed/tcp/////, 80/open/tcp/////\tIgnored State: filtered (997)\n")
-	require.Contains(t, out, "Host: 203.0.113.8 (203.0.113.8)\tPorts: \tIgnored State: closed (26)\n")
+	require.Contains(t, out, "Host: 203.0.113.8 (203.0.113.8)\tPorts: 1/closed/tcp/////, ")
+	require.Contains(t, out, "26/closed/tcp/////\tIgnored State: filtered (3)\n", "filtered keeps the one ignored state")
+	require.Contains(t, out, "Host: 203.0.113.9 (203.0.113.9)\tPorts: \tIgnored State: closed (26)\n")
 }
 
 func TestOutputPortStatesJSON(t *testing.T) {
@@ -144,4 +152,32 @@ func TestOutputPortStatesJSON(t *testing.T) {
 	require.Equal(t, "closed", record["state"])
 	require.EqualValues(t, 22, record["port"])
 	require.Equal(t, "203.0.113.8", record["ip"])
+}
+
+func TestHandleHostPortClosed(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	closedAddr := l.Addr().(*net.TCPAddr)
+	require.NoError(t, l.Close())
+
+	for name, proxy := range map[string]string{"direct": "", "proxy refused": closedAddr.String()} {
+		t.Run(name, func(t *testing.T) {
+			options := &Options{Host: []string{"127.0.0.1"}, Ports: "80", ScanType: ConnectScan, IPVersion: []string{"4"}, PortState: true, Proxy: proxy}
+			runner, err := NewRunner(options)
+			require.NoError(t, err)
+			t.Cleanup(func() { _ = runner.Close() })
+			runner.limiter = ratelimit.NewUnlimited(context.Background())
+			runner.wgscan = sizedwaitgroup.New(1)
+
+			runner.wgscan.Add()
+			runner.handleHostPort(context.Background(), "127.0.0.1", "", &port.Port{Port: closedAddr.Port, Protocol: protocol.TCP})
+
+			closed := runner.scanner.ScanResults.GetClosedPorts()
+			if proxy == "" {
+				require.Len(t, closed["127.0.0.1"], 1)
+			} else {
+				require.Empty(t, closed, "the proxy refused, not the target")
+			}
+		})
+	}
 }
