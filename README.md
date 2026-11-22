@@ -92,6 +92,7 @@ OUTPUT:
    -oX, -xml-output string                write nmap-compatible XML output to file (- for stdout)
    -oG, -grep-output string               write nmap-compatible greppable output to file (- for stdout)
    -oA, -output-all string                write json, xml and greppable output to <basename>.{json,xml,gnmap}
+   -port-state                            also report closed and filtered tcp ports
 
 SERVICES-DISCOVERY:
    -sD, -service-discovery           identify services by port number

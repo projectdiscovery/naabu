@@ -1006,6 +1006,14 @@ func transportReaderCallback(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 stri
 			case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
 			case <-listenHandler.done:
 			}
+		case tcpPortMatches && tcp.RST && listenHandler.ReportClosed:
+			if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
+				continue
+			}
+			select {
+			case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}, closed: true}:
+			case <-listenHandler.done:
+			}
 		case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads
 			select {
 			case listenHandler.UdpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(udp.SrcPort), Protocol: protocol.UDP}}:

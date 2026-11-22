@@ -27,4 +27,6 @@ type Options struct {
 	OnReceive            result.ResultFn
 	ScanType             string
 	NetworkPolicyOptions *networkpolicy.Options
+	// PortState also records ports that answered with a reset as closed.
+	PortState bool
 }

@@ -268,3 +268,21 @@ func TestUpdateHostOS(t *testing.T) {
 	got["192.0.2.1"].OSDetails = "changed"
 	assert.Equal(t, want, snapshot()["192.0.2.1"])
 }
+
+func TestClosedPorts(t *testing.T) {
+	res := NewResult()
+	ssh := &port.Port{Port: 22, Protocol: protocol.TCP}
+	web := &port.Port{Port: 80, Protocol: protocol.TCP}
+
+	res.AddClosedPort("203.0.113.7", ssh)
+	res.AddClosedPort("203.0.113.7", web)
+	res.AddPort("203.0.113.7", web)
+	res.AddClosedPort("203.0.113.7", web)
+	res.AddPort("203.0.113.7", &port.Port{Port: 53, Protocol: protocol.UDP})
+
+	closed := res.GetClosedPorts()
+	assert.Len(t, closed["203.0.113.7"], 1, "an open reply wins over a reset either way round")
+	assert.Equal(t, 22, closed["203.0.113.7"][0].Port)
+	assert.False(t, res.IPHasPort("203.0.113.7", ssh), "closed ports stay out of the open set")
+	assert.Equal(t, map[string]int{"203.0.113.7": 1}, res.GetTCPPortCounts())
+}

@@ -81,6 +81,9 @@ type ListenHandler struct {
 	// probing", which preserves the legacy zero-length-datagram
 	// behavior for callers that have not opted in to -uP.
 	UDPProbeProvider UDPProbeProvider
+	// ReportClosed forwards port scan resets to TcpChan. Off by default: on a
+	// typical scan most ports are closed, and their resets would flood it.
+	ReportClosed bool
 }
 
 func NewListenHandler() *ListenHandler {
@@ -102,6 +105,7 @@ func Acquire(options *Options) (*ListenHandler, error) {
 			return nil, err
 		}
 		h.Busy = true
+		h.ReportClosed = options.PortState
 		listenHandlersMu.Lock()
 		ListenHandlers = append(ListenHandlers, h)
 		listenHandlersMu.Unlock()

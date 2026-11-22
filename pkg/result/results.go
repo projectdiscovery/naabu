@@ -13,6 +13,7 @@ import (
 	"unicode"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 )
 
@@ -41,6 +42,7 @@ type HostResult struct {
 type Result struct {
 	sync.RWMutex
 	ipPorts   map[string]map[string]*port.Port
+	closed    map[string]map[string]*port.Port
 	ips       map[string]struct{}
 	skipped   map[string]struct{}
 	deadHosts map[string]struct{}
@@ -52,6 +54,7 @@ type Result struct {
 func NewResult() *Result {
 	return &Result{
 		ipPorts:   make(map[string]map[string]*port.Port),
+		closed:    make(map[string]map[string]*port.Port),
 		ips:       make(map[string]struct{}),
 		skipped:   make(map[string]struct{}),
 		deadHosts: make(map[string]struct{}),
@@ -163,6 +166,41 @@ func (r *Result) AddPort(ip string, p *port.Port) {
 
 	r.ipPorts[ip][portIdentity(p)] = p
 	r.ips[ip] = struct{}{}
+	delete(r.closed[ip], portIdentity(p))
+}
+
+// AddClosedPort records that ip answered p with a reset. An open reply wins
+// over a reset whichever arrives first, so AddPort also clears the port here.
+func (r *Result) AddClosedPort(ip string, p *port.Port) {
+	r.Lock()
+	defer r.Unlock()
+
+	if _, open := r.ipPorts[ip][portIdentity(p)]; open {
+		return
+	}
+	if _, ok := r.closed[ip]; !ok {
+		r.closed[ip] = make(map[string]*port.Port)
+	}
+	r.closed[ip][portIdentity(p)] = p
+}
+
+// GetClosedPorts returns a copy of the closed ports recorded per ip.
+func (r *Result) GetClosedPorts() map[string][]*port.Port {
+	r.RLock()
+	defer r.RUnlock()
+
+	out := make(map[string][]*port.Port, len(r.closed))
+	for ip, ports := range r.closed {
+		if len(ports) == 0 {
+			continue
+		}
+		hostPorts := make([]*port.Port, 0, len(ports))
+		for _, p := range ports {
+			hostPorts = append(hostPorts, copyPort(p))
+		}
+		out[ip] = hostPorts
+	}
+	return out
 }
 
 // SetPorts for a specific ip
@@ -350,6 +388,22 @@ func (r *Result) GetHostPortsMap() map[string][]int {
 			portList = append(portList, p.Port)
 		}
 		out[ip] = portList
+	}
+	return out
+}
+
+// GetTCPPortCounts returns how many open tcp ports each ip has.
+func (r *Result) GetTCPPortCounts() map[string]int {
+	r.RLock()
+	defer r.RUnlock()
+
+	out := make(map[string]int, len(r.ipPorts))
+	for ip, ports := range r.ipPorts {
+		for _, p := range ports {
+			if p.Protocol == protocol.TCP {
+				out[ip]++
+			}
+		}
 	}
 	return out
 }

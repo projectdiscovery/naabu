@@ -65,6 +65,9 @@ type Runner struct {
 	stats          *clistats.Statistics
 	streamChannel  chan Target
 	excludedIpsNP  *networkpolicy.NetworkPolicy
+	// countFiltered is set when -port-state can derive filtered ports; see
+	// enableFilteredCount.
+	countFiltered bool
 
 	unique gcache.Cache[string, struct{}]
 
@@ -239,6 +242,7 @@ func NewRunner(options *Options) (*Runner, error) {
 		OnReceive:            options.OnReceive,
 		ScanType:             options.ScanType,
 		NetworkPolicyOptions: options.NetworkPolicyOptions,
+		PortState:            options.PortState,
 	}
 
 	if scanOpts.OnReceive == nil {
@@ -800,6 +804,7 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		r.enableFilteredCount(targetsWithPort)
 		var targetsCount, portsCount, targetsWithPortCount uint64
 		for _, target := range append(targetsV4, targetsv6...) {
 			if target == nil {
@@ -1372,6 +1377,9 @@ func (r *Runner) handleHostPort(ctx context.Context, host, payload string, p *po
 
 		r.limiter.Take()
 		open, err := r.scanner.ConnectPort(host, payload, p, r.options.GetTimeout())
+		if r.options.PortState && p.Protocol == protocol.TCP && scan.IsRefused(err) {
+			r.scanner.ScanResults.AddClosedPort(host, p)
+		}
 		if open && err == nil {
 			r.scanner.ScanResults.AddPort(host, p)
 			// ignore OnReceive when verification is enabled
@@ -2050,6 +2058,7 @@ func (r *Runner) writeOutput(scanResults *result.Result, completed *result.HostR
 		return
 	}
 	r.outputDeadHosts(file, &csvFileHeaderEnabled)
+	r.outputPortStates(r.portStates(scanResults), file, &csvStdoutHeaderEnabled, &csvFileHeaderEnabled)
 
 	r.writeNmapFormats(scanResults)
 }
