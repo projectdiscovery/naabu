@@ -332,7 +332,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
 		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan (deprecated)"),
 		flagSet.IntVarP(&options.StatsInterval, "stats-interval", "si", DefautStatsInterval, "number of seconds to wait between showing a statistics update (deprecated)"),
-		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on"),
+		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on (setting it starts the endpoint)"),
 	)
 
 	flagSet.CreateGroup("cloud", "Cloud",
@@ -455,6 +455,7 @@ func ParseOptions() *Options {
 	if _, ok := setFlags["rate"]; ok {
 		options.RateSet = true
 	}
+	options.enableMetricsIfPortSet(setFlags)
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
@@ -523,4 +524,15 @@ func (options *Options) GetTimeout() time.Duration {
 		return DefaultPortTimeoutConnectScan
 	}
 	return options.Timeout
+}
+
+// enableMetricsIfPortSet starts the metrics endpoint when -mp is given, so it
+// no longer needs the deprecated -stats. The default port alone keeps it off,
+// which keeps parallel runs from all binding a port nobody asked for.
+func (options *Options) enableMetricsIfPortSet(setFlags map[string]struct{}) {
+	_, long := setFlags["metrics-port"]
+	_, short := setFlags["mp"]
+	if long || short {
+		options.EnableProgressBar = true
+	}
 }

@@ -63,7 +63,7 @@ func (options *Options) ValidateOptions() error {
 	// Sharding partitions the (host, port) index space, but the smart-scan and
 	// stream paths do not consult inShard, so combining them would make every
 	// node scan the full space (duplicated work, not a partition). Reject it
-	// rather than silently mis-sharding.
+	// rather than silently sharding wrong.
 	if options.ShardTotal > 1 {
 		if options.SmartScan {
 			return fmt.Errorf("-shard is not supported with -smart-scan")
@@ -117,7 +117,7 @@ func (options *Options) ValidateOptions() error {
 			return errors.New("resume not supported in stream active mode")
 		}
 		if options.EnableProgressBar {
-			return errors.New("stats not supported in stream active mode")
+			return errors.New("stats and metrics are not supported in stream active mode")
 		}
 		if options.Nmap {
 			return errors.New("nmap not supported in stream active mode")
