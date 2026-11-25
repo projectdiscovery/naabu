@@ -814,6 +814,22 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 		ctx, stopScan := r.withMaxRuntime(ctx)
 		defer stopScan()
 
+		Range := targetsCount * portsCount
+
+		if r.options.EnableProgressBar {
+			r.stats.AddStatic("ports", portsCount)
+			r.stats.AddStatic("hosts", targetsCount)
+			r.stats.AddStatic("retries", r.options.Retries)
+			r.stats.AddStatic("startedAt", time.Now())
+			r.stats.AddCounter("packets", uint64(0))
+			r.stats.AddCounter("errors", uint64(0))
+			r.stats.AddCounter("total", Range*uint64(r.options.Retries)+targetsWithPortCount)
+			r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
+			if err := r.stats.Start(); err != nil {
+				gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
+			}
+		}
+
 		if r.options.SmartScan {
 			// Predictive scan: two-phase priority-ordered scan of the
 			// user's port list, reordered by the correlation model.
@@ -837,8 +853,6 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				}
 			}
 
-			Range := targetsCount * portsCount
-
 			// Multi-core transmit senders are opened once and reused across all
 			// retries; opening/closing every worker socket per retry was pure churn.
 			useFastTx := synSender != nil && r.options.TxWorkers > 1 && !r.options.Resume
@@ -846,20 +860,6 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 			if useFastTx {
 				txSenders = r.buildTxSenders(synSender, int64(Range))
 				defer closeTxSenders(txSenders)
-			}
-
-			if r.options.EnableProgressBar {
-				r.stats.AddStatic("ports", portsCount)
-				r.stats.AddStatic("hosts", targetsCount)
-				r.stats.AddStatic("retries", r.options.Retries)
-				r.stats.AddStatic("startedAt", time.Now())
-				r.stats.AddCounter("packets", uint64(0))
-				r.stats.AddCounter("errors", uint64(0))
-				r.stats.AddCounter("total", Range*uint64(r.options.Retries)+targetsWithPortCount)
-				r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
-				if err := r.stats.Start(); err != nil {
-					gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
-				}
 			}
 
 			// Retries are performed regardless of the previous scan results due to network unreliability
