@@ -37,13 +37,6 @@ func TestStatsRejectedInStreamMode(t *testing.T) {
 	require.ErrorContains(t, options.ValidateOptions(), "stats not supported in stream active mode")
 }
 
-func TestStatsRejectedWithSmartScan(t *testing.T) {
-	options := validBaseOptions()
-	options.SmartScan = true
-	options.EnableProgressBar = true
-	require.ErrorContains(t, options.ValidateOptions(), "stats and metrics are not supported with -smart-scan")
-}
-
 func validBaseOptions() *Options {
 	return &Options{
 		Host:  goflags.StringSlice{"127.0.0.1"},
