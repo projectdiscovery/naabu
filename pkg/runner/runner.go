@@ -859,6 +859,11 @@ func (r *Runner) RunEnumeration(pctx context.Context) error {
 				r.stats.AddStatic("hosts_with_port", targetsWithPortCount)
 				if err := r.stats.Start(); err != nil {
 					gologger.Warning().Msgf("Couldn't start statistics: %s\n", err)
+				} else {
+					// clistats moves to a free port when the requested one is taken.
+					if r.stats.Options.ListenPort > 0 {
+						gologger.Info().Msgf("Metrics available at http://%s:%d/metrics\n", r.stats.Options.ListenHost, r.stats.Options.ListenPort)
+					}
 				}
 			}
 
