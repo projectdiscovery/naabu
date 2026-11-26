@@ -111,13 +111,18 @@ func (options *Options) ValidateOptions() error {
 		options.Stream = true
 	}
 
+	// stats and metrics need the scan loop; smart-scan does not run it.
+	if options.EnableProgressBar && options.SmartScan {
+		return errors.New("stats and metrics are not supported with -smart-scan")
+	}
+
 	// stream
 	if options.Stream {
 		if options.Resume {
 			return errors.New("resume not supported in stream active mode")
 		}
 		if options.EnableProgressBar {
-			return errors.New("stats and metrics are not supported in stream active mode")
+			return errors.New("stats not supported in stream active mode")
 		}
 		if options.Nmap {
 			return errors.New("nmap not supported in stream active mode")

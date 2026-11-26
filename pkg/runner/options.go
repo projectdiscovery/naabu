@@ -529,10 +529,18 @@ func (options *Options) GetTimeout() time.Duration {
 // enableMetricsIfPortSet starts the metrics endpoint when -mp is given, so it
 // no longer needs the deprecated -stats. The default port alone keeps it off,
 // which keeps parallel runs from all binding a port nobody asked for.
+//
+// Stream active mode has no stats path, so -mp is ignored there with a warning
+// instead of failing a run that worked before this flag was tied to -stats.
 func (options *Options) enableMetricsIfPortSet(setFlags map[string]struct{}) {
 	_, long := setFlags["metrics-port"]
 	_, short := setFlags["mp"]
-	if long || short {
-		options.EnableProgressBar = true
+	if !long && !short {
+		return
 	}
+	if options.Stream {
+		gologger.Warning().Msgf("-mp is ignored in stream active mode: the metrics endpoint is not available there\n")
+		return
+	}
+	options.EnableProgressBar = true
 }

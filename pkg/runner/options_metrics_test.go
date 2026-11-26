@@ -3,6 +3,7 @@ package runner
 import (
 	"testing"
 
+	goflags "github.com/projectdiscovery/goflags"
 	"github.com/stretchr/testify/require"
 )
 
@@ -20,5 +21,33 @@ func TestEnableMetricsIfPortSet(t *testing.T) {
 			options.enableMetricsIfPortSet(tc.set)
 			require.Equal(t, tc.want, options.EnableProgressBar)
 		})
+	}
+}
+
+func TestMetricsPortIgnoredInStreamMode(t *testing.T) {
+	options := &Options{Stream: true}
+	options.enableMetricsIfPortSet(map[string]struct{}{"mp": {}})
+	require.False(t, options.EnableProgressBar)
+}
+
+func TestStatsRejectedInStreamMode(t *testing.T) {
+	options := validBaseOptions()
+	options.Stream = true
+	options.EnableProgressBar = true
+	require.ErrorContains(t, options.ValidateOptions(), "stats not supported in stream active mode")
+}
+
+func TestStatsRejectedWithSmartScan(t *testing.T) {
+	options := validBaseOptions()
+	options.SmartScan = true
+	options.EnableProgressBar = true
+	require.ErrorContains(t, options.ValidateOptions(), "stats and metrics are not supported with -smart-scan")
+}
+
+func validBaseOptions() *Options {
+	return &Options{
+		Host:  goflags.StringSlice{"127.0.0.1"},
+		Ports: "80",
+		Rate:  1000,
 	}
 }
