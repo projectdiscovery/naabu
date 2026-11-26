@@ -34,6 +34,12 @@ func isLocalExhaustion(err error) bool {
 		errors.Is(err, syscall.ENFILE) || errors.Is(err, syscall.ENOBUFS) || isPlatformExhaustion(err)
 }
 
+// IsRefused reports whether a dial failed because the target answered with a
+// reset, which makes the port closed rather than filtered.
+func IsRefused(err error) bool {
+	return errors.Is(err, syscall.ECONNREFUSED) || isPlatformRefused(err)
+}
+
 func (s *Scanner) countLocalFailure(err error) {
 	if isLocalExhaustion(err) {
 		s.LocalDialFailures.Add(1)

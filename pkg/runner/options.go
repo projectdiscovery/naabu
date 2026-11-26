@@ -105,6 +105,7 @@ type Options struct {
 	HealthCheck       bool
 	OnlyHostDiscovery bool // Perform only host discovery
 	ShowDeadHosts     bool // Report hosts that did not respond to discovery
+	PortState         bool // Report closed and filtered TCP ports too
 	// Deprecated: use WithHostDiscovery instead
 	SkipHostDiscovery bool // Skip Host discovery
 	WithHostDiscovery bool // Enable Host discovery
@@ -252,6 +253,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.XMLOutput, "xml-output", "oX", "", "write nmap-compatible XML output to file (- for stdout)"),
 		flagSet.StringVarP(&options.GrepOutput, "grep-output", "oG", "", "write nmap-compatible greppable output to file (- for stdout)"),
 		flagSet.StringVarP(&options.OutputAll, "output-all", "oA", "", "write json, xml and greppable output to <basename>.{json,xml,gnmap}"),
+		flagSet.BoolVar(&options.PortState, "port-state", false, "also report closed and filtered tcp ports"),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",

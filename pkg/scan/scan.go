@@ -146,10 +146,11 @@ type PkgSend struct {
 
 // PkgResult contains the results of sending TCP packages
 type PkgResult struct {
-	ipv4 string
-	ipv6 string
-	port *port.Port
-	mac  string
+	ipv4   string
+	ipv6   string
+	port   *port.Port
+	mac    string
+	closed bool
 }
 
 var (
@@ -339,6 +340,10 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
+			if ip.closed {
+				s.addClosed(ip)
+				continue
+			}
 			// Reply authenticity is enforced upstream by the SYN-cookie check
 			// in the raw read path: a SYN-ACK only reaches this channel if its
 			// Ack matched the cookie we encoded into the probe's sequence
@@ -374,6 +379,18 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 				}
 			}
 		}
+	}
+}
+
+func (s *Scanner) addClosed(ip *PkgResult) {
+	if !s.ListenHandler.Phase.Is(Scan) && !s.stream {
+		return
+	}
+	if ip.ipv4 != "" {
+		s.ScanResults.AddClosedPort(ip.ipv4, ip.port)
+	}
+	if ip.ipv6 != "" {
+		s.ScanResults.AddClosedPort(ip.ipv6, ip.port)
 	}
 }
 

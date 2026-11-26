@@ -3,6 +3,7 @@ package result
 import (
 	"context"
 	"fmt"
+	"math/bits"
 	"net"
 	"os/exec"
 	"runtime"
@@ -13,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/projectdiscovery/naabu/v2/pkg/result/confidence"
 )
 
@@ -41,6 +43,7 @@ type HostResult struct {
 type Result struct {
 	sync.RWMutex
 	ipPorts   map[string]map[string]*port.Port
+	closed    map[string]*closedSet
 	ips       map[string]struct{}
 	skipped   map[string]struct{}
 	deadHosts map[string]struct{}
@@ -52,6 +55,7 @@ type Result struct {
 func NewResult() *Result {
 	return &Result{
 		ipPorts:   make(map[string]map[string]*port.Port),
+		closed:    make(map[string]*closedSet),
 		ips:       make(map[string]struct{}),
 		skipped:   make(map[string]struct{}),
 		deadHosts: make(map[string]struct{}),
@@ -163,6 +167,95 @@ func (r *Result) AddPort(ip string, p *port.Port) {
 
 	r.ipPorts[ip][portIdentity(p)] = p
 	r.ips[ip] = struct{}{}
+	if set := r.closed[ip]; set != nil {
+		set.remove(p)
+	}
+}
+
+// closedSet holds the closed tcp ports of one host as a bitset. A scan of the
+// whole port range finds tens of thousands of closed ports per host, which a
+// map of port pointers would store at about 100 bytes each; the bitset is a
+// fixed 8 KiB per host.
+type closedSet struct {
+	bits  [1 << 10]uint64
+	count int
+}
+
+func closedIndex(p *port.Port) (word int, mask uint64, ok bool) {
+	if p == nil || p.Protocol != protocol.TCP || p.Port < 0 || p.Port > 65535 {
+		return 0, 0, false
+	}
+	return p.Port >> 6, 1 << (uint(p.Port) & 63), true
+}
+
+func (c *closedSet) add(p *port.Port) {
+	if word, mask, ok := closedIndex(p); ok && c.bits[word]&mask == 0 {
+		c.bits[word] |= mask
+		c.count++
+	}
+}
+
+func (c *closedSet) remove(p *port.Port) {
+	if word, mask, ok := closedIndex(p); ok && c.bits[word]&mask != 0 {
+		c.bits[word] &^= mask
+		c.count--
+	}
+}
+
+func (c *closedSet) ports() []*port.Port {
+	out := make([]*port.Port, 0, c.count)
+	for word, w := range &c.bits {
+		for ; w != 0; w &= w - 1 {
+			out = append(out, &port.Port{Port: word<<6 + bits.TrailingZeros64(w), Protocol: protocol.TCP})
+		}
+	}
+	return out
+}
+
+// AddClosedPort records that ip answered the tcp port p with a reset. An open
+// reply wins over a reset whichever arrives first, so AddPort also clears the
+// port here. Ports that are not tcp are ignored.
+func (r *Result) AddClosedPort(ip string, p *port.Port) {
+	if p == nil {
+		return
+	}
+	r.Lock()
+	defer r.Unlock()
+
+	if _, open := r.ipPorts[ip][portIdentity(p)]; open {
+		return
+	}
+	set, ok := r.closed[ip]
+	if !ok {
+		set = &closedSet{}
+		r.closed[ip] = set
+	}
+	set.add(p)
+}
+
+// GetClosedPorts returns the closed ports recorded per ip, in port order.
+func (r *Result) GetClosedPorts() map[string][]*port.Port {
+	r.RLock()
+	defer r.RUnlock()
+
+	out := make(map[string][]*port.Port, len(r.closed))
+	for ip, set := range r.closed {
+		if set.count == 0 {
+			continue
+		}
+		out[ip] = set.ports()
+	}
+	return out
+}
+
+// MergeClosedPorts copies the closed ports of other into r, skipping any port
+// r holds open.
+func (r *Result) MergeClosedPorts(other *Result) {
+	for ip, ports := range other.GetClosedPorts() {
+		for _, p := range ports {
+			r.AddClosedPort(ip, p)
+		}
+	}
 }
 
 // SetPorts for a specific ip
@@ -176,6 +269,9 @@ func (r *Result) SetPorts(ip string, ports []*port.Port) {
 
 	for _, p := range ports {
 		r.ipPorts[ip][portIdentity(p)] = p
+		if set := r.closed[ip]; set != nil {
+			set.remove(p)
+		}
 	}
 	r.ips[ip] = struct{}{}
 }
@@ -350,6 +446,22 @@ func (r *Result) GetHostPortsMap() map[string][]int {
 			portList = append(portList, p.Port)
 		}
 		out[ip] = portList
+	}
+	return out
+}
+
+// GetTCPPortCounts returns how many open tcp ports each ip has.
+func (r *Result) GetTCPPortCounts() map[string]int {
+	r.RLock()
+	defer r.RUnlock()
+
+	out := make(map[string]int, len(r.ipPorts))
+	for ip, ports := range r.ipPorts {
+		for _, p := range ports {
+			if p.Protocol == protocol.TCP {
+				out[ip]++
+			}
+		}
 	}
 	return out
 }

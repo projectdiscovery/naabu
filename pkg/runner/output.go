@@ -56,6 +56,9 @@ type Result struct {
 	// OS fingerprint of the host from nmap OS detection
 	OS    string `json:"os,omitempty" csv:"os"`
 	OSCPE string `json:"os_cpe,omitempty" csv:"os_cpe"`
+
+	// State is set only on -port-state records for non-open ports.
+	State string `json:"state,omitempty" csv:"state"`
 }
 
 // TODO:
@@ -96,6 +99,8 @@ type jsonResult struct {
 
 	OS    string `json:"os,omitempty"`
 	OSCPE string `json:"os_cpe,omitempty"`
+
+	State string `json:"state,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -134,6 +139,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.CPEs = r.CPEs
 	data.OS = r.OS
 	data.OSCPE = r.OSCPE
+	data.State = r.State
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
