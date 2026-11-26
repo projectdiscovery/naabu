@@ -161,7 +161,7 @@ DEBUG:
    -version                  display version of naabu
    -stats                    display stats of the running scan (deprecated)
    -si, -stats-interval int  number of seconds to wait between showing a statistics update (deprecated) (default 5)
-   -mp, -metrics-port int    port to expose naabu metrics on (default 63636)
+   -mp, -metrics-port int    port to expose naabu metrics on (setting it starts the endpoint) (default 63636)
 
 CLOUD:
    -auth                           configure projectdiscovery cloud (pdcp) api key (default true)
@@ -443,7 +443,7 @@ Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80`
 IPs are matched against the CDN and WAF ranges in [cdncheck](https://github.com/projectdiscovery/cdncheck) (for example Cloudflare, Fastly, CloudFront and Imperva Incapsula). Cloud provider ranges are not excluded, unless they also appear in a CDN or WAF range.
 
 # Scan Status
-Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` (the port can be changed via the `-metrics-port` flag)
+Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` when `-metrics-port` is set (for example `-mp 63636`). If the port is taken, naabu picks a free one and logs the URL.
 
 # Using naabu as library
 The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:
