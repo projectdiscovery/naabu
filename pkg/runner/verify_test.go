@@ -81,3 +81,35 @@ func TestConnectVerificationKeepsCappedHosts(t *testing.T) {
 	require.Equal(t, confidence.Low, hostResult.Confidence,
 		"verification must preserve the signal that the scan was truncated")
 }
+
+func TestConnectVerificationKeepsClosedPorts(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	defer func() { _ = ln.Close() }()
+	go func() {
+		for {
+			conn, err := ln.Accept()
+			if err != nil {
+				return
+			}
+			_ = conn.Close()
+		}
+	}()
+
+	scanner, err := scan.NewScanner(&scan.Options{})
+	require.NoError(t, err)
+
+	openP := &port.Port{Port: ln.Addr().(*net.TCPAddr).Port, Protocol: protocol.TCP}
+	scanner.ScanResults.AddPort("127.0.0.1", openP)
+	// a closed port on a host with open ports, and a host with only closed ports
+	scanner.ScanResults.AddClosedPort("127.0.0.1", &port.Port{Port: 1, Protocol: protocol.TCP})
+	scanner.ScanResults.AddClosedPort("127.0.0.2", &port.Port{Port: 2, Protocol: protocol.TCP})
+
+	r := &Runner{scanner: scanner, options: &Options{Rate: 10}}
+	r.ConnectVerification()
+
+	require.True(t, scanner.ScanResults.IPHasPort("127.0.0.1", openP))
+	closed := scanner.ScanResults.GetClosedPorts()
+	require.Len(t, closed["127.0.0.1"], 1, "-verify must not drop the closed ports of a host")
+	require.Len(t, closed["127.0.0.2"], 1, "-verify must keep hosts that only had closed ports")
+}

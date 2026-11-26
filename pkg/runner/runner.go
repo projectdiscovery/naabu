@@ -68,6 +68,11 @@ type Runner struct {
 	// countFiltered is set when -port-state can derive filtered ports; see
 	// enableFilteredCount.
 	countFiltered bool
+	// portStatesFor and portStatesCache memoize portStates for one result set,
+	// since the console, file and nmap outputs all need the same view.
+	portStatesMu    sync.Mutex
+	portStatesFor   *result.Result
+	portStatesCache map[string]hostPortStates
 
 	unique gcache.Cache[string, struct{}]
 
@@ -1281,6 +1286,8 @@ func (r *Runner) ConnectVerification() {
 
 	swg.Wait()
 
+	// verification only re-dials open ports; keep the resets the scan recorded
+	verifiedResult.MergeClosedPorts(r.scanner.ScanResults)
 	r.scanner.ScanResults = verifiedResult
 }
 

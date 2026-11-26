@@ -286,3 +286,50 @@ func TestClosedPorts(t *testing.T) {
 	assert.False(t, res.IPHasPort("203.0.113.7", ssh), "closed ports stay out of the open set")
 	assert.Equal(t, map[string]int{"203.0.113.7": 1}, res.GetTCPPortCounts())
 }
+
+func TestClosedPortsBitset(t *testing.T) {
+	res := NewResult()
+	const ip = "203.0.113.8"
+
+	for _, n := range []int{65535, 0, 1, 64, 63, 22} {
+		res.AddClosedPort(ip, &port.Port{Port: n, Protocol: protocol.TCP})
+	}
+	// duplicates, udp and out of range ports add nothing
+	res.AddClosedPort(ip, &port.Port{Port: 22, Protocol: protocol.TCP})
+	res.AddClosedPort(ip, &port.Port{Port: 53, Protocol: protocol.UDP})
+	res.AddClosedPort(ip, &port.Port{Port: 65536, Protocol: protocol.TCP})
+	res.AddClosedPort(ip, &port.Port{Port: -1, Protocol: protocol.TCP})
+	res.AddClosedPort(ip, nil)
+
+	var got []int
+	for _, p := range res.GetClosedPorts()[ip] {
+		assert.Equal(t, protocol.TCP, p.Protocol)
+		got = append(got, p.Port)
+	}
+	assert.Equal(t, []int{0, 1, 22, 63, 64, 65535}, got, "ports come back in order")
+
+	// SetPorts and AddPort both turn a closed port into an open one
+	res.SetPorts(ip, []*port.Port{{Port: 22, Protocol: protocol.TCP}})
+	res.AddPort(ip, &port.Port{Port: 64, Protocol: protocol.TCP})
+	got = nil
+	for _, p := range res.GetClosedPorts()[ip] {
+		got = append(got, p.Port)
+	}
+	assert.Equal(t, []int{0, 1, 63, 65535}, got)
+}
+
+func TestMergeClosedPorts(t *testing.T) {
+	from := NewResult()
+	from.AddClosedPort("203.0.113.9", &port.Port{Port: 22, Protocol: protocol.TCP})
+	from.AddClosedPort("203.0.113.9", &port.Port{Port: 80, Protocol: protocol.TCP})
+	from.AddClosedPort("203.0.113.10", &port.Port{Port: 25, Protocol: protocol.TCP})
+
+	into := NewResult()
+	into.AddPort("203.0.113.9", &port.Port{Port: 80, Protocol: protocol.TCP})
+	into.MergeClosedPorts(from)
+
+	closed := into.GetClosedPorts()
+	assert.Len(t, closed["203.0.113.9"], 1, "a port the destination holds open is not merged as closed")
+	assert.Equal(t, 22, closed["203.0.113.9"][0].Port)
+	assert.Len(t, closed["203.0.113.10"], 1)
+}

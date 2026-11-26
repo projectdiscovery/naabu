@@ -47,6 +47,16 @@ func (r *Runner) portStates(scanResults *result.Result) map[string]hostPortState
 	if !r.options.PortState {
 		return nil
 	}
+	r.portStatesMu.Lock()
+	defer r.portStatesMu.Unlock()
+	if r.portStatesFor != scanResults {
+		r.portStatesCache = r.computePortStates(scanResults)
+		r.portStatesFor = scanResults
+	}
+	return r.portStatesCache
+}
+
+func (r *Runner) computePortStates(scanResults *result.Result) map[string]hostPortStates {
 	states := make(map[string]hostPortStates)
 	for ip, ports := range scanResults.GetClosedPorts() {
 		states[ip] = hostPortStates{closed: sortedPorts(ports), filtered: -1}

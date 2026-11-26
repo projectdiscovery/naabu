@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/Mzack9999/gopacket/layers"
+	"github.com/projectdiscovery/naabu/v2/pkg/port"
+	"github.com/projectdiscovery/naabu/v2/pkg/protocol"
 	"github.com/stretchr/testify/require"
 )
 
@@ -164,4 +166,101 @@ func TestTransportReaderHostDiscoveryIgnoresDecoy(t *testing.T) {
 		"host discovery treats any reply as proof of life")
 	require.Nil(t, received(t, handler.TcpChan),
 		"no port may be recorded during host discovery")
+}
+
+// rstFrom builds the reset a closed port answers a SYN probe with, which
+// acknowledges the probe's sequence number like a SYN-ACK does.
+func rstFrom(responderPort, localPort int) layers.TCP {
+	return layers.TCP{
+		SrcPort: layers.TCPPort(responderPort),
+		DstPort: layers.TCPPort(localPort),
+		RST:     true,
+		ACK:     true,
+		Ack:     SynCookie(net.ParseIP(testResponderIP), uint16(responderPort), uint16(localPort)) + 1,
+	}
+}
+
+func TestTransportReaderReportsReset(t *testing.T) {
+	const (
+		localPort     = 31339
+		responderPort = 8081
+	)
+
+	cases := []struct {
+		name         string
+		reportClosed bool
+		phase        State
+		tcp          layers.TCP
+		want         bool
+		why          string
+	}{
+		{
+			name:         "cookie-valid reset is reported as closed",
+			reportClosed: true,
+			phase:        Scan,
+			tcp:          rstFrom(responderPort, localPort),
+			want:         true,
+			why:          "a reset that acknowledges our probe is a closed port",
+		},
+		{
+			name:  "reset is ignored without -port-state",
+			phase: Scan,
+			tcp:   rstFrom(responderPort, localPort),
+			why:   "most ports are closed and would flood the channel",
+		},
+		{
+			name:         "reset with a wrong cookie is dropped",
+			reportClosed: true,
+			phase:        Scan,
+			tcp: func() layers.TCP {
+				tcp := rstFrom(responderPort, localPort)
+				tcp.Ack++
+				return tcp
+			}(),
+			why: "an unsolicited reset must not be recorded",
+		},
+		{
+			name:         "reset during host discovery is not a port result",
+			reportClosed: true,
+			phase:        HostDiscovery,
+			tcp:          rstFrom(responderPort, localPort),
+			why:          "host discovery only learns the host is alive",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			handler := registerTestHandler(t, localPort, tc.phase)
+			handler.ReportClosed = tc.reportClosed
+
+			transportReaderCallback(tc.tcp, layers.UDP{}, testResponderIP, "")
+
+			result := received(t, handler.TcpChan)
+			if !tc.want {
+				require.Nil(t, result, tc.why)
+				return
+			}
+			require.NotNil(t, result, tc.why)
+			require.True(t, result.closed)
+			require.Equal(t, responderPort, result.port.Port)
+			require.Equal(t, testResponderIP, result.ipv4)
+		})
+	}
+}
+
+func TestAddClosedRecordsOnlyDuringScan(t *testing.T) {
+	scanner, err := NewScanner(&Options{})
+	require.NoError(t, err)
+	reset := &PkgResult{ipv4: testResponderIP, port: &port.Port{Port: 8082, Protocol: protocol.TCP}, closed: true}
+
+	scanner.ListenHandler.Phase.Set(HostDiscovery)
+	scanner.addClosed(reset)
+	require.Empty(t, scanner.ScanResults.GetClosedPorts(), "a reset outside the scan phase is not recorded")
+
+	scanner.ListenHandler.Phase.Set(Scan)
+	scanner.addClosed(reset)
+	closed := scanner.ScanResults.GetClosedPorts()[testResponderIP]
+	require.Len(t, closed, 1)
+	require.Equal(t, 8082, closed[0].Port)
+	require.False(t, scanner.ScanResults.IPHasPort(testResponderIP, reset.port), "closed ports stay out of the open set")
 }
