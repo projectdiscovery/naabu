@@ -35,27 +35,30 @@ type Result struct {
 
 	// TODO: flattening fields should be fully reworked to reuse nested structs
 	// just add the service flat structure
-	DeviceType  string   `json:"device_type,omitempty"`
-	ExtraInfo   string   `json:"extra_info,omitempty"`
-	HighVersion string   `json:"high_version,omitempty"`
-	Hostname    string   `json:"hostname,omitempty"`
-	LowVersion  string   `json:"low_version,omitempty"`
-	Method      string   `json:"method,omitempty"`
-	Name        string   `json:"name,omitempty"`
-	OSType      string   `json:"os_type,omitempty"`
-	Product     string   `json:"product,omitempty"`
-	Proto       string   `json:"proto,omitempty"`
-	RPCNum      string   `json:"rpc_num,omitempty"`
+	DeviceType  string   `json:"device_type,omitempty" csv:"device_type"`
+	ExtraInfo   string   `json:"extra_info,omitempty" csv:"extra_info"`
+	HighVersion string   `json:"high_version,omitempty" csv:"high_version"`
+	Hostname    string   `json:"hostname,omitempty" csv:"hostname"`
+	LowVersion  string   `json:"low_version,omitempty" csv:"low_version"`
+	Method      string   `json:"method,omitempty" csv:"method"`
+	Name        string   `json:"name,omitempty" csv:"name"`
+	OSType      string   `json:"os_type,omitempty" csv:"os_type"`
+	Product     string   `json:"product,omitempty" csv:"product"`
+	Proto       string   `json:"proto,omitempty" csv:"proto"`
+	RPCNum      string   `json:"rpc_num,omitempty" csv:"rpc_num"`
 	Banner      string   `json:"banner,omitempty" csv:"banner"`
-	ServiceFP   string   `json:"service_fp,omitempty"`
-	Tunnel      string   `json:"tunnel,omitempty"`
-	Version     string   `json:"version,omitempty"`
-	Confidence  int      `json:"confidence,omitempty"`
+	ServiceFP   string   `json:"service_fp,omitempty" csv:"service_fp"`
+	Tunnel      string   `json:"tunnel,omitempty" csv:"tunnel"`
+	Version     string   `json:"version,omitempty" csv:"version"`
+	Confidence  int      `json:"confidence,omitempty" csv:"confidence"`
 	CPEs        []string `json:"cpes,omitempty" csv:"cpes"`
 
 	// OS fingerprint of the host from nmap OS detection
 	OS    string `json:"os,omitempty" csv:"os"`
 	OSCPE string `json:"os_cpe,omitempty" csv:"os_cpe"`
+
+	// State is set only on -port-state records for non-open ports.
+	State string `json:"state,omitempty" csv:"state"`
 }
 
 // TODO:
@@ -96,6 +99,8 @@ type jsonResult struct {
 
 	OS    string `json:"os,omitempty"`
 	OSCPE string `json:"os_cpe,omitempty"`
+
+	State string `json:"state,omitempty"`
 }
 
 func (r *Result) JSON(excludedFields []string) ([]byte, error) {
@@ -134,6 +139,7 @@ func (r *Result) JSON(excludedFields []string) ([]byte, error) {
 	data.CPEs = r.CPEs
 	data.OS = r.OS
 	data.OSCPE = r.OSCPE
+	data.State = r.State
 
 	if len(excludedFields) == 0 {
 		return json.Marshal(data)
@@ -166,11 +172,26 @@ func (r *Result) CSVHeaders(excludedFields []string) ([]string, error) {
 	for i := 0; i < ty.NumField(); i++ {
 		field := ty.Field(i)
 		csvTag := field.Tag.Get("csv")
-		if !stringSliceContains(headers, csvTag) && !stringSliceContains(excludedFields, csvTag) {
+		if csvTag == "" {
+			continue
+		}
+		if !stringSliceContains(headers, csvTag) && !isExcludedCSVField(excludedFields, field.Name, csvTag) {
 			headers = append(headers, csvTag)
 		}
 	}
 	return headers, nil
+}
+
+// isExcludedCSVField reports whether -eof names the field, either as -lof
+// lists it (the field name, case-insensitive like the JSON filter) or by its
+// csv tag.
+func isExcludedCSVField(excludedFields []string, fieldName, csvTag string) bool {
+	for _, excluded := range excludedFields {
+		if strings.EqualFold(excluded, fieldName) || strings.EqualFold(excluded, csvTag) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
@@ -187,7 +208,7 @@ func (r *Result) CSVFields(excludedFields []string) ([]string, error) {
 	for i := 0; i < vl.NumField(); i++ {
 		field := vl.Field(i)
 		csvTag := ty.Field(i).Tag.Get("csv")
-		if stringSliceContains(headers, csvTag) {
+		if csvTag != "" && stringSliceContains(headers, csvTag) {
 			var fieldStr string
 			if ty.Field(i).Name == "CPEs" {
 				fieldStr = strings.Join(data.CPEs, ";")

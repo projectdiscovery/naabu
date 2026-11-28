@@ -234,3 +234,23 @@ func TestTierInternalOrderStaysRandomised(t *testing.T) {
 	}
 	require.Less(t, longest, 10, "probes within a tier must not walk ports in order")
 }
+
+// TestTierOrderSpreadsAdjacentPortsWithRealSeed guards #1835. The scan seeds
+// Blackrock with time.Now().UnixNano(), and blackrock v0.0.2 lost the low bits
+// of its round function for seeds that large. For the full range, tier 2 splits
+// as 253x256, so the power-of-two half stopped mixing and adjacent ports were
+// probed back to back, all in flight before -pts could skip the host.
+func TestTierOrderSpreadsAdjacentPortsWithRealSeed(t *testing.T) {
+	ports := fullRangePorts(t)
+	tiers := buildPortTiers(ports, true)
+	order := simulateTierOrder(ports, tiers, 1, 1795021861000000000)
+
+	first, last := len(order), 0
+	for i, probe := range order {
+		if probe.Port >= 40000 && probe.Port < 40030 {
+			first = min(first, i)
+			last = max(last, i)
+		}
+	}
+	require.Greater(t, last-first, len(order)/4, "adjacent ports must be spread across the scan")
+}

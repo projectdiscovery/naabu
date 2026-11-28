@@ -2,6 +2,7 @@ package runner
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"strings"
 	"testing"
@@ -136,6 +137,81 @@ func TestWriteJSONOutputWithServiceInfo(t *testing.T) {
 	cpes := cpesRaw.([]interface{})
 	assert.Len(t, cpes, 1)
 	assert.Equal(t, "cpe:/a:openbsd:openssh:8.9", cpes[0])
+}
+
+// Every CSV row must have one value per header, with the service fields under
+// their own columns.
+func TestWriteCsvOutputHeaderMatchesRows(t *testing.T) {
+	ports := []*port.Port{
+		{
+			Port:     22,
+			Protocol: protocol.TCP,
+			Service: &port.Service{
+				Name:    "ssh",
+				Product: "OpenSSH",
+				Banner:  "SSH-2.0-OpenSSH_8.9",
+			},
+		},
+	}
+
+	resetCSVHeaders(t)
+	var buf bytes.Buffer
+	require.NoError(t, WriteCsvOutput("example.com", "93.184.216.34", ports, false, false, "", true, nil, &buf))
+
+	records, err := csv.NewReader(&buf).ReadAll()
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	header, row := records[0], records[1]
+	require.Len(t, row, len(header))
+	require.NotContains(t, header, "")
+
+	column := func(name string) string {
+		for i, h := range header {
+			if h == name {
+				return row[i]
+			}
+		}
+		t.Fatalf("no %q column in %v", name, header)
+		return ""
+	}
+	assert.Equal(t, "22", column("port"))
+	assert.Equal(t, "ssh", column("name"))
+	assert.Equal(t, "OpenSSH", column("product"))
+	assert.Equal(t, "SSH-2.0-OpenSSH_8.9", column("banner"))
+}
+
+// -eof drops a CSV column whether it names the field as -lof lists it
+// ("devicetype"), in any case ("MacAddress"), or by its csv tag ("product").
+func TestWriteCsvOutputExcludedFields(t *testing.T) {
+	ports := []*port.Port{
+		{
+			Port:     22,
+			Protocol: protocol.TCP,
+			Service:  &port.Service{Name: "ssh", Product: "OpenSSH", DeviceType: "router"},
+		},
+	}
+
+	resetCSVHeaders(t)
+	var buf bytes.Buffer
+	require.NoError(t, WriteCsvOutput("example.com", "93.184.216.34", ports, false, false, "", true, []string{"devicetype", "MacAddress", "product"}, &buf))
+
+	records, err := csv.NewReader(&buf).ReadAll()
+	require.NoError(t, err)
+	require.Len(t, records, 2)
+	header, row := records[0], records[1]
+	require.Len(t, row, len(header))
+	require.NotContains(t, header, "device_type")
+	require.NotContains(t, header, "mac_address")
+	require.NotContains(t, header, "product")
+	require.Contains(t, header, "name")
+}
+
+// resetCSVHeaders clears the package-level CSV header list for one test.
+func resetCSVHeaders(t *testing.T) {
+	t.Helper()
+	saved := headers
+	headers = []string{}
+	t.Cleanup(func() { headers = saved })
 }
 
 func TestWriteJSONOutputWithoutService(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -49,6 +50,22 @@ func init() {
 	// scan via ensureRawInfra.
 	buildHandlerFn = buildListenHandler
 	ensureRawInfraFn = ensureRawInfra
+	captureDropsFn = captureDrops
+}
+
+func captureDrops() uint64 {
+	rawInfraMu.Lock()
+	defer rawInfraMu.Unlock()
+	if !rawInfraOK || handlers == nil {
+		return 0
+	}
+	var dropped uint64
+	for _, h := range slices.Concat(handlers.TransportActive, handlers.LoopbackHandlers, handlers.EthernetActive) {
+		if stats, err := h.Stats(); err == nil {
+			dropped += uint64(stats.PacketsDropped)
+		}
+	}
+	return dropped
 }
 
 var (
@@ -987,6 +1004,14 @@ func transportReaderCallback(tcp layers.TCP, udp layers.UDP, srcIP4, srcIP6 stri
 			}
 			select {
 			case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}}:
+			case <-listenHandler.done:
+			}
+		case tcpPortMatches && tcp.RST && listenHandler.ReportClosed:
+			if !verifySynCookie(srcIP4, srcIP6, uint16(tcp.SrcPort), uint16(tcp.DstPort), tcp.Ack) {
+				continue
+			}
+			select {
+			case listenHandler.TcpChan <- &PkgResult{ipv4: srcIP4, ipv6: srcIP6, port: &port.Port{Port: int(tcp.SrcPort), Protocol: protocol.TCP}, closed: true}:
 			case <-listenHandler.done:
 			}
 		case udpPortMatches && udp.Length > 0: // needs a better matching of udp payloads

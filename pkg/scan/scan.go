@@ -9,6 +9,7 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/projectdiscovery/cdncheck"
@@ -129,6 +130,9 @@ type Scanner struct {
 	// also pushes the value into the ListenHandler so the raw send
 	// path sees it.
 	UDPProbeProvider UDPProbeProvider
+	// LocalDialFailures counts connect probes that failed for lack of local
+	// sockets or source ports, which hides open ports as closed.
+	LocalDialFailures atomic.Uint64
 }
 
 // PkgSend is a TCP package
@@ -142,10 +146,11 @@ type PkgSend struct {
 
 // PkgResult contains the results of sending TCP packages
 type PkgResult struct {
-	ipv4 string
-	ipv6 string
-	port *port.Port
-	mac  string
+	ipv4   string
+	ipv6   string
+	port   *port.Port
+	mac    string
+	closed bool
 }
 
 var (
@@ -335,6 +340,10 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case ip := <-s.ListenHandler.TcpChan:
+			if ip.closed {
+				s.addClosed(ip)
+				continue
+			}
 			// Reply authenticity is enforced upstream by the SYN-cookie check
 			// in the raw read path: a SYN-ACK only reaches this channel if its
 			// Ack matched the cookie we encoded into the probe's sequence
@@ -370,6 +379,18 @@ func (s *Scanner) TCPResultWorker(ctx context.Context) {
 				}
 			}
 		}
+	}
+}
+
+func (s *Scanner) addClosed(ip *PkgResult) {
+	if !s.ListenHandler.Phase.Is(Scan) && !s.stream {
+		return
+	}
+	if ip.ipv4 != "" {
+		s.ScanResults.AddClosedPort(ip.ipv4, ip.port)
+	}
+	if ip.ipv6 != "" {
+		s.ScanResults.AddClosedPort(ip.ipv6, ip.port)
 	}
 }
 
@@ -464,6 +485,7 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 		}
 		conn, err = proxyDialer.DialContext(ctx, p.Protocol.String(), hostport)
 		if err != nil {
+			s.countLocalFailure(err)
 			return false, err
 		}
 	} else {
@@ -478,6 +500,7 @@ func (s *Scanner) ConnectPort(host, payload string, p *port.Port, timeout time.D
 		conn, err = netDialer.Dial(p.Protocol.String(), hostport)
 	}
 	if err != nil {
+		s.countLocalFailure(err)
 		return false, err
 	}
 	defer func() {

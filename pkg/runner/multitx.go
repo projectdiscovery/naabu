@@ -79,6 +79,7 @@ func (r *Runner) runFastTx(ctx context.Context, b *blackrock.BlackRock, rng, ind
 		go func(worker int, sender *SYNSender) {
 			defer wg.Done()
 			pace := newPacer(rateForWorker(r.options.Rate, n, worker))
+			pace.flush = sender.flushQueued
 			forEachWorkerIndex(worker, n, rng, func(index int64) bool {
 				select {
 				case <-ctx.Done():
@@ -191,7 +192,9 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 			if !r.canIScanIfCDN(ip, port) {
 				return
 			}
-			pace.wait()
+			if !pace.wait(ctx) {
+				return
+			}
 			if err := sender.send(dstIP4, srcSum, uint16(port.Port)); err != nil {
 				if isCongestion(err) {
 					pace.onCongestion()
@@ -199,7 +202,7 @@ func (r *Runner) fastScanIndex(ctx context.Context, b *blackrock.BlackRock, inde
 				gologger.Debug().Msgf("fast send error %s:%d: %s\n", ip, port.Port, err)
 			}
 		} else {
-			r.RawSocketEnumeration(ctx, ip, port)
+			r.enumerateRaw(ctx, ip, port, rawWait(pace, r.takeLimiter))
 		}
 	} else {
 		r.wgscan.Add()

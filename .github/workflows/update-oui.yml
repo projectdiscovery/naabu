@@ -1,8 +1,6 @@
 name: 🔄 Update OUI Database
 
 on:
-  release:
-    types: [published]
   schedule:
     # refresh monthly so the embedded vendor data does not drift
     - cron: "0 4 1 * *"
@@ -17,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+        with:
+          ref: dev
       - uses: projectdiscovery/actions/setup/go@v1
 
       - name: Regenerate embedded OUI dataset
@@ -36,5 +36,6 @@ jobs:
 
             Regenerated with `go generate ./pkg/macvendor/...`.
           branch: chore/update-oui-db
+          base: dev
           add-paths: pkg/macvendor/oui.dat.gz
           delete-branch: true

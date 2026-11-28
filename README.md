@@ -92,6 +92,7 @@ OUTPUT:
    -oX, -xml-output string                write nmap-compatible XML output to file (- for stdout)
    -oG, -grep-output string               write nmap-compatible greppable output to file (- for stdout)
    -oA, -output-all string                write json, xml and greppable output to <basename>.{json,xml,gnmap}
+   -port-state                            also report closed and filtered tcp ports
 
 SERVICES-DISCOVERY:
    -sD, -service-discovery           identify services by port number
@@ -142,6 +143,7 @@ OPTIMIZATION:
    -retries int                    number of retries for the port scan (default 3)
    -timeout value                  time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds) (default 1s)
    -warm-up-time int               time in seconds between scan phases (default 2)
+   -mrt, -max-runtime value        stop sending port scan probes after this long and report results so far (e.g. 10m)
    -T, -timing int                 timing template, higher is faster (0-5) (default 3)
    -ping                           ping probes for verification of host
    -verify                         validate the ports again with TCP verification
@@ -160,7 +162,7 @@ DEBUG:
    -version                  display version of naabu
    -stats                    display stats of the running scan (deprecated)
    -si, -stats-interval int  number of seconds to wait between showing a statistics update (deprecated) (default 5)
-   -mp, -metrics-port int    port to expose naabu metrics on (default 63636)
+   -mp, -metrics-port int    port to expose naabu metrics on (setting it starts the endpoint) (default 63636)
 
 CLOUD:
    -auth                           configure projectdiscovery cloud (pdcp) api key (default true)
@@ -439,10 +441,10 @@ Notes:
 
 Naabu also supports excluding CDN/WAF IPs being port scanned. If used, only `80` and `443` ports get scanned for those IPs. This feature can be enabled by using `exclude-cdn` flag.
 
-Currently `cloudflare`, `akamai`, `incapsula` and `sucuri` IPs are supported for exclusions.
+IPs are matched against the CDN and WAF ranges in [cdncheck](https://github.com/projectdiscovery/cdncheck) (for example Cloudflare, Fastly, CloudFront and Imperva Incapsula). Cloud provider ranges are not excluded, unless they also appear in a CDN or WAF range.
 
 # Scan Status
-Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` (the port can be changed via the `-metrics-port` flag)
+Naabu exposes json scan info on a local port bound to localhost at `http://localhost:63636/metrics` when `-metrics-port` is set (for example `-mp 63636`). If the port is taken, naabu picks a free one and logs the URL.
 
 # Using naabu as library
 The following sample program scan the port `80` of `scanme.sh`. The results are returned via the `OnResult` callback:

@@ -32,7 +32,7 @@ type Engine struct {
 	matchCache     sync.Map // response hash → *matchCacheEntry (avoids re-matching identical banners)
 }
 
-// StreamResult is emitted by FingerprintStream for each identified service.
+// StreamResult is emitted by FingerprintStream for each completed target. Service is nil when no probe matched.
 type StreamResult struct {
 	IP      string
 	Port    int
@@ -108,8 +108,8 @@ func (e *Engine) Fingerprint(ctx context.Context, targets []Target) map[string]*
 	return results
 }
 
-// FingerprintStream processes targets from a channel and emits results as
-// they're identified. This enables pipeline fingerprinting: the caller can
+// FingerprintStream processes targets from a channel and emits completed results,
+// including targets without a service match. The caller can
 // feed targets as ports are discovered during scanning, overlapping the scan
 // and fingerprint phases to eliminate idle time between them.
 func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <-chan StreamResult {
@@ -125,17 +125,14 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 					return
 				}
 				r := e.fingerprintOne(ctx, t)
+				sr := StreamResult{IP: t.IP, Port: t.Port}
 				if r != nil {
-					sr := StreamResult{
-						IP:      t.IP,
-						Port:    t.Port,
-						Service: r.ToService(),
-					}
-					select {
-					case results <- sr:
-					case <-ctx.Done():
-						return
-					}
+					sr.Service = r.ToService()
+				}
+				select {
+				case results <- sr:
+				case <-ctx.Done():
+					return
 				}
 			}
 		}()
@@ -157,8 +154,9 @@ func (e *Engine) FingerprintStream(ctx context.Context, targets <-chan Target) <
 // eliminates the sequential bottleneck where HTTP targets wait 6s for NULL
 // to timeout before GetRequest even starts.
 //
-// Phase 2 (sequential): remaining non-hinted probes run one at a time, sorted
-// by rarity. Skipped entirely in fast mode.
+// Phase 2: non-hinted probes run in batches of four, sorted by rarity. A unique
+// softmatched service narrows later batches; conflicting softmatches keep the
+// full search. Skipped entirely in fast mode.
 func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	if e.db == nil || len(e.db.Probes) == 0 {
 		return nil
@@ -185,6 +183,17 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 
 	var softResult *MatchResult
 	var softTLS bool
+	var conflictingSoftmatches bool
+	rememberSoftmatch := func(soft *MatchResult, tls bool) {
+		if soft == nil {
+			return
+		}
+		if softResult == nil {
+			softResult, softTLS = soft, tls
+		} else if strings.TrimPrefix(softResult.Service, "ssl/") != strings.TrimPrefix(soft.Service, "ssl/") {
+			conflictingSoftmatches = true
+		}
+	}
 	var wrappedResult *MatchResult
 
 	if len(hinted) > 0 {
@@ -221,10 +230,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 				probeCancel()
 				return matchResultToResult(r.hard, r.tls, "")
 			}
-			if r.soft != nil && softResult == nil {
-				softResult = r.soft
-				softTLS = r.tls
-			}
+			rememberSoftmatch(r.soft, r.tls)
 		}
 		probeCancel()
 	}
@@ -233,15 +239,31 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	// Instead of connecting sequentially (each waiting for its own handshake),
 	// batches of probes dial concurrently so only one RTT is paid per batch.
 	const fallbackBatchSize = 4
-	for i := 0; i < len(fallback); i += fallbackBatchSize {
+	var skipped []*ServiceProbe
+	for i := 0; i < len(fallback) || (conflictingSoftmatches && len(skipped) > 0); {
 		if ctx.Err() != nil {
 			break
 		}
-		end := i + fallbackBatchSize
-		if end > len(fallback) {
-			end = len(fallback)
+		// A later conflict invalidates the earlier narrowing decision. Retry
+		// only candidates that were skipped, never probes already sent.
+		if conflictingSoftmatches && len(skipped) > 0 {
+			fallback = append(skipped, fallback[i:]...)
+			skipped = nil
+			i = 0
 		}
-		batch := fallback[i:end]
+		batch := make([]*ServiceProbe, 0, fallbackBatchSize)
+		for i < len(fallback) && len(batch) < fallbackBatchSize {
+			sp := fallback[i]
+			i++
+			if softResult == nil || conflictingSoftmatches || e.probeSupportsService(sp, softResult.Service) {
+				batch = append(batch, sp)
+			} else {
+				skipped = append(skipped, sp)
+			}
+		}
+		if len(batch) == 0 {
+			break
+		}
 
 		if len(batch) == 1 {
 			sp := batch[0]
@@ -257,10 +279,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 			if result != nil {
 				return matchResultToResult(result, useTLS, "")
 			}
-			if soft != nil && softResult == nil {
-				softResult = soft
-				softTLS = useTLS
-			}
+			rememberSoftmatch(soft, useTLS)
 			continue
 		}
 
@@ -287,10 +306,7 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 				batchCancel()
 				return matchResultToResult(r.hard, r.tls, "")
 			}
-			if r.soft != nil && softResult == nil {
-				softResult = r.soft
-				softTLS = r.tls
-			}
+			rememberSoftmatch(r.soft, r.tls)
 		}
 		batchCancel()
 	}
@@ -304,6 +320,35 @@ func (e *Engine) fingerprintOne(ctx context.Context, t Target) *Result {
 	}
 
 	return nil
+}
+
+// probeSupportsService checks rules belonging to the probe and its explicit
+// fallbacks. The implicit NULL fallback must not qualify every unrelated probe.
+func (e *Engine) probeSupportsService(sp *ServiceProbe, service string) bool {
+	service = strings.TrimPrefix(service, "ssl/")
+	// A generic SSL softmatch identifies a tunnel, not the service behind it.
+	if service == "ssl" {
+		return true
+	}
+	supports := func(p *ServiceProbe) bool {
+		for _, matches := range [][]*Match{p.Matches, p.SoftMatches} {
+			for _, m := range matches {
+				if strings.TrimPrefix(m.Service, "ssl/") == service {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	if supports(sp) {
+		return true
+	}
+	for _, name := range strings.Split(sp.Fallback, ",") {
+		if fb := e.findProbe(strings.TrimSpace(name)); fb != nil && supports(fb) {
+			return true
+		}
+	}
+	return false
 }
 
 // classifyProbes splits probes into hinted (run in parallel) and fallback

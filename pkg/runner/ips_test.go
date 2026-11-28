@@ -60,6 +60,34 @@ func TestIsExcluded(t *testing.T) {
 	}
 }
 
+func TestIsExcludedNonUnicast(t *testing.T) {
+	r, err := NewRunner(&Options{})
+	require.NoError(t, err)
+	defer r.Close() //nolint:errcheck
+
+	tests := map[string]bool{
+		"0.0.0.0":         true,
+		"0.0.0.1":         true,
+		"224.0.0.1":       true,
+		"239.255.255.250": true,
+		"240.0.0.1":       true,
+		"255.255.255.255": true,
+		"::":              true,
+		"ff02::1":         true,
+		"10.0.0.1":        false,
+		"127.0.0.1":       false,
+		"169.254.169.254": false,
+		"192.168.1.1":     false,
+		"8.8.8.8":         false,
+		"::1":             false,
+		"fe80::1":         false,
+		"2606:4700::1111": false,
+	}
+	for ip, want := range tests {
+		require.Equal(t, want, r.isExcluded(ip), ip)
+	}
+}
+
 func TestIsIpOrCidr(t *testing.T) {
 	valid := []string{"1.1.1.1", "2.2.2.2", "1.1.1.0/24"}
 	invalid := []string{"1.1.1.1.1", "a.a.a.a", "77"}

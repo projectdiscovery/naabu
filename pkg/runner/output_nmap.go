@@ -27,6 +27,9 @@ type nmapHostData struct {
 	mac      string
 	macVnd   string
 	ports    []*port.Port
+	// closed and filtered come from -port-state.
+	closed   []*port.Port
+	filtered int
 }
 
 // --- XML schema (subset of nmap's DTD, enough for common consumers) ---
@@ -77,7 +80,19 @@ type xmlHostname struct {
 }
 
 type xmlPorts struct {
-	Ports []xmlPort `xml:"port"`
+	Extra []xmlExtraPorts `xml:"extraports,omitempty"`
+	Ports []xmlPort       `xml:"port"`
+}
+
+type xmlExtraPorts struct {
+	State   string           `xml:"state,attr"`
+	Count   int              `xml:"count,attr"`
+	Reasons []xmlExtraReason `xml:"extrareasons"`
+}
+
+type xmlExtraReason struct {
+	Reason string `xml:"reason,attr"`
+	Count  int    `xml:"count,attr"`
 }
 
 type xmlPort struct {
@@ -152,6 +167,10 @@ func newXMLService(svc *port.Service) *xmlService {
 	}
 }
 
+func newXMLExtraPorts(state, reason string, count int) xmlExtraPorts {
+	return xmlExtraPorts{State: state, Count: count, Reasons: []xmlExtraReason{{Reason: reason, Count: count}}}
+}
+
 // writeNmapXML renders hosts as an nmap-compatible XML document.
 func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end time.Time) error {
 	run := xmlRun{
@@ -170,6 +189,8 @@ func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end
 		hostReason := "user-set"
 		if len(h.ports) > 0 {
 			hostReason = "syn-ack"
+		} else if len(h.closed) > 0 {
+			hostReason = reasonReset
 		}
 		xh := xmlHost{
 			Status:    xmlStatus{State: "up", Reason: hostReason},
@@ -181,8 +202,14 @@ func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end
 		if h.hostname != "" && h.hostname != h.ip {
 			xh.Hostnames = &xmlHostnames{Hostnames: []xmlHostname{{Name: h.hostname, Type: "user"}}}
 		}
-		if len(h.ports) > 0 {
+		if len(h.ports) > 0 || len(h.closed) > 0 || h.filtered > 0 {
 			xp := &xmlPorts{}
+			if h.filtered > 0 {
+				xp.Extra = append(xp.Extra, newXMLExtraPorts(stateFiltered, reasonNoReply, h.filtered))
+			}
+			if len(h.closed) > collapseThreshold {
+				xp.Extra = append(xp.Extra, newXMLExtraPorts(stateClosed, reasonReset, len(h.closed)))
+			}
 			for _, p := range h.ports {
 				// nmap reports the probe that elicited the reply; a UDP open port
 				// is confirmed by a udp-response, not a syn-ack.
@@ -193,9 +220,19 @@ func writeNmapXML(w io.Writer, hosts []nmapHostData, scanType string, start, end
 				xp.Ports = append(xp.Ports, xmlPort{
 					Protocol: p.Protocol.String(),
 					PortID:   p.Port,
-					State:    xmlPortState{State: "open", Reason: reason},
+					State:    xmlPortState{State: stateOpen, Reason: reason},
 					Service:  newXMLService(p.Service),
 				})
+			}
+			if len(h.closed) <= collapseThreshold {
+				for _, p := range h.closed {
+					xp.Ports = append(xp.Ports, xmlPort{
+						Protocol: p.Protocol.String(),
+						PortID:   p.Port,
+						State:    xmlPortState{State: stateClosed, Reason: reasonReset},
+					})
+				}
+				sort.SliceStable(xp.Ports, func(i, j int) bool { return xp.Ports[i].PortID < xp.Ports[j].PortID })
 			}
 			xh.Ports = xp
 		}
@@ -241,13 +278,17 @@ func writeGreppable(w io.Writer, hosts []nmapHostData, start, end time.Time) err
 		if name == "" {
 			name = h.ip
 		}
-		if len(h.ports) == 0 {
+		if len(h.ports) == 0 && len(h.closed) == 0 && h.filtered <= 0 {
 			if _, err := fmt.Fprintf(w, "Host: %s (%s)\tStatus: Up\n", h.ip, name); err != nil {
 				return err
 			}
 			continue
 		}
-		var parts []string
+		type entry struct {
+			port int
+			text string
+		}
+		var entries []entry
 		for _, p := range h.ports {
 			svcName := ""
 			version := ""
@@ -256,9 +297,29 @@ func writeGreppable(w io.Writer, hosts []nmapHostData, start, end time.Time) err
 				version = grepSanitize(strings.TrimSpace(p.Service.Product + " " + p.Service.Version))
 			}
 			// portid/state/protocol/owner/service/rpc/version
-			parts = append(parts, fmt.Sprintf("%d/open/%s//%s//%s/", p.Port, p.Protocol.String(), svcName, version))
+			entries = append(entries, entry{p.Port, fmt.Sprintf("%d/open/%s//%s//%s/", p.Port, p.Protocol.String(), svcName, version)})
 		}
-		if _, err := fmt.Fprintf(w, "Host: %s (%s)\tPorts: %s\n", h.ip, name, strings.Join(parts, ", ")); err != nil {
+		ignoredState, ignored := stateFiltered, h.filtered
+		// Greppable output has room for one ignored state. Filtered takes it
+		// whenever there is any, since it can only be a count; closed ports
+		// are then listed.
+		if h.filtered == 0 && len(h.closed) > collapseThreshold {
+			ignoredState, ignored = stateClosed, len(h.closed)
+		} else {
+			for _, p := range h.closed {
+				entries = append(entries, entry{p.Port, fmt.Sprintf("%d/closed/%s/////", p.Port, p.Protocol.String())})
+			}
+		}
+		sort.SliceStable(entries, func(i, j int) bool { return entries[i].port < entries[j].port })
+		parts := make([]string, 0, len(entries))
+		for _, e := range entries {
+			parts = append(parts, e.text)
+		}
+		line := fmt.Sprintf("Host: %s (%s)\tPorts: %s", h.ip, name, strings.Join(parts, ", "))
+		if ignored > 0 {
+			line += fmt.Sprintf("\tIgnored State: %s (%d)", ignoredState, ignored)
+		}
+		if _, err := fmt.Fprintln(w, line); err != nil {
 			return err
 		}
 	}
@@ -299,11 +360,34 @@ func (r *Runner) collectNmapHosts(scanResults *result.Result) []nmapHostData {
 			})
 		}
 	}
+	hosts = r.addPortStates(hosts, r.portStates(scanResults))
 	// The result store is map-backed, so host and port order is otherwise random
 	// per run; sort for reproducible output (and to match nmap's ordering).
 	sort.Slice(hosts, func(i, j int) bool {
 		return compareIPStrings(hosts[i].ip, hosts[j].ip) < 0
 	})
+	return hosts
+}
+
+// addPortStates merges -port-state results into hosts, adding the hosts that
+// answered only with resets.
+func (r *Runner) addPortStates(hosts []nmapHostData, states map[string]hostPortStates) []nmapHostData {
+	index := make(map[string]int, len(hosts))
+	for i, h := range hosts {
+		index[h.ip] = i
+	}
+	for ip, s := range states {
+		if !ipMatchesIpVersions(ip, r.options.IPVersion...) {
+			continue
+		}
+		i, ok := index[ip]
+		if !ok {
+			hosts = append(hosts, nmapHostData{ip: ip, hostname: r.primaryHostname(ip)})
+			i = len(hosts) - 1
+		}
+		hosts[i].closed = s.closed
+		hosts[i].filtered = max(s.filtered, 0)
+	}
 	return hosts
 }
 

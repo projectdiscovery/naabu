@@ -3,6 +3,7 @@ package scan
 import (
 	"log"
 	"net"
+	"syscall"
 	"testing"
 
 	"github.com/projectdiscovery/naabu/v2/pkg/port"
@@ -45,4 +46,16 @@ func TestConnectVerify(t *testing.T) {
 	}
 	got := s.ConnectVerify("localhost", targetPorts)
 	assert.EqualValues(t, wanted, got)
+}
+
+func TestIsRefused(t *testing.T) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	assert.NoError(t, err)
+	addr := l.Addr().String()
+	assert.NoError(t, l.Close())
+
+	_, err = net.Dial("tcp", addr)
+	assert.True(t, IsRefused(err), "a dial to a closed local port is refused: %v", err)
+	assert.False(t, IsRefused(nil))
+	assert.False(t, IsRefused(syscall.ETIMEDOUT))
 }

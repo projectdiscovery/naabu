@@ -48,9 +48,14 @@ type Options struct {
 
 	Retries int // Retries is the number of retries for the port
 	Rate    int // Rate is the rate of port scan requests
+	// RateSet distinguishes an explicit -rate from the flag default, so the
+	// connect-scan fallback only replaces a rate the user left alone. Without it
+	// an explicit -rate 1000 (the SYN default) is silently raised to 1500.
+	RateSet bool
 	// Timeout        int                 // Timeout is the milliseconds to wait for ports to respond
 	Timeout             time.Duration
 	WarmUpTime          int                 // WarmUpTime between scan phases
+	MaxRuntime          time.Duration       // MaxRuntime caps the port scan phase, 0 means no limit
 	Host                goflags.StringSlice // Host is the single host or comma-separated list of hosts to find ports for
 	HostsFile           string              // HostsFile is the file containing list of hosts to find port for
 	Output              string              // Output is the file to write found ports to.
@@ -100,6 +105,7 @@ type Options struct {
 	HealthCheck       bool
 	OnlyHostDiscovery bool // Perform only host discovery
 	ShowDeadHosts     bool // Report hosts that did not respond to discovery
+	PortState         bool // Report closed and filtered TCP ports too
 	// Deprecated: use WithHostDiscovery instead
 	SkipHostDiscovery bool // Skip Host discovery
 	WithHostDiscovery bool // Enable Host discovery
@@ -247,6 +253,7 @@ func ParseOptions() *Options {
 		flagSet.StringVarP(&options.XMLOutput, "xml-output", "oX", "", "write nmap-compatible XML output to file (- for stdout)"),
 		flagSet.StringVarP(&options.GrepOutput, "grep-output", "oG", "", "write nmap-compatible greppable output to file (- for stdout)"),
 		flagSet.StringVarP(&options.OutputAll, "output-all", "oA", "", "write json, xml and greppable output to <basename>.{json,xml,gnmap}"),
+		flagSet.BoolVar(&options.PortState, "port-state", false, "also report closed and filtered tcp ports"),
 	)
 
 	flagSet.CreateGroup("config", "Configuration",
@@ -307,6 +314,7 @@ func ParseOptions() *Options {
 		flagSet.IntVar(&options.Retries, "retries", DefaultRetriesSynScan, "number of retries for the port scan"),
 		flagSet.Var(newMillisecondDuration(&options.Timeout, DefaultPortTimeoutSynScan), "timeout", "time to wait before timing out (e.g. 500ms, 2s; a bare number is milliseconds)"),
 		flagSet.IntVar(&options.WarmUpTime, "warm-up-time", defaultWarmUpTime, "time in seconds between scan phases"),
+		flagSet.DurationVarP(&options.MaxRuntime, "max-runtime", "mrt", 0, "stop sending port scan probes after this long and report results so far (e.g. 10m)"),
 		flagSet.IntVarP(&options.TimingTemplate, "timing", "T", DefaultTimingTemplate, "timing template, higher is faster (0-5)"),
 		flagSet.BoolVar(&options.Ping, "ping", false, "ping probes for verification of host"),
 		flagSet.BoolVar(&options.Verify, "verify", false, "validate the ports again with TCP verification"),
@@ -326,7 +334,7 @@ func ParseOptions() *Options {
 		flagSet.BoolVar(&options.Version, "version", false, "display version of naabu"),
 		flagSet.BoolVar(&options.EnableProgressBar, "stats", false, "display stats of the running scan (deprecated)"),
 		flagSet.IntVarP(&options.StatsInterval, "stats-interval", "si", DefautStatsInterval, "number of seconds to wait between showing a statistics update (deprecated)"),
-		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on"),
+		flagSet.IntVarP(&options.MetricsPort, "metrics-port", "mp", 63636, "port to expose naabu metrics on (setting it starts the endpoint)"),
 	)
 
 	flagSet.CreateGroup("cloud", "Cloud",
@@ -446,6 +454,10 @@ func ParseOptions() *Options {
 	if _, ok := setFlags["seed"]; ok {
 		options.SeedSet = true
 	}
+	if _, ok := setFlags["rate"]; ok {
+		options.RateSet = true
+	}
+	options.enableMetricsIfPortSet(setFlags)
 
 	// Validate the options passed by the user and if any
 	// invalid options have been used, exit.
@@ -514,4 +526,23 @@ func (options *Options) GetTimeout() time.Duration {
 		return DefaultPortTimeoutConnectScan
 	}
 	return options.Timeout
+}
+
+// enableMetricsIfPortSet starts the metrics endpoint when -mp is given, so it
+// no longer needs the deprecated -stats. The default port alone keeps it off,
+// which keeps parallel runs from all binding a port nobody asked for.
+//
+// Stream active mode has no stats path, so -mp is ignored there with a warning
+// instead of failing a run that worked before this flag was tied to -stats.
+func (options *Options) enableMetricsIfPortSet(setFlags map[string]struct{}) {
+	_, long := setFlags["metrics-port"]
+	_, short := setFlags["mp"]
+	if !long && !short {
+		return
+	}
+	if options.Stream {
+		gologger.Warning().Msgf("-mp is ignored in stream active mode: the metrics endpoint is not available there\n")
+		return
+	}
+	options.EnableProgressBar = true
 }

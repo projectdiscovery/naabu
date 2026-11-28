@@ -1,6 +1,7 @@
 package runner
 
 import (
+	"context"
 	"errors"
 	"syscall"
 	"time"
@@ -35,6 +36,11 @@ type pacer struct {
 	budget     int64
 	next       time.Time
 	lastAdjust time.Time
+	// flush, when set, sends the packets queued in the caller's sendmmsg batch
+	// at each window boundary, so they leave as one window's budget instead of
+	// piling up into a 1024-packet line-rate burst at low rates. It returns
+	// how many packets are still queued after a failed send.
+	flush func() (pending int, err error)
 }
 
 // pacerRecoverEvery is how long the pacer waits between additive-increase steps
@@ -76,20 +82,43 @@ func (p *pacer) setRate(rate int64) {
 // wait blocks as needed to keep the average send rate at or below the current
 // effective packets per second, nudging the rate back up toward the configured
 // ceiling once a recovery interval has elapsed since the last backoff.
-func (p *pacer) wait() {
+// It returns false when ctx is cancelled, without admitting another packet.
+func (p *pacer) wait(ctx context.Context) bool {
+	if ctx.Err() != nil {
+		return false
+	}
 	if p.maxRate <= 0 {
-		return
+		return true
 	}
 	if p.budget > 0 {
 		p.budget--
-		return
+		return true
+	}
+	var pending int64
+	if p.flush != nil {
+		n, err := p.flush()
+		if isCongestion(err) {
+			p.onCongestion()
+		}
+		pending = int64(n)
 	}
 	now := time.Now()
 	if p.next.IsZero() {
 		p.next = now
 	}
 	if now.Before(p.next) {
-		time.Sleep(p.next.Sub(now))
+		timer := time.NewTimer(p.next.Sub(now))
+		select {
+		case <-ctx.Done():
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			return false
+		case <-timer.C:
+		}
 		now = p.next
 	}
 	if p.rate < p.maxRate && now.Sub(p.lastAdjust) >= pacerRecoverEvery {
@@ -105,7 +134,12 @@ func (p *pacer) wait() {
 		p.setRate(nr)
 	}
 	p.next = now.Add(p.window)
-	p.budget = p.batch - 1
+	// Packets a failed flush kept queued go out with the next flush, so they
+	// count against this window. When that count exceeds the batch the budget
+	// goes negative, and the next wait retries the flush instead of granting
+	// another full window on top of them.
+	p.budget = p.batch - 1 - pending
+	return ctx.Err() == nil
 }
 
 // onCongestion halves the effective rate after the kernel signals a full TX

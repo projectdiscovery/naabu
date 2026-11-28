@@ -41,7 +41,18 @@ var (
 	// without raw-socket support, where Acquire falls back to a plain handler.
 	buildHandlerFn   func() (*ListenHandler, error)
 	ensureRawInfraFn func() bool
+	captureDropsFn   func() uint64
 )
+
+// CaptureDrops returns how many packets the kernel capture buffers dropped
+// because they were read too slowly. It is cumulative over the process, so
+// callers diff it across a scan.
+func CaptureDrops() uint64 {
+	if captureDropsFn == nil {
+		return 0
+	}
+	return captureDropsFn()
+}
 
 type ListenHandler struct {
 	Busy      bool
@@ -70,6 +81,9 @@ type ListenHandler struct {
 	// probing", which preserves the legacy zero-length-datagram
 	// behavior for callers that have not opted in to -uP.
 	UDPProbeProvider UDPProbeProvider
+	// ReportClosed forwards port scan resets to TcpChan. Off by default: on a
+	// typical scan most ports are closed, and their resets would flood it.
+	ReportClosed bool
 }
 
 func NewListenHandler() *ListenHandler {
@@ -91,6 +105,7 @@ func Acquire(options *Options) (*ListenHandler, error) {
 			return nil, err
 		}
 		h.Busy = true
+		h.ReportClosed = options.PortState
 		listenHandlersMu.Lock()
 		ListenHandlers = append(ListenHandlers, h)
 		listenHandlersMu.Unlock()
