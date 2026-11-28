@@ -5,34 +5,34 @@ go 1.26.10
 require (
 	github.com/Mzack9999/gcache v0.0.0-20230410081825-519e28eab057
 	github.com/Mzack9999/gopacket v0.0.0-20260720123648-429cac97ac7a
-	github.com/Ullaakut/nmap/v3 v3.0.6
+	github.com/Ullaakut/nmap/v3 v3.1.0
 	github.com/armon/go-socks5 v0.0.0-20160902184237-e75332964ef5
 	github.com/asaskevich/govalidator v0.0.0-20230301143203-a9d515a09cc2
-	github.com/dlclark/regexp2 v1.11.5
+	github.com/dlclark/regexp2 v1.12.0
 	github.com/logrusorgru/aurora v2.0.3+incompatible
 	github.com/miekg/dns v1.1.73
 	github.com/pkg/errors v0.9.1
 	github.com/projectdiscovery/blackrock v0.0.4
 	github.com/projectdiscovery/cdncheck v1.4.0
-	github.com/projectdiscovery/clistats v0.1.10
+	github.com/projectdiscovery/clistats v0.1.11
 	github.com/projectdiscovery/dnsx v1.3.1
-	github.com/projectdiscovery/fdmax v0.0.6
+	github.com/projectdiscovery/fdmax v0.0.7
 	github.com/projectdiscovery/freeport v0.0.8
-	github.com/projectdiscovery/goflags v0.2.1
-	github.com/projectdiscovery/gologger v1.1.76
-	github.com/projectdiscovery/ipranger v0.0.73
+	github.com/projectdiscovery/goflags v0.2.2
+	github.com/projectdiscovery/gologger v1.1.77
+	github.com/projectdiscovery/ipranger v0.0.74
 	github.com/projectdiscovery/mapcidr v1.1.97
-	github.com/projectdiscovery/networkpolicy v0.1.59
-	github.com/projectdiscovery/ratelimit v0.0.95
-	github.com/projectdiscovery/retryabledns v1.0.119
-	github.com/projectdiscovery/retryablehttp-go v1.3.35
+	github.com/projectdiscovery/networkpolicy v0.1.60
+	github.com/projectdiscovery/ratelimit v0.1.0
+	github.com/projectdiscovery/retryabledns v1.0.120
+	github.com/projectdiscovery/retryablehttp-go v1.3.36
 	github.com/projectdiscovery/uncover v1.2.1
-	github.com/projectdiscovery/utils v0.11.15
+	github.com/projectdiscovery/utils v0.11.17
 	github.com/remeh/sizedwaitgroup v1.0.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/multierr v1.11.0
-	golang.org/x/net v0.62.0
-	golang.org/x/sys v0.49.0
+	golang.org/x/net v0.63.0
+	golang.org/x/sys v0.50.0
 )
 
 require (
@@ -105,12 +105,12 @@ require (
 	github.com/zmap/zcrypto v0.0.0-20261015050653-aa1de3126e87 // indirect
 	go.etcd.io/bbolt v1.3.7 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
-	golang.org/x/crypto v0.58.0 // indirect
+	golang.org/x/crypto v0.59.0 // indirect
 	golang.org/x/exp v0.0.0-20260112195511-716be5621a96 // indirect
 	golang.org/x/oauth2 v0.27.0 // indirect
-	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/term v0.47.0 // indirect
-	golang.org/x/text v0.43.0 // indirect
+	golang.org/x/sync v0.25.0 // indirect
+	golang.org/x/term v0.48.0 // indirect
+	golang.org/x/text v0.44.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
